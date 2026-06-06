@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wisper UI Prototype</title>
+<style>
+/* ============================================================
+   CSS Variables — matches Flutter UI design spec §5
+   ============================================================ */
+:root {
+  /* Light theme */
+  --bg:              #FFFFFF;
+  --fg:              #000000;
+  --primary:         #3F51B5;  /* Indigo 500 */
+  --primary-text:    #FFFFFF;
+  --card-bg:         #F5F5F5;  /* Grey 50 */
+  --card-elevation:  0 1px 3px rgba(0,0,0,.12);
+  --list-bg:         #ECEFF1;  /* BlueGrey 50 */
+  --nav-bg:          #ECEFF1;
+  --nav-active-bg:   #CFD8DC;  /* BlueGrey 100 */
+  --input-bg:        #FFFFFF;
+  --input-border:    #BDBDBD;
+  --divider:         #E0E0E0;
+  --status-running:  #00C853;  /* Green A700 */
+  --status-error:    #E53935;  /* Red 600 */
+  --status-stopped:  #757575;  /* Grey 600 */
+  --status-fav:      #F44336;  /* Red 500 */
+  --status-fav-off:  #BDBDBD;  /* Grey 400 */
+  --toast-bg:        #E0E0E0;
+  --toast-fg:        #333333;
+  --appbar-bg:       #FFFFFF;
+  --appbar-shadow:   0 1px 0 var(--divider);
+  --overlay:         rgba(0,0,0,0.4);
+  --surface-variant: #E8EAF6;  /* Indigo 50 */
+  --on-surface-variant: #3F51B5;
+  --border-radius:   16px;
+  --border-radius-sm: 12px;
+  --transition:      .2s ease;
+}
+
+[data-theme="dark"] {
+  --bg:              #212121;  /* Grey 900 */
+  --fg:              #FFFFFF;
+  --primary:         #4CAF50;  /* Green 500 */
+  --primary-text:    #FFFFFF;
+  --card-bg:         #424242;  /* Grey 800 */
+  --card-elevation:  0 1px 3px rgba(0,0,0,.3);
+  --list-bg:         #616161;  /* Grey 700 */
+  --nav-bg:          #424242;
+  --nav-active-bg:   #757575;  /* Grey 600 */
+  --input-bg:        #333333;
+  --input-border:    #616161;
+  --divider:         #424242;
+  --toast-bg:        #616161;
+  --toast-fg:        #FFFFFF;
+  --appbar-bg:       #212121;
+  --appbar-shadow:   0 1px 0 var(--divider);
+  --overlay:         rgba(0,0,0,0.6);
+  --surface-variant: #1B2631;
+  --on-surface-variant: #4CAF50;
+}
+
+/* ============================================================
+   Reset & Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  transition: background var(--transition), color var(--transition);
+  min-height: 100vh;
+}
+
+/* ============================================================
+   App Shell
+   ============================================================ */
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   AppBar / Header
+   ============================================================ */
+.appbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--appbar-bg);
+  box-shadow: var(--appbar-shadow);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 8px;
+  transition: background var(--transition);
+}
+.appbar-title {
+  flex: 1;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.appbar-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--fg);
+  font-size: .9rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background var(--transition);
+}
+.appbar-btn:hover { background: var(--surface-variant); }
+.appbar-btn.primary-btn {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-weight: 500;
+}
+.appbar-btn.primary-btn:hover { opacity: .9; }
+.appbar-btn.danger-btn {
+  color: var(--status-error);
+}
+.appbar-btn.stop-btn {
+  background: var(--status-error);
+  color: white;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-weight: 500;
+}
+.appbar-btn.stop-btn:hover { opacity: .9; }
+.back-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 1.3rem; color: var(--fg); padding: 4px 8px;
+  border-radius: 8px;
+  display: flex; align-items: center;
+}
+.back-btn:hover { background: var(--surface-variant); }
+
+/* ============================================================
+   Theme Toggle (floating, for prototype only)
+   ============================================================ */
+.theme-toggle {
+  position: fixed;
+  bottom: 16px; right: 16px;
+  z-index: 999;
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none; border-radius: 24px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: .85rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.theme-toggle:hover { opacity: .9; }
+
+/* ============================================================
+   Page container
+   ============================================================ */
+.page { display: none; flex: 1; flex-direction: column; }
+.page.active { display: flex; }
+
+/* ============================================================
+   Home Header
+   ============================================================ */
+.home-header {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  gap: 12px;
+}
+.app-icon {
+  width: 42px; height: 42px;
+  background: var(--primary);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 1.1rem;
+}
+.header-actions {
+  margin-left: auto;
+  display: flex; gap: 4px;
+}
+
+/* ============================================================
+   Nav Tabs (pill style)
+   ============================================================ */
+.nav-tabs {
+  display: flex;
+  background: var(--nav-bg);
+  border-radius: 24px;
+  margin: 0 16px 12px;
+  padding: 4px;
+  transition: background var(--transition);
+}
+.nav-tab {
+  flex: 1;
+  padding: 10px 0;
+  text-align: center;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: .95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.nav-tab.active {
+  background: var(--nav-active-bg);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-elevation);
+  padding: 20px 24px;
+  margin: 0 16px 16px;
+  cursor: pointer;
+  transition: background var(--transition), box-shadow var(--transition), transform .1s;
+}
+.card:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.card:active { transform: translateY(0); }
+
+/* Tunnel Card */
+.tunnel-card-body {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.tunnel-card-left {
+  flex: 1;
+  min-width: 0;
+}
+.tunnel-card-right {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.tunnel-card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.tunnel-name { font-weight: 600; font-size: 1.1rem; }
+.status-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+.status-dot.running { background: var(--status-running); }
+.status-dot.error   { background: var(--status-error); }
+.status-dot.stopped { background: var(--status-stopped); }
+
+.tunnel-meta {
+  color: var(--status-stopped);
+  font-size: .9rem;
+  margin-bottom: 4px;
+}
+.tunnel-endpoint {
+  font-size: .95rem;
+  color: var(--fg);
+  opacity: .8;
+}
+
+/* Stats Row */
+.stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: .9rem;
+  margin-bottom: 5px;
+  color: var(--fg);
+  opacity: .85;
+}
+.stats-icon { font-size: .95rem; width: 22px; text-align: center; flex-shrink: 0; }
+.stats-value { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.stats-rate { color: var(--status-stopped); font-size: .85rem; flex-shrink: 0; }
+
+@media (max-width: 600px) {
+  .tunnel-card-body { flex-direction: column; gap: 12px; }
+  .tunnel-card-right { text-align: left; }
+  .stats-row { justify-content: flex-start; }
+}
+
+/* Type selection card */
+.type-card {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+}
+.type-card-content { flex: 1; }
+.type-card-title { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
+.type-card-desc { color: var(--status-stopped); font-size: .85rem; }
+.type-card-arrow { font-size: 1.2rem; color: var(--status-stopped); }
+
+/* ============================================================
+   Detail Page
+   ============================================================ */
+.detail-section {
+  margin: 16px;
+}
+.detail-card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-elevation);
+  padding: 20px;
+  transition: background var(--transition);
+}
+
+/* Copyable text */
+.copyable-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--surface-variant);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 10px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: .85rem;
+  word-break: break-all;
+  gap: 8px;
+}
+.copyable-text { flex: 1; }
+.copy-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 1rem; color: var(--primary);
+  padding: 4px;
+  border-radius: 6px;
+}
+.copy-btn:hover { background: rgba(0,0,0,.08); }
+
+/* Form fields */
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-size: .8rem;
+  font-weight: 500;
+  color: var(--status-stopped);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--border-radius-sm);
+  background: var(--input-bg);
+  color: var(--fg);
+  font-size: .95rem;
+  outline: none;
+  transition: border-color var(--transition), background var(--transition);
+}
+.form-input:focus { border-color: var(--primary); }
+.form-input[readonly] {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+.form-input.error { border-color: var(--status-error); }
+.form-error {
+  font-size: .8rem;
+  color: var(--status-error);
+  margin-top: 4px;
+}
+
+/* Switch row */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+.switch-label { font-size: .95rem; }
+.switch {
+  width: 44px; height: 24px;
+  border-radius: 12px;
+  background: var(--status-stopped);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.switch.on { background: var(--primary); }
+.switch-knob {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: white;
+  position: absolute;
+  top: 2px; left: 2px;
+  transition: left var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.switch.on .switch-knob { left: 22px; }
+
+/* Auth fields show/hide */
+.auth-field {
+  overflow: hidden;
+  transition: max-height .3s ease, opacity .3s ease, margin .3s ease;
+}
+.auth-field.hidden {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  pointer-events: none;
+}
+.auth-field.visible {
+  max-height: 100px;
+  opacity: 1;
+}
+
+/* ============================================================
+   Settings
+   ============================================================ */
+.settings-header {
+  text-align: center;
+  padding: 32px 16px 24px;
+}
+.settings-icon {
+  width: 80px; height: 80px;
+  background: var(--primary);
+  border-radius: 18px;
+  margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 1.8rem;
+}
+.settings-app-name { font-weight: 600; font-size: 1.2rem; margin-bottom: 4px; }
+.settings-version { color: var(--status-stopped); font-size: .9rem; }
+
+.selector-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+}
+.selector-field:last-child { border-bottom: none; }
+.selector-field:hover { background: var(--surface-variant); }
+.selector-label { font-size: .95rem; }
+.selector-value {
+  display: flex; align-items: center; gap: 4px;
+  color: var(--status-stopped);
+  font-size: .9rem;
+}
+
+/* ============================================================
+   FAB (Floating Action Button)
+   ============================================================ */
+.fab {
+  position: absolute;
+  bottom: 24px; right: 24px;
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0,0,0,.25);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .1s, background var(--transition);
+}
+.fab:hover { transform: scale(1.05); }
+.fab:active { transform: scale(.97); }
+
+/* ============================================================
+   Toast
+   ============================================================ */
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%; transform: translateX(-50%);
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  font-size: .9rem;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  max-width: 400px;
+  transition: background var(--transition);
+}
+.toast.show { display: flex; animation: toast-in .3s ease; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.toast-icon { font-size: 1.1rem; }
+
+/* ============================================================
+   Dialog
+   ============================================================ */
+.dialog-overlay {
+  position: fixed; inset: 0;
+  background: var(--overlay);
+  display: none; align-items: center; justify-content: center;
+  z-index: 200;
+}
+.dialog-overlay.show { display: flex; animation: fade-in .2s ease; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.dialog-box {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  padding: 24px;
+  max-width: 340px;
+  width: 90%;
+  box-shadow: 0 8px 24px rgba(0,0,0,.2);
+}
+.dialog-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 12px; text-align: center; }
+.dialog-message { color: var(--status-stopped); font-size: .9rem; margin-bottom: 20px; text-align: center; line-height: 1.5; }
+.dialog-actions { display: flex; gap: 12px; justify-content: center; }
+.dialog-btn {
+  padding: 10px 24px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-size: .9rem;
+  font-weight: 500;
+  transition: background var(--transition);
+}
+.dialog-btn.cancel {
+  background: var(--surface-variant);
+  color: var(--fg);
+}
+.dialog-btn.danger {
+  background: var(--status-error);
+  color: white;
+}
+.dialog-btn:hover { opacity: .9; }
+
+/* ============================================================
+   Empty State
+   ============================================================ */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--status-stopped);
+}
+.empty-state-icon { font-size: 3rem; margin-bottom: 12px; opacity: .4; }
+.empty-state-text { font-size: 1rem; }
+
+/* ============================================================
+   Page nav bar (prototype only)
+   ============================================================ */
+.proto-nav {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--divider);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  transition: background var(--transition);
+}
+.proto-nav-btn {
+  padding: 6px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--divider);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  font-size: .8rem;
+  transition: all var(--transition);
+}
+.proto-nav-btn:hover { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+.proto-nav-btn.active { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+.proto-label {
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--status-stopped);
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+}
+
+/* Stats badge in detail page */
+.stats-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-variant);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: .8rem;
+  margin-right: 6px;
+  margin-bottom: 4px;
+}
+
+/* Password visibility toggle */
+.password-wrapper {
+  position: relative;
+}
+.password-wrapper .form-input { padding-right: 40px; }
+.password-toggle {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  font-size: 1.1rem; color: var(--status-stopped);
+}
+
+/* Favorite button */
+.fav-btn {
+  font-size: 1.1rem;
+  transition: color var(--transition), transform .15s;
+}
+.fav-btn.active {
+  color: var(--status-fav);
+}
+.fav-btn.inactive {
+  color: var(--status-fav-off);
+}
+.fav-btn:active {
+  transform: scale(1.3);
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     PROTOTYPE NAVIGATION BAR (for switching pages)
+     ============================================================ -->
+<div class="proto-nav" id="protoNav">
+  <span class="proto-label">Pages ▸</span>
+  <button class="proto-nav-btn active" data-page="home">Home</button>
+  <button class="proto-nav-btn" data-page="tunnel-new">New Tunnel</button>
+  <button class="proto-nav-btn" data-page="tunnel-detail-view">Tunnel Detail (View)</button>
+  <button class="proto-nav-btn" data-page="tunnel-detail-edit">Tunnel Detail (Edit)</button>
+  <button class="proto-nav-btn" data-page="tunnel-file">File Tunnel</button>
+  <button class="proto-nav-btn" data-page="tunnel-http">HTTP Tunnel</button>
+  <button class="proto-nav-btn" data-page="entrypoint-new">New Entrypoint</button>
+  <button class="proto-nav-btn" data-page="entrypoint-detail">Entrypoint Detail</button>
+  <button class="proto-nav-btn" data-page="settings">Settings</button>
+</div>
+
+<!-- Theme Toggle -->
+<button class="theme-toggle" id="themeToggle">🌙 Dark</button>
+
+<!-- ============================================================
+     PAGE: Home
+     ============================================================ -->
+<div class="page active" id="page-home">
+  <div class="app-shell">
+    <!-- Home Header -->
+    <div class="home-header">
+      <div class="app-icon">W</div>
+      <div class="header-actions">
+        <button class="appbar-btn" title="Favorites" onclick="showToast('⭐', 'Favorites filter toggled')">★</button>
+        <button class="appbar-btn" onclick="navigateTo('settings')">⚙</button>
+      </div>
+    </div>
+
+    <!-- Nav Tabs -->
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="tunnels" onclick="switchTab(this, 'tunnels')">Tunnel</button>
+      <button class="nav-tab" data-tab="entrypoints" onclick="switchTab(this, 'entrypoints')">Entrypoint</button>
+    </div>
+
+    <!-- Tunnel List -->
+    <div id="tab-tunnels" style="flex:1; overflow-y:auto; padding-bottom:80px;">
+      <!-- Card 1: Running TCP Tunnel -->
+      <div class="card" onclick="navigateTo('tunnel-detail-view')">
+        <div class="tunnel-card-body">
+          <div class="tunnel-card-left">
+            <div class="tunnel-card-header">
+              <span class="tunnel-name">My TCP Tunnel</span>
+              <span class="status-dot running"></span>
+            </div>
+            <div class="tunnel-meta">TCP · 5m</div>
+            <div class="tunnel-endpoint">localhost:8080</div>
+          </div>
+          <div class="tunnel-card-right">
+            <div class="stats-row">
+              <span class="stats-icon">↕</span>
+              <span class="stats-value">12 / 120</span>
+              <span class="stats-rate">5.2 R/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">1.5 KB</span>
+              <span class="stats-rate">0.8 KB/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">3.2 KB</span>
+              <span class="stats-rate">1.2 KB/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Running File Tunnel -->
+      <div class="card" onclick="navigateTo('tunnel-detail-view')">
+        <div class="tunnel-card-body">
+          <div class="tunnel-card-left">
+            <div class="tunnel-card-header">
+              <span class="tunnel-name">File Share</span>
+              <span class="status-dot running"></span>
+            </div>
+            <div class="tunnel-meta">FILE · 2h</div>
+            <div class="tunnel-endpoint">/home/user/files</div>
+          </div>
+          <div class="tunnel-card-right">
+            <div class="stats-row">
+              <span class="stats-icon">↕</span>
+              <span class="stats-value">3 / 45</span>
+              <span class="stats-rate">1.1 R/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">5.2 KB</span>
+              <span class="stats-rate">2.1 KB/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">12.8 KB</span>
+              <span class="stats-rate">5.6 KB/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Stopped HTTP Tunnel -->
+      <div class="card" onclick="navigateTo('tunnel-detail-view')">
+        <div class="tunnel-card-body">
+          <div class="tunnel-card-left">
+            <div class="tunnel-card-header">
+              <span class="tunnel-name">Dev Server</span>
+              <span class="status-dot stopped"></span>
+            </div>
+            <div class="tunnel-meta">HTTP · 已停止</div>
+            <div class="tunnel-endpoint">localhost:3000</div>
+          </div>
+          <div class="tunnel-card-right">
+            <div class="stats-row">
+              <span class="stats-icon">↕</span>
+              <span class="stats-value">0 / 0</span>
+              <span class="stats-rate">0 R/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">0 B</span>
+              <span class="stats-rate">0 B/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">0 B</span>
+              <span class="stats-rate">0 B/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Error UDP Tunnel -->
+      <div class="card" onclick="navigateTo('tunnel-detail-view')">
+        <div class="tunnel-card-body">
+          <div class="tunnel-card-left">
+            <div class="tunnel-card-header">
+              <span class="tunnel-name">DNS Forwarder</span>
+              <span class="status-dot error"></span>
+            </div>
+            <div class="tunnel-meta">UDP · 连接失败</div>
+            <div class="tunnel-endpoint">localhost:5353</div>
+          </div>
+          <div class="tunnel-card-right">
+            <div class="stats-row">
+              <span class="stats-icon">↕</span>
+              <span class="stats-value">0 / 0</span>
+              <span class="stats-rate">0 R/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">0 B</span>
+              <span class="stats-rate">0 B/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">0 B</span>
+              <span class="stats-rate">0 B/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Entrypoint List (hidden by default) -->
+    <div id="tab-entrypoints" style="flex:1; overflow-y:auto; padding-bottom:80px; display:none;">
+      <!-- Card: Running TCP Entrypoint -->
+      <div class="card" onclick="navigateTo('entrypoint-detail')">
+        <div class="tunnel-card-body">
+          <div class="tunnel-card-left">
+            <div class="tunnel-card-header">
+              <span class="tunnel-name">Web Service Entry</span>
+              <span class="status-dot running"></span>
+            </div>
+            <div class="tunnel-meta">TCP · 15m</div>
+            <div class="tunnel-endpoint">0.0.0.0:9090</div>
+          </div>
+          <div class="tunnel-card-right">
+            <div class="stats-row">
+              <span class="stats-icon">↕</span>
+              <span class="stats-value">8 / 56</span>
+              <span class="stats-rate">3.1 R/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">8.4 KB</span>
+              <span class="stats-rate">4.2 KB/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">22.1 KB</span>
+              <span class="stats-rate">11.0 KB/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card: Stopped UDP Entrypoint -->
+      <div class="card" onclick="navigateTo('entrypoint-detail')">
+        <div class="tunnel-card-body">
+          <div class="tunnel-card-left">
+            <div class="tunnel-card-header">
+              <span class="tunnel-name">DNS Proxy Entry</span>
+              <span class="status-dot stopped"></span>
+            </div>
+            <div class="tunnel-meta">UDP · 已停止</div>
+            <div class="tunnel-endpoint">0.0.0.0:5353</div>
+          </div>
+          <div class="tunnel-card-right">
+            <div class="stats-row">
+              <span class="stats-icon">↕</span>
+              <span class="stats-value">0 / 0</span>
+              <span class="stats-rate">0 R/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">0 B</span>
+              <span class="stats-rate">0 B/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">0 B</span>
+              <span class="stats-rate">0 B/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAB -->
+    <button class="fab" id="homeFab" onclick="navigateTo('tunnel-new')">+</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: Tunnel Type Selection
+     ============================================================ -->
+<div class="page" id="page-tunnel-new">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('home')">←</button>
+      <span class="appbar-title">Tunnel</span>
+    </div>
+    <div style="flex:1; overflow-y:auto; padding-top:8px;">
+      <div class="card" onclick="navigateTo('tunnel-file')">
+        <div class="type-card">
+          <div class="type-card-content">
+            <div class="type-card-title">📁 File</div>
+            <div class="type-card-desc">Share files from a local directory</div>
+          </div>
+          <span class="type-card-arrow">→</span>
+        </div>
+      </div>
+      <div class="card" onclick="navigateTo('tunnel-http')">
+        <div class="type-card">
+          <div class="type-card-content">
+            <div class="type-card-title">🌐 HTTP</div>
+            <div class="type-card-desc">Share a local HTTP server</div>
+          </div>
+          <span class="type-card-arrow">→</span>
+        </div>
+      </div>
+      <div class="card" onclick="navigateTo('tunnel-detail-edit')">
+        <div class="type-card">
+          <div class="type-card-content">
+            <div class="type-card-title">🔌 TCP</div>
+            <div class="type-card-desc">Forward a local TCP port</div>
+          </div>
+          <span class="type-card-arrow">→</span>
+        </div>
+      </div>
+      <div class="card" onclick="navigateTo('tunnel-detail-edit')">
+        <div class="type-card">
+          <div class="type-card-content">
+            <div class="type-card-title">📡 UDP</div>
+            <div class="type-card-desc">Forward a local UDP port</div>
+          </div>
+          <span class="type-card-arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: Tunnel Detail — VIEW mode (TCP example)
+     ============================================================ -->
+<div class="page" id="page-tunnel-detail-view">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('home')">←</button>
+      <span class="appbar-title">TCP</span>
+      <button class="appbar-btn fav-btn active" id="favTunnel" title="Favorite" onclick="toggleFavorite(this)">★</button>
+      <button class="appbar-btn primary-btn" id="startStopTunnel" onclick="toggleStartStop(this, 'Tunnel')">▶ Start</button>
+      <button class="appbar-btn danger-btn" onclick="showDialog()">🗑</button>
+      <button class="appbar-btn" onclick="navigateTo('tunnel-detail-edit')">✏ Edit</button>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div class="detail-section">
+        <div class="detail-card">
+          <!-- Copyable ID -->
+          <div class="copyable-row">
+            <span class="copyable-text">a1b2c3d4-e5f6-7890-abcd-ef1234567890</span>
+            <button class="copy-btn" onclick="copyText(this)" title="Copy">📋</button>
+          </div>
+          <!-- Copyable Entrypoint -->
+          <div class="copyable-row">
+            <span class="copyable-text">https://abc123.wisper.app</span>
+            <button class="copy-btn" onclick="copyText(this)" title="Copy">📋</button>
+          </div>
+
+          <!-- Name (read-only) -->
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input class="form-input" readonly value="My TCP Tunnel">
+          </div>
+          <!-- Endpoint (read-only) -->
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Endpoint</label>
+            <input class="form-input" readonly value="localhost:8080">
+          </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div style="margin-top:16px;">
+          <div class="detail-card">
+            <div style="font-weight:600; margin-bottom:12px; font-size:.95rem;">Statistics</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:12px;">
+              <span class="stats-badge">↕ 12 / 120 connections</span>
+              <span class="stats-badge">⚡ 5.2 R/s</span>
+              <span class="stats-badge">⏱ 5m uptime</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">1.5 KB total</span>
+              <span class="stats-rate">0.8 KB/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">3.2 KB total</span>
+              <span class="stats-rate">1.2 KB/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: Tunnel Detail — EDIT mode (TCP example)
+     ============================================================ -->
+<div class="page" id="page-tunnel-detail-edit">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('tunnel-new')">←</button>
+      <span class="appbar-title">TCP</span>
+      <button class="appbar-btn primary-btn" onclick="showToast('✓', 'Tunnel saved')">✓ Save</button>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div class="detail-section">
+        <div class="detail-card">
+          <!-- Name (editable) -->
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input class="form-input" value="My TCP Tunnel" placeholder="Enter tunnel name">
+          </div>
+          <!-- Endpoint (editable + validation) -->
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Endpoint</label>
+            <input class="form-input error" value="localhost:xyz8080">
+            <div class="form-error">Invalid address</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: File Tunnel (with Basic Auth)
+     ============================================================ -->
+<div class="page" id="page-tunnel-file">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('tunnel-new')">←</button>
+      <span class="appbar-title">File</span>
+      <button class="appbar-btn primary-btn" onclick="showToast('✓', 'Tunnel saved')">✓ Save</button>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div class="detail-section">
+        <div class="detail-card">
+          <!-- Name -->
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input class="form-input" value="My File Share" placeholder="Enter tunnel name">
+          </div>
+          <!-- Directory -->
+          <div class="form-group">
+            <label class="form-label">Directory</label>
+            <input class="form-input" value="/home/user/files" placeholder="Select directory">
+            <div class="form-error" style="display:none;">Not a directory</div>
+          </div>
+          <!-- Basic Auth Switch -->
+          <div class="switch-row">
+            <span class="switch-label">Basic Auth</span>
+            <div class="switch on" id="authSwitch" onclick="toggleAuthSwitch(this)">
+              <div class="switch-knob"></div>
+            </div>
+          </div>
+          <!-- Username -->
+          <div class="form-group auth-field visible" id="authUsername">
+            <label class="form-label">Username</label>
+            <input class="form-input" value="admin" placeholder="Enter username">
+          </div>
+          <!-- Password -->
+          <div class="form-group auth-field visible" id="authPassword" style="margin-bottom:0;">
+            <label class="form-label">Password</label>
+            <div class="password-wrapper">
+              <input class="form-input" type="password" value="secret123" placeholder="Enter password">
+              <button class="password-toggle" onclick="togglePassword(this)">👁</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: HTTP Tunnel (with Rewrite Host & TLS)
+     ============================================================ -->
+<div class="page" id="page-tunnel-http">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('tunnel-new')">←</button>
+      <span class="appbar-title">HTTP</span>
+      <button class="appbar-btn primary-btn" onclick="showToast('✓', 'Tunnel saved')">✓ Save</button>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div class="detail-section">
+        <div class="detail-card">
+          <!-- Name -->
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input class="form-input" value="Dev Server" placeholder="Enter tunnel name">
+          </div>
+          <!-- Endpoint -->
+          <div class="form-group">
+            <label class="form-label">Endpoint</label>
+            <input class="form-input" value="localhost:3000" placeholder="http://host:port">
+          </div>
+          <!-- Rewrite Host Switch -->
+          <div class="switch-row">
+            <span class="switch-label">Rewrite Host</span>
+            <div class="switch on" onclick="toggleSwitch(this)">
+              <div class="switch-knob"></div>
+            </div>
+          </div>
+          <!-- Enable TLS Switch -->
+          <div class="switch-row" style="padding-bottom:0;">
+            <span class="switch-label">Enable TLS</span>
+            <div class="switch" onclick="toggleSwitch(this)">
+              <div class="switch-knob"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: Entrypoint Type Selection
+     ============================================================ -->
+<div class="page" id="page-entrypoint-new">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('home')">←</button>
+      <span class="appbar-title">Entrypoint</span>
+    </div>
+    <div style="flex:1; overflow-y:auto; padding-top:8px;">
+      <div class="card" onclick="navigateTo('entrypoint-detail')">
+        <div class="type-card">
+          <div class="type-card-content">
+            <div class="type-card-title">🔌 TCP</div>
+            <div class="type-card-desc">Expose a TCP service through the tunnel</div>
+          </div>
+          <span class="type-card-arrow">→</span>
+        </div>
+      </div>
+      <div class="card" onclick="navigateTo('entrypoint-detail')">
+        <div class="type-card">
+          <div class="type-card-content">
+            <div class="type-card-title">📡 UDP</div>
+            <div class="type-card-desc">Expose a UDP service through the tunnel</div>
+          </div>
+          <span class="type-card-arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: Entrypoint Detail (View + Edit)
+     ============================================================ -->
+<div class="page" id="page-entrypoint-detail">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('home')">←</button>
+      <span class="appbar-title">TCP Entrypoint</span>
+      <button class="appbar-btn fav-btn inactive" id="favEntrypoint" title="Favorite" onclick="toggleFavorite(this)">★</button>
+      <button class="appbar-btn primary-btn" id="startStopEntrypoint" onclick="toggleStartStop(this, 'Entrypoint')">▶ Start</button>
+      <button class="appbar-btn danger-btn" onclick="showDialog()">🗑</button>
+      <button class="appbar-btn">✏ Edit</button>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div class="detail-section">
+        <div class="detail-card">
+          <!-- Copyable ID -->
+          <div class="copyable-row">
+            <span class="copyable-text">f9e8d7c6-b5a4-3210-fedc-ba9876543210</span>
+            <button class="copy-btn" onclick="copyText(this)" title="Copy">📋</button>
+          </div>
+          <!-- Name -->
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input class="form-input" readonly value="Web Service Entry">
+          </div>
+          <!-- Bind Address -->
+          <div class="form-group">
+            <label class="form-label">Bind Address</label>
+            <input class="form-input" readonly value="0.0.0.0:9090">
+          </div>
+          <!-- Tunnel Chain -->
+          <div class="form-group">
+            <label class="form-label">Tunnel Chain</label>
+            <input class="form-input" readonly value="tunnel.wisper.app:443 → abc123">
+          </div>
+          <!-- Keepalive Switch -->
+          <div class="switch-row">
+            <span class="switch-label">Keepalive</span>
+            <div class="switch on" onclick="toggleSwitch(this)">
+              <div class="switch-knob"></div>
+            </div>
+          </div>
+          <!-- TTL -->
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">TTL</label>
+            <input class="form-input" readonly value="30s">
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div style="margin-top:16px;">
+          <div class="detail-card">
+            <div style="font-weight:600; margin-bottom:12px; font-size:.95rem;">Statistics</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:12px;">
+              <span class="stats-badge">↕ 8 / 56 connections</span>
+              <span class="stats-badge">⚡ 3.1 R/s</span>
+              <span class="stats-badge">⏱ 15m uptime</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#4CAF50;">↑</span>
+              <span class="stats-value">8.4 KB total</span>
+              <span class="stats-rate">4.2 KB/s</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-icon" style="color:#2196F3;">↓</span>
+              <span class="stats-value">22.1 KB total</span>
+              <span class="stats-rate">11.0 KB/s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PAGE: Settings
+     ============================================================ -->
+<div class="page" id="page-settings">
+  <div class="app-shell">
+    <div class="appbar">
+      <button class="back-btn" onclick="navigateTo('home')">←</button>
+      <span class="appbar-title">Settings</span>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div class="settings-header">
+        <div class="settings-icon">W</div>
+        <div class="settings-app-name">Wisper</div>
+        <div class="settings-version">v0.1.0</div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-card" style="padding:0;">
+          <div class="selector-field" onclick="cycleSelector(this, ['English', '中文'])">
+            <span class="selector-label">Language</span>
+            <span class="selector-value"><span>English</span> ▶</span>
+          </div>
+          <div class="selector-field" onclick="cycleSelector(this, ['System', 'Light', 'Dark'])">
+            <span class="selector-label">Theme</span>
+            <span class="selector-value"><span>System</span> ▶</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Toast
+     ============================================================ -->
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">ℹ</span>
+  <span id="toastMsg">Message</span>
+</div>
+
+<!-- ============================================================
+     Delete Confirmation Dialog
+     ============================================================ -->
+<div class="dialog-overlay" id="dialogOverlay" onclick="hideDialog()">
+  <div class="dialog-box" onclick="event.stopPropagation()">
+    <div class="dialog-title">Delete Tunnel?</div>
+    <div class="dialog-message">This action cannot be undone.</div>
+    <div class="dialog-actions">
+      <button class="dialog-btn cancel" onclick="hideDialog()">Cancel</button>
+      <button class="dialog-btn danger" onclick="hideDialog(); showToast('🗑', 'Tunnel deleted')">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Navigation
+// ============================================================
+function navigateTo(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('page-' + pageId);
+  if (target) target.classList.add('active');
+
+  // Update proto nav buttons
+  document.querySelectorAll('.proto-nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.page === pageId);
+  });
+}
+
+// Proto nav buttons
+document.querySelectorAll('.proto-nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+});
+
+// ============================================================
+// Theme Toggle
+// ============================================================
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.addEventListener('click', () => {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  themeBtn.textContent = isDark ? '🌙 Dark' : '☀️ Light';
+});
+
+// ============================================================
+// Home Tab Switching
+// ============================================================
+function switchTab(el, tabName) {
+  // Update tab buttons
+  el.parentElement.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+
+  // Show/hide tab content
+  document.getElementById('tab-tunnels').style.display = tabName === 'tunnels' ? 'block' : 'none';
+  document.getElementById('tab-entrypoints').style.display = tabName === 'entrypoints' ? 'block' : 'none';
+
+  // Update FAB behavior
+  const fab = document.getElementById('homeFab');
+  if (tabName === 'entrypoints') {
+    fab.onclick = () => navigateTo('entrypoint-new');
+  } else {
+    fab.onclick = () => navigateTo('tunnel-new');
+  }
+}
+
+// ============================================================
+// Toast
+// ============================================================
+let toastTimer;
+function showToast(icon, message) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastIcon').textContent = icon;
+  document.getElementById('toastMsg').textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ============================================================
+// Dialog
+// ============================================================
+function showDialog() {
+  document.getElementById('dialogOverlay').classList.add('show');
+}
+function hideDialog() {
+  document.getElementById('dialogOverlay').classList.remove('show');
+}
+
+// ============================================================
+// Copy to clipboard
+// ============================================================
+function copyText(btn) {
+  const text = btn.parentElement.querySelector('.copyable-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('📋', 'Copied to clipboard');
+  });
+}
+
+// ============================================================
+// Switch toggle (generic)
+// ============================================================
+function toggleSwitch(el) {
+  el.classList.toggle('on');
+}
+
+// ============================================================
+// [Enhancement 1] Basic Auth switch — show/hide auth fields
+// ============================================================
+function toggleAuthSwitch(el) {
+  el.classList.toggle('on');
+  const isOn = el.classList.contains('on');
+  const username = document.getElementById('authUsername');
+  const password = document.getElementById('authPassword');
+  if (isOn) {
+    username.classList.remove('hidden');
+    username.classList.add('visible');
+    password.classList.remove('hidden');
+    password.classList.add('visible');
+  } else {
+    username.classList.add('hidden');
+    username.classList.remove('visible');
+    password.classList.add('hidden');
+    password.classList.remove('visible');
+  }
+}
+
+// ============================================================
+// [Enhancement 2] Start/Stop button toggle
+// ============================================================
+function toggleStartStop(btn, label) {
+  if (btn.classList.contains('primary-btn')) {
+    // Currently "Start" → switch to "Stop"
+    btn.classList.remove('primary-btn');
+    btn.classList.add('stop-btn');
+    btn.textContent = '■ Stop';
+    showToast('▶', label + ' started');
+  } else {
+    // Currently "Stop" → switch to "Start"
+    btn.classList.remove('stop-btn');
+    btn.classList.add('primary-btn');
+    btn.textContent = '▶ Start';
+    showToast('■', label + ' stopped');
+  }
+}
+
+// ============================================================
+// [Enhancement 3] Favorite button toggle
+// ============================================================
+function toggleFavorite(btn) {
+  if (btn.classList.contains('active')) {
+    btn.classList.remove('active');
+    btn.classList.add('inactive');
+    showToast('☆', 'Removed from favorites');
+  } else {
+    btn.classList.remove('inactive');
+    btn.classList.add('active');
+    showToast('★', 'Added to favorites');
+  }
+}
+
+// ============================================================
+// Password toggle
+// ============================================================
+function togglePassword(btn) {
+  const input = btn.parentElement.querySelector('.form-input');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+// ============================================================
+// Selector cycle
+// ============================================================
+function cycleSelector(el, options) {
+  const valueSpan = el.querySelector('.selector-value span');
+  const current = valueSpan.textContent;
+  const idx = options.indexOf(current);
+  const next = options[(idx + 1) % options.length];
+  valueSpan.textContent = next;
+}
+</script>
+</body>
+</html>
