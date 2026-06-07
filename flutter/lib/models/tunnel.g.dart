@@ -41,10 +41,12 @@ Map<String, dynamic> _$TunnelToJson(Tunnel instance) => <String, dynamic>{
 TunnelOptions _$TunnelOptionsFromJson(Map<String, dynamic> json) =>
     TunnelOptions(
       hostname: json['hostname'] as String? ?? '',
+      directory: json['directory'] as String? ?? '',
       username: json['username'] as String? ?? '',
       password: json['password'] as String? ?? '',
       basicAuth: json['basic_auth'] as bool? ?? false,
       enableTLS: json['enableTLS'] as bool? ?? false,
+      rewriteHost: json['rewriteHost'] as bool? ?? false,
       keepalive: json['keepalive'] as bool? ?? false,
       ttl: (json['ttl'] as num?)?.toInt() ?? 0,
     );
@@ -52,10 +54,12 @@ TunnelOptions _$TunnelOptionsFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$TunnelOptionsToJson(TunnelOptions instance) =>
     <String, dynamic>{
       'hostname': instance.hostname,
+      'directory': instance.directory,
       'username': instance.username,
       'password': instance.password,
       'basic_auth': instance.basicAuth,
       'enableTLS': instance.enableTLS,
+      'rewriteHost': instance.rewriteHost,
       'keepalive': instance.keepalive,
       'ttl': instance.ttl,
     };

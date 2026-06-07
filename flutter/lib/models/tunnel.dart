@@ -44,20 +44,24 @@ class Tunnel {
 class TunnelOptions {
   const TunnelOptions({
     this.hostname = '',
+    this.directory = '',
     this.username = '',
     this.password = '',
     this.basicAuth = false,
     this.enableTLS = false,
+    this.rewriteHost = false,
     this.keepalive = false,
     this.ttl = 0,
   });
 
   final String hostname;
+  final String directory;
   final String username;
   final String password;
   @JsonKey(name: 'basic_auth')
   final bool basicAuth;
   final bool enableTLS;
+  final bool rewriteHost;
   final bool keepalive;
   final int ttl;
 

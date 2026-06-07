@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/entrypoint.dart';
 import '../../providers/entrypoint_provider.dart';
 import '../../providers/tunnel_provider.dart' show backendProvider;
+import '../../config/format.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/copyable_text.dart';
 import '../../widgets/delete_confirm_dialog.dart';
@@ -37,6 +38,10 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
   late TextEditingController _bindAddrCtrl;
   late TextEditingController _tunnelChainCtrl;
 
+  // Options fields
+  bool _keepalive = false;
+  late TextEditingController _ttlCtrl;
+
   bool get _isNew => widget.id == 'new';
 
   @override
@@ -46,6 +51,7 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
     _nameCtrl = TextEditingController();
     _bindAddrCtrl = TextEditingController();
     _tunnelChainCtrl = TextEditingController();
+    _ttlCtrl = TextEditingController();
   }
 
   @override
@@ -53,6 +59,7 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
     _nameCtrl.dispose();
     _bindAddrCtrl.dispose();
     _tunnelChainCtrl.dispose();
+    _ttlCtrl.dispose();
     super.dispose();
   }
 
@@ -62,6 +69,8 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
     _nameCtrl.text = ep.name;
     _bindAddrCtrl.text = ep.bindAddress;
     _tunnelChainCtrl.text = ep.tunnelChain;
+    _keepalive = ep.options.keepalive;
+    _ttlCtrl.text = ep.options.ttl > 0 ? ep.options.ttl.toString() : '';
   }
 
   @override
@@ -101,6 +110,28 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
         title: Text('${widget.type.toUpperCase()} Entrypoint'),
         actions: [
           if (!_isNew && ep != null) ...[
+            // Favorite
+            IconButton(
+              icon: Icon(
+                ep.favorite ? Icons.star : Icons.star_outline,
+                color: ep.favorite ? const Color(0xFFF44336) : null,
+              ),
+              onPressed: () {
+                final tunnels = ref
+                    .read(entrypointListProvider)
+                    .valueOrNull;
+                if (tunnels != null) {
+                  final entry = tunnels.firstWhere((e) => e.id == widget.id);
+                  // Update favorite via backend
+                  ref.read(backendProvider).updateEntrypoint(widget.id, {
+                    ...entry.toJson(),
+                    'favorite': !entry.favorite,
+                  }).then((_) {
+                    ref.read(entrypointListProvider.notifier).refresh();
+                  });
+                }
+              },
+            ),
             // Start/Stop
             _buildStartStopButton(ep),
             // Delete
@@ -119,8 +150,10 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
             // Edit
             if (!_isEditing)
               TextButton(
-                onPressed: () =>
-                    setState(() { _isEditing = true; _controllersInitialized = false; }),
+                onPressed: () => setState(() {
+                  _isEditing = true;
+                  _controllersInitialized = false;
+                }),
                 child: const Text('Edit'),
               ),
           ],
@@ -141,8 +174,39 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // View-only ID
                   if (!_isNew && !_isEditing) ...[
                     CopyableText(text: ep?.id ?? ''),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // Error display
+                  if (!_isEditing &&
+                      ep != null &&
+                      ep.error.isNotEmpty) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color:
+                            const Color(0xFFE53935).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 18, color: Color(0xFFE53935)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              ep.error,
+                              style: const TextStyle(
+                                  color: Color(0xFFE53935), fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 10),
                   ],
 
@@ -167,6 +231,8 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
                       border: OutlineInputBorder(),
                     ),
                     readOnly: !_isEditing,
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -176,6 +242,27 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
                     decoration: const InputDecoration(
                       labelText: 'Tunnel Chain',
                       border: OutlineInputBorder(),
+                    ),
+                    readOnly: !_isEditing,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Keepalive switch
+                  SwitchListTile(
+                    title: const Text('Keepalive'),
+                    value: _keepalive,
+                    onChanged: _isEditing ? (v) => setState(() => _keepalive = v) : null,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // TTL
+                  TextFormField(
+                    controller: _ttlCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'TTL',
+                      border: OutlineInputBorder(),
+                      hintText: 'e.g. 30s',
                     ),
                     readOnly: !_isEditing,
                   ),
@@ -227,27 +314,42 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
         const Text('Statistics',
             style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            _badge(
+                '↕ ${stats.currentConns} / ${stats.totalConns} connections'),
+            _badge('⚡ ${stats.requestRate.toStringAsFixed(1)} R/s'),
+          ],
+        ),
+        const SizedBox(height: 12),
         StatsRow(
           icon: Icons.arrow_upward,
           iconColor: const Color(0xFF4CAF50),
-          value: _formatBytes(stats.inputBytes),
-          rate: '${_formatBytes(stats.inputRateBytes)}/s',
+          value: formatBytes(stats.inputBytes),
+          rate: '${formatBytes(stats.inputRateBytes)}/s',
         ),
         const SizedBox(height: 4),
         StatsRow(
           icon: Icons.arrow_downward,
           iconColor: const Color(0xFF2196F3),
-          value: _formatBytes(stats.outputBytes),
-          rate: '${_formatBytes(stats.outputRateBytes)}/s',
+          value: formatBytes(stats.outputBytes),
+          rate: '${formatBytes(stats.outputRateBytes)}/s',
         ),
       ],
     );
   }
 
-  static String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  Widget _badge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 12)),
+    );
   }
 
   Future<void> _onSave() async {
@@ -257,7 +359,18 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
       'name': _nameCtrl.text,
       'type': widget.type,
       'endpoint': _bindAddrCtrl.text,
+      'entrypoint': _tunnelChainCtrl.text,
+      'keepalive': _keepalive,
     };
+
+    final ttlText = _ttlCtrl.text.trim();
+    if (ttlText.isNotEmpty) {
+      // Parse "30s" → 30, or bare number
+      final digits = ttlText.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.isNotEmpty) {
+        body['ttl'] = int.parse(digits);
+      }
+    }
 
     try {
       final backend = ref.read(backendProvider);

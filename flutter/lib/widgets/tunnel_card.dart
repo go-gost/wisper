@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../config/format.dart';
 import 'stats_row.dart';
 
 /// Status colour for the indicator dot.
@@ -25,6 +26,7 @@ class TunnelCard extends StatelessWidget {
     required this.type,
     required this.endpoint,
     required this.status,
+    this.error = '',
     required this.currentConns,
     required this.totalConns,
     required this.requestRate,
@@ -39,6 +41,7 @@ class TunnelCard extends StatelessWidget {
   final String type;
   final String endpoint;
   final String status;
+  final String error;
   final int currentConns;
   final int totalConns;
   final double requestRate;
@@ -47,6 +50,16 @@ class TunnelCard extends StatelessWidget {
   final int inputRateBytes;
   final int outputRateBytes;
   final VoidCallback? onTap;
+
+  /// Human-readable status line matching the HTML prototype.
+  /// Running: "TCP · 5m", Stopped: "HTTP · Stopped", Error: "UDP · `error`".
+  String get _statusLabel {
+    return switch (status) {
+      'running' => '$type · running',
+      'error' => '$type · ${error.isNotEmpty ? error : "error"}',
+      _ => '$type · stopped',
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +126,7 @@ class TunnelCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '$type · $status',
+          _statusLabel,
           style: TextStyle(
             color: Theme.of(context).disabledColor,
             fontSize: 13,
@@ -145,23 +158,18 @@ class TunnelCard extends StatelessWidget {
         StatsRow(
           icon: Icons.arrow_upward,
           iconColor: const Color(0xFF4CAF50),
-          value: _formatBytes(inputBytes),
-          rate: '${_formatBytes(inputRateBytes)}/s',
+          value: formatBytes(inputBytes),
+          rate: '${formatBytes(inputRateBytes)}/s',
         ),
         const SizedBox(height: 4),
         StatsRow(
           icon: Icons.arrow_downward,
           iconColor: const Color(0xFF2196F3),
-          value: _formatBytes(outputBytes),
-          rate: '${_formatBytes(outputRateBytes)}/s',
+          value: formatBytes(outputBytes),
+          rate: '${formatBytes(outputRateBytes)}/s',
         ),
       ],
     );
   }
 
-  static String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
 }

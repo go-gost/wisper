@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../models/tunnel.dart';
 import '../../providers/tunnel_provider.dart';
+import '../../config/format.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/copyable_text.dart';
 import '../../widgets/delete_confirm_dialog.dart';
@@ -39,12 +40,14 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
   late TextEditingController _endpointCtrl;
 
   // File tunnel fields
+  late TextEditingController _directoryCtrl;
   bool _basicAuth = false;
   late TextEditingController _usernameCtrl;
   late TextEditingController _passwordCtrl;
 
   // HTTP tunnel fields
   bool _enableTLS = false;
+  bool _rewriteHost = false;
 
   bool get _isNew => widget.id == 'new';
 
@@ -54,6 +57,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     _isEditing = _isNew;
     _nameCtrl = TextEditingController();
     _endpointCtrl = TextEditingController();
+    _directoryCtrl = TextEditingController();
     _usernameCtrl = TextEditingController();
     _passwordCtrl = TextEditingController();
   }
@@ -62,6 +66,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
   void dispose() {
     _nameCtrl.dispose();
     _endpointCtrl.dispose();
+    _directoryCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
@@ -73,15 +78,11 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     _nameCtrl.text = tunnel.name;
     _endpointCtrl.text = tunnel.endpoint;
     _basicAuth = tunnel.options.basicAuth;
+    _directoryCtrl.text = tunnel.options.directory;
     _usernameCtrl.text = tunnel.options.username;
     _passwordCtrl.text = tunnel.options.password;
     _enableTLS = tunnel.options.enableTLS;
-  }
-
-  static String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    _rewriteHost = tunnel.options.rewriteHost;
   }
 
   @override
@@ -156,11 +157,14 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
               },
             ),
             // Edit
-            TextButton(
-              onPressed: () =>
-                  setState(() { _isEditing = true; _controllersInitialized = false; }),
-              child: const Text('Edit'),
-            ),
+            if (!_isEditing)
+              TextButton(
+                onPressed: () => setState(() {
+                  _isEditing = true;
+                  _controllersInitialized = false;
+                }),
+                child: const Text('Edit'),
+              ),
           ],
           if (_isEditing)
             TextButton(
@@ -188,6 +192,35 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                     const SizedBox(height: 10),
                   ],
 
+                  // Error display
+                  if (!_isEditing &&
+                      tunnel != null &&
+                      tunnel.error.isNotEmpty) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE53935).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 18, color: Color(0xFFE53935)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              tunnel.error,
+                              style: const TextStyle(
+                                  color: Color(0xFFE53935), fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+
                   // Name
                   TextFormField(
                     controller: _nameCtrl,
@@ -201,17 +234,18 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Endpoint
-                  TextFormField(
-                    controller: _endpointCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Endpoint',
-                      border: OutlineInputBorder(),
+                  // Endpoint (hidden for file type — directory replaces it)
+                  if (widget.type != 'file')
+                    TextFormField(
+                      controller: _endpointCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Endpoint',
+                        border: OutlineInputBorder(),
+                      ),
+                      readOnly: !_isEditing,
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Required' : null,
                     ),
-                    readOnly: !_isEditing,
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Required' : null,
-                  ),
 
                   // Type-specific fields
                   TunnelFormFields(
@@ -220,11 +254,15 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                     basicAuth: _basicAuth,
                     onBasicAuthChanged: (v) =>
                         setState(() => _basicAuth = v),
+                    directoryCtrl: _directoryCtrl,
                     usernameCtrl: _usernameCtrl,
                     passwordCtrl: _passwordCtrl,
                     enableTLS: _enableTLS,
                     onEnableTLSChanged: (v) =>
                         setState(() => _enableTLS = v),
+                    rewriteHost: _rewriteHost,
+                    onRewriteHostChanged: (v) =>
+                        setState(() => _rewriteHost = v),
                   ),
 
                   // Stats section (view mode only)
@@ -287,15 +325,15 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
         StatsRow(
           icon: Icons.arrow_upward,
           iconColor: const Color(0xFF4CAF50),
-          value: _formatBytes(stats.inputBytes),
-          rate: '${_formatBytes(stats.inputRateBytes)}/s',
+          value: formatBytes(stats.inputBytes),
+          rate: '${formatBytes(stats.inputRateBytes)}/s',
         ),
         const SizedBox(height: 4),
         StatsRow(
           icon: Icons.arrow_downward,
           iconColor: const Color(0xFF2196F3),
-          value: _formatBytes(stats.outputBytes),
-          rate: '${_formatBytes(stats.outputRateBytes)}/s',
+          value: formatBytes(stats.outputBytes),
+          rate: '${formatBytes(stats.outputRateBytes)}/s',
         ),
       ],
     );
@@ -322,11 +360,15 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     };
 
     if (widget.type == 'file') {
+      body['endpoint'] = _directoryCtrl.text;
+      body['directory'] = _directoryCtrl.text;
+      body['basic_auth'] = _basicAuth;
       body['username'] = _basicAuth ? _usernameCtrl.text : '';
       body['password'] = _basicAuth ? _passwordCtrl.text : '';
     }
     if (widget.type == 'http') {
       body['enableTLS'] = _enableTLS;
+      body['rewriteHost'] = _rewriteHost;
     }
 
     try {

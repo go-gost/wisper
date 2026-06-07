@@ -4,35 +4,48 @@ library;
 import 'package:flutter/material.dart';
 
 /// Renders type-specific form fields based on tunnel type.
-class TunnelFormFields extends StatelessWidget {
+class TunnelFormFields extends StatefulWidget {
   const TunnelFormFields({
     super.key,
     required this.type,
     required this.isEditing,
     required this.basicAuth,
     this.onBasicAuthChanged,
+    required this.directoryCtrl,
     required this.usernameCtrl,
     required this.passwordCtrl,
     required this.enableTLS,
     this.onEnableTLSChanged,
+    required this.rewriteHost,
+    this.onRewriteHostChanged,
   });
 
   final String type;
   final bool isEditing;
   final bool basicAuth;
   final ValueChanged<bool>? onBasicAuthChanged;
+  final TextEditingController directoryCtrl;
   final TextEditingController usernameCtrl;
   final TextEditingController passwordCtrl;
   final bool enableTLS;
   final ValueChanged<bool>? onEnableTLSChanged;
+  final bool rewriteHost;
+  final ValueChanged<bool>? onRewriteHostChanged;
+
+  @override
+  State<TunnelFormFields> createState() => _TunnelFormFieldsState();
+}
+
+class _TunnelFormFieldsState extends State<TunnelFormFields> {
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (type == 'file') _buildFileFields(context),
-        if (type == 'http') _buildHttpFields(context),
+        if (widget.type == 'file') _buildFileFields(context),
+        if (widget.type == 'http') _buildHttpFields(context),
         // TCP and UDP have no extra fields beyond name/endpoint
       ],
     );
@@ -43,31 +56,55 @@ class TunnelFormFields extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
+        TextFormField(
+          controller: widget.directoryCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Directory',
+            border: OutlineInputBorder(),
+          ),
+          readOnly: !widget.isEditing,
+          validator: widget.isEditing
+              ? (v) {
+                  if (v == null || v.isEmpty) return 'Required';
+                  return null;
+                }
+              : null,
+        ),
+        const SizedBox(height: 16),
         SwitchListTile(
           title: const Text('Basic Auth'),
-          value: basicAuth,
-          onChanged: isEditing ? onBasicAuthChanged : null,
+          value: widget.basicAuth,
+          onChanged: widget.isEditing ? widget.onBasicAuthChanged : null,
           contentPadding: EdgeInsets.zero,
         ),
-        if (basicAuth) ...[
+        if (widget.basicAuth) ...[
           const SizedBox(height: 8),
           TextFormField(
-            controller: usernameCtrl,
+            controller: widget.usernameCtrl,
             decoration: const InputDecoration(
               labelText: 'Username',
               border: OutlineInputBorder(),
             ),
-            readOnly: !isEditing,
+            readOnly: !widget.isEditing,
           ),
           const SizedBox(height: 16),
           TextFormField(
-            controller: passwordCtrl,
-            decoration: const InputDecoration(
+            controller: widget.passwordCtrl,
+            decoration: InputDecoration(
               labelText: 'Password',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
+              suffixIcon: widget.isEditing
+                  ? IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    )
+                  : null,
             ),
-            obscureText: true,
-            readOnly: !isEditing,
+            obscureText: _obscurePassword,
+            readOnly: !widget.isEditing,
           ),
         ],
       ],
@@ -81,14 +118,14 @@ class TunnelFormFields extends StatelessWidget {
         const SizedBox(height: 16),
         SwitchListTile(
           title: const Text('Rewrite Host'),
-          value: false, // TODO: wire up
-          onChanged: null, // TODO: wire up
+          value: widget.rewriteHost,
+          onChanged: widget.isEditing ? widget.onRewriteHostChanged : null,
           contentPadding: EdgeInsets.zero,
         ),
         SwitchListTile(
           title: const Text('Enable TLS'),
-          value: enableTLS,
-          onChanged: isEditing ? onEnableTLSChanged : null,
+          value: widget.enableTLS,
+          onChanged: widget.isEditing ? widget.onEnableTLSChanged : null,
           contentPadding: EdgeInsets.zero,
         ),
       ],
