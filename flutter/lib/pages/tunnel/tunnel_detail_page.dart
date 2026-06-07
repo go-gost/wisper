@@ -78,7 +78,10 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     _nameCtrl.text = tunnel.name;
     _endpointCtrl.text = tunnel.endpoint;
     _basicAuth = tunnel.options.basicAuth;
-    _directoryCtrl.text = tunnel.options.directory;
+    // For file type, directory IS the endpoint (Go stores it as endpoint).
+    _directoryCtrl.text = tunnel.options.directory.isNotEmpty
+        ? tunnel.options.directory
+        : tunnel.endpoint;
     _usernameCtrl.text = tunnel.options.username;
     _passwordCtrl.text = tunnel.options.password;
     _enableTLS = tunnel.options.enableTLS;
@@ -361,7 +364,6 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
 
     if (widget.type == 'file') {
       body['endpoint'] = _directoryCtrl.text;
-      body['directory'] = _directoryCtrl.text;
       body['basic_auth'] = _basicAuth;
       body['username'] = _basicAuth ? _usernameCtrl.text : '';
       body['password'] = _basicAuth ? _passwordCtrl.text : '';

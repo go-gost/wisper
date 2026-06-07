@@ -38,8 +38,9 @@ type Options struct {
 	Hostname  string
 	Username  string
 	Password  string
-	EnableTLS bool
-	Keepalive bool
+	EnableTLS   bool
+	RewriteHost bool
+	Keepalive   bool
 	TTL       int
 	CreatedAt time.Time
 	Stats     config.ServiceStats
@@ -87,6 +88,12 @@ func PasswordOption(password string) Option {
 func EnableTLSOption(b bool) Option {
 	return func(opts *Options) {
 		opts.EnableTLS = b
+	}
+}
+
+func RewriteHostOption(b bool) Option {
+	return func(opts *Options) {
+		opts.RewriteHost = b
 	}
 }
 
@@ -256,8 +263,9 @@ func LoadConfig() {
 			Hostname:  cfg.Hostname,
 			Username:  cfg.Username,
 			Password:  cfg.Password,
-			EnableTLS: cfg.EnableTLS,
-			CreatedAt: cfg.CreatedAt,
+			EnableTLS:   cfg.EnableTLS,
+			RewriteHost: cfg.RewriteHost,
+			CreatedAt:   cfg.CreatedAt,
 			Stats:     cfg.Stats,
 		})
 		if tun == nil {

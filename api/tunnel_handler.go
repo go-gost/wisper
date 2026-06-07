@@ -23,13 +23,14 @@ type tunnelResponse struct {
 }
 
 type tunnelOptionsResp struct {
-	Hostname  string `json:"hostname,omitempty"`
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
-	BasicAuth bool   `json:"basic_auth"`
-	EnableTLS bool   `json:"enableTLS,omitempty"`
-	Keepalive bool   `json:"keepalive,omitempty"`
-	TTL       int    `json:"ttl,omitempty"`
+	Hostname    string `json:"hostname,omitempty"`
+	Username    string `json:"username,omitempty"`
+	Password    string `json:"password,omitempty"`
+	BasicAuth   bool   `json:"basic_auth"`
+	EnableTLS   bool   `json:"enableTLS,omitempty"`
+	RewriteHost bool   `json:"rewriteHost,omitempty"`
+	Keepalive   bool   `json:"keepalive,omitempty"`
+	TTL         int    `json:"ttl,omitempty"`
 }
 
 type statsResponse struct {
@@ -65,13 +66,14 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		CreatedAt:  opts.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		Error:      errStr(t.Err()),
 		Options: tunnelOptionsResp{
-			Hostname:  opts.Hostname,
-			Username:  opts.Username,
-			Password:  opts.Password,
-			BasicAuth: opts.Username != "",
-			EnableTLS: opts.EnableTLS,
-			Keepalive: opts.Keepalive,
-			TTL:       opts.TTL,
+			Hostname:    opts.Hostname,
+			Username:    opts.Username,
+			Password:    opts.Password,
+			BasicAuth:   opts.Username != "",
+			EnableTLS:   opts.EnableTLS,
+			RewriteHost: opts.RewriteHost,
+			Keepalive:   opts.Keepalive,
+			TTL:         opts.TTL,
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
@@ -94,13 +96,14 @@ func errStr(err error) string {
 
 // tunnelCreateRequest is the JSON body for creating a new tunnel.
 type tunnelCreateRequest struct {
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	Endpoint  string `json:"endpoint"`
-	Hostname  string `json:"hostname,omitempty"`
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
-	EnableTLS bool   `json:"enableTLS,omitempty"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Endpoint    string `json:"endpoint"`
+	Hostname    string `json:"hostname,omitempty"`
+	Username    string `json:"username,omitempty"`
+	Password    string `json:"password,omitempty"`
+	EnableTLS   bool   `json:"enableTLS,omitempty"`
+	RewriteHost bool   `json:"rewriteHost,omitempty"`
 }
 
 func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
@@ -111,6 +114,7 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.UsernameOption(r.Username),
 		tunnel.PasswordOption(r.Password),
 		tunnel.EnableTLSOption(r.EnableTLS),
+		tunnel.RewriteHostOption(r.RewriteHost),
 	}
 }
 
@@ -270,6 +274,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnel.UsernameOption(opts.Username),
 		tunnel.PasswordOption(opts.Password),
 		tunnel.EnableTLSOption(opts.EnableTLS),
+		tunnel.RewriteHostOption(opts.RewriteHost),
 		tunnel.CreatedAtOption(opts.CreatedAt),
 	}
 

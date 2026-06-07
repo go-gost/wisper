@@ -120,8 +120,9 @@ type Tunnel struct {
 	Hostname  string `yaml:",omitempty"`
 	Username  string `yaml:",omitempty"`
 	Password  string `yaml:",omitempty"`
-	EnableTLS bool   `yaml:"enableTLS,omitempty"`
-	Keepalive bool   `yaml:",omitempty"`
+	EnableTLS   bool   `yaml:"enableTLS,omitempty"`
+	RewriteHost bool   `yaml:"rewriteHost,omitempty"`
+	Keepalive   bool   `yaml:",omitempty"`
 	TTL       int    `yaml:"ttl,omitempty"`
 
 	Stats     ServiceStats
