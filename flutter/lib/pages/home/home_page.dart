@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../providers/tunnel_provider.dart';
 import '../../providers/entrypoint_provider.dart';
 import '../../providers/stats_provider.dart';
@@ -22,20 +23,22 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   int _tabIndex = 0;
+  bool _showFavoritesOnly = false;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AppScaffold(
-      appBar: _buildHeader(context),
+      appBar: _buildHeader(context, l10n),
       body: Column(
         children: [
           NavTabs(
-            tabs: const ['Tunnel', 'Entrypoint'],
+            tabs: [l10n.homeTabTunnel, l10n.homeTabEntrypoint],
             selectedIndex: _tabIndex,
             onChanged: (i) => setState(() => _tabIndex = i),
           ),
           Expanded(
-            child: _tabIndex == 0 ? _buildTunnelList() : _buildEntrypointList(),
+            child: _tabIndex == 0 ? _buildTunnelList(context, l10n) : _buildEntrypointList(context, l10n),
           ),
         ],
       ),
@@ -53,7 +56,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -80,15 +83,19 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.star_outline),
-              tooltip: 'Favorites',
-              onPressed: () {
-                // TODO: toggle favorites filter (Phase 4)
-              },
+              icon: Icon(
+                _showFavoritesOnly ? Icons.star : Icons.star_outline,
+                color: _showFavoritesOnly ? const Color(0xFFF44336) : null,
+              ),
+              tooltip: _showFavoritesOnly
+                  ? l10n.homeAllTooltip
+                  : l10n.homeFavoritesTooltip,
+              onPressed: () =>
+                  setState(() => _showFavoritesOnly = !_showFavoritesOnly),
             ),
             IconButton(
               icon: const Icon(Icons.settings),
-              tooltip: 'Settings',
+              tooltip: l10n.settingsTitle,
               onPressed: () => context.push('/settings'),
             ),
           ],
@@ -97,7 +104,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildTunnelList() {
+  Widget _buildTunnelList(BuildContext context, AppLocalizations l10n) {
     final tunnelsAsync = ref.watch(tunnelListProvider);
     final statsAsync = ref.watch(statsProvider);
 
@@ -105,14 +112,18 @@ class _HomePageState extends ConsumerState<HomePage> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (tunnels) {
-        if (tunnels.isEmpty) {
-          return const Center(
+        final filtered = _showFavoritesOnly
+            ? tunnels.where((t) => t.favorite).toList()
+            : tunnels;
+
+        if (filtered.isEmpty) {
+          return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.cloud_off, size: 48, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('No tunnels yet'),
+                const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+                const SizedBox(height: 12),
+                Text(l10n.homeEmptyTunnels),
               ],
             ),
           );
@@ -123,9 +134,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         return RefreshIndicator(
           onRefresh: () => ref.read(tunnelListProvider.notifier).refresh(),
           child: ListView.builder(
-            itemCount: tunnels.length,
+            itemCount: filtered.length,
             itemBuilder: (context, index) {
-              final t = tunnels[index];
+              final t = filtered[index];
               final s = statsMap[t.id];
               return TunnelCard(
                 name: t.name,
@@ -149,7 +160,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildEntrypointList() {
+  Widget _buildEntrypointList(BuildContext context, AppLocalizations l10n) {
     final entrypointsAsync = ref.watch(entrypointListProvider);
     final statsAsync = ref.watch(statsProvider);
 
@@ -157,14 +168,18 @@ class _HomePageState extends ConsumerState<HomePage> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (entrypoints) {
-        if (entrypoints.isEmpty) {
-          return const Center(
+        final filtered = _showFavoritesOnly
+            ? entrypoints.where((e) => e.favorite).toList()
+            : entrypoints;
+
+        if (filtered.isEmpty) {
+          return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.cloud_off, size: 48, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('No entrypoints yet'),
+                const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+                const SizedBox(height: 12),
+                Text(l10n.homeEmptyEntrypoints),
               ],
             ),
           );
@@ -175,9 +190,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         return RefreshIndicator(
           onRefresh: () => ref.read(entrypointListProvider.notifier).refresh(),
           child: ListView.builder(
-            itemCount: entrypoints.length,
+            itemCount: filtered.length,
             itemBuilder: (context, index) {
-              final e = entrypoints[index];
+              final e = filtered[index];
               final s = statsMap[e.id];
               return TunnelCard(
                 name: e.name,

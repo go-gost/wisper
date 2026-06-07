@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../config/constants.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/app_scaffold.dart';
 
 /// Page that shows the available tunnel types as selectable cards.
@@ -13,10 +14,11 @@ class TunnelListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AppScaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.pop()),
-        title: const Text('Tunnel'),
+        title: Text(l10n.tunnelNewTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 8),
@@ -43,7 +45,7 @@ class TunnelListPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            type.description,
+                            _typeDesc(l10n, type),
                             style: TextStyle(
                               color: Theme.of(context).disabledColor,
                               fontSize: 13,
@@ -64,5 +66,14 @@ class TunnelListPage extends StatelessWidget {
         }).toList(),
       ),
     );
+  }
+
+  String _typeDesc(AppLocalizations l10n, TunnelType type) {
+    return switch (type) {
+      TunnelType.file => l10n.typeFileDesc,
+      TunnelType.http => l10n.typeHttpDesc,
+      TunnelType.tcp => l10n.typeTcpDesc,
+      TunnelType.udp => l10n.typeUdpDesc,
+    };
   }
 }

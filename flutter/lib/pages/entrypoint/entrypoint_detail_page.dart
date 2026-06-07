@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/entrypoint.dart';
 import '../../providers/entrypoint_provider.dart';
+import '../../providers/stats_provider.dart';
 import '../../providers/tunnel_provider.dart' show backendProvider;
 import '../../config/format.dart';
 import '../../widgets/app_scaffold.dart';
@@ -75,6 +77,8 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     if (!_isNew) {
       final epAsync = ref.watch(entrypointProvider(widget.id));
 
@@ -82,32 +86,32 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
         loading: () => AppScaffold(
           appBar: AppBar(
             leading: BackButton(onPressed: () => context.pop()),
-            title: Text('${widget.type.toUpperCase()} Entrypoint'),
+            title: Text('${widget.type.toUpperCase()} ${l10n.entrypointNewTitle}'),
           ),
           body: const Center(child: CircularProgressIndicator()),
         ),
         error: (e, _) => AppScaffold(
           appBar: AppBar(
             leading: BackButton(onPressed: () => context.pop()),
-            title: Text('${widget.type.toUpperCase()} Entrypoint'),
+            title: Text('${widget.type.toUpperCase()} ${l10n.entrypointNewTitle}'),
           ),
           body: Center(child: Text('Error: $e')),
         ),
         data: (ep) {
           if (!_isEditing) _initControllers(ep);
-          return _buildContent(context, ep);
+          return _buildContent(context, l10n, ep);
         },
       );
     }
 
-    return _buildContent(context, null);
+    return _buildContent(context, l10n, null);
   }
 
-  Widget _buildContent(BuildContext context, Entrypoint? ep) {
+  Widget _buildContent(BuildContext context, AppLocalizations l10n, Entrypoint? ep) {
     return AppScaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.pop()),
-        title: Text('${widget.type.toUpperCase()} Entrypoint'),
+        title: Text('${widget.type.toUpperCase()} ${l10n.entrypointNewTitle}'),
         actions: [
           if (!_isNew && ep != null) ...[
             // Favorite
@@ -116,36 +120,14 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
                 ep.favorite ? Icons.star : Icons.star_outline,
                 color: ep.favorite ? const Color(0xFFF44336) : null,
               ),
-              onPressed: () {
-                final tunnels = ref
-                    .read(entrypointListProvider)
-                    .valueOrNull;
-                if (tunnels != null) {
-                  final entry = tunnels.firstWhere((e) => e.id == widget.id);
-                  // Update favorite via backend
-                  ref.read(backendProvider).updateEntrypoint(widget.id, {
-                    ...entry.toJson(),
-                    'favorite': !entry.favorite,
-                  }).then((_) {
-                    ref.read(entrypointListProvider.notifier).refresh();
-                  });
-                }
-              },
+              onPressed: () => _onToggleFavorite(ep),
             ),
             // Start/Stop
-            _buildStartStopButton(ep),
+            _buildStartStopButton(context, l10n, ep),
             // Delete
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Color(0xFFE53935)),
-              onPressed: () async {
-                final confirm = await DeleteConfirmDialog.show(context);
-                if (confirm) {
-                  await ref
-                      .read(entrypointListProvider.notifier)
-                      .delete(widget.id);
-                  if (context.mounted) context.pop();
-                }
-              },
+              onPressed: () => _onDelete(context, l10n),
             ),
             // Edit
             if (!_isEditing)
@@ -154,13 +136,13 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
                   _isEditing = true;
                   _controllersInitialized = false;
                 }),
-                child: const Text('Edit'),
+                child: Text(l10n.btnEdit),
               ),
           ],
           if (_isEditing)
             TextButton(
               onPressed: _onSave,
-              child: const Text('Save'),
+              child: Text(l10n.btnSave),
             ),
         ],
       ),
@@ -213,35 +195,35 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
                   // Name
                   TextFormField(
                     controller: _nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.fieldName,
+                      border: const OutlineInputBorder(),
                     ),
                     readOnly: !_isEditing,
                     validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Required' : null,
+                        (v == null || v.isEmpty) ? l10n.requiredField : null,
                   ),
                   const SizedBox(height: 16),
 
                   // Bind Address
                   TextFormField(
                     controller: _bindAddrCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Bind Address',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.fieldBindAddress,
+                      border: const OutlineInputBorder(),
                     ),
                     readOnly: !_isEditing,
                     validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Required' : null,
+                        (v == null || v.isEmpty) ? l10n.requiredField : null,
                   ),
                   const SizedBox(height: 16),
 
                   // Tunnel Chain
                   TextFormField(
                     controller: _tunnelChainCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tunnel Chain',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.fieldTunnelChain,
+                      border: const OutlineInputBorder(),
                     ),
                     readOnly: !_isEditing,
                   ),
@@ -249,7 +231,7 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
 
                   // Keepalive switch
                   SwitchListTile(
-                    title: const Text('Keepalive'),
+                    title: Text(l10n.switchKeepalive),
                     value: _keepalive,
                     onChanged: _isEditing ? (v) => setState(() => _keepalive = v) : null,
                     contentPadding: EdgeInsets.zero,
@@ -259,18 +241,18 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
                   // TTL
                   TextFormField(
                     controller: _ttlCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'TTL',
-                      border: OutlineInputBorder(),
-                      hintText: 'e.g. 30s',
+                    decoration: InputDecoration(
+                      labelText: l10n.fieldTTL,
+                      border: const OutlineInputBorder(),
+                      hintText: l10n.fieldTTLHint,
                     ),
                     readOnly: !_isEditing,
                   ),
 
-                  // Stats (view mode only)
+                  // Stats (view mode only) — uses live-polled stats
                   if (!_isEditing && ep != null) ...[
                     const SizedBox(height: 24),
-                    _buildStatsSection(ep),
+                    _buildLiveStatsSection(ep),
                   ],
                 ],
               ),
@@ -281,7 +263,7 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
     );
   }
 
-  Widget _buildStartStopButton(Entrypoint ep) {
+  Widget _buildStartStopButton(BuildContext context, AppLocalizations l10n, Entrypoint ep) {
     final isRunning = ep.status == 'running';
     if (isRunning) {
       return Padding(
@@ -290,52 +272,62 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFE53935),
           ),
-          onPressed: () =>
-              ref.read(entrypointListProvider.notifier).stop(widget.id),
-          child: const Text('Stop'),
+          onPressed: () => _onStop(context, l10n),
+          child: Text(l10n.btnStop),
         ),
       );
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: FilledButton(
-        onPressed: () =>
-            ref.read(entrypointListProvider.notifier).start(widget.id),
-        child: const Text('Start'),
+        onPressed: () => _onStart(context, l10n),
+        child: Text(l10n.btnStart),
       ),
     );
   }
 
-  Widget _buildStatsSection(Entrypoint ep) {
-    final stats = ep.stats;
+  /// Stats section that uses the live-polled stats from [statsProvider].
+  Widget _buildLiveStatsSection(Entrypoint ep) {
+    final l10n = AppLocalizations.of(context)!;
+    final statsAsync = ref.watch(statsProvider);
+    final liveStats = statsAsync.valueOrNull?[ep.id];
+
+    // Fall back to entrypoint snapshot if live stats unavailable.
+    final currentConns = liveStats?.currentConns ?? ep.stats.currentConns;
+    final totalConns = liveStats?.totalConns ?? ep.stats.totalConns;
+    final requestRate = liveStats?.requestRate ?? ep.stats.requestRate;
+    final inputBytes = liveStats?.inputBytes ?? ep.stats.inputBytes;
+    final outputBytes = liveStats?.outputBytes ?? ep.stats.outputBytes;
+    final inputRateBytes = liveStats?.inputRateBytes ?? ep.stats.inputRateBytes;
+    final outputRateBytes = liveStats?.outputRateBytes ?? ep.stats.outputRateBytes;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Statistics',
-            style: TextStyle(fontWeight: FontWeight.w600)),
+        Text(l10n.labelStatistics,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 4,
           runSpacing: 4,
           children: [
-            _badge(
-                '↕ ${stats.currentConns} / ${stats.totalConns} connections'),
-            _badge('⚡ ${stats.requestRate.toStringAsFixed(1)} R/s'),
+            _badge('↕ $currentConns / $totalConns connections'),
+            _badge('⚡ ${requestRate.toStringAsFixed(1)} R/s'),
           ],
         ),
         const SizedBox(height: 12),
         StatsRow(
           icon: Icons.arrow_upward,
           iconColor: const Color(0xFF4CAF50),
-          value: formatBytes(stats.inputBytes),
-          rate: '${formatBytes(stats.inputRateBytes)}/s',
+          value: formatBytes(inputBytes),
+          rate: '${formatBytes(inputRateBytes)}/s',
         ),
         const SizedBox(height: 4),
         StatsRow(
           icon: Icons.arrow_downward,
           iconColor: const Color(0xFF2196F3),
-          value: formatBytes(stats.outputBytes),
-          rate: '${formatBytes(stats.outputRateBytes)}/s',
+          value: formatBytes(outputBytes),
+          rate: '${formatBytes(outputRateBytes)}/s',
         ),
       ],
     );
@@ -352,8 +344,79 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Actions with toast feedback
+  // ---------------------------------------------------------------------------
+
+  Future<void> _onStart(BuildContext context, AppLocalizations l10n) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(entrypointListProvider.notifier).start(widget.id);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.started)));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.startFailed('$e'))));
+      }
+    }
+  }
+
+  Future<void> _onStop(BuildContext context, AppLocalizations l10n) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(entrypointListProvider.notifier).stop(widget.id);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.stopped)));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.stopFailed('$e'))));
+      }
+    }
+  }
+
+  Future<void> _onDelete(BuildContext context, AppLocalizations l10n) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final confirm = await DeleteConfirmDialog.show(context);
+    if (!confirm) return;
+    try {
+      await ref.read(entrypointListProvider.notifier).delete(widget.id);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.deleted)));
+        router.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.deleteFailed('$e'))));
+      }
+    }
+  }
+
+  Future<void> _onToggleFavorite(Entrypoint ep) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(entrypointListProvider.notifier)
+          .toggleFavorite(widget.id, ep.favorite);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text(
+            ep.favorite ? l10n.favoriteRemoved : l10n.favoriteAdded,
+          ),
+        ));
+      }
+    } catch (_) {
+      // Silently ignore — favorite toggle is non-critical
+    }
+  }
+
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
 
     final body = <String, dynamic>{
       'name': _nameCtrl.text,
@@ -380,12 +443,13 @@ class _EntrypointDetailPageState extends ConsumerState<EntrypointDetailPage> {
         await backend.updateEntrypoint(widget.id, body);
       }
       await ref.read(entrypointListProvider.notifier).refresh();
-      if (mounted) context.pop();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.saved)));
+        context.pop();
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text(l10n.saveFailed('$e'))));
       }
     }
   }

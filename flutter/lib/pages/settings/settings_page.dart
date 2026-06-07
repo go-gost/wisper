@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/app_settings.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/app_scaffold.dart';
@@ -18,11 +19,12 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
+    final l10n = AppLocalizations.of(context)!;
 
     return AppScaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.pop()),
-        title: const Text('Settings'),
+        title: Text(l10n.settingsTitle),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -48,9 +50,9 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Wisper',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+            Text(
+              l10n.appName,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
             ),
             const SizedBox(height: 4),
             Text(
@@ -65,8 +67,8 @@ class SettingsPage extends ConsumerWidget {
               child: Column(
                 children: [
                   SelectorField(
-                    label: 'Language',
-                    options: const ['English', '中文'],
+                    label: l10n.settingsLanguage,
+                    options: [l10n.settingsLangEn, l10n.settingsLangZh],
                     selectedIndex: settings.language == LanguagePreference.en
                         ? 0
                         : 1,
@@ -76,8 +78,12 @@ class SettingsPage extends ConsumerWidget {
                   ),
                   const Divider(height: 1),
                   SelectorField(
-                    label: 'Theme',
-                    options: const ['System', 'Light', 'Dark'],
+                    label: l10n.settingsTheme,
+                    options: [
+                      l10n.settingsThemeSystem,
+                      l10n.settingsThemeLight,
+                      l10n.settingsThemeDark,
+                    ],
                     selectedIndex: settings.theme.index,
                     onChanged: (i) => notifier.setTheme(
                       ThemePreference.values[i],

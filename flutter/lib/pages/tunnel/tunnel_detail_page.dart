@@ -8,8 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/tunnel.dart';
 import '../../providers/tunnel_provider.dart';
+import '../../providers/stats_provider.dart';
 import '../../config/format.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/copyable_text.dart';
@@ -90,6 +92,8 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     // Load existing tunnel data when not creating new
     if (!_isNew) {
       final tunnelAsync = ref.watch(tunnelProvider(widget.id));
@@ -111,16 +115,16 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
         ),
         data: (tunnel) {
           if (!_isEditing) _initControllers(tunnel);
-          return _buildContent(context, tunnel);
+          return _buildContent(context, l10n, tunnel);
         },
       );
     }
 
     // New tunnel — empty form
-    return _buildContent(context, null);
+    return _buildContent(context, l10n, null);
   }
 
-  Widget _buildContent(BuildContext context, Tunnel? tunnel) {
+  Widget _buildContent(BuildContext context, AppLocalizations l10n, Tunnel? tunnel) {
     return AppScaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.pop()),
@@ -135,29 +139,15 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                     ? const Color(0xFFF44336)
                     : null,
               ),
-              onPressed: () {
-                if (tunnel != null) {
-                  ref
-                      .read(tunnelListProvider.notifier)
-                      .toggleFavorite(widget.id, tunnel.favorite);
-                }
-              },
+              onPressed: () => _onToggleFavorite(tunnel),
             ),
             // Start/Stop
-            _buildStartStopButton(tunnel),
+            _buildStartStopButton(context, l10n, tunnel),
             // Delete
             IconButton(
               icon: const Icon(Icons.delete_outline,
                   color: Color(0xFFE53935)),
-              onPressed: () async {
-                final confirm = await DeleteConfirmDialog.show(context);
-                if (confirm) {
-                  await ref
-                      .read(tunnelListProvider.notifier)
-                      .delete(widget.id);
-                  if (context.mounted) context.pop();
-                }
-              },
+              onPressed: () => _onDelete(context, l10n),
             ),
             // Edit
             if (!_isEditing)
@@ -166,13 +156,13 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                   _isEditing = true;
                   _controllersInitialized = false;
                 }),
-                child: const Text('Edit'),
+                child: Text(l10n.btnEdit),
               ),
           ],
           if (_isEditing)
             TextButton(
               onPressed: _onSave,
-              child: const Text('Save'),
+              child: Text(l10n.btnSave),
             ),
         ],
       ),
@@ -227,13 +217,13 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                   // Name
                   TextFormField(
                     controller: _nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.fieldName,
+                      border: const OutlineInputBorder(),
                     ),
                     readOnly: !_isEditing,
                     validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Required' : null,
+                        (v == null || v.isEmpty) ? l10n.requiredField : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -241,13 +231,13 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                   if (widget.type != 'file')
                     TextFormField(
                       controller: _endpointCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Endpoint',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n.fieldEndpoint,
+                        border: const OutlineInputBorder(),
                       ),
                       readOnly: !_isEditing,
                       validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Required' : null,
+                          (v == null || v.isEmpty) ? l10n.requiredField : null,
                     ),
 
                   // Type-specific fields
@@ -268,10 +258,10 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                         setState(() => _rewriteHost = v),
                   ),
 
-                  // Stats section (view mode only)
+                  // Stats section (view mode only) — uses live-polled stats
                   if (!_isEditing && tunnel != null) ...[
                     const SizedBox(height: 24),
-                    _buildStatsSection(tunnel),
+                    _buildLiveStatsSection(tunnel),
                   ],
                 ],
               ),
@@ -282,7 +272,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     );
   }
 
-  Widget _buildStartStopButton(Tunnel? tunnel) {
+  Widget _buildStartStopButton(BuildContext context, AppLocalizations l10n, Tunnel? tunnel) {
     final isRunning = tunnel?.status == 'running';
     if (isRunning) {
       return Padding(
@@ -291,52 +281,62 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFE53935),
           ),
-          onPressed: () =>
-              ref.read(tunnelListProvider.notifier).stop(widget.id),
-          child: const Text('Stop'),
+          onPressed: () => _onStop(context, l10n),
+          child: Text(l10n.btnStop),
         ),
       );
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: FilledButton(
-        onPressed: () =>
-            ref.read(tunnelListProvider.notifier).start(widget.id),
-        child: const Text('Start'),
+        onPressed: () => _onStart(context, l10n),
+        child: Text(l10n.btnStart),
       ),
     );
   }
 
-  Widget _buildStatsSection(Tunnel tunnel) {
-    final stats = tunnel.stats;
+  /// Stats section that uses the live-polled stats from [statsProvider].
+  Widget _buildLiveStatsSection(Tunnel tunnel) {
+    final l10n = AppLocalizations.of(context)!;
+    final statsAsync = ref.watch(statsProvider);
+    final liveStats = statsAsync.valueOrNull?[tunnel.id];
+
+    // Fall back to tunnel snapshot if live stats unavailable.
+    final currentConns = liveStats?.currentConns ?? tunnel.stats.currentConns;
+    final totalConns = liveStats?.totalConns ?? tunnel.stats.totalConns;
+    final requestRate = liveStats?.requestRate ?? tunnel.stats.requestRate;
+    final inputBytes = liveStats?.inputBytes ?? tunnel.stats.inputBytes;
+    final outputBytes = liveStats?.outputBytes ?? tunnel.stats.outputBytes;
+    final inputRateBytes = liveStats?.inputRateBytes ?? tunnel.stats.inputRateBytes;
+    final outputRateBytes = liveStats?.outputRateBytes ?? tunnel.stats.outputRateBytes;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Statistics',
-            style: TextStyle(fontWeight: FontWeight.w600)),
+        Text(l10n.labelStatistics,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 4,
           runSpacing: 4,
           children: [
-            _badge(
-                '↕ ${stats.currentConns} / ${stats.totalConns} connections'),
-            _badge('⚡ ${stats.requestRate.toStringAsFixed(1)} R/s'),
+            _badge('↕ $currentConns / $totalConns connections'),
+            _badge('⚡ ${requestRate.toStringAsFixed(1)} R/s'),
           ],
         ),
         const SizedBox(height: 12),
         StatsRow(
           icon: Icons.arrow_upward,
           iconColor: const Color(0xFF4CAF50),
-          value: formatBytes(stats.inputBytes),
-          rate: '${formatBytes(stats.inputRateBytes)}/s',
+          value: formatBytes(inputBytes),
+          rate: '${formatBytes(inputRateBytes)}/s',
         ),
         const SizedBox(height: 4),
         StatsRow(
           icon: Icons.arrow_downward,
           iconColor: const Color(0xFF2196F3),
-          value: formatBytes(stats.outputBytes),
-          rate: '${formatBytes(stats.outputRateBytes)}/s',
+          value: formatBytes(outputBytes),
+          rate: '${formatBytes(outputRateBytes)}/s',
         ),
       ],
     );
@@ -353,8 +353,80 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Actions with toast feedback
+  // ---------------------------------------------------------------------------
+
+  Future<void> _onStart(BuildContext context, AppLocalizations l10n) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(tunnelListProvider.notifier).start(widget.id);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.started)));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.startFailed('$e'))));
+      }
+    }
+  }
+
+  Future<void> _onStop(BuildContext context, AppLocalizations l10n) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(tunnelListProvider.notifier).stop(widget.id);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.stopped)));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.stopFailed('$e'))));
+      }
+    }
+  }
+
+  Future<void> _onDelete(BuildContext context, AppLocalizations l10n) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final confirm = await DeleteConfirmDialog.show(context);
+    if (!confirm) return;
+    try {
+      await ref.read(tunnelListProvider.notifier).delete(widget.id);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.deleted)));
+        router.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.deleteFailed('$e'))));
+      }
+    }
+  }
+
+  Future<void> _onToggleFavorite(Tunnel? tunnel) async {
+    if (tunnel == null) return;
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(tunnelListProvider.notifier)
+          .toggleFavorite(widget.id, tunnel.favorite);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text(
+            tunnel.favorite ? l10n.favoriteRemoved : l10n.favoriteAdded,
+          ),
+        ));
+      }
+    } catch (_) {
+      // Silently ignore — favorite toggle is non-critical
+    }
+  }
+
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
 
     final body = <String, dynamic>{
       'name': _nameCtrl.text,
@@ -381,12 +453,13 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
         await backend.updateTunnel(widget.id, body);
       }
       await ref.read(tunnelListProvider.notifier).refresh();
-      if (mounted) context.pop();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.saved)));
+        context.pop();
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text(l10n.saveFailed('$e'))));
       }
     }
   }

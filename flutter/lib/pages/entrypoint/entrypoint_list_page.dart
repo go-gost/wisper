@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../config/constants.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/app_scaffold.dart';
 
 /// Page that shows the available entrypoint types as selectable cards.
@@ -13,10 +14,11 @@ class EntrypointListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AppScaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.pop()),
-        title: const Text('Entrypoint'),
+        title: Text(l10n.entrypointNewTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 8),
@@ -43,7 +45,7 @@ class EntrypointListPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            type.description,
+                            _typeDesc(l10n, type),
                             style: TextStyle(
                               color: Theme.of(context).disabledColor,
                               fontSize: 13,
@@ -64,5 +66,12 @@ class EntrypointListPage extends StatelessWidget {
         }).toList(),
       ),
     );
+  }
+
+  String _typeDesc(AppLocalizations l10n, EntrypointType type) {
+    return switch (type) {
+      EntrypointType.tcp => l10n.typeTcpEntryDesc,
+      EntrypointType.udp => l10n.typeUdpEntryDesc,
+    };
   }
 }

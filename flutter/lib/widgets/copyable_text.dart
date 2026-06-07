@@ -4,6 +4,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_localizations.dart';
+
 /// Displays text in a monospace container with a copy button.
 class CopyableText extends StatelessWidget {
   const CopyableText({
@@ -38,13 +40,13 @@ class CopyableText extends StatelessWidget {
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.copy, size: 18),
-            tooltip: 'Copy',
+            tooltip: AppLocalizations.of(context)!.btnCopy,
             onPressed: () {
               Clipboard.setData(ClipboardData(text: text));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Copied to clipboard'),
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  content: Text(AppLocalizations.of(context)!.copiedToClipboard),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             },

@@ -3,6 +3,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
+
 /// A dialog that asks the user to confirm a delete action.
 class DeleteConfirmDialog extends StatelessWidget {
   const DeleteConfirmDialog({
@@ -19,11 +21,12 @@ class DeleteConfirmDialog extends StatelessWidget {
     String? title,
     String? message,
   }) async {
+    final l10n = AppLocalizations.of(context)!;
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => DeleteConfirmDialog(
-        title: title ?? 'Delete?',
-        message: message ?? 'This action cannot be undone.',
+        title: title ?? l10n.deleteConfirmTitle,
+        message: message ?? l10n.deleteConfirmMessage,
       ),
     );
     return result ?? false;
@@ -37,14 +40,14 @@ class DeleteConfirmDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)!.btnCancel),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFE53935),
           ),
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Delete'),
+          child: Text(AppLocalizations.of(context)!.btnDelete),
         ),
       ],
     );

@@ -57,6 +57,18 @@ class EntrypointListNotifier extends AsyncNotifier<List<Entrypoint>> {
     await backend.stopEntrypoint(id);
     await refresh();
   }
+
+  /// Toggle the favorite status of an entrypoint.
+  Future<void> toggleFavorite(String id, bool current) async {
+    final backend = ref.read(backendProvider);
+    final entrypoints = state.valueOrNull ?? [];
+    final ep = entrypoints.firstWhere((e) => e.id == id);
+    await backend.updateEntrypoint(id, {
+      ...ep.toJson(),
+      'favorite': !current,
+    });
+    await refresh();
+  }
 }
 
 /// Provider for a single entrypoint by ID.

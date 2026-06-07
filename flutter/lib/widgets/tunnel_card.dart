@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../config/format.dart';
+import '../l10n/app_localizations.dart';
 import 'stats_row.dart';
 
 /// Status colour for the indicator dot.
@@ -52,12 +53,12 @@ class TunnelCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// Human-readable status line matching the HTML prototype.
-  /// Running: "TCP · 5m", Stopped: "HTTP · Stopped", Error: "UDP · `error`".
-  String get _statusLabel {
+  String _statusLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return switch (status) {
-      'running' => '$type · running',
-      'error' => '$type · ${error.isNotEmpty ? error : "error"}',
-      _ => '$type · stopped',
+      'running' => '$type · ${l10n.statusRunning}',
+      'error' => '$type · ${error.isNotEmpty ? error : l10n.statusError}',
+      _ => '$type · ${l10n.statusStopped}',
     };
   }
 
@@ -126,7 +127,7 @@ class TunnelCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          _statusLabel,
+          _statusLabel(context),
           style: TextStyle(
             color: Theme.of(context).disabledColor,
             fontSize: 13,

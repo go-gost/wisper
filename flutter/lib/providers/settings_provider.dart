@@ -86,3 +86,12 @@ final themeModeProvider = Provider<ThemeMode>((ref) {
     ThemePreference.system => ThemeMode.system,
   };
 });
+
+/// Derive [Locale] from settings.
+final localeProvider = Provider<Locale>((ref) {
+  final settings = ref.watch(settingsProvider);
+  return switch (settings.language) {
+    LanguagePreference.zh => const Locale('zh'),
+    LanguagePreference.en => const Locale('en'),
+  };
+});

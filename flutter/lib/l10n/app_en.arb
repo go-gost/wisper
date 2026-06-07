@@ -5,6 +5,8 @@
   "homeTabEntrypoint": "Entrypoint",
   "homeEmptyTunnels": "No tunnels yet",
   "homeEmptyEntrypoints": "No entrypoints yet",
+  "homeFavoritesTooltip": "Show favorites only",
+  "homeAllTooltip": "Show all",
   "tunnelNewTitle": "Tunnel",
   "entrypointNewTitle": "Entrypoint",
   "settingsTitle": "Settings",
@@ -29,6 +31,8 @@
   "fieldUsername": "Username",
   "fieldPassword": "Password",
   "fieldDirectory": "Directory",
+  "fieldTTL": "TTL",
+  "fieldTTLHint": "e.g. 30s",
   "switchBasicAuth": "Basic Auth",
   "switchRewriteHost": "Rewrite Host",
   "switchEnableTLS": "Enable TLS",
@@ -43,11 +47,34 @@
   "saveFailed": "Save failed: {error}",
   "@saveFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": { "type": "String" }
     }
   },
+  "started": "Started successfully",
+  "stopped": "Stopped successfully",
+  "startFailed": "Start failed: {error}",
+  "@startFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "stopFailed": "Stop failed: {error}",
+  "@stopFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "deleted": "Deleted successfully",
+  "deleteFailed": "Delete failed: {error}",
+  "@deleteFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "saved": "Saved successfully",
+  "favoriteAdded": "Added to favorites",
+  "favoriteRemoved": "Removed from favorites",
+  "requiredField": "Required",
   "typeFile": "File",
   "typeHttp": "HTTP",
   "typeTcp": "TCP",
@@ -57,5 +84,6 @@
   "typeTcpDesc": "Forward a local TCP port",
   "typeUdpDesc": "Forward a local UDP port",
   "typeTcpEntryDesc": "Expose a TCP service through the tunnel",
-  "typeUdpEntryDesc": "Expose a UDP service through the tunnel"
+  "typeUdpEntryDesc": "Expose a UDP service through the tunnel",
+  "settingsFavorites": "Favorites"
 }

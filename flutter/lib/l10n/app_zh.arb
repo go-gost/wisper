@@ -5,6 +5,8 @@
   "homeTabEntrypoint": "入口",
   "homeEmptyTunnels": "暂无隧道",
   "homeEmptyEntrypoints": "暂无入口",
+  "homeFavoritesTooltip": "仅显示收藏",
+  "homeAllTooltip": "显示全部",
   "tunnelNewTitle": "隧道",
   "entrypointNewTitle": "入口",
   "settingsTitle": "设置",
@@ -29,6 +31,8 @@
   "fieldUsername": "用户名",
   "fieldPassword": "密码",
   "fieldDirectory": "目录",
+  "fieldTTL": "TTL",
+  "fieldTTLHint": "例如 30s",
   "switchBasicAuth": "基本认证",
   "switchRewriteHost": "重写主机",
   "switchEnableTLS": "启用 TLS",
@@ -43,11 +47,34 @@
   "saveFailed": "保存失败：{error}",
   "@saveFailed": {
     "placeholders": {
-      "error": {
-        "type": "String"
-      }
+      "error": { "type": "String" }
     }
   },
+  "started": "启动成功",
+  "stopped": "停止成功",
+  "startFailed": "启动失败：{error}",
+  "@startFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "stopFailed": "停止失败：{error}",
+  "@stopFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "deleted": "删除成功",
+  "deleteFailed": "删除失败：{error}",
+  "@deleteFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "saved": "保存成功",
+  "favoriteAdded": "已添加到收藏",
+  "favoriteRemoved": "已从收藏移除",
+  "requiredField": "必填",
   "typeFile": "文件",
   "typeHttp": "HTTP",
   "typeTcp": "TCP",
@@ -57,5 +84,6 @@
   "typeTcpDesc": "转发本地 TCP 端口",
   "typeUdpDesc": "转发本地 UDP 端口",
   "typeTcpEntryDesc": "通过隧道暴露 TCP 服务",
-  "typeUdpEntryDesc": "通过隧道暴露 UDP 服务"
+  "typeUdpEntryDesc": "通过隧道暴露 UDP 服务",
+  "settingsFavorites": "收藏"
 }
