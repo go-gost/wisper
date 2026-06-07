@@ -5,7 +5,7 @@ library;
 const kMaxContentWidth = 800.0;
 
 /// Default Go backend HTTP port.
-const kDefaultBackendPort = 18080;
+const kDefaultBackendPort = 8900;
 
 /// Stats polling interval in milliseconds.
 const kStatsPollIntervalMs = 1000;

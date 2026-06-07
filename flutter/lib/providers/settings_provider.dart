@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_settings.dart';
-import '../providers/tunnel_provider.dart' show backendProvider;
+import '../providers/backend_provider.dart' show backendProvider;
 
 /// Application settings state notifier.
 final settingsProvider =
@@ -29,7 +29,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       state = AppSettings(
         theme: _parseTheme(config['theme'] as String?),
         language: _parseLanguage(config['language'] as String?),
-        backendPort: config['port'] as int? ?? 18080,
+        backendPort: config['port'] as int? ?? 8900,
       );
     } catch (_) {
       // Use defaults if backend is unavailable

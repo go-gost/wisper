@@ -12,7 +12,7 @@ class AppSettings {
   const AppSettings({
     this.theme = ThemePreference.system,
     this.language = LanguagePreference.en,
-    this.backendPort = 18080,
+    this.backendPort = 8900,
   });
 
   final ThemePreference theme;

@@ -9,7 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/entrypoint.dart';
 import '../../providers/entrypoint_provider.dart';
 import '../../providers/stats_provider.dart';
-import '../../providers/tunnel_provider.dart' show backendProvider;
+import '../../providers/backend_provider.dart' show backendProvider;
 import '../../config/format.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/copyable_text.dart';

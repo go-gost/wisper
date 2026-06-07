@@ -1,0 +1,21 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+dist/
+
+# Config written by tests
+api/config.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# CodeGraph daemon
+.codegraph/daemon.pid

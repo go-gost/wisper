@@ -11,7 +11,7 @@ import '../models/tunnel_stats.dart';
 
 /// HTTP client for the Wisper Go backend API.
 class GoBackend {
-  GoBackend({String host = 'localhost', int port = 18080})
+  GoBackend({String host = 'localhost', int port = 8900})
       : _base = 'http://$host:$port';
 
   final String _base;

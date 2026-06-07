@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/tunnel.dart';
 import '../../providers/tunnel_provider.dart';
+import '../../providers/backend_provider.dart' show backendProvider;
 import '../../providers/stats_provider.dart';
 import '../../config/format.dart';
 import '../../widgets/app_scaffold.dart';

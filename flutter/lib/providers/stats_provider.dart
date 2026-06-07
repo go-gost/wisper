@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/tunnel.dart' show Tunnel;
 import '../models/entrypoint.dart' show Entrypoint;
-import '../providers/tunnel_provider.dart' show backendProvider;
+import '../providers/backend_provider.dart' show backendProvider;
 
 /// Stats data held per-item.
 class ItemStats {

@@ -4,12 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/tunnel.dart';
-import '../services/go_backend.dart';
-
-/// Singleton [GoBackend] instance provider.
-final backendProvider = Provider<GoBackend>((ref) {
-  return GoBackend();
-});
+import '../providers/backend_provider.dart' show backendProvider;
 
 /// Async list of all tunnels.
 final tunnelListProvider =

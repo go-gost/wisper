@@ -4,7 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/entrypoint.dart';
-import '../providers/tunnel_provider.dart' show backendProvider;
+import '../providers/backend_provider.dart' show backendProvider;
 
 /// Async list of all entrypoints.
 final entrypointListProvider =
