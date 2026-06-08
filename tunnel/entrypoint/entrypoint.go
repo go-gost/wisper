@@ -2,6 +2,7 @@ package entrypoint
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/go-gost/core/logger"
@@ -101,6 +102,67 @@ func Delete(id string) {
 			return
 		}
 	}
+}
+
+// RestartRunning recreates all running entrypoints so they pick up the current
+// config (e.g. a changed server address). Stopped entrypoints are left as-is.
+// Endpoints are closed before new ones start to avoid conflicts on the relay
+// server (same tunnel ID cannot be registered twice concurrently).
+func RestartRunning() {
+	type restartInfo struct {
+		index int
+		opts  tunnel.Options
+		fav   bool
+		stats config.ServiceStats
+	}
+
+	var pending []restartInfo
+
+	// Phase 1: close all running entrypoints and collect their info.
+	for i := 0; i < Count(); i++ {
+		ep := GetIndex(i)
+		if ep == nil || ep.IsClosed() {
+			continue
+		}
+		pending = append(pending, restartInfo{
+			index: i,
+			opts:  ep.Options(),
+			fav:   ep.IsFavorite(),
+			stats: ep.Stats(),
+		})
+		ep.Close()
+	}
+
+	// Phase 2: start new entrypoints with the updated config.
+	for _, p := range pending {
+		newEP := createEntryPoint(entryPoints.list[p.index].Type(), tunnel.Options{
+			ID:        p.opts.ID,
+			Name:      p.opts.Name,
+			Endpoint:  p.opts.Endpoint,
+			Hostname:  p.opts.Hostname,
+			Username:  p.opts.Username,
+			Password:  p.opts.Password,
+			EnableTLS: p.opts.EnableTLS,
+			Keepalive: p.opts.Keepalive,
+			TTL:       p.opts.TTL,
+			CreatedAt: p.opts.CreatedAt,
+		})
+		if newEP == nil {
+			continue
+		}
+
+		newEP.SetStats(p.stats)
+		newEP.Favorite(p.fav)
+
+		if err := newEP.Run(); err != nil {
+			logger.Default().Error(fmt.Sprintf("restart entrypoint %s: %v", p.opts.Name, err))
+			continue
+		}
+
+		Set(newEP)
+	}
+
+	SaveConfig()
 }
 
 // LoadConfig loads entrypoints from the persisted configuration.

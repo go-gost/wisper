@@ -107,8 +107,10 @@ type Settings struct {
 	Server string
 	// Public entrypoint address (default: gost.run).
 	Entrypoint string
-	Lang       string
-	Theme      string
+	// Skip TLS certificate verification for the tunnel server.
+	Insecure bool
+	Lang     string
+	Theme    string
 }
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.

@@ -219,4 +219,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFavorites => 'Favorites';
+
+  @override
+  String get settingsServer => 'Tunnel Server';
+
+  @override
+  String get settingsServerHint => 'e.g. tunnel.gost.run';
+
+  @override
+  String get settingsEntrypoint => 'Entrypoint Domain';
+
+  @override
+  String get settingsEntrypointHint => 'e.g. gost.run';
+
+  @override
+  String get settingsInsecure => 'Skip TLS Verify';
+
+  @override
+  String get settingsInsecureDesc =>
+      'Disable certificate verification for private/self-signed servers';
 }

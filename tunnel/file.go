@@ -85,7 +85,7 @@ func (s *fileTunnel) Type() string     { return FileTunnel }
 func (s *fileTunnel) Name() string     { return s.opts.Name }
 func (s *fileTunnel) Endpoint() string { return s.opts.Endpoint }
 func (s *fileTunnel) Entrypoint() string {
-	return fmt.Sprintf("https://%s.%s", s.endpoint, EndpointAddr)
+	return fmt.Sprintf("https://%s.%s", s.endpoint, GetEndpointAddr())
 }
 func (s *fileTunnel) Options() Options { return s.opts }
 func (s *fileTunnel) Favorite(b bool)  { s.favorite.Store(b) }
@@ -241,7 +241,7 @@ func (s *fileTunnel) Run() (err error) {
 		s.setErr(serveErr)
 	}()
 
-	log.Infof("file service run at %s, entrypoint: https://%s.%s", s.file.Addr(), s.endpoint, EndpointAddr)
+	log.Infof("file service run at %s, entrypoint: https://%s.%s", s.file.Addr(), s.endpoint, GetEndpointAddr())
 	return nil
 }
 

@@ -219,4 +219,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsFavorites => '收藏';
+
+  @override
+  String get settingsServer => '隧道服务器';
+
+  @override
+  String get settingsServerHint => '例如 tunnel.gost.run';
+
+  @override
+  String get settingsEntrypoint => '入口域名';
+
+  @override
+  String get settingsEntrypointHint => '例如 gost.run';
+
+  @override
+  String get settingsInsecure => '跳过 TLS 验证';
+
+  @override
+  String get settingsInsecureDesc => '禁用证书验证，适用于私有/自签名服务器';
 }

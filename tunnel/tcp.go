@@ -79,7 +79,7 @@ func (s *tcpTunnel) Type() string     { return TCPTunnel }
 func (s *tcpTunnel) Name() string     { return s.opts.Name }
 func (s *tcpTunnel) Endpoint() string { return s.opts.Endpoint }
 func (s *tcpTunnel) Entrypoint() string {
-	return fmt.Sprintf("%s.%s", s.endpoint, EndpointAddr)
+	return fmt.Sprintf("%s.%s", s.endpoint, GetEndpointAddr())
 }
 func (s *tcpTunnel) Options() Options { return s.opts }
 func (s *tcpTunnel) Favorite(b bool)  { s.favorite.Store(b) }

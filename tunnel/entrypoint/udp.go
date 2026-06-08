@@ -79,7 +79,7 @@ func (s *udpEntryPoint) ID() string   { return s.opts.ID }
 func (s *udpEntryPoint) Type() string { return UDPEntryPoint }
 func (s *udpEntryPoint) Name() string { return s.opts.Name }
 func (s *udpEntryPoint) Endpoint() string {
-	return fmt.Sprintf("%s.%s", s.endpoint, tunnel.EndpointAddr)
+	return fmt.Sprintf("%s.%s", s.endpoint, tunnel.GetEndpointAddr())
 }
 func (s *udpEntryPoint) Entrypoint() string { return s.opts.Endpoint }
 func (s *udpEntryPoint) Options() tunnel.Options { return s.opts }

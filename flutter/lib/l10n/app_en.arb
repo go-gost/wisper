@@ -87,5 +87,11 @@
   "typeUdpDesc": "Forward a local UDP port",
   "typeTcpEntryDesc": "Expose a TCP service through the tunnel",
   "typeUdpEntryDesc": "Expose a UDP service through the tunnel",
-  "settingsFavorites": "Favorites"
+  "settingsFavorites": "Favorites",
+  "settingsServer": "Tunnel Server",
+  "settingsServerHint": "e.g. tunnel.gost.run",
+  "settingsEntrypoint": "Entrypoint Domain",
+  "settingsEntrypointHint": "e.g. gost.run",
+  "settingsInsecure": "Skip TLS Verify",
+  "settingsInsecureDesc": "Disable certificate verification for private/self-signed servers"
 }

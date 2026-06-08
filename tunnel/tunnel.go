@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -14,10 +15,32 @@ import (
 )
 
 const (
-	EndpointAddr = "gost.run"
-	ServerName   = "tunnel.gost.run"
-	ServerAddr   = ServerName + ":443"
+	defaultEndpointAddr = "gost.run"
+	defaultServerName   = "tunnel.gost.run"
 )
+
+// GetEndpointAddr returns the public entrypoint domain, reading from config
+// with fallback to the default (gost.run).
+func GetEndpointAddr() string {
+	if s := config.Get().Settings; s != nil && s.Entrypoint != "" {
+		return s.Entrypoint
+	}
+	return defaultEndpointAddr
+}
+
+// GetServerName returns the tunnel relay server hostname, reading from config
+// with fallback to the default (tunnel.gost.run).
+func GetServerName() string {
+	if s := config.Get().Settings; s != nil && s.Server != "" {
+		return s.Server
+	}
+	return defaultServerName
+}
+
+// GetServerAddr returns the tunnel relay server address (hostname:443).
+func GetServerAddr() string {
+	return GetServerName() + ":443"
+}
 
 const (
 	FileTunnel = "file"
@@ -227,8 +250,75 @@ func Delete(id string) {
 	}
 }
 
+// RestartRunning recreates all running tunnels so they pick up the current
+// config (e.g. a changed server address). Stopped tunnels are left as-is.
+// Tunnels are closed before new ones start to avoid conflicts on the relay
+// server (same tunnel ID cannot be registered twice concurrently).
+func RestartRunning() {
+	type restartInfo struct {
+		index int
+		opts  Options
+		fav   bool
+		stats config.ServiceStats
+	}
+
+	var pending []restartInfo
+
+	// Phase 1: close all running tunnels and collect their info.
+	for i := 0; i < Count(); i++ {
+		t := GetIndex(i)
+		if t == nil || t.IsClosed() {
+			continue
+		}
+		pending = append(pending, restartInfo{
+			index: i,
+			opts:  t.Options(),
+			fav:   t.IsFavorite(),
+			stats: t.Stats(),
+		})
+		t.Close()
+	}
+
+	// Phase 2: start new tunnels with the updated config.
+	for _, p := range pending {
+		newT := createTunnel(tunnels.list[p.index].Type(), Options{
+			ID:          p.opts.ID,
+			Name:        p.opts.Name,
+			Endpoint:    p.opts.Endpoint,
+			Hostname:    p.opts.Hostname,
+			Username:    p.opts.Username,
+			Password:    p.opts.Password,
+			EnableTLS:   p.opts.EnableTLS,
+			RewriteHost: p.opts.RewriteHost,
+			FileUpload:  p.opts.FileUpload,
+			CreatedAt:   p.opts.CreatedAt,
+		})
+		if newT == nil {
+			continue
+		}
+
+		newT.SetStats(p.stats)
+		newT.Favorite(p.fav)
+
+		if err := newT.Run(); err != nil {
+			logger.Default().Error(fmt.Sprintf("restart tunnel %s: %v", p.opts.Name, err))
+			continue
+		}
+
+		Set(newT)
+	}
+
+	SaveConfig()
+}
+
 // ChainConfig builds a GOST chain configuration that connects to the tunnel server.
 func ChainConfig(id string, name string) *xconfig.ChainConfig {
+	s := config.Get().Settings
+	secure := true
+	if s != nil && s.Insecure {
+		secure = false
+	}
+
 	return &xconfig.ChainConfig{
 		Name: name,
 		Hops: []*xconfig.HopConfig{
@@ -237,7 +327,7 @@ func ChainConfig(id string, name string) *xconfig.ChainConfig {
 				Nodes: []*xconfig.NodeConfig{
 					{
 						Name: name,
-						Addr: ServerAddr,
+						Addr: GetServerAddr(),
 						Connector: &xconfig.ConnectorConfig{
 							Type:     "tunnel",
 							Metadata: map[string]any{"tunnel.id": id},
@@ -245,8 +335,8 @@ func ChainConfig(id string, name string) *xconfig.ChainConfig {
 						Dialer: &xconfig.DialerConfig{
 							Type: "wss",
 							TLS: &xconfig.TLSConfig{
-								Secure:     true,
-								ServerName: ServerName,
+								Secure:     secure,
+								ServerName: GetServerName(),
 							},
 						},
 					},

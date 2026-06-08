@@ -79,7 +79,7 @@ func (s *udpTunnel) Type() string     { return UDPTunnel }
 func (s *udpTunnel) Name() string     { return s.opts.Name }
 func (s *udpTunnel) Endpoint() string { return s.opts.Endpoint }
 func (s *udpTunnel) Entrypoint() string {
-	return fmt.Sprintf("%s.%s", s.endpoint, EndpointAddr)
+	return fmt.Sprintf("%s.%s", s.endpoint, GetEndpointAddr())
 }
 func (s *udpTunnel) Options() Options { return s.opts }
 func (s *udpTunnel) Favorite(b bool)  { s.favorite.Store(b) }

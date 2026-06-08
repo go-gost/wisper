@@ -81,7 +81,7 @@ func (s *httpTunnel) Type() string     { return HTTPTunnel }
 func (s *httpTunnel) Name() string     { return s.opts.Name }
 func (s *httpTunnel) Endpoint() string { return s.opts.Endpoint }
 func (s *httpTunnel) Entrypoint() string {
-	return fmt.Sprintf("https://%s.%s", s.endpoint, EndpointAddr)
+	return fmt.Sprintf("https://%s.%s", s.endpoint, GetEndpointAddr())
 }
 func (s *httpTunnel) Options() Options { return s.opts }
 func (s *httpTunnel) Favorite(b bool)  { s.favorite.Store(b) }

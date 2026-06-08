@@ -87,5 +87,11 @@
   "typeUdpDesc": "转发本地 UDP 端口",
   "typeTcpEntryDesc": "通过隧道暴露 TCP 服务",
   "typeUdpEntryDesc": "通过隧道暴露 UDP 服务",
-  "settingsFavorites": "收藏"
+  "settingsFavorites": "收藏",
+  "settingsServer": "隧道服务器",
+  "settingsServerHint": "例如 tunnel.gost.run",
+  "settingsEntrypoint": "入口域名",
+  "settingsEntrypointHint": "例如 gost.run",
+  "settingsInsecure": "跳过 TLS 验证",
+  "settingsInsecureDesc": "禁用证书验证，适用于私有/自签名服务器"
 }

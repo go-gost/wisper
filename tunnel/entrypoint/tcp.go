@@ -79,7 +79,7 @@ func (s *tcpEntryPoint) ID() string   { return s.opts.ID }
 func (s *tcpEntryPoint) Type() string { return TCPEntryPoint }
 func (s *tcpEntryPoint) Name() string { return s.opts.Name }
 func (s *tcpEntryPoint) Endpoint() string {
-	return fmt.Sprintf("%s.%s", s.endpoint, tunnel.EndpointAddr)
+	return fmt.Sprintf("%s.%s", s.endpoint, tunnel.GetEndpointAddr())
 }
 func (s *tcpEntryPoint) Entrypoint() string { return s.opts.Endpoint }
 func (s *tcpEntryPoint) Options() tunnel.Options { return s.opts }

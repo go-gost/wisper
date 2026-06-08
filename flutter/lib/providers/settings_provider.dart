@@ -28,8 +28,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       if (!mounted) return;
       state = AppSettings(
         theme: _parseTheme(config['theme'] as String?),
-        language: _parseLanguage(config['language'] as String?),
+        language: _parseLanguage(config['lang'] as String?),
         backendPort: config['port'] as int? ?? 8900,
+        server: config['server'] as String? ?? '',
+        entrypoint: config['entrypoint'] as String? ?? '',
+        insecure: config['insecure'] as bool? ?? false,
       );
     } catch (_) {
       // Use defaults if backend is unavailable
@@ -48,13 +51,34 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _saveToBackend();
   }
 
+  /// Update tunnel server hostname.
+  Future<void> setServer(String server) async {
+    state = state.copyWith(server: server);
+    await _saveToBackend();
+  }
+
+  /// Update entrypoint domain.
+  Future<void> setEntrypoint(String entrypoint) async {
+    state = state.copyWith(entrypoint: entrypoint);
+    await _saveToBackend();
+  }
+
+  /// Update TLS skip-verify setting.
+  Future<void> setInsecure(bool insecure) async {
+    state = state.copyWith(insecure: insecure);
+    await _saveToBackend();
+  }
+
   Future<void> _saveToBackend() async {
     try {
       final backend = ref.read(backendProvider);
       await backend.updateConfig({
         'theme': state.theme.name,
-        'language': state.language.name,
+        'lang': state.language.name,
         'port': state.backendPort,
+        'server': state.server,
+        'entrypoint': state.entrypoint,
+        'insecure': state.insecure,
       });
     } catch (_) {
       // Silently fail — settings are kept locally

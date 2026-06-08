@@ -21,9 +21,13 @@ all: linux darwin windows
 
 # ----- Flutter Web (embedded into Go binary) -----
 web:
-	cd flutter && flutter build web
+	cd flutter && flutter build web --no-source-maps --no-wasm-dry-run
 	rm -rf web
-	cp -r flutter/build/web web
+	mv flutter/build/web web
+	rm -rf web/canvaskit
+	rm -rf web/assets/assets/backend
+	find web/ -name '*.symbols' -delete
+	find web/ -name 'NOTICES' -delete
 
 # ----- Linux -----
 linux: $(DIST_DIR)/linux-amd64/$(BINARY)

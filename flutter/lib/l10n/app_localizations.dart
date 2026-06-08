@@ -505,6 +505,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Favorites'**
   String get settingsFavorites;
+
+  /// No description provided for @settingsServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Tunnel Server'**
+  String get settingsServer;
+
+  /// No description provided for @settingsServerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. tunnel.gost.run'**
+  String get settingsServerHint;
+
+  /// No description provided for @settingsEntrypoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Entrypoint Domain'**
+  String get settingsEntrypoint;
+
+  /// No description provided for @settingsEntrypointHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. gost.run'**
+  String get settingsEntrypointHint;
+
+  /// No description provided for @settingsInsecure.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip TLS Verify'**
+  String get settingsInsecure;
+
+  /// No description provided for @settingsInsecureDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable certificate verification for private/self-signed servers'**
+  String get settingsInsecureDesc;
 }
 
 class _AppLocalizationsDelegate
