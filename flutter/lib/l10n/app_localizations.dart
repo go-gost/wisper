@@ -320,6 +320,12 @@ abstract class AppLocalizations {
   /// **'Enable TLS'**
   String get switchEnableTLS;
 
+  /// No description provided for @switchFileUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'File Upload'**
+  String get switchFileUpload;
+
   /// No description provided for @switchKeepalive.
   ///
   /// In en, this message translates to:

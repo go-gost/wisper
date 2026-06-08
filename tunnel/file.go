@@ -92,12 +92,16 @@ func (s *fileTunnel) Favorite(b bool)  { s.favorite.Store(b) }
 func (s *fileTunnel) IsFavorite() bool { return s.favorite.Load() }
 
 func (s *fileTunnel) init() error {
+	handlerMeta := map[string]any{"file.dir": s.opts.Endpoint}
+	if s.opts.FileUpload {
+		handlerMeta["file.put"] = true
+	}
 	fileSvc := &config.ServiceConfig{
 		Name: s.opts.Name,
 		Addr: ":0",
 		Handler: &config.HandlerConfig{
 			Type:     "file",
-			Metadata: map[string]any{"file.dir": s.opts.Endpoint},
+			Metadata: handlerMeta,
 		},
 		Listener: &config.ListenerConfig{
 			Type: "tcp",
@@ -228,10 +232,16 @@ func (s *fileTunnel) Run() (err error) {
 
 	go s.file.Serve()
 	go func() {
-		s.setErr(s.forward.Serve())
+		serveErr := s.forward.Serve()
+		if serveErr != nil {
+			log.Error("file tunnel forwarder stopped with error", "err", serveErr)
+		} else {
+			log.Info("file tunnel forwarder stopped")
+		}
+		s.setErr(serveErr)
 	}()
 
-	log.Infof("file service run at %s", s.file.Addr())
+	log.Infof("file service run at %s, entrypoint: https://%s.%s", s.file.Addr(), s.endpoint, EndpointAddr)
 	return nil
 }
 

@@ -37,6 +37,7 @@
   "fieldHostname": "Hostname",
   "switchRewriteHost": "Rewrite Host",
   "switchEnableTLS": "Enable TLS",
+  "switchFileUpload": "File Upload",
   "switchKeepalive": "Keepalive",
   "labelStatistics": "Statistics",
   "statusRunning": "running",

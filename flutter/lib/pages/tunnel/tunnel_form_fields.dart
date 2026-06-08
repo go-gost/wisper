@@ -21,6 +21,8 @@ class TunnelFormFields extends StatefulWidget {
     required this.rewriteHost,
     this.onRewriteHostChanged,
     required this.hostnameCtrl,
+    required this.fileUpload,
+    this.onFileUploadChanged,
   });
 
   final String type;
@@ -35,6 +37,8 @@ class TunnelFormFields extends StatefulWidget {
   final bool rewriteHost;
   final ValueChanged<bool>? onRewriteHostChanged;
   final TextEditingController hostnameCtrl;
+  final bool fileUpload;
+  final ValueChanged<bool>? onFileUploadChanged;
 
   @override
   State<TunnelFormFields> createState() => _TunnelFormFieldsState();
@@ -112,6 +116,13 @@ class _TunnelFormFieldsState extends State<TunnelFormFields> {
             readOnly: !widget.isEditing,
           ),
         ],
+        const SizedBox(height: 16),
+        SwitchListTile(
+          title: Text(l10n.switchFileUpload),
+          value: widget.fileUpload,
+          onChanged: widget.isEditing ? widget.onFileUploadChanged : null,
+          contentPadding: EdgeInsets.zero,
+        ),
       ],
     );
   }

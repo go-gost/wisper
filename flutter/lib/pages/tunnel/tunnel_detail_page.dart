@@ -51,6 +51,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
   // HTTP tunnel fields
   bool _enableTLS = false;
   bool _rewriteHost = false;
+  bool _fileUpload = false;
   late TextEditingController _hostnameCtrl;
 
   bool get _isNew => widget.id == 'new';
@@ -92,6 +93,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     _passwordCtrl.text = tunnel.options.password;
     _enableTLS = tunnel.options.enableTLS;
     _rewriteHost = tunnel.options.rewriteHost;
+    _fileUpload = tunnel.options.fileUpload;
     _hostnameCtrl.text = tunnel.options.hostname;
   }
 
@@ -262,6 +264,9 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                     onRewriteHostChanged: (v) =>
                         setState(() => _rewriteHost = v),
                     hostnameCtrl: _hostnameCtrl,
+                    fileUpload: _fileUpload,
+                    onFileUploadChanged: (v) =>
+                        setState(() => _fileUpload = v),
                   ),
 
                   // Stats section (view mode only) — uses live-polled stats
@@ -445,6 +450,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
       body['basic_auth'] = _basicAuth;
       body['username'] = _basicAuth ? _usernameCtrl.text : '';
       body['password'] = _basicAuth ? _passwordCtrl.text : '';
+      body['file_upload'] = _fileUpload;
     }
     if (widget.type == 'http') {
       body['enableTLS'] = _enableTLS;

@@ -37,6 +37,7 @@
   "fieldHostname": "主机名",
   "switchRewriteHost": "重写主机",
   "switchEnableTLS": "启用 TLS",
+  "switchFileUpload": "文件上传",
   "switchKeepalive": "保活",
   "labelStatistics": "统计",
   "statusRunning": "运行中",

@@ -120,6 +120,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchEnableTLS => 'Enable TLS';
 
   @override
+  String get switchFileUpload => 'File Upload';
+
+  @override
   String get switchKeepalive => 'Keepalive';
 
   @override

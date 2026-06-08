@@ -122,6 +122,7 @@ type Tunnel struct {
 	Password  string `yaml:",omitempty"`
 	EnableTLS   bool   `yaml:"enableTLS,omitempty"`
 	RewriteHost bool   `yaml:"rewriteHost,omitempty"`
+	FileUpload  bool   `yaml:"fileUpload,omitempty"`
 	Keepalive   bool   `yaml:",omitempty"`
 	TTL       int    `yaml:"ttl,omitempty"`
 

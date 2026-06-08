@@ -120,6 +120,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get switchEnableTLS => '启用 TLS';
 
   @override
+  String get switchFileUpload => '文件上传';
+
+  @override
   String get switchKeepalive => '保活';
 
   @override

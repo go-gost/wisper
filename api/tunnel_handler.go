@@ -29,6 +29,7 @@ type tunnelOptionsResp struct {
 	BasicAuth   bool   `json:"basic_auth"`
 	EnableTLS   bool   `json:"enableTLS,omitempty"`
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
+	FileUpload  bool   `json:"file_upload,omitempty"`
 	Keepalive   bool   `json:"keepalive,omitempty"`
 	TTL         int    `json:"ttl,omitempty"`
 }
@@ -72,6 +73,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			BasicAuth:   opts.Username != "",
 			EnableTLS:   opts.EnableTLS,
 			RewriteHost: opts.RewriteHost,
+			FileUpload:  opts.FileUpload,
 			Keepalive:   opts.Keepalive,
 			TTL:         opts.TTL,
 		},
@@ -104,6 +106,7 @@ type tunnelCreateRequest struct {
 	Password    string `json:"password,omitempty"`
 	EnableTLS   bool   `json:"enableTLS,omitempty"`
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
+	FileUpload  bool   `json:"file_upload,omitempty"`
 }
 
 func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
@@ -115,6 +118,7 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.PasswordOption(r.Password),
 		tunnel.EnableTLSOption(r.EnableTLS),
 		tunnel.RewriteHostOption(r.RewriteHost),
+		tunnel.FileUploadOption(r.FileUpload),
 	}
 }
 
@@ -275,6 +279,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnel.PasswordOption(opts.Password),
 		tunnel.EnableTLSOption(opts.EnableTLS),
 		tunnel.RewriteHostOption(opts.RewriteHost),
+		tunnel.FileUploadOption(opts.FileUpload),
 		tunnel.CreatedAtOption(opts.CreatedAt),
 	}
 

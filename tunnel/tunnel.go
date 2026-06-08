@@ -40,6 +40,7 @@ type Options struct {
 	Password    string
 	EnableTLS   bool
 	RewriteHost bool
+	FileUpload  bool
 	Keepalive   bool
 	TTL         int
 	CreatedAt   time.Time
@@ -94,6 +95,12 @@ func EnableTLSOption(b bool) Option {
 func RewriteHostOption(b bool) Option {
 	return func(opts *Options) {
 		opts.RewriteHost = b
+	}
+}
+
+func FileUploadOption(b bool) Option {
+	return func(opts *Options) {
+		opts.FileUpload = b
 	}
 }
 
@@ -265,6 +272,7 @@ func LoadConfig() {
 			Password:    cfg.Password,
 			EnableTLS:   cfg.EnableTLS,
 			RewriteHost: cfg.RewriteHost,
+			FileUpload:  cfg.FileUpload,
 			CreatedAt:   cfg.CreatedAt,
 			Stats:       cfg.Stats,
 		})
@@ -306,6 +314,7 @@ func SaveConfig() error {
 			Password:  opts.Password,
 				EnableTLS:   opts.EnableTLS,
 				RewriteHost: opts.RewriteHost,
+				FileUpload:  opts.FileUpload,
 			Favorite:  tun.IsFavorite(),
 			Closed:    tun.IsClosed(),
 			CreatedAt: opts.CreatedAt,
@@ -333,6 +342,7 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		EnableTLSOption(opts.EnableTLS),
 		CreatedAtOption(opts.CreatedAt),
 			RewriteHostOption(opts.RewriteHost),
+			FileUploadOption(opts.FileUpload),
 	}
 
 	switch st {

@@ -47,6 +47,7 @@ TunnelOptions _$TunnelOptionsFromJson(Map<String, dynamic> json) =>
       basicAuth: json['basic_auth'] as bool? ?? false,
       enableTLS: json['enableTLS'] as bool? ?? false,
       rewriteHost: json['rewriteHost'] as bool? ?? false,
+      fileUpload: json['file_upload'] as bool? ?? false,
       keepalive: json['keepalive'] as bool? ?? false,
       ttl: (json['ttl'] as num?)?.toInt() ?? 0,
     );
@@ -60,6 +61,7 @@ Map<String, dynamic> _$TunnelOptionsToJson(TunnelOptions instance) =>
       'basic_auth': instance.basicAuth,
       'enableTLS': instance.enableTLS,
       'rewriteHost': instance.rewriteHost,
+      'file_upload': instance.fileUpload,
       'keepalive': instance.keepalive,
       'ttl': instance.ttl,
     };

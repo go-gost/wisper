@@ -50,6 +50,7 @@ class TunnelOptions {
     this.basicAuth = false,
     this.enableTLS = false,
     this.rewriteHost = false,
+    this.fileUpload = false,
     this.keepalive = false,
     this.ttl = 0,
   });
@@ -62,6 +63,8 @@ class TunnelOptions {
   final bool basicAuth;
   final bool enableTLS;
   final bool rewriteHost;
+  @JsonKey(name: 'file_upload')
+  final bool fileUpload;
   final bool keepalive;
   final int ttl;
 
