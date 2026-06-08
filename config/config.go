@@ -103,9 +103,9 @@ func Set(c *Config) {
 
 // Settings holds application settings.
 type Settings struct {
-	// Server address (default: tunnel.gost.plus).
+	// Server address (default: tunnel.gost.run).
 	Server string
-	// Public entrypoint address (default: gost.plus).
+	// Public entrypoint address (default: gost.run).
 	Entrypoint string
 	Lang       string
 	Theme      string
@@ -113,18 +113,18 @@ type Settings struct {
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.
 type Tunnel struct {
-	ID        string
-	Name      string
-	Type      string
-	Endpoint  string
-	Hostname  string `yaml:",omitempty"`
-	Username  string `yaml:",omitempty"`
-	Password  string `yaml:",omitempty"`
+	ID          string
+	Name        string
+	Type        string
+	Endpoint    string
+	Hostname    string `yaml:",omitempty"`
+	Username    string `yaml:",omitempty"`
+	Password    string `yaml:",omitempty"`
 	EnableTLS   bool   `yaml:"enableTLS,omitempty"`
 	RewriteHost bool   `yaml:"rewriteHost,omitempty"`
 	FileUpload  bool   `yaml:"fileUpload,omitempty"`
 	Keepalive   bool   `yaml:",omitempty"`
-	TTL       int    `yaml:"ttl,omitempty"`
+	TTL         int    `yaml:"ttl,omitempty"`
 
 	Stats     ServiceStats
 	Favorite  bool

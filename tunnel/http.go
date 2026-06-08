@@ -213,7 +213,13 @@ func (s *httpTunnel) Run() (err error) {
 	}
 
 	go func() {
-		s.setErr(s.forward.Serve())
+		serveErr := s.forward.Serve()
+		if serveErr != nil {
+			log.Error("http tunnel forwarder stopped with error", "err", serveErr)
+		} else {
+			log.Info("http tunnel forwarder stopped")
+		}
+		s.setErr(serveErr)
 	}()
 
 	return nil
