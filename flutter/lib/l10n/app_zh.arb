@@ -34,6 +34,7 @@
   "fieldTTL": "TTL",
   "fieldTTLHint": "例如 30s",
   "switchBasicAuth": "基本认证",
+  "fieldHostname": "主机名",
   "switchRewriteHost": "重写主机",
   "switchEnableTLS": "启用 TLS",
   "switchKeepalive": "保活",

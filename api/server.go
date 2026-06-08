@@ -46,7 +46,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // NewHandler returns the root HTTP handler with all API routes registered.
-func NewHandler() http.Handler {
+// If webHandler is non-nil, non-API requests are served by it (embedded Flutter web UI).
+func NewHandler(webHandler http.Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	// Tunnel endpoints
@@ -71,6 +72,11 @@ func NewHandler() http.Handler {
 	mux.HandleFunc("GET /api/stats", handleGetStats)
 	mux.HandleFunc("GET /api/config", handleGetConfig)
 	mux.HandleFunc("PUT /api/config", handleUpdateConfig)
+
+	// Serve embedded web UI for non-API requests.
+	if webHandler != nil {
+		mux.Handle("/", webHandler)
+	}
 
 	return corsMiddleware(mux)
 }

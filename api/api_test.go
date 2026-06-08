@@ -33,7 +33,7 @@ func setupTestServer(t *testing.T) *httptest.Server {
 
 	config.Set(&config.Config{})
 
-	return httptest.NewServer(NewHandler())
+	return httptest.NewServer(NewHandler(nil))
 }
 
 // preRegisterTunnel creates a tunnel object (without calling Run) and

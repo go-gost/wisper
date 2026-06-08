@@ -302,6 +302,12 @@ abstract class AppLocalizations {
   /// **'Basic Auth'**
   String get switchBasicAuth;
 
+  /// No description provided for @fieldHostname.
+  ///
+  /// In en, this message translates to:
+  /// **'Hostname'**
+  String get fieldHostname;
+
   /// No description provided for @switchRewriteHost.
   ///
   /// In en, this message translates to:

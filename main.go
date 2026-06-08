@@ -43,8 +43,8 @@ func main() {
 		runner.WithCancel(true),
 	)
 
-	// Start HTTP API server.
-	handler := api.NewHandler()
+	// Start HTTP API server (with embedded web UI).
+	handler := api.NewHandler(webFileServer())
 	srv := &http.Server{Handler: handler}
 
 	ln, err := net.Listen("tcp", *addr)

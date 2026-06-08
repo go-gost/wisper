@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -100,6 +101,12 @@ func (s *httpTunnel) init() error {
 	}
 	if s.opts.Hostname != "" {
 		node.HTTP.Host = s.opts.Hostname
+	} else if s.opts.RewriteHost {
+		host, _, _ := net.SplitHostPort(s.opts.Endpoint)
+		if host == "" {
+			host = s.opts.Endpoint
+		}
+		node.HTTP.Host = host
 	}
 	if s.opts.EnableTLS {
 		node.TLS = &config.TLSNodeConfig{}

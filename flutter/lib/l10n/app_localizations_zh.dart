@@ -111,6 +111,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get switchBasicAuth => '基本认证';
 
   @override
+  String get fieldHostname => '主机名';
+
+  @override
   String get switchRewriteHost => '重写主机';
 
   @override

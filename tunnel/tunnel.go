@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	EndpointAddr = "gost.plus"
-	ServerName   = "tunnel.gost.plus"
+	EndpointAddr = "gost.run"
+	ServerName   = "tunnel.gost.run"
 	ServerAddr   = ServerName + ":443"
 )
 
@@ -32,18 +32,18 @@ var (
 
 // Options holds the configuration for creating a tunnel.
 type Options struct {
-	ID        string
-	Name      string
-	Endpoint  string
-	Hostname  string
-	Username  string
-	Password  string
+	ID          string
+	Name        string
+	Endpoint    string
+	Hostname    string
+	Username    string
+	Password    string
 	EnableTLS   bool
 	RewriteHost bool
 	Keepalive   bool
-	TTL       int
-	CreatedAt time.Time
-	Stats     config.ServiceStats
+	TTL         int
+	CreatedAt   time.Time
+	Stats       config.ServiceStats
 }
 
 // Option is a functional option for tunnel Options.
@@ -257,16 +257,16 @@ func LoadConfig() {
 		}
 
 		tun := createTunnel(cfg.Type, Options{
-			ID:        cfg.ID,
-			Name:      cfg.Name,
-			Endpoint:  cfg.Endpoint,
-			Hostname:  cfg.Hostname,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
+			ID:          cfg.ID,
+			Name:        cfg.Name,
+			Endpoint:    cfg.Endpoint,
+			Hostname:    cfg.Hostname,
+			Username:    cfg.Username,
+			Password:    cfg.Password,
 			EnableTLS:   cfg.EnableTLS,
 			RewriteHost: cfg.RewriteHost,
 			CreatedAt:   cfg.CreatedAt,
-			Stats:     cfg.Stats,
+			Stats:       cfg.Stats,
 		})
 		if tun == nil {
 			continue
@@ -304,7 +304,8 @@ func SaveConfig() error {
 			Hostname:  opts.Hostname,
 			Username:  opts.Username,
 			Password:  opts.Password,
-			EnableTLS: opts.EnableTLS,
+				EnableTLS:   opts.EnableTLS,
+				RewriteHost: opts.RewriteHost,
 			Favorite:  tun.IsFavorite(),
 			Closed:    tun.IsClosed(),
 			CreatedAt: opts.CreatedAt,
@@ -331,6 +332,7 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		PasswordOption(opts.Password),
 		EnableTLSOption(opts.EnableTLS),
 		CreatedAtOption(opts.CreatedAt),
+			RewriteHostOption(opts.RewriteHost),
 	}
 
 	switch st {

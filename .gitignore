@@ -19,3 +19,6 @@ api/config.yml
 
 # CodeGraph daemon
 .codegraph/daemon.pid
+
+# Flutter build cache
+flutter/build/

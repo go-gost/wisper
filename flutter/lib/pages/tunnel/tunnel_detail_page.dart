@@ -51,6 +51,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
   // HTTP tunnel fields
   bool _enableTLS = false;
   bool _rewriteHost = false;
+  late TextEditingController _hostnameCtrl;
 
   bool get _isNew => widget.id == 'new';
 
@@ -63,6 +64,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     _directoryCtrl = TextEditingController();
     _usernameCtrl = TextEditingController();
     _passwordCtrl = TextEditingController();
+    _hostnameCtrl = TextEditingController();
   }
 
   @override
@@ -72,6 +74,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     _directoryCtrl.dispose();
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _hostnameCtrl.dispose();
     super.dispose();
   }
 
@@ -89,6 +92,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     _passwordCtrl.text = tunnel.options.password;
     _enableTLS = tunnel.options.enableTLS;
     _rewriteHost = tunnel.options.rewriteHost;
+    _hostnameCtrl.text = tunnel.options.hostname;
   }
 
   @override
@@ -257,6 +261,7 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
                     rewriteHost: _rewriteHost,
                     onRewriteHostChanged: (v) =>
                         setState(() => _rewriteHost = v),
+                    hostnameCtrl: _hostnameCtrl,
                   ),
 
                   // Stats section (view mode only) — uses live-polled stats
@@ -444,6 +449,9 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
     if (widget.type == 'http') {
       body['enableTLS'] = _enableTLS;
       body['rewriteHost'] = _rewriteHost;
+      if (body['rewriteHost'] == true) {
+        body['hostname'] = _hostnameCtrl.text;
+      }
     }
 
     try {
@@ -454,6 +462,9 @@ class _TunnelDetailPageState extends ConsumerState<TunnelDetailPage> {
         await backend.updateTunnel(widget.id, body);
       }
       await ref.read(tunnelListProvider.notifier).refresh();
+      if (!_isNew) {
+        ref.invalidate(tunnelProvider(widget.id));
+      }
       if (mounted) {
         messenger.showSnackBar(SnackBar(content: Text(l10n.saved)));
         context.pop();

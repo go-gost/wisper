@@ -1,7 +1,7 @@
 /// Tunnel/Entrypoint card used in the home page list.
 ///
 /// Two-column layout: left = name/type/endpoint, right = stats.
-/// Stacks vertically on narrow screens (≤600px).
+/// Left column expands to fill available space; right column takes natural width.
 library;
 
 import 'package:flutter/material.dart';
@@ -69,33 +69,36 @@ class TunnelCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final narrow = constraints.maxWidth <= 600;
-              if (narrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLeftColumn(context),
-                    const SizedBox(height: 12),
-                    _buildRightColumn(context, narrow: true),
-                  ],
-                );
-              }
-              return Row(
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 3, child: _buildLeftColumn(context)),
-                  Expanded(
-                    flex: 2,
-                    child: _buildRightColumn(context, narrow: false),
+                  Expanded(child: _buildLeftColumn(context)),
+                  const SizedBox(width: 24),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: _buildRightColumn(context),
                   ),
                 ],
-              );
-            },
-          ),
+              ),
+            ),
+            // Status dot anchored at top-right for consistent positioning.
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: _statusColor(status),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -105,25 +108,10 @@ class TunnelCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                name,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: _statusColor(status),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
+        Text(
+          name,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
         Text(
@@ -145,10 +133,9 @@ class TunnelCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRightColumn(BuildContext context, {required bool narrow}) {
-    final align = narrow ? CrossAxisAlignment.start : CrossAxisAlignment.end;
+  Widget _buildRightColumn(BuildContext context) {
     return Column(
-      crossAxisAlignment: align,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         StatsRow(
           icon: Icons.swap_vert,

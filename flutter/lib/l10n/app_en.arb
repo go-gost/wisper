@@ -34,6 +34,7 @@
   "fieldTTL": "TTL",
   "fieldTTLHint": "e.g. 30s",
   "switchBasicAuth": "Basic Auth",
+  "fieldHostname": "Hostname",
   "switchRewriteHost": "Rewrite Host",
   "switchEnableTLS": "Enable TLS",
   "switchKeepalive": "Keepalive",

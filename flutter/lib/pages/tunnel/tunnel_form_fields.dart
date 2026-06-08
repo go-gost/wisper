@@ -20,6 +20,7 @@ class TunnelFormFields extends StatefulWidget {
     this.onEnableTLSChanged,
     required this.rewriteHost,
     this.onRewriteHostChanged,
+    required this.hostnameCtrl,
   });
 
   final String type;
@@ -33,6 +34,7 @@ class TunnelFormFields extends StatefulWidget {
   final ValueChanged<bool>? onEnableTLSChanged;
   final bool rewriteHost;
   final ValueChanged<bool>? onRewriteHostChanged;
+  final TextEditingController hostnameCtrl;
 
   @override
   State<TunnelFormFields> createState() => _TunnelFormFieldsState();
@@ -126,6 +128,19 @@ class _TunnelFormFieldsState extends State<TunnelFormFields> {
           onChanged: widget.isEditing ? widget.onRewriteHostChanged : null,
           contentPadding: EdgeInsets.zero,
         ),
+        if (widget.rewriteHost) ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: widget.hostnameCtrl,
+            decoration: InputDecoration(
+              labelText: l10n.fieldHostname,
+              hintText: 'e.g. example.local',
+              border: const OutlineInputBorder(),
+            ),
+            readOnly: !widget.isEditing,
+          ),
+        ],
+        const SizedBox(height: 8),
         SwitchListTile(
           title: Text(l10n.switchEnableTLS),
           value: widget.enableTLS,

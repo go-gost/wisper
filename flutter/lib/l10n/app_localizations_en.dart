@@ -111,6 +111,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchBasicAuth => 'Basic Auth';
 
   @override
+  String get fieldHostname => 'Hostname';
+
+  @override
   String get switchRewriteHost => 'Rewrite Host';
 
   @override

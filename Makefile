@@ -15,9 +15,15 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 DIST_DIR   := dist
 FLUTTER_ASSETS := flutter/assets/backend
 
-.PHONY: all linux darwin windows clean
+.PHONY: all linux darwin windows web clean
 
 all: linux darwin windows
+
+# ----- Flutter Web (embedded into Go binary) -----
+web:
+	cd flutter && flutter build web
+	rm -rf web
+	cp -r flutter/build/web web
 
 # ----- Linux -----
 linux: $(DIST_DIR)/linux-amd64/$(BINARY)

@@ -236,6 +236,11 @@ body {
 .card:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
 .card:active { transform: translateY(0); }
 
+/* Card */
+.card {
+  position: relative;  /* anchor for status dot */
+}
+
 /* Tunnel Card */
 .tunnel-card-body {
   display: flex;
@@ -249,6 +254,7 @@ body {
 .tunnel-card-right {
   flex-shrink: 0;
   text-align: right;
+  padding-top: 20px;  /* clear the status dot */
 }
 
 .tunnel-card-header {
@@ -257,12 +263,13 @@ body {
   margin-bottom: 8px;
 }
 .tunnel-name { font-weight: 600; font-size: 1.1rem; }
+/* Status dot anchored at top-right for consistent positioning */
 .status-dot {
   width: 12px; height: 12px;
   border-radius: 50%;
-  display: inline-block;
-  margin-left: 10px;
-  flex-shrink: 0;
+  position: absolute;
+  top: 20px;
+  right: 24px;
 }
 .status-dot.running { background: var(--status-running); }
 .status-dot.error   { background: var(--status-error); }

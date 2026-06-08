@@ -38,5 +38,5 @@ final backendReadyProvider = FutureProvider<bool>((ref) async {
 final backendProvider = Provider<GoBackend>((ref) {
   // Watch the readiness provider so this rebuilds if backend restarts.
   ref.watch(backendReadyProvider);
-  return GoBackend(port: kDefaultBackendPort);
+  return GoBackend();
 });

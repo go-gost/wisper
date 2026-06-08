@@ -10,9 +10,14 @@ import '../models/entrypoint.dart';
 import '../models/tunnel_stats.dart';
 
 /// HTTP client for the Wisper Go backend API.
+///
+/// When no host/port is specified, requests use relative paths (same-origin),
+/// which works when the Flutter web UI is embedded in the Go binary.
 class GoBackend {
-  GoBackend({String host = 'localhost', int port = 8900})
-      : _base = 'http://$host:$port';
+  GoBackend({String? host, int? port})
+      : _base = (host != null && port != null)
+            ? 'http://$host:$port'
+            : '';
 
   final String _base;
 
