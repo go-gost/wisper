@@ -118,7 +118,11 @@ func (s *tcpTunnel) Run() (err error) {
 		return ErrTunnelClosed
 	}
 
-	defer func() { s.setErr(err) }()
+	defer func() {
+		if err != nil {
+			s.setErr(err)
+		}
+	}()
 
 	if err = s.init(); err != nil {
 		return
@@ -173,7 +177,11 @@ func (s *tcpTunnel) Run() (err error) {
 	}
 
 	go func() {
-		s.setErr(s.forward.Serve())
+		serveErr := s.forward.Serve()
+		if serveErr != nil {
+			log.Error("tcp tunnel serve error", "err", serveErr)
+		}
+		s.setErr(serveErr)
 	}()
 
 	return nil

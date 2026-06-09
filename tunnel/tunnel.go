@@ -150,6 +150,15 @@ type ServiceStatus interface {
 	Status() *xservice.Status
 }
 
+// IsServiceFailed checks whether the tunnel's underlying GOST service is in a
+// failed state (e.g., cannot connect to the relay server). This is more
+// reliable than Err() because Serve() retries temporary bind/accept errors
+// indefinitely and never returns.
+func IsServiceFailed(t Tunnel) bool {
+	s := t.Status()
+	return s != nil && s.State() == xservice.StateFailed
+}
+
 // Tunnel is the interface for all tunnel and entrypoint types.
 type Tunnel interface {
 	ID() string

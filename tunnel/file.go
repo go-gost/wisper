@@ -139,7 +139,11 @@ func (s *fileTunnel) Run() (err error) {
 		return ErrTunnelClosed
 	}
 
-	defer func() { s.setErr(err) }()
+	defer func() {
+		if err != nil {
+			s.setErr(err)
+		}
+	}()
 
 	if err = s.init(); err != nil {
 		return

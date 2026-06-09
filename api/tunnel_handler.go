@@ -49,7 +49,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	s := t.Stats()
 	status := "stopped"
 	if !t.IsClosed() {
-		if t.Err() != nil {
+		if t.Err() != nil || tunnel.IsServiceFailed(t) {
 			status = "error"
 		} else {
 			status = "running"

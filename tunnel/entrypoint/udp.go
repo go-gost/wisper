@@ -123,7 +123,11 @@ func (s *udpEntryPoint) Run() (err error) {
 		return ErrEntryPointClosed
 	}
 
-	defer func() { s.setErr(err) }()
+	defer func() {
+		if err != nil {
+			s.setErr(err)
+		}
+	}()
 
 	if err = s.init(); err != nil {
 		return
@@ -180,7 +184,11 @@ func (s *udpEntryPoint) Run() (err error) {
 	}
 
 	go func() {
-		s.setErr(s.forward.Serve())
+		serveErr := s.forward.Serve()
+		if serveErr != nil {
+			log.Error("udp entrypoint serve error", "err", serveErr)
+		}
+		s.setErr(serveErr)
 	}()
 
 	return nil
