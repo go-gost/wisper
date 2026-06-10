@@ -71,7 +71,7 @@ export class SettingsPage extends LitElement {
     this._debounceTimer = setTimeout(async () => {
       try {
         await updateSettings({ [field]: value });
-        this._showSnackbar(t('saved'));
+        this._showSnackbar('✓ ' + t('saved'));
       } catch {
         this._showSnackbar(t('saveFailed'));
       }
@@ -81,13 +81,13 @@ export class SettingsPage extends LitElement {
   private async _setTheme(theme: ThemePreference) {
     this._theme = theme;
     await updateSettings({ theme });
-    this._showSnackbar(t('saved'));
+    this._showSnackbar('✓ ' + t('saved'));
   }
 
   private async _setLang(lang: LanguagePreference) {
     this._lang = lang;
     await updateSettings({ lang });
-    this._showSnackbar(t('saved'));
+    this._showSnackbar('✓ ' + t('saved'));
   }
 
   private _cycleOption<T>(current: T, options: T[]): T {
@@ -96,155 +96,188 @@ export class SettingsPage extends LitElement {
   }
 
   static styles = css`
-    .title-row { display: flex; align-items: center; gap: 8px; }
+    /* ── AppBar ── */
     .back-btn {
-      background: none; border: none; cursor: pointer; font-size: 18px;
-      padding: 4px; color: var(--color-text-secondary); border-radius: 50%;
-      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      background: none; border: none; cursor: pointer;
+      font-size: 1.3rem; color: var(--color-text-primary); padding: 4px 8px;
+      border-radius: 8px; display: flex; align-items: center;
     }
-    .back-btn:hover { background: var(--color-surface-hover); }
-    .page-title { font-size: 18px; font-weight: 600; }
+    .back-btn:hover { background: var(--color-surface-variant); }
+    .page-title { font-size: 1.15rem; font-weight: 600; }
 
-    .app-info {
-      display: flex; flex-direction: column; align-items: center;
-      padding: 32px 0 20px; gap: 8px;
+    /* ── Settings header (matching prototype) ── */
+    .settings-header {
+      text-align: center;
+      padding: 32px 16px 24px;
     }
-    .app-icon {
-      width: 80px; height: 80px; border-radius: 20px;
-      background: var(--color-primary); color: white;
+    .settings-icon {
+      width: 80px; height: 80px;
+      background: var(--color-primary);
+      border-radius: 18px;
+      margin: 0 auto 16px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 36px; font-weight: 800;
+      color: white; font-weight: 700; font-size: 1.8rem;
     }
-    .app-name { font-size: 20px; font-weight: 700; color: var(--color-text-primary); }
-    .app-version { font-size: 13px; color: var(--color-text-muted); }
+    .settings-app-name { font-weight: 600; font-size: 1.2rem; margin-bottom: 4px; }
+    .settings-version { color: var(--color-stopped); font-size: 0.9rem; }
 
-    .card {
-      background: var(--color-surface); border: 1px solid var(--color-border);
-      border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px;
+    /* ── Card ── */
+    .detail-section { margin: 0 16px 16px; }
+    .detail-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
       box-shadow: var(--shadow-card);
+      padding: 0;
+      transition: background var(--transition-fast);
     }
+    .card-padded { padding: 20px; }
     .card-title {
       font-size: 14px; font-weight: 600; color: var(--color-text-primary);
       margin-bottom: 12px;
     }
 
-    .field { margin-bottom: 12px; }
-    .field label { display: block; font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 4px; }
-    .field input {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm); background: var(--color-surface);
-      color: var(--color-text-primary); font-size: 14px; font-family: inherit;
-      box-sizing: border-box; transition: border-color var(--transition-fast);
+    /* ── Form fields ── */
+    .form-group { margin-bottom: 12px; }
+    .form-label {
+      display: block;
+      font-size: 0.8rem; font-weight: 500;
+      color: var(--color-stopped);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
-    .field input:focus { border-color: var(--color-primary); outline: none; }
+    .form-input {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid var(--color-input-border);
+      border-radius: var(--radius-md); background: var(--color-input-bg);
+      color: var(--color-text-primary); font-size: 0.95rem;
+      font-family: inherit; outline: none; box-sizing: border-box;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
+    }
+    .form-input:focus { border-color: var(--color-primary); }
     .hint { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
 
+    /* ── Switch row ── */
     .switch-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .switch-label { font-size: 14px; color: var(--color-text-primary); }
+    .switch-label { font-size: 0.95rem; color: var(--color-text-primary); }
     .switch-desc { font-size: 12px; color: var(--color-text-muted); }
-    .switch { position: relative; width: 44px; height: 24px; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; inset: 0; background: var(--color-border);
-      border-radius: 12px; cursor: pointer; transition: var(--transition-fast);
+    .switch {
+      width: 44px; height: 24px; border-radius: 12px;
+      background: var(--color-stopped); position: relative;
+      cursor: pointer; transition: background var(--transition-fast); flex-shrink: 0;
     }
-    .slider::before {
-      content: ''; position: absolute; width: 18px; height: 18px;
-      left: 3px; bottom: 3px; background: white; border-radius: 50%;
-      transition: var(--transition-fast);
+    .switch.on { background: var(--color-primary); }
+    .switch-knob {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: white; position: absolute; top: 2px; left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
-    input:checked + .slider { background: var(--color-primary); }
-    input:checked + .slider::before { transform: translateX(20px); }
+    .switch.on .switch-knob { left: 22px; }
 
-    .selector-row {
+    /* ── Selector rows (matching prototype) ── */
+    .selector-field {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 0; border-bottom: 1px solid var(--color-divider);
+      padding: 14px 16px; border-bottom: 1px solid var(--color-divider);
       cursor: pointer;
     }
-    .selector-row:last-child { border-bottom: none; }
-    .selector-label { font-size: 14px; color: var(--color-text-primary); }
+    .selector-field:last-child { border-bottom: none; }
+    .selector-field:hover { background: var(--color-surface-variant); }
+    .selector-label { font-size: 0.95rem; }
     .selector-value {
-      font-size: 13px; color: var(--color-text-muted);
       display: flex; align-items: center; gap: 4px;
+      color: var(--color-stopped); font-size: 0.9rem;
     }
 
-    .snackbar {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      padding: 10px 20px; background: #333; color: white;
-      border-radius: var(--radius-pill); font-size: 13px;
-      z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      animation: snackIn 0.3s ease;
+    /* ── Toast ── */
+    .toast {
+      position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+      background: var(--color-toast-bg); color: var(--color-toast-fg);
+      padding: 12px 24px; border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      font-size: 0.9rem; z-index: 100;
+      display: flex; align-items: center; gap: 8px;
+      max-width: 400px; transition: background var(--transition-fast);
+      animation: toast-in 0.3s ease;
     }
-    @keyframes snackIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
   `;
 
   render() {
     return html`
       <app-scaffold>
-        <div slot="appBar" class="title-row">
+        <!-- AppBar -->
+        <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${() => this._navigate('/')}>←</button>
           <span class="page-title">${t('settingsTitle')}</span>
         </div>
 
-        <div class="app-info">
-          <div class="app-icon">W</div>
-          <div class="app-name">${t('appName')}</div>
-          <div class="app-version">v0.1.0</div>
+        <!-- App Info Header -->
+        <div class="settings-header">
+          <div class="settings-icon">W</div>
+          <div class="settings-app-name">${t('appName')}</div>
+          <div class="settings-version">v0.1.0</div>
         </div>
 
         <!-- Server Settings -->
-        <div class="card">
-          <div class="card-title">Server</div>
-          <div class="field">
-            <label>${t('settingsServer')}</label>
-            <input type="text" .value=${this._server}
-              placeholder=${t('settingsServerHint')}
-              @input=${(e: Event) => {
-                this._server = (e.target as HTMLInputElement).value;
-                this._debouncedSave('server', this._server);
-              }}>
-            <div class="hint">${t('settingsServerHint')}</div>
-          </div>
-          <div class="field">
-            <label>${t('settingsEntrypoint')}</label>
-            <input type="text" .value=${this._entrypoint}
-              placeholder=${t('settingsEntrypointHint')}
-              @input=${(e: Event) => {
-                this._entrypoint = (e.target as HTMLInputElement).value;
-                this._debouncedSave('entrypoint', this._entrypoint);
-              }}>
-            <div class="hint">${t('settingsEntrypointHint')}</div>
-          </div>
-          <div class="switch-row">
-            <div>
-              <div class="switch-label">${t('settingsInsecure')}</div>
-              <div class="switch-desc">${t('settingsInsecureDesc')}</div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" .checked=${this._insecure}
-                @change=${(e: Event) => {
-                  this._insecure = (e.target as HTMLInputElement).checked;
+        <div class="detail-section">
+          <div class="detail-card">
+            <div class="card-padded">
+              <div class="card-title">Server</div>
+              <div class="form-group">
+                <label class="form-label">${t('settingsServer')}</label>
+                <input class="form-input" .value=${this._server}
+                  placeholder=${t('settingsServerHint')}
+                  @input=${(e: Event) => {
+                    this._server = (e.target as HTMLInputElement).value;
+                    this._debouncedSave('server', this._server);
+                  }}>
+                <div class="hint">${t('settingsServerHint')}</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">${t('settingsEntrypoint')}</label>
+                <input class="form-input" .value=${this._entrypoint}
+                  placeholder=${t('settingsEntrypointHint')}
+                  @input=${(e: Event) => {
+                    this._entrypoint = (e.target as HTMLInputElement).value;
+                    this._debouncedSave('entrypoint', this._entrypoint);
+                  }}>
+                <div class="hint">${t('settingsEntrypointHint')}</div>
+              </div>
+              <div class="switch-row">
+                <div>
+                  <div class="switch-label">${t('settingsInsecure')}</div>
+                  <div class="switch-desc">${t('settingsInsecureDesc')}</div>
+                </div>
+                <div class="switch ${this._insecure ? 'on' : ''}" @click=${() => {
+                  this._insecure = !this._insecure;
                   this._debouncedSave('insecure', this._insecure);
                 }}>
-              <span class="slider"></span>
-            </label>
+                  <div class="switch-knob"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- Theme & Language -->
-        <div class="card">
-          <div class="card-title">${t('settingsTheme')} & ${t('settingsLanguage')}</div>
-          <div class="selector-row" @click=${() => this._setLang(this._cycleOption(this._lang, LANG_OPTIONS.map(o => o.value)))}>
-            <span class="selector-label">${t('settingsLanguage')}</span>
-            <span class="selector-value">${t(LANG_OPTIONS.find(o => o.value === this._lang)?.labelKey ?? 'settingsLangEn')}</span>
-          </div>
-          <div class="selector-row" @click=${() => this._setTheme(this._cycleOption(this._theme, THEME_OPTIONS.map(o => o.value)))}>
-            <span class="selector-label">${t('settingsTheme')}</span>
-            <span class="selector-value">${t(THEME_OPTIONS.find(o => o.value === this._theme)?.labelKey ?? 'settingsThemeSystem')}</span>
+        <div class="detail-section">
+          <div class="detail-card">
+            <div class="selector-field" @click=${() => this._setLang(this._cycleOption(this._lang, LANG_OPTIONS.map(o => o.value)))}>
+              <span class="selector-label">${t('settingsLanguage')}</span>
+              <span class="selector-value">${t(LANG_OPTIONS.find(o => o.value === this._lang)?.labelKey ?? 'settingsLangEn')} ▶</span>
+            </div>
+            <div class="selector-field" @click=${() => this._setTheme(this._cycleOption(this._theme, THEME_OPTIONS.map(o => o.value)))}>
+              <span class="selector-label">${t('settingsTheme')}</span>
+              <span class="selector-value">${t(THEME_OPTIONS.find(o => o.value === this._theme)?.labelKey ?? 'settingsThemeSystem')} ▶</span>
+            </div>
           </div>
         </div>
 
-        ${this._snackbar ? html`<div class="snackbar">${this._snackbar}</div>` : ''}
+        ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
       </app-scaffold>
     `;
   }

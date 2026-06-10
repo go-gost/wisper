@@ -1,4 +1,5 @@
 import { Router } from '@lit-labs/router';
+import type { ReactiveControllerHost } from 'lit';
 import { html } from 'lit';
 
 // Lazy imports — Vite code-splits these automatically.
@@ -13,10 +14,12 @@ const settingsPage = () => import('../pages/settings-page');
  * Create the Lit router with all application routes.
  * Each route renders a placeholder element that activates the corresponding
  * page component. The pages handle their own data fetching.
+ *
+ * @param host - The Lit element that hosts the router (must be a ReactiveControllerHost).
  */
-export function createRouter() {
+export function createRouter(host: ReactiveControllerHost) {
   return new Router(
-    undefined, // use <wisper-app> as the outlet host
+    host,
     [
       {
         path: '/',

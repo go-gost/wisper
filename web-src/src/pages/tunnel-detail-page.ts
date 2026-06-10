@@ -22,6 +22,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _tunnel: Tunnel | null = null;
   @state() private _saving = false;
   @state() private _snackbar = '';
+  @state() private _showDeleteDialog = false;
 
   // Form state
   @state() private _name = '';
@@ -145,7 +146,7 @@ export class TunnelDetailPage extends LitElement {
   }
 
   private async _handleDelete() {
-    if (!confirm(t('deleteConfirmMessage'))) return;
+    this._showDeleteDialog = false;
     try {
       await remove(this.tunnelId);
       this._showSnackbar(t('deleted'));
@@ -178,83 +179,195 @@ export class TunnelDetailPage extends LitElement {
   }
 
   static styles = css`
-    .title-row { display: flex; align-items: center; gap: 8px; }
+    /* ── AppBar ── */
     .back-btn {
-      background: none; border: none; cursor: pointer; font-size: 18px;
-      padding: 4px; color: var(--color-text-secondary); border-radius: 50%;
-      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      background: none; border: none; cursor: pointer;
+      font-size: 1.3rem; color: var(--color-text-primary); padding: 4px 8px;
+      border-radius: 8px; display: flex; align-items: center;
     }
-    .back-btn:hover { background: var(--color-surface-hover); }
-    .page-title { font-size: 18px; font-weight: 600; flex: 1; }
-    .actions { display: flex; gap: 6px; }
+    .back-btn:hover { background: var(--color-surface-variant); }
 
-    .btn {
-      padding: 6px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-pill);
-      font-size: 13px; font-weight: 500; cursor: pointer; transition: all var(--transition-fast);
-      background: var(--color-surface); color: var(--color-text-primary);
+    .page-title { font-size: 1.15rem; font-weight: 600; flex: 1; }
+
+    /* Buttons matching prototype */
+    .appbar-btn {
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px; color: var(--color-text-primary);
+      font-size: 0.9rem; display: flex; align-items: center; gap: 4px;
+      transition: background var(--transition-fast);
+      font-family: inherit;
     }
-    .btn:hover { background: var(--color-surface-hover); }
-    .btn.primary { background: var(--color-primary); color: var(--color-primary-text); border-color: var(--color-primary); }
-    .btn.primary:hover { background: var(--color-primary-hover); }
-    .btn.danger { color: var(--color-error); border-color: var(--color-error); }
-    .btn.danger:hover { background: var(--color-error-bg); }
-    .btn.start { color: var(--color-running); border-color: var(--color-running); }
-    .btn.stop { color: var(--color-error); border-color: var(--color-error); }
+    .appbar-btn:hover { background: var(--color-surface-variant); }
 
-    .section { margin-top: 20px; }
-    .section-title { font-size: 14px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 10px; }
-
-    .field { margin-bottom: 16px; }
-    .field label { display: block; font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 4px; }
-    .field input {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm); background: var(--color-surface);
-      color: var(--color-text-primary); font-size: 14px; font-family: inherit;
-      box-sizing: border-box; transition: border-color var(--transition-fast);
+    .primary-btn {
+      background: var(--color-primary); color: var(--color-primary-text);
+      border-radius: 20px; padding: 6px 16px; font-weight: 500;
+      border: none; cursor: pointer; font-size: 0.9rem; font-family: inherit;
+      transition: background var(--transition-fast);
     }
-    .field input:focus { border-color: var(--color-primary); outline: none; }
-    .field input:read-only { background: var(--color-surface-hover); color: var(--color-text-secondary); }
+    .primary-btn:hover { opacity: 0.9; }
 
-    .copy-field {
-      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    .stop-btn {
+      background: var(--color-error); color: white;
+      border-radius: 20px; padding: 6px 16px; font-weight: 500;
+      border: none; cursor: pointer; font-size: 0.9rem; font-family: inherit;
+      transition: background var(--transition-fast);
     }
-    .copy-field code {
-      flex: 1; padding: 8px 12px; background: var(--color-surface-hover);
-      border-radius: var(--radius-sm); font-size: 13px; font-family: monospace;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    .stop-btn:hover { opacity: 0.9; }
+
+    .danger-btn {
+      color: var(--color-error);
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+    }
+    .danger-btn:hover { background: var(--color-error-bg); }
+
+    .fav-btn {
+      font-size: 1.1rem; transition: color var(--transition-fast), transform 0.15s;
+      background: none; border: none; cursor: pointer; padding: 6px 10px;
+      border-radius: 8px; display: flex; align-items: center;
+    }
+    .fav-btn.active { color: var(--color-fav); }
+    .fav-btn.inactive { color: var(--color-fav-off); }
+    .fav-btn:active { transform: scale(1.3); }
+
+    /* ── Detail Section ── */
+    .detail-section {
+      margin: 16px;
+    }
+
+    .detail-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      padding: 20px;
+      transition: background var(--transition-fast);
+    }
+
+    /* ── Copyable rows ── */
+    .copyable-row {
+      display: flex; align-items: center;
+      padding: 8px 12px;
+      background: var(--color-surface-variant);
+      border-radius: var(--radius-md);
+      margin-bottom: 10px;
+      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
+      gap: 8px;
+    }
+    .copyable-text { flex: 1; }
+    .copy-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 1rem; color: var(--color-primary);
+      padding: 4px; border-radius: 6px;
+    }
+    .copy-btn:hover { background: rgba(0,0,0,0.08); }
+
+    /* ── Form fields ── */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--color-stopped);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--color-input-border);
+      border-radius: var(--radius-md);
+      background: var(--color-input-bg);
       color: var(--color-text-primary);
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
+      box-sizing: border-box;
     }
-    .icon-btn {
-      background: none; border: none; cursor: pointer; font-size: 16px;
-      padding: 6px; border-radius: var(--radius-sm); color: var(--color-text-muted);
+    .form-input:focus { border-color: var(--color-primary); }
+    .form-input[readonly] {
+      background: transparent;
+      border-color: transparent;
+      cursor: default;
     }
-    .icon-btn:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+    .form-input.error { border-color: var(--color-error); }
+    .form-error {
+      font-size: 0.8rem; color: var(--color-error); margin-top: 4px;
+    }
 
-    .stats-grid {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 12px; margin-top: 12px;
-    }
-    .stat-badge {
-      padding: 10px 12px; background: var(--color-surface);
-      border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-      font-size: 12px; color: var(--color-text-secondary);
-    }
-    .stat-badge .val { font-weight: 600; color: var(--color-text-primary); font-size: 15px; }
-    .stat-badge .rate { font-size: 11px; color: var(--color-text-muted); }
+    /* ── Stats ── */
+    .stats-section { margin-top: 16px; }
+    .stats-title { font-weight: 600; margin-bottom: 12px; font-size: 0.95rem; }
 
+    .stats-badges {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;
+    }
+    .stats-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--color-surface-variant);
+      padding: 4px 10px; border-radius: 12px;
+      font-size: 0.8rem; margin-right: 6px; margin-bottom: 4px;
+    }
+
+    /* ── Error banner ── */
     .error-banner {
-      padding: 12px; background: var(--color-error-bg); border-radius: var(--radius-sm);
-      font-size: 13px; color: var(--color-error); margin-top: 12px;
+      padding: 12px; background: var(--color-error-bg);
+      border-radius: var(--radius-md); font-size: 0.85rem;
+      color: var(--color-error); margin: 0 16px;
     }
 
-    .snackbar {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      padding: 10px 20px; background: #333; color: white;
-      border-radius: var(--radius-pill); font-size: 13px;
-      z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      animation: snackIn 0.3s ease;
+    /* ── Toast (top, like prototype) ── */
+    .toast {
+      position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+      background: var(--color-toast-bg); color: var(--color-toast-fg);
+      padding: 12px 24px; border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      font-size: 0.9rem; z-index: 100;
+      display: flex; align-items: center; gap: 8px;
+      max-width: 400px; transition: background var(--transition-fast);
+      animation: toast-in 0.3s ease;
     }
-    @keyframes snackIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* ── Delete Dialog Overlay ── */
+    .dialog-overlay {
+      position: fixed; inset: 0;
+      background: var(--color-overlay);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200;
+      animation: fade-in 0.2s ease;
+    }
+    @keyframes fade-in { from { opacity: 0; } }
+    .dialog-box {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: 24px; max-width: 340px; width: 90%;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    }
+    .dialog-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 12px; text-align: center; }
+    .dialog-message { color: var(--color-stopped); font-size: 0.9rem; margin-bottom: 20px; text-align: center; line-height: 1.5; }
+    .dialog-actions { display: flex; gap: 12px; justify-content: center; }
+    .dialog-btn {
+      padding: 10px 24px; border-radius: 20px; border: none;
+      cursor: pointer; font-size: 0.9rem; font-weight: 500;
+      transition: background var(--transition-fast);
+      font-family: inherit;
+    }
+    .dialog-btn.cancel {
+      background: var(--color-surface-variant); color: var(--color-text-primary);
+    }
+    .dialog-btn.danger {
+      background: var(--color-error); color: white;
+    }
+    .dialog-btn:hover { opacity: 0.9; }
   `;
 
   render() {
@@ -265,94 +378,126 @@ export class TunnelDetailPage extends LitElement {
 
     return html`
       <app-scaffold>
-        <div slot="appBar" class="title-row">
+        <!-- AppBar -->
+        <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${() => this._navigate('/')}>←</button>
           <span class="page-title">${this.mode === 'create' ? `${t('tunnelNewTitle')} — ${typeLabel}` : typeLabel}</span>
-          <div class="actions">
-            ${this.mode === 'view' && t2 ? html`
-              <button class="btn" @click=${this._handleFavorite}>${t2.favorite ? '★' : '☆'}</button>
-              ${t2.status === 'running'
-                ? html`<button class="btn stop" @click=${this._handleStop}>${t('btnStop')}</button>`
-                : html`<button class="btn start" @click=${this._handleStart}>${t('btnStart')}</button>`
-              }
-              <button class="btn" @click=${this._enterEdit}>${t('btnEdit')}</button>
-              <button class="btn danger" @click=${this._handleDelete}>${t('btnDelete')}</button>
-            ` : html`
-              <button class="btn primary" ?disabled=${this._saving} @click=${this._handleSave}>
-                ${this._saving ? '...' : t('btnSave')}
-              </button>
-            `}
-          </div>
+
+          ${this.mode === 'view' && t2 ? html`
+            <button class="fav-btn ${t2.favorite ? 'active' : 'inactive'}" @click=${this._handleFavorite}>★</button>
+            ${t2.status === 'running'
+              ? html`<button class="stop-btn" @click=${this._handleStop}>■ ${t('btnStop')}</button>`
+              : html`<button class="primary-btn" @click=${this._handleStart}>▶ ${t('btnStart')}</button>`
+            }
+            <button class="danger-btn" @click=${() => { this._showDeleteDialog = true; }}>🗑</button>
+            <button class="appbar-btn" @click=${this._enterEdit}>✏ ${t('btnEdit')}</button>
+          ` : html`
+            <button class="primary-btn" ?disabled=${this._saving} @click=${this._handleSave}>
+              ✓ ${t('btnSave')}
+            </button>
+          `}
         </div>
 
         ${this.mode === 'view' && t2 ? html`
-          <!-- View mode -->
+          <!-- Error banner -->
           ${t2.error ? html`<div class="error-banner">${t2.error}</div>` : ''}
 
-          <div class="section">
-            <div class="section-title">${t('fieldEndpoint')}</div>
-            <div class="copy-field">
-              <code>${t2.id}</code>
-              <button class="icon-btn" @click=${async () => { await copyToClipboard(t2.id); this._showSnackbar(t('copiedToClipboard')); }}>📋</button>
-            </div>
-            <div class="copy-field">
-              <code>${t2.entrypoint}</code>
-              <button class="icon-btn" @click=${async () => { await copyToClipboard(t2.entrypoint); this._showSnackbar(t('copiedToClipboard')); }}>📋</button>
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">${t('labelStatistics')}</div>
-            ${stats ? html`
-              <div class="stats-grid">
-                <div class="stat-badge"><div class="val">${formatNumber(stats.current_conns)}</div><div class="rate">${formatRate(stats.request_rate)}</div></div>
-                <div class="stat-badge"><div class="val">${formatNumber(stats.total_conns)}</div><div class="rate">total</div></div>
-                <div class="stat-badge"><div class="val">${formatBytes(stats.input_bytes)}</div><div class="rate">${formatRate(stats.input_rate_bytes)}</div></div>
-                <div class="stat-badge"><div class="val">${formatBytes(stats.output_bytes)}</div><div class="rate">${formatRate(stats.output_rate_bytes)}</div></div>
+          <!-- View mode -->
+          <div class="detail-section">
+            <div class="detail-card">
+              <!-- Copyable ID -->
+              <div class="copyable-row">
+                <span class="copyable-text">${t2.id}</span>
+                <button class="copy-btn" @click=${async () => { await copyToClipboard(t2.id); this._showSnackbar('📋 ' + t('copiedToClipboard')); }}>📋</button>
               </div>
-            ` : html`<div style="color:var(--color-text-muted);font-size:13px;">Loading...</div>`}
-          </div>
+              <!-- Copyable Entrypoint -->
+              <div class="copyable-row">
+                <span class="copyable-text">${t2.entrypoint}</span>
+                <button class="copy-btn" @click=${async () => { await copyToClipboard(t2.entrypoint); this._showSnackbar('📋 ' + t('copiedToClipboard')); }}>📋</button>
+              </div>
 
-          <!-- Read-only fields -->
-          <div class="section">
-            <div class="field"><label>${t('fieldName')}</label><input type="text" .value=${t2.name} readonly></div>
-            ${this.tunnelType !== 'file' ? html`<div class="field"><label>${t('fieldEndpoint')}</label><input type="text" .value=${t2.endpoint} readonly></div>` : ''}
+              <!-- Name (read-only) -->
+              <div class="form-group">
+                <label class="form-label">${t('fieldName')}</label>
+                <input class="form-input" readonly .value=${t2.name}>
+              </div>
+              <!-- Endpoint (read-only) -->
+              ${this.tunnelType !== 'file' ? html`
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">${t('fieldEndpoint')}</label>
+                  <input class="form-input" readonly .value=${t2.endpoint}>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Stats -->
+            ${stats ? html`
+              <div class="stats-section">
+                <div class="detail-card">
+                  <div class="stats-title">${t('labelStatistics')}</div>
+                  <div class="stats-badges">
+                    <span class="stats-badge">↕ ${formatNumber(stats.current_conns)} / ${formatNumber(stats.total_conns)} connections</span>
+                    <span class="stats-badge">⚡ ${formatRate(stats.request_rate)}</span>
+                  </div>
+                  <stats-row icon="↑" .value=${formatBytes(stats.input_bytes) + ' total'} .rate=${formatRate(stats.input_rate_bytes)}></stats-row>
+                  <stats-row icon="↓" .value=${formatBytes(stats.output_bytes) + ' total'} .rate=${formatRate(stats.output_rate_bytes)}></stats-row>
+                </div>
+              </div>
+            ` : ''}
           </div>
         ` : html`
           <!-- Edit/Create mode -->
-          <div class="section">
-            <div class="field">
-              <label>${t('fieldName')} *</label>
-              <input type="text" .value=${this._name} @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
-            </div>
-            ${this.tunnelType !== 'file' ? html`
-              <div class="field">
-                <label>${t('fieldEndpoint')}</label>
-                <input type="text" .value=${this._endpoint} @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
+          <div class="detail-section">
+            <div class="detail-card">
+              <div class="form-group">
+                <label class="form-label">${t('fieldName')}</label>
+                <input class="form-input" .value=${this._name} placeholder="Enter tunnel name"
+                  @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
               </div>
-            ` : ''}
+              ${this.tunnelType !== 'file' ? html`
+                <div class="form-group">
+                  <label class="form-label">${t('fieldEndpoint')}</label>
+                  <input class="form-input" .value=${this._endpoint}
+                    placeholder=${this.tunnelType === 'http' ? 'http://host:port' : 'host:port'}
+                    @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
+                </div>
+              ` : ''}
 
-            ${this.tunnelType === 'file' ? html`
-              <file-form-fields
-                .directory=${this._name}
-                .basicAuth=${this._basicAuth}
-                .username=${this._username}
-                .password=${this._password}
-                .fileUpload=${this._fileUpload}
-              ></file-form-fields>
-            ` : ''}
+              ${this.tunnelType === 'file' ? html`
+                <file-form-fields
+                  .directory=${this._endpoint}
+                  .basicAuth=${this._basicAuth}
+                  .username=${this._username}
+                  .password=${this._password}
+                  .fileUpload=${this._fileUpload}
+                ></file-form-fields>
+              ` : ''}
 
-            ${this.tunnelType === 'http' ? html`
-              <http-form-fields
-                .rewriteHost=${this._rewriteHost}
-                .hostname=${this._hostname}
-                .enableTLS=${this._enableTLS}
-              ></http-form-fields>
-            ` : ''}
+              ${this.tunnelType === 'http' ? html`
+                <http-form-fields
+                  .rewriteHost=${this._rewriteHost}
+                  .hostname=${this._hostname}
+                  .enableTLS=${this._enableTLS}
+                ></http-form-fields>
+              ` : ''}
+            </div>
           </div>
         `}
 
-        ${this._snackbar ? html`<div class="snackbar">${this._snackbar}</div>` : ''}
+        ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
+
+        ${this._showDeleteDialog ? html`
+          <div class="dialog-overlay" @click=${() => { this._showDeleteDialog = false; }}>
+            <div class="dialog-box" @click=${(e: Event) => { e.stopPropagation(); }}>
+              <div class="dialog-title">${t('deleteConfirmTitle')}</div>
+              <div class="dialog-message">${t('deleteConfirmMessage')}</div>
+              <div class="dialog-actions">
+                <button class="dialog-btn cancel" @click=${() => { this._showDeleteDialog = false; }}>${t('btnCancel')}</button>
+                <button class="dialog-btn danger" @click=${this._handleDelete}>${t('btnDelete')}</button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
       </app-scaffold>
     `;
   }

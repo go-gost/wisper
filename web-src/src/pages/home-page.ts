@@ -1,15 +1,14 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
-import { getTunnels, isLoading as tunnelsLoading, refresh as refreshTunnels, toggleFavorite } from '../store/tunnel-store';
-import { getEntrypoints, isLoading as entrypointsLoading, refresh as refreshEntrypoints, toggleFavorite as toggleEntrypointFavorite } from '../store/entrypoint-store';
+import { getTunnels, isLoading as tunnelsLoading, toggleFavorite } from '../store/tunnel-store';
+import { getEntrypoints, isLoading as entrypointsLoading, toggleFavorite as toggleEntrypointFavorite } from '../store/entrypoint-store';
 import { subscribe as subTunnel } from '../store/tunnel-store';
 import { subscribe as subEntrypoint } from '../store/entrypoint-store';
 import { subscribe as subSettings } from '../store/settings-store';
 import '../components/app-scaffold';
 import '../components/nav-tabs';
 import '../components/tunnel-card';
-import '../components/stats-row';
 
 @customElement('home-page')
 export class HomePage extends LitElement {
@@ -46,116 +45,121 @@ export class HomePage extends LitElement {
   }
 
   static styles = css`
-    .header {
+    /* ── Home Header ── */
+    .home-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      width: 100%;
+      padding: 16px;
+      gap: 12px;
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 18px;
-      color: var(--color-primary);
-    }
-
-    .brand-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+    .app-icon {
+      width: 42px;
+      height: 42px;
       background: var(--color-primary);
-      color: white;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 800;
-      font-size: 16px;
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
     }
 
     .header-actions {
+      margin-left: auto;
       display: flex;
-      gap: 8px;
+      gap: 4px;
     }
 
     .icon-btn {
       background: none;
       border: none;
       cursor: pointer;
-      font-size: 20px;
-      padding: 6px;
-      border-radius: 50%;
-      color: var(--color-text-secondary);
-      transition: all var(--transition-fast);
-      width: 36px;
-      height: 36px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      color: var(--color-text-primary);
+      font-size: 1.1rem;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background var(--transition-fast);
+      width: 36px;
+      height: 36px;
     }
 
     .icon-btn:hover {
-      background: var(--color-surface-hover);
-      color: var(--color-text-primary);
+      background: var(--color-surface-variant);
     }
 
     .icon-btn.active {
-      color: var(--color-primary);
+      color: var(--color-fav);
     }
 
+    /* ── Nav wrapper ── */
     .nav-wrapper {
-      margin-bottom: 16px;
+      margin: 0 16px 12px;
     }
 
+    /* ── List ── */
     .list {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 0;
+      padding-bottom: 80px;
     }
 
+    /* ── Empty state ── */
     .empty {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 48px 16px;
-      color: var(--color-text-muted);
-      text-align: center;
+      padding: 40px;
+      color: var(--color-stopped);
     }
 
     .empty-icon {
-      font-size: 48px;
+      font-size: 3rem;
       margin-bottom: 12px;
       opacity: 0.4;
     }
 
+    .empty-text {
+      font-size: 1rem;
+    }
+
+    /* ── Loading ── */
     .loading {
       display: flex;
       justify-content: center;
       padding: 24px;
     }
 
+    /* ── FAB (rounded square, like prototype) ── */
     .fab {
       width: 56px;
       height: 56px;
-      border-radius: 50%;
+      border-radius: 16px;
       border: none;
       background: var(--color-primary);
       color: var(--color-primary-text);
-      font-size: 28px;
+      font-size: 1.5rem;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      transition: all var(--transition-fast);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: transform 0.1s, background var(--transition-fast);
     }
 
     .fab:hover {
-      background: var(--color-primary-hover);
       transform: scale(1.05);
+    }
+
+    .fab:active {
+      transform: scale(0.97);
     }
   `;
 
@@ -193,15 +197,6 @@ export class HomePage extends LitElement {
     return this.tabIndex === 0 ? this._tunnelsLoading : this._entrypointsLoading;
   }
 
-  private _handleToggleFavorite(e: Event, id: string) {
-    e.stopPropagation();
-    if (this.tabIndex === 0) {
-      toggleFavorite(id);
-    } else {
-      toggleEntrypointFavorite(id);
-    }
-  }
-
   render() {
     const items = this._list;
     const emptyLabel = this.tabIndex === 0 ? t('homeEmptyTunnels') : t('homeEmptyEntrypoints');
@@ -209,11 +204,9 @@ export class HomePage extends LitElement {
 
     return html`
       <app-scaffold>
-        <div slot="appBar" class="header">
-          <div class="brand">
-            <div class="brand-icon">W</div>
-            ${t('appName')}
-          </div>
+        <!-- Home Header (NOT in appBar slot — renders as page content) -->
+        <div class="home-header">
+          <div class="app-icon">W</div>
           <div class="header-actions">
             <button
               class="icon-btn ${this.showFavorites ? 'active' : ''}"
@@ -238,7 +231,7 @@ export class HomePage extends LitElement {
             ? html`
               <div class="empty">
                 <span class="empty-icon">☁️</span>
-                <span>${emptyLabel}</span>
+                <span class="empty-text">${emptyLabel}</span>
               </div>
             `
             : html`
@@ -262,7 +255,7 @@ export class HomePage extends LitElement {
             `}
 
         <div slot="fab">
-          <button class="fab" title="+" @click=${() => this._navigate(fabPath)}>+</button>
+          <button class="fab" @click=${() => this._navigate(fabPath)}>+</button>
         </div>
       </app-scaffold>
     `;

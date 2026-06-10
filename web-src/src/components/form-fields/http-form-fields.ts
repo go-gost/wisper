@@ -2,6 +2,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { t } from '../../i18n/i18n';
 
+/**
+ * HttpFormFields — tunnel form fields specific to HTTP tunnels.
+ * Matches prototype styling.
+ */
 @customElement('http-form-fields')
 export class HttpFormFields extends LitElement {
   @property() hostname = '';
@@ -10,37 +14,53 @@ export class HttpFormFields extends LitElement {
   @property({ type: Boolean }) disabled = false;
 
   static styles = css`
-    .fields { display: flex; flex-direction: column; gap: 16px; }
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-    input {
-      padding: 10px 12px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      background: var(--color-surface);
+    .fields { display: flex; flex-direction: column; gap: 8px; }
+
+    .form-group { margin-bottom: 8px; }
+    .form-label {
+      display: block;
+      font-size: 0.8rem; font-weight: 500;
+      color: var(--color-stopped);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--color-input-border);
+      border-radius: var(--radius-md);
+      background: var(--color-input-bg);
       color: var(--color-text-primary);
-      font-size: 14px;
+      font-size: 0.95rem;
       font-family: inherit;
-      transition: border-color var(--transition-fast);
+      outline: none;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
+      box-sizing: border-box;
     }
-    input:focus { border-color: var(--color-primary); outline: none; }
-    input:disabled { opacity: 0.6; }
-    .switch-row { display: flex; align-items: center; justify-content: space-between; }
-    .switch-label { font-size: 14px; color: var(--color-text-primary); }
-    .switch { position: relative; width: 44px; height: 24px; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; inset: 0; background: var(--color-border);
-      border-radius: 12px; cursor: pointer; transition: var(--transition-fast);
+    .form-input:focus { border-color: var(--color-primary); }
+    .form-input:disabled { opacity: 0.6; }
+
+    .switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0;
     }
-    .slider::before {
-      content: ''; position: absolute; width: 18px; height: 18px;
-      left: 3px; bottom: 3px; background: white; border-radius: 50%;
-      transition: var(--transition-fast);
+    .switch-label { font-size: 0.95rem; }
+    .switch {
+      width: 44px; height: 24px; border-radius: 12px;
+      background: var(--color-stopped); position: relative;
+      cursor: pointer; transition: background var(--transition-fast);
+      flex-shrink: 0;
     }
-    input:checked + .slider { background: var(--color-primary); }
-    input:checked + .slider::before { transform: translateX(20px); }
-    input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+    .switch.on { background: var(--color-primary); }
+    .switch-knob {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: white; position: absolute;
+      top: 2px; left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .switch.on .switch-knob { left: 22px; }
   `;
 
   render() {
@@ -48,26 +68,28 @@ export class HttpFormFields extends LitElement {
       <div class="fields">
         <div class="switch-row">
           <span class="switch-label">${t('switchRewriteHost')}</span>
-          <label class="switch">
-            <input type="checkbox" .checked=${this.rewriteHost} ?disabled=${this.disabled}
-              @change=${(e: Event) => { this.rewriteHost = (e.target as HTMLInputElement).checked; this.requestUpdate(); }}>
-            <span class="slider"></span>
-          </label>
+          <div class="switch ${this.rewriteHost ? 'on' : ''}" @click=${() => {
+            if (!this.disabled) { this.rewriteHost = !this.rewriteHost; this.requestUpdate(); }
+          }}>
+            <div class="switch-knob"></div>
+          </div>
         </div>
+
         ${this.rewriteHost ? html`
-          <div class="field">
-            <label>${t('fieldHostname')}</label>
-            <input type="text" .value=${this.hostname} ?disabled=${this.disabled}
+          <div class="form-group">
+            <label class="form-label">${t('fieldHostname')}</label>
+            <input class="form-input" type="text" .value=${this.hostname} ?disabled=${this.disabled}
               @input=${(e: Event) => { this.hostname = (e.target as HTMLInputElement).value; }}>
           </div>
         ` : ''}
+
         <div class="switch-row">
           <span class="switch-label">${t('switchEnableTLS')}</span>
-          <label class="switch">
-            <input type="checkbox" .checked=${this.enableTLS} ?disabled=${this.disabled}
-              @change=${(e: Event) => { this.enableTLS = (e.target as HTMLInputElement).checked; }}>
-            <span class="slider"></span>
-          </label>
+          <div class="switch ${this.enableTLS ? 'on' : ''}" @click=${() => {
+            if (!this.disabled) { this.enableTLS = !this.enableTLS; }
+          }}>
+            <div class="switch-knob"></div>
+          </div>
         </div>
       </div>
     `;

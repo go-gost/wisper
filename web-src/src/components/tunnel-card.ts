@@ -6,12 +6,14 @@ import type { ServiceStats, ServiceStatus } from '../api/types';
 
 /**
  * TunnelCard — displays a tunnel or entrypoint summary card in lists.
- * Used on the home page for both tunnels and entrypoints.
+ * Matches prototype design with two-column layout:
+ *   left: name, meta (TYPE · status), endpoint
+ *   right: stats rows
+ *   status dot: absolutely positioned at top-right
  *
  * @attr name - Display name
  * @attr type - Tunnel/entrypoint type label (e.g. "HTTP", "TCP")
  * @attr endpoint - Local endpoint address
- * @attr entrypoint - Public URL
  * @attr status - Current service status (running/stopped/error)
  * @attr error - Error message if status === error
  * @attr stats - ServiceStats object with live metrics
@@ -21,7 +23,6 @@ export class TunnelCard extends LitElement {
   @property() name = '';
   @property() type = '';
   @property() endpoint = '';
-  @property() entrypoint = '';
   @property() status: ServiceStatus = 'stopped';
   @property() stats: ServiceStats | null = null;
   @property() error = '';
@@ -32,52 +33,68 @@ export class TunnelCard extends LitElement {
     }
 
     .card {
+      position: relative;
       background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: 16px;
-      cursor: pointer;
-      transition: all var(--transition-fast);
+      border-radius: var(--radius-lg);
       box-shadow: var(--shadow-card);
+      padding: 20px 24px;
+      margin: 0 16px 16px;
+      cursor: pointer;
+      transition: background var(--transition-fast), box-shadow var(--transition-fast), transform 0.1s;
     }
 
     .card:hover {
+      transform: translateY(-1px);
       box-shadow: var(--shadow-card-hover);
     }
 
     .card:active {
-      transform: scale(0.99);
+      transform: translateY(0);
     }
 
-    .top-row {
+    /* ── Two-column body ── */
+    .tunnel-card-body {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .tunnel-card-left {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tunnel-card-right {
+      flex-shrink: 0;
+      text-align: right;
+      padding-top: 20px;
+      --stats-justify: flex-end;
+    }
+
+    /* ── Header ── */
+    .tunnel-card-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       margin-bottom: 8px;
     }
 
-    .name {
+    .tunnel-name {
       font-weight: 600;
-      font-size: 15px;
-      color: var(--color-text-primary);
+      font-size: 1.1rem;
     }
 
-    .status-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
+    /* ── Status dot — absolute top-right ── */
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      flex-shrink: 0;
+      position: absolute;
+      top: 20px;
+      right: 24px;
     }
 
     .status-dot.running {
       background: var(--color-running);
-      box-shadow: 0 0 6px var(--color-running);
     }
 
     .status-dot.stopped {
@@ -86,52 +103,43 @@ export class TunnelCard extends LitElement {
 
     .status-dot.error {
       background: var(--color-error);
-      box-shadow: 0 0 6px var(--color-error);
     }
 
-    .status-label {
-      font-size: 12px;
-      color: var(--color-text-muted);
+    /* ── Meta ── */
+    .tunnel-meta {
+      color: var(--color-stopped);
+      font-size: 0.9rem;
+      margin-bottom: 4px;
     }
 
-    .mid-row {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 8px;
-      font-size: 13px;
-      color: var(--color-text-secondary);
+    .tunnel-endpoint {
+      font-size: 0.95rem;
+      color: var(--color-text-primary);
+      opacity: 0.8;
     }
 
-    .type-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: var(--radius-sm);
-      background: var(--color-surface-hover);
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--color-text-secondary);
-    }
-
-    .endpoint {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 4px;
-      color: var(--color-text-muted);
-    }
-
+    /* ── Error banner ── */
     .error-banner {
-      margin-top: 8px;
+      margin-top: 12px;
       padding: 8px 12px;
       background: var(--color-error-bg);
       border-radius: var(--radius-sm);
-      font-size: 12px;
+      font-size: 0.8rem;
       color: var(--color-error);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .tunnel-card-body {
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .tunnel-card-right {
+        text-align: left;
+        padding-top: 0;
+        --stats-justify: flex-start;
+      }
     }
   `;
 
@@ -148,26 +156,27 @@ export class TunnelCard extends LitElement {
 
     return html`
       <div class="card">
-        <div class="top-row">
-          <span class="name">${this.name}</span>
-          <div class="status-row">
-            <span class="status-label">${this._statusLabel(this.status)}</span>
-            <span class="status-dot ${this.status}"></span>
-          </div>
-        </div>
+        <span class="status-dot ${this.status}"></span>
 
-        <div class="mid-row">
-          <span class="type-badge">${this.type}</span>
-          <span class="endpoint" title=${this.endpoint}>${this.endpoint}</span>
-        </div>
-
-        ${s ? html`
-          <div class="stats-grid">
-            <stats-row icon="link" .value=${formatNumber(s.current_conns)} .label=${formatRate(s.request_rate)}></stats-row>
-            <stats-row icon="arrow_upward" .value=${formatBytes(s.input_bytes)} .label=${formatRate(s.input_rate_bytes)}></stats-row>
-            <stats-row icon="arrow_downward" .value=${formatBytes(s.output_bytes)} .label=${formatRate(s.output_rate_bytes)}></stats-row>
+        <div class="tunnel-card-body">
+          <!-- Left: info -->
+          <div class="tunnel-card-left">
+            <div class="tunnel-card-header">
+              <span class="tunnel-name">${this.name}</span>
+            </div>
+            <div class="tunnel-meta">${this.type} · ${this._statusLabel(this.status)}</div>
+            <div class="tunnel-endpoint">${this.endpoint}</div>
           </div>
-        ` : ''}
+
+          <!-- Right: stats -->
+          ${s ? html`
+            <div class="tunnel-card-right">
+              <stats-row icon="↕" .value=${`${formatNumber(s.current_conns)} / ${formatNumber(s.total_conns)}`} .rate=${formatRate(s.request_rate)}></stats-row>
+              <stats-row icon="↑" .value=${formatBytes(s.input_bytes)} .rate=${formatRate(s.input_rate_bytes)}></stats-row>
+              <stats-row icon="↓" .value=${formatBytes(s.output_bytes)} .rate=${formatRate(s.output_rate_bytes)}></stats-row>
+            </div>
+          ` : ''}
+        </div>
 
         ${this.error ? html`<div class="error-banner">${this.error}</div>` : ''}
       </div>

@@ -2,6 +2,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { t } from '../../i18n/i18n';
 
+/**
+ * FileFormFields — tunnel form fields specific to file tunnels.
+ * Matches prototype styling: uppercase labels, 1.5px borders, 12px radius.
+ */
 @customElement('file-form-fields')
 export class FileFormFields extends LitElement {
   @property() directory = '';
@@ -15,58 +19,79 @@ export class FileFormFields extends LitElement {
     .fields {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 8px;
     }
 
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-    input {
-      padding: 10px 12px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      background: var(--color-surface);
+    .form-group { margin-bottom: 8px; }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--color-stopped);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--color-input-border);
+      border-radius: var(--radius-md);
+      background: var(--color-input-bg);
       color: var(--color-text-primary);
-      font-size: 14px;
+      font-size: 0.95rem;
       font-family: inherit;
-      transition: border-color var(--transition-fast);
+      outline: none;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
+      box-sizing: border-box;
     }
-    input:focus { border-color: var(--color-primary); outline: none; }
-    input:disabled { opacity: 0.6; }
+    .form-input:focus { border-color: var(--color-primary); }
+    .form-input:disabled { opacity: 0.6; }
 
-    .switch-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .switch-label { font-size: 14px; color: var(--color-text-primary); }
-    .switch {
+    /* ── Password wrapper ── */
+    .password-wrapper {
       position: relative;
-      width: 44px;
-      height: 24px;
     }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute;
-      inset: 0;
-      background: var(--color-border);
-      border-radius: 12px;
-      cursor: pointer;
-      transition: var(--transition-fast);
+    .password-wrapper .form-input { padding-right: 40px; }
+    .password-toggle {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      font-size: 1.1rem; color: var(--color-stopped);
     }
-    .slider::before {
-      content: '';
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      left: 3px;
-      bottom: 3px;
-      background: white;
-      border-radius: 50%;
-      transition: var(--transition-fast);
+
+    /* ── Switch ── */
+    .switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0;
     }
-    input:checked + .slider { background: var(--color-primary); }
-    input:checked + .slider::before { transform: translateX(20px); }
-    input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+    .switch-label { font-size: 0.95rem; }
+    .switch {
+      width: 44px; height: 24px; border-radius: 12px;
+      background: var(--color-stopped); position: relative;
+      cursor: pointer; transition: background var(--transition-fast);
+      flex-shrink: 0;
+    }
+    .switch.on { background: var(--color-primary); }
+    .switch-knob {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: white; position: absolute;
+      top: 2px; left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .switch.on .switch-knob { left: 22px; }
+
+    /* ── Auth fields show/hide ── */
+    .auth-field {
+      overflow: hidden;
+      transition: max-height .3s ease, opacity .3s ease, margin .3s ease;
+    }
+    .auth-field.hidden {
+      max-height: 0; opacity: 0; margin-bottom: 0; pointer-events: none;
+    }
+    .auth-field.visible {
+      max-height: 100px; opacity: 1;
+    }
   `;
 
   private _fireChange() {
@@ -83,41 +108,62 @@ export class FileFormFields extends LitElement {
     }));
   }
 
+  private _togglePassword(e: Event) {
+    const btn = e.target as HTMLElement;
+    const input = btn.parentElement!.querySelector('.form-input') as HTMLInputElement;
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁';
+    }
+  }
+
   render() {
     return html`
       <div class="fields">
-        <div class="field">
-          <label>${t('fieldDirectory')}</label>
-          <input type="text" .value=${this.directory} ?disabled=${this.disabled}
+        <div class="form-group">
+          <label class="form-label">${t('fieldDirectory')}</label>
+          <input class="form-input" type="text" .value=${this.directory} ?disabled=${this.disabled}
+            placeholder="Select directory"
             @input=${(e: Event) => { this.directory = (e.target as HTMLInputElement).value; this._fireChange(); }}>
         </div>
+
         <div class="switch-row">
           <span class="switch-label">${t('switchBasicAuth')}</span>
-          <label class="switch">
-            <input type="checkbox" .checked=${this.basicAuth} ?disabled=${this.disabled}
-              @change=${(e: Event) => { this.basicAuth = (e.target as HTMLInputElement).checked; this._fireChange(); this.requestUpdate(); }}>
-            <span class="slider"></span>
-          </label>
+          <div class="switch ${this.basicAuth ? 'on' : ''}" @click=${() => {
+            if (!this.disabled) { this.basicAuth = !this.basicAuth; this._fireChange(); this.requestUpdate(); }
+          }}>
+            <div class="switch-knob"></div>
+          </div>
         </div>
-        ${this.basicAuth ? html`
-          <div class="field">
-            <label>${t('fieldUsername')}</label>
-            <input type="text" .value=${this.username} ?disabled=${this.disabled}
+
+        <div class="auth-field ${this.basicAuth ? 'visible' : 'hidden'}">
+          <div class="form-group">
+            <label class="form-label">${t('fieldUsername')}</label>
+            <input class="form-input" type="text" .value=${this.username} ?disabled=${this.disabled}
+              placeholder="Enter username"
               @input=${(e: Event) => { this.username = (e.target as HTMLInputElement).value; this._fireChange(); }}>
           </div>
-          <div class="field">
-            <label>${t('fieldPassword')}</label>
-            <input type="password" .value=${this.password} ?disabled=${this.disabled}
-              @input=${(e: Event) => { this.password = (e.target as HTMLInputElement).value; this._fireChange(); }}>
+          <div class="form-group">
+            <label class="form-label">${t('fieldPassword')}</label>
+            <div class="password-wrapper">
+              <input class="form-input" type="password" .value=${this.password} ?disabled=${this.disabled}
+                placeholder="Enter password"
+                @input=${(e: Event) => { this.password = (e.target as HTMLInputElement).value; this._fireChange(); }}>
+              <button class="password-toggle" @click=${this._togglePassword}>👁</button>
+            </div>
           </div>
-        ` : ''}
+        </div>
+
         <div class="switch-row">
           <span class="switch-label">${t('switchFileUpload')}</span>
-          <label class="switch">
-            <input type="checkbox" .checked=${this.fileUpload} ?disabled=${this.disabled}
-              @change=${(e: Event) => { this.fileUpload = (e.target as HTMLInputElement).checked; this._fireChange(); }}>
-            <span class="slider"></span>
-          </label>
+          <div class="switch ${this.fileUpload ? 'on' : ''}" @click=${() => {
+            if (!this.disabled) { this.fileUpload = !this.fileUpload; this._fireChange(); this.requestUpdate(); }
+          }}>
+            <div class="switch-knob"></div>
+          </div>
         </div>
       </div>
     `;

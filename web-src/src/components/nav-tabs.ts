@@ -2,7 +2,8 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 /**
- * NavTabs — pill-style tab bar with animated active indicator.
+ * NavTabs — pill-style tab bar matching prototype design.
+ * Active tab gets a background color change only (no text color change).
  *
  * @fires tab-change — CustomEvent<{index: number}> when a tab is selected.
  */
@@ -14,36 +15,30 @@ export class NavTabs extends LitElement {
   static styles = css`
     :host {
       display: flex;
-      gap: 4px;
+      background: var(--color-nav-bg);
+      border-radius: 24px;
       padding: 4px;
-      background: var(--color-surface);
-      border-radius: var(--radius-pill);
-      border: 1px solid var(--color-border);
+      transition: background var(--transition-fast);
     }
 
     button {
       flex: 1;
-      padding: 8px 16px;
+      padding: 10px 0;
+      text-align: center;
+      border-radius: 20px;
       border: none;
-      border-radius: var(--radius-pill);
       background: transparent;
-      color: var(--color-text-secondary);
-      font-size: 14px;
+      color: var(--color-text-primary);
+      font-size: 0.95rem;
       font-weight: 500;
       cursor: pointer;
-      transition: all var(--transition-fast);
-      position: relative;
-      white-space: nowrap;
+      transition: background var(--transition-fast);
+      font-family: inherit;
     }
 
     button.active {
-      background: var(--color-primary);
-      color: var(--color-primary-text);
-    }
-
-    button:hover:not(.active) {
-      color: var(--color-text-primary);
-      background: var(--color-surface-hover);
+      background: var(--color-nav-active-bg);
+      font-weight: 600;
     }
   `;
 
