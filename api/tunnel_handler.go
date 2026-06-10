@@ -48,9 +48,13 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	opts := t.Options()
 	s := t.Stats()
 	status := "stopped"
+	errMsg := errStr(t.Err())
 	if !t.IsClosed() {
 		if t.Err() != nil || tunnel.IsServiceFailed(t) {
 			status = "error"
+			if errMsg == "" {
+				errMsg = tunnel.ServiceErrorMessage(t)
+			}
 		} else {
 			status = "running"
 		}
@@ -65,7 +69,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		Status:     status,
 		Favorite:   t.IsFavorite(),
 		CreatedAt:  opts.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		Error:      errStr(t.Err()),
+		Error:      errMsg,
 		Options: tunnelOptionsResp{
 			Hostname:    opts.Hostname,
 			Username:    opts.Username,

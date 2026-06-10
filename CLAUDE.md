@@ -14,13 +14,13 @@ make all
 # Build Go backend for a specific target (from Makefile)
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/linux-amd64/wisper .
 
-# Build Flutter web UI for embedding (use make web, not flutter build directly)
+# Build Lit web UI for embedding into Go binary
+# ⚠️ MUST use `make web` — NEVER run `npx vite build` directly.
+# The Makefile handles conditional rebuild (stamp-based) and cleanup.
 make web
 
-# Build Go + Flutter together for desktop (build.sh)
-./build.sh linux       # Go binary → Flutter linux bundle
-./build.sh macos       # Go binary → Flutter macOS .app bundle
-./build.sh windows     # Go binary → Flutter Windows bundle
+# Force web rebuild (ignore stamp)
+make web-force
 
 # Run the server (defaults to :8900)
 ./wisper
@@ -34,24 +34,23 @@ go test ./api/ -v -run TestListTunnels  # single test suite
 
 ## Architecture
 
-Wisper is a **GOST tunnel manager** — a Go HTTP API server with an embedded Flutter web UI for creating and managing reverse proxy tunnels through the GOST network.
+Wisper is a **GOST tunnel manager** — a Go HTTP API server with an embedded Lit web UI for creating and managing reverse proxy tunnels through the GOST network.
 
-The project is a **single Go module** (`github.com/go-gost/wisper`, `go.mod` at root). The Flutter app lives under `flutter/` and is embedded into the Go binary via `//go:embed` in `web.go`.
+The project is a **single Go module** (`github.com/go-gost/wisper`, `go.mod` at root). The Lit web app lives under `web-src/` and is embedded into the Go binary via `//go:embed` in `web.go`.
 
 ### How the two halves connect
 
-1. `flutter build web` outputs to `flutter/build/web/`
-2. Copy to `web/` (or symlink) for `go:embed` to find
-3. `web.go` embeds `web/*` and serves it as an SPA (non-file requests → `index.html`)
-4. `api/server.go` registers API routes on `/api/*` and falls back to the web handler for everything else
-5. Flutter's `GoBackend` Dart class uses relative URLs when `_base` is empty, so it works same-origin
+1. `npx vite build` in `web-src/` outputs to `web/`
+2. `web.go` embeds `web/*` via `//go:embed` and serves it as an SPA (non-file requests → `index.html`)
+3. `api/server.go` registers API routes on `/api/*` and falls back to the web handler for everything else
+4. The `GoBackend` TypeScript class uses relative URLs when base is empty, so it works same-origin
 
 ### Go package layout
 
 | Package | Purpose |
 |---------|---------|
 | `main` (`main.go`) | Entry point: parses flags, inits config, starts stats runner, starts HTTP server, graceful shutdown |
-| `web.go` | Embeds Flutter web build and serves it with SPA fallback |
+| `web.go` | Embeds Lit web build and serves it with SPA fallback |
 | `config/` | App settings + tunnel/entrypoint persistence to `~/.config/wisper/config.yml`. Thread-safe via `atomic.Value` with deep-copy semantics |
 | `tunnel/` | `Tunnel` interface + 4 concrete types (file, http, tcp, udp) + `ChainConfig` builder |
 | `tunnel/entrypoint/` | Entrypoint types (tcp, udp) implementing `tunnel.Tunnel` interface |
@@ -126,28 +125,69 @@ GET    /api/config                   get app settings (server, entrypoint, lang,
 PUT    /api/config                   update app settings
 ```
 
-### Flutter app structure
+### Lit web app structure
 
 ```
-flutter/lib/
-  main.dart              — App entry point, provider setup
-  app.dart               — MaterialApp.router with GoRouter, theme, i18n
-  config/                — Theme, routes, constants, formatting helpers
-  models/                — Data classes with json_serializable (*.g.dart)
-  services/              — GoBackend HTTP client, PlatformService, clipboard helpers
-  providers/             — Riverpod providers for tunnel, entrypoint, settings, stats state
-  pages/
-    home/                — Tab shell: tunnels | entrypoints | settings
-    tunnel/              — List, detail/form pages for tunnels
-    entrypoint/          — List, detail/form pages for entrypoints
-    settings/            — Settings page (lang, theme, server config)
-  widgets/               — Reusable: TunnelCard, StatsRow, CopyableText, NavTabs, etc.
-  l10n/                  — AppLocalizations with en + zh (46+ strings)
+web-src/
+  index.html              — Bootstrap HTML, loads /src/main.ts
+  package.json            — Dependencies (lit, @lit-labs/router)
+  tsconfig.json           — TypeScript config (strict, decorators)
+  vite.config.ts          — Vite: output to ../web/, proxy /api in dev
+
+  src/
+    main.ts               — Entry: imports global.css and app.ts
+    app.ts                — Root <wisper-app>: init settings, stats polling, router outlet
+
+    api/
+      backend.ts          — GoBackend class (17 API methods, fetch-based)
+      types.ts            — Tunnel, Entrypoint, Stats, AppSettings types + enums
+
+    store/
+      tunnel-store.ts     — Module-level store: CRUD, subscribe/notify
+      entrypoint-store.ts — Module-level store: CRUD, subscribe/notify
+      settings-store.ts   — Settings state, load/save via API, theme/locale apply
+      stats-store.ts      — 1s polling, pushes stats into tunnel/entrypoint stores
+
+    router/
+      routes.ts           — 6 route definitions with lazy-loaded pages
+
+    components/
+      app-scaffold.ts     — Centered 800px layout wrapper
+      nav-tabs.ts         — Pill-style tab bar
+      tunnel-card.ts      — Tunnel/entrypoint summary card
+      stats-row.ts        — Icon + value + rate display
+      copyable-text.ts    — Monospace text + copy button
+      delete-dialog.ts    — Confirmation modal dialog
+      spinner.ts          — Loading spinner
+      form-fields/        — Type-specific form field groups
+
+    pages/
+      home-page.ts                — Tabbed list + FAB
+      tunnel-type-select-page.ts  — 4 tunnel type cards
+      tunnel-detail-page.ts       — View/edit/create form + stats
+      entrypoint-type-select-page.ts — 2 entrypoint type cards
+      entrypoint-detail-page.ts   — View/edit/create form + stats
+      settings-page.ts            — Server/theme/language settings
+
+    i18n/
+      en.ts               — English strings (~55 keys)
+      zh.ts               — Chinese strings (~55 keys)
+      i18n.ts             — t(key, params?) + setLocale() + locale change events
+
+    styles/
+      theme.ts            — CSS custom properties for light/dark, applyTheme()
+      global.css          — Reset, base typography
+
+    utils/
+      format.ts           — formatBytes, formatRate, formatNumber
+      clipboard.ts        — navigator.clipboard with execCommand fallback
 ```
 
-State management is **Riverpod** with `StateNotifier` providers. Navigation is **GoRouter** with path-based routing (`/tunnels`, `/tunnels/:id`, `/entrypoints`, `/entrypoints/:id`, `/settings`).
+State management uses **module-level singleton stores with subscribe/notify pattern** — no extra dependencies. Components subscribe in `connectedCallback()` and unsubscribe in `disconnectedCallback()`.
 
-The Flutter app uses conditional imports (`clipboard_helper.dart` → `clipboard_helper_web.dart` / `clipboard_helper_stub.dart`) to handle the `dart:html` clipboard API on web vs other platforms.
+Routing uses **`@lit-labs/router`** with lazy-loaded page modules. SPA navigation uses `window.history.pushState` + `PopStateEvent`.
+
+Theming uses **CSS custom properties** toggled by `.dark` class on `document.documentElement`.
 
 ## Configuration
 
@@ -159,7 +199,7 @@ The Flutter app uses conditional imports (`clipboard_helper.dart` → `clipboard
 
 ## Test patterns
 
-API tests (`api/api_test.go`) use `httptest.NewServer` and pre-register tunnel/entrypoint objects in a closed state (no network services started). Helper functions: `setupTestServer`, `preRegisterTunnel`, `preRegisterEntrypoint`. Tests reset global state between cases. Flutter tests live alongside each Dart source file and use `flutter_test` + `mockito`.
+API tests (`api/api_test.go`) use `httptest.NewServer` and pre-register tunnel/entrypoint objects in a closed state (no network services started). Helper functions: `setupTestServer`, `preRegisterTunnel`, `preRegisterEntrypoint`. Tests reset global state between cases.
 
 ## Key design conventions
 
@@ -167,3 +207,12 @@ API tests (`api/api_test.go`) use `httptest.NewServer` and pre-register tunnel/e
 - **Close-once channel**: `IsClosed()` checks a `chan struct{}` via non-blocking select; `Close()` closes it once.
 - **No `init()` registration**: Unlike the main GOST project, wisper does not use `init()` side-effect registrations. Tunnel types are created directly via constructors.
 - **Stats polling**: `runner/task/stats.go` runs every second, computes input/output bytes-per-second rates and connection rates from cumulative counters, then persists to disk (note: this means disk writes every second while tunnels are running).
+
+## Desktop/Mobile Wrapping
+
+The Lit web app is designed (but not yet implemented) for wrapping into desktop and mobile apps:
+
+- **Electron/Tauri**: Load `index.html` in a BrowserWindow/WebView, spawn Go backend as sidecar
+- **Capacitor**: Copy `web/` into Capacitor `www/`, run Go backend as embedded server
+
+The key design decisions: all API calls use relative paths, no Node.js-specific APIs, optional `baseUrl` on GoBackend for non-embedded scenarios, CSS custom properties for theming everywhere.

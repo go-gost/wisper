@@ -22,3 +22,6 @@ api/config.yml
 
 # Flutter build cache
 flutter/build/
+
+# Web build stamp (local, never commit)
+web/.build_stamp

@@ -7,8 +7,10 @@ import (
 )
 
 // writeJSON writes a JSON response with the given status code.
+// It sets cache-control headers to prevent browsers from serving stale responses.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		slog.Error("writeJSON", "err", err)
@@ -29,7 +31,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
-// corsMiddleware adds CORS headers for local Flutter UI access.
+// corsMiddleware adds CORS headers for local web UI access.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -46,7 +48,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // NewHandler returns the root HTTP handler with all API routes registered.
-// If webHandler is non-nil, non-API requests are served by it (embedded Flutter web UI).
+// If webHandler is non-nil, non-API requests are served by it (embedded Lit web UI).
 func NewHandler(webHandler http.Handler) http.Handler {
 	mux := http.NewServeMux()
 

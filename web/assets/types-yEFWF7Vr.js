@@ -1,0 +1,1 @@
+const e=[{value:"file",label:"File",desc:""},{value:"http",label:"HTTP",desc:""},{value:"tcp",label:"TCP",desc:""},{value:"udp",label:"UDP",desc:""}],l=[{value:"tcp",label:"TCP",desc:""},{value:"udp",label:"UDP",desc:""}];export{l as E,e as T};

@@ -5,6 +5,7 @@
 #   make linux        — build Linux amd64
 #   make darwin       — build macOS arm64 + amd64
 #   make windows      — build Windows amd64
+#   make web          — build Lit web UI (Vite + TypeScript)
 #   make clean        — remove build artifacts
 
 BINARY  := wisper
@@ -13,21 +14,35 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Output directories
 DIST_DIR   := dist
-FLUTTER_ASSETS := flutter/assets/backend
 
-.PHONY: all linux darwin windows web clean
+.PHONY: all linux darwin windows web web-force clean
 
 all: linux darwin windows
 
-# ----- Flutter Web (embedded into Go binary) -----
+# ----- Lit Web UI (embedded into Go binary) -----
+# Uses Vite + TypeScript + Lit for a fast, lightweight web build.
+# Build is skipped when no source files have changed.
 web:
-	cd flutter && flutter build web --no-source-maps --no-wasm-dry-run
-	rm -rf web
-	mv flutter/build/web web
-	rm -rf web/canvaskit
-	rm -rf web/assets/assets/backend
-	find web/ -name '*.symbols' -delete
-	find web/ -name 'NOTICES' -delete
+	@STAMP="web/.build_stamp"; NEEDS_BUILD=0; \
+	if [ ! -f "$$STAMP" ]; then NEEDS_BUILD=1; \
+	elif [ -n "$$(find web-src/src/ -type f -newer $$STAMP 2>/dev/null)" ]; then NEEDS_BUILD=1; \
+	elif [ "web-src/package.json" -nt "$$STAMP" ]; then NEEDS_BUILD=1; \
+	elif [ ! -f "web/index.html" ]; then NEEDS_BUILD=1; \
+	elif [ ! -f "web/assets/main-*.js" ] && [ ! -f "web/assets/index-*.js" ]; then NEEDS_BUILD=1; fi; \
+	if [ "$$NEEDS_BUILD" -eq 1 ]; then \
+		echo "Building Lit web UI (Vite + TypeScript)..."; \
+		rm -rf web; \
+		(cd web-src && npm ci && npx vite build) || { echo "Vite build failed"; exit 1; }; \
+		touch "$$STAMP"; \
+		echo "Web build complete"; \
+	else \
+		echo "No source changes, skipping web build (use 'make web-force' to force)"; \
+	fi
+
+.PHONY: web-force
+web-force:
+	rm -f web/.build_stamp
+	$(MAKE) web
 
 # ----- Linux -----
 linux: $(DIST_DIR)/linux-amd64/$(BINARY)
@@ -53,22 +68,6 @@ windows: $(DIST_DIR)/windows-amd64/$(BINARY).exe
 $(DIST_DIR)/windows-amd64/$(BINARY).exe:
 	@mkdir -p $(dir $@)
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $@ .
-
-# ----- Copy to Flutter assets -----
-# Call after building the target platform. Example: make flutter-linux
-.PHONY: flutter-linux flutter-darwin flutter-windows
-
-flutter-linux: linux
-	mkdir -p $(FLUTTER_ASSETS)
-	cp $(DIST_DIR)/linux-amd64/$(BINARY) $(FLUTTER_ASSETS)/$(BINARY)
-
-flutter-darwin: darwin
-	mkdir -p $(FLUTTER_ASSETS)
-	cp $(DIST_DIR)/darwin-arm64/$(BINARY) $(FLUTTER_ASSETS)/$(BINARY)
-
-flutter-windows: windows
-	mkdir -p $(FLUTTER_ASSETS)
-	cp $(DIST_DIR)/windows-amd64/$(BINARY).exe $(FLUTTER_ASSETS)/$(BINARY).exe
 
 # ----- Clean -----
 clean:

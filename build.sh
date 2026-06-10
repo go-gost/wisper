@@ -1,75 +1,64 @@
 #!/usr/bin/env bash
-# wisper/build.sh — Build the Go backend and Flutter app together.
+# wisper/build.sh — Build the Go backend and web UI together.
 #
 # Usage:
 #   ./build.sh <platform>
 #
-# Platforms: linux, macos, windows, apk, ios
+# Platforms: linux, macos, windows, web
 #
-# This script:
-# 1. Cross-compiles the Go backend for the target platform
-# 2. Places the binary where the Flutter app expects it
-# 3. Runs flutter build for the target platform
+# Note: desktop platforms (linux/macos/windows) currently only build
+# the Go backend. Desktop app wrapping (Tauri/Electron) is a future task.
 
 set -euo pipefail
 
 BINARY="wisper"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST_DIR="$SCRIPT_DIR/dist"
-FLUTTER_DIR="$SCRIPT_DIR/flutter"
+WEB_SRC_DIR="$SCRIPT_DIR/web-src"
 
 # Determine Go target OS/ARCH from platform argument.
 case "${1:-}" in
   linux)
     GOOS=linux GOARCH=amd64
-    FLUTTER_CMD="flutter build linux"
-    BUNDLE_DIR="$FLUTTER_DIR/build/linux/x64/release/bundle"
+    BUNDLE_DIR="$DIST_DIR/$GOOS-$GOARCH"
     ;;
   macos)
     GOOS=darwin GOARCH=arm64
-    FLUTTER_CMD="flutter build macos"
-    BUNDLE_DIR="$FLUTTER_DIR/build/macos/Build/Products/Release/wisper.app/Contents/MacOS"
+    BUNDLE_DIR="$DIST_DIR/$GOOS-$GOARCH"
     ;;
   windows)
     GOOS=windows GOARCH=amd64
-    FLUTTER_CMD="flutter build windows"
-    BUNDLE_DIR="$FLUTTER_DIR/build/windows/x64/runner/Release"
+    BUNDLE_DIR="$DIST_DIR/$GOOS-$GOARCH"
     ;;
-  apk)
-    echo "Android APK: Go backend must be bundled as a native library (not supported by this script)"
-    echo "Use a FFI bridge or gomobile for Android/iOS."
-    exit 1
-    ;;
-  ios)
-    echo "iOS: Go backend must be bundled as a native framework (not supported by this script)"
-    echo "Use gomobile bind for iOS."
-    exit 1
+  web)
+    # Web-only: build Lit web UI via Vite (Go backend is compiled separately).
     ;;
   *)
-    echo "Usage: $0 {linux|macos|windows}"
+    echo "Usage: $0 {linux|macos|windows|web}"
     exit 1
     ;;
 esac
 
-# Step 1: Build Go backend.
+# Step 1: Build Lit web UI (no Go backend needed — it's embedded via go:embed).
+if [ "$1" = "web" ]; then
+  echo "==> Building Lit web UI (Vite + TypeScript)..."
+  (cd "$WEB_SRC_DIR" && npm ci && npx vite build)
+  echo "==> Done! Web assets at: $SCRIPT_DIR/web ($(du -sh "$SCRIPT_DIR/web" | cut -f1))"
+  exit 0
+fi
+
+# Step 2: Build Go backend (for desktop platforms).
 OUT_NAME="$BINARY"
 [ "$GOOS" = "windows" ] && OUT_NAME="$BINARY.exe"
-OUT_PATH="$DIST_DIR/$GOOS-$GOARCH/$OUT_NAME"
+OUT_PATH="$BUNDLE_DIR/$OUT_NAME"
 
 echo "==> Building Go backend ($GOOS/$GOARCH)..."
-mkdir -p "$(dirname "$OUT_PATH")"
+mkdir -p "$BUNDLE_DIR"
 CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -o "$OUT_PATH" .
 
 echo "    Output: $OUT_PATH ($(du -h "$OUT_PATH" | cut -f1))"
 
-# Step 2: Build Flutter app.
-echo "==> Building Flutter app ($1)..."
-(cd "$FLUTTER_DIR" && $FLUTTER_CMD)
-
-# Step 3: Copy Go binary into the Flutter bundle.
-echo "==> Copying Go backend into Flutter bundle..."
-mkdir -p "$BUNDLE_DIR"
-cp "$OUT_PATH" "$BUNDLE_DIR/$OUT_NAME"
-chmod +x "$BUNDLE_DIR/$OUT_NAME"
-
-echo "==> Done! Bundle at: $BUNDLE_DIR"
+# NOTE: Desktop app wrapping (Tauri/Electron) is not yet implemented.
+# The Go binary above can be used as a sidecar or embedded server.
+echo "==> Done! Binary at: $OUT_PATH"
+echo "    Desktop wrapping (Tauri/Electron) is planned but not yet implemented."

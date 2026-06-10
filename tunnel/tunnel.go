@@ -159,6 +159,20 @@ func IsServiceFailed(t Tunnel) bool {
 	return s != nil && s.State() == xservice.StateFailed
 }
 
+// ServiceErrorMessage returns the last accept/bind error message from the
+// underlying GOST service status. Returns an empty string if no error is
+// available.
+func ServiceErrorMessage(t Tunnel) string {
+	s := t.Status()
+	if s == nil {
+		return ""
+	}
+	if err := s.LastError(); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
 // Tunnel is the interface for all tunnel and entrypoint types.
 type Tunnel interface {
 	ID() string
