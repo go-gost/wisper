@@ -1,5 +1,6 @@
 import { GoBackend } from '../api/backend';
 import type { Tunnel, TunnelCreateRequest } from '../api/types';
+import { subscribe as subscribeSettings } from './settings-store';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -7,6 +8,12 @@ let tunnels: Tunnel[] = [];
 let loading = false;
 const listeners = new Set<() => void>();
 const backend = new GoBackend();
+
+// Refresh cached tunnel data when settings change (e.g. entrypoint domain),
+// so that URLs derived from config stay up to date.
+subscribeSettings(() => {
+  refresh();
+});
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -103,4 +110,10 @@ export function applyStats(statsList: Tunnel[]): void {
     tunnels = tunnels.map(t => (t.id === s.id ? { ...t, stats: s.stats, status: s.status } : t));
   }
   notify();
+}
+
+/** Reset cumulative traffic stats for a tunnel. */
+export async function resetStats(id: string, kind?: string): Promise<void> {
+  await backend.resetStats(id, false, kind);
+  await refresh();
 }

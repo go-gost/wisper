@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
 )
 
@@ -44,9 +45,18 @@ type statsResponse struct {
 	OutputRateBytes uint64  `json:"output_rate_bytes"`
 }
 
+// safeSub returns a - b, or 0 if b > a (underflow guard for baseline subtraction).
+func safeSub(a, b uint64) uint64 {
+	if a >= b {
+		return a - b
+	}
+	return 0
+}
+
 func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	opts := t.Options()
 	s := t.Stats()
+	bl := t.StatsBaseline()
 	status := "stopped"
 	errMsg := errStr(t.Err())
 	if !t.IsClosed() {
@@ -83,10 +93,10 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
-			TotalConns:      s.TotalConns,
+			TotalConns:      safeSub(s.TotalConns, bl.TotalConns),
 			RequestRate:     s.RequestRate,
-			InputBytes:      s.InputBytes,
-			OutputBytes:     s.OutputBytes,
+			InputBytes:      safeSub(s.InputBytes, bl.InputBytes),
+			OutputBytes:     safeSub(s.OutputBytes, bl.OutputBytes),
 			InputRateBytes:  s.InputRateBytes,
 			OutputRateBytes: s.OutputRateBytes,
 		},
@@ -330,6 +340,37 @@ func handleStopTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t.Close()
+	tunnel.SaveConfig()
+
+	writeJSON(w, http.StatusOK, toTunnelResponse(t))
+}
+
+func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	t := tunnel.Get(id)
+	if t == nil {
+		writeError(w, http.StatusNotFound, "tunnel not found")
+		return
+	}
+
+	kind := r.URL.Query().Get("kind")
+	s := t.Stats()
+	bl := t.StatsBaseline()
+
+	switch kind {
+	case "input":
+		bl.InputBytes = s.InputBytes
+	case "output":
+		bl.OutputBytes = s.OutputBytes
+	default:
+		bl = config.ServiceStats{
+			TotalConns: s.TotalConns,
+			InputBytes: s.InputBytes,
+			OutputBytes: s.OutputBytes,
+			TotalErrs:  s.TotalErrs,
+		}
+	}
+	t.SetStatsBaseline(bl)
 	tunnel.SaveConfig()
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(t))

@@ -128,10 +128,11 @@ type Tunnel struct {
 	Keepalive   bool   `yaml:",omitempty"`
 	TTL         int    `yaml:"ttl,omitempty"`
 
-	Stats     ServiceStats
-	Favorite  bool
-	Closed    bool
-	CreatedAt time.Time
+	Stats         ServiceStats
+	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
+	Favorite      bool
+	Closed        bool
+	CreatedAt     time.Time
 }
 
 // Config is the root configuration file structure.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
 	"github.com/go-gost/wisper/tunnel/entrypoint"
 )
@@ -217,6 +218,37 @@ func handleStopEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ep.Close()
+	entrypoint.SaveConfig()
+
+	writeJSON(w, http.StatusOK, toTunnelResponse(ep))
+}
+
+func handleResetEntrypointStats(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	ep := entrypoint.Get(id)
+	if ep == nil {
+		writeError(w, http.StatusNotFound, "entrypoint not found")
+		return
+	}
+
+	kind := r.URL.Query().Get("kind")
+	s := ep.Stats()
+	bl := ep.StatsBaseline()
+
+	switch kind {
+	case "input":
+		bl.InputBytes = s.InputBytes
+	case "output":
+		bl.OutputBytes = s.OutputBytes
+	default:
+		bl = config.ServiceStats{
+			TotalConns: s.TotalConns,
+			InputBytes: s.InputBytes,
+			OutputBytes: s.OutputBytes,
+			TotalErrs:  s.TotalErrs,
+		}
+	}
+	ep.SetStatsBaseline(bl)
 	entrypoint.SaveConfig()
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(ep))

@@ -60,6 +60,7 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("DELETE /api/tunnels/{id}", handleDeleteTunnel)
 	mux.HandleFunc("POST /api/tunnels/{id}/start", handleStartTunnel)
 	mux.HandleFunc("POST /api/tunnels/{id}/stop", handleStopTunnel)
+	mux.HandleFunc("POST /api/tunnels/{id}/stats/reset", handleResetTunnelStats)
 
 	// Entrypoint endpoints
 	mux.HandleFunc("GET /api/entrypoints", handleListEntrypoints)
@@ -69,6 +70,7 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("DELETE /api/entrypoints/{id}", handleDeleteEntrypoint)
 	mux.HandleFunc("POST /api/entrypoints/{id}/start", handleStartEntrypoint)
 	mux.HandleFunc("POST /api/entrypoints/{id}/stop", handleStopEntrypoint)
+	mux.HandleFunc("POST /api/entrypoints/{id}/stats/reset", handleResetEntrypointStats)
 
 	// Stats and config
 	mux.HandleFunc("GET /api/stats", handleGetStats)

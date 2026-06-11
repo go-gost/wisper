@@ -40,6 +40,7 @@ type fileTunnel struct {
 	forward  service.Service
 	favorite atomic.Bool
 	stats    cfg.ServiceStats
+	statsBaseline cfg.ServiceStats
 
 	cclose chan struct{}
 
@@ -266,6 +267,18 @@ func (s *fileTunnel) SetStats(stats cfg.ServiceStats) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stats = stats
+}
+
+func (s *fileTunnel) StatsBaseline() cfg.ServiceStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.statsBaseline
+}
+
+func (s *fileTunnel) SetStatsBaseline(baseline cfg.ServiceStats) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.statsBaseline = baseline
 }
 
 func (s *fileTunnel) Close() error {

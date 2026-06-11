@@ -1,5 +1,6 @@
 import { GoBackend } from '../api/backend';
 import type { Entrypoint, EntrypointCreateRequest } from '../api/types';
+import { subscribe as subscribeSettings } from './settings-store';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -7,6 +8,12 @@ let entrypoints: Entrypoint[] = [];
 let loading = false;
 const listeners = new Set<() => void>();
 const backend = new GoBackend();
+
+// Refresh cached entrypoint data when settings change (e.g. entrypoint domain),
+// so that URLs derived from config stay up to date.
+subscribeSettings(() => {
+  refresh();
+});
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -95,4 +102,10 @@ export function applyStats(statsList: Entrypoint[]): void {
     );
   }
   notify();
+}
+
+/** Reset cumulative traffic stats for an entrypoint. */
+export async function resetStats(id: string, kind?: string): Promise<void> {
+  await backend.resetStats(id, true, kind);
+  await refresh();
 }

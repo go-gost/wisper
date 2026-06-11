@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
-import { getEntrypoints, refresh, remove, start, stop, subscribe } from '../store/entrypoint-store';
+import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { copyToClipboard } from '../utils/clipboard';
 import type { Entrypoint, EntrypointType } from '../api/types';
 import '../components/app-scaffold';
@@ -21,6 +21,8 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _saving = false;
   @state() private _snackbar = '';
   @state() private _showDeleteDialog = false;
+  @state() private _showResetDialog = false;
+  private _resetKind = '';
 
   // Form fields
   @state() private _name = '';
@@ -184,6 +186,21 @@ export class EntrypointDetailPage extends LitElement {
   private async _handleCopy(text: string) {
     await copyToClipboard(text);
     this._showSnackbar(t('copiedToClipboard'));
+  }
+
+  private _handleResetStats(kind: string) {
+    this._resetKind = kind;
+    this._showResetDialog = true;
+  }
+
+  private async _doResetStats() {
+    this._showResetDialog = false;
+    try {
+      await resetStats(this.entrypointId, this._resetKind);
+      this._showSnackbar(t('saved'));
+    } catch {
+      this._showSnackbar(t('saveFailed'));
+    }
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -372,6 +389,10 @@ export class EntrypointDetailPage extends LitElement {
     .dialog-btn.danger { background: var(--red); color: #fff; }
     .dialog-btn:hover { opacity: 0.85; }
 
+t    /* Reset button */
+	      background: var(--border-subtle);
+	      color: var(--text);
+	    }
     /* ── Edit button at bottom ── */
     .btn-edit-bottom {
       width: 100%;
@@ -473,6 +494,7 @@ export class EntrypointDetailPage extends LitElement {
           `
           : ''}
 
+
             <!-- Edit button (view mode only) -->
             ${this.mode === 'view' && ep
               ? html`
@@ -536,6 +558,25 @@ export class EntrypointDetailPage extends LitElement {
           : ''}
 
         ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
+
+        ${this._showResetDialog
+          ? html`
+            <div class="dialog-overlay" @click=${() => { this._showResetDialog = false; }}>
+              <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="dialog-title">${t('resetStatsConfirmTitle')}</div>
+                <div class="dialog-message">${t('resetStatsConfirm')}</div>
+                <div class="dialog-actions">
+                  <button class="dialog-btn cancel" @click=${() => { this._showResetDialog = false; }}>
+                    ${t('btnCancel')}
+                  </button>
+                  <button class="dialog-btn danger" @click=${this._doResetStats}>
+                    ${t('btnResetStats')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `
+          : ''}
 
         ${this._showDeleteDialog
           ? html`

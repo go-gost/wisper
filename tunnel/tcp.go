@@ -33,6 +33,7 @@ type tcpTunnel struct {
 	forward  service.Service
 	favorite atomic.Bool
 	stats    cfg.ServiceStats
+	statsBaseline cfg.ServiceStats
 
 	cclose chan struct{}
 
@@ -204,6 +205,18 @@ func (s *tcpTunnel) SetStats(stats cfg.ServiceStats) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stats = stats
+}
+
+func (s *tcpTunnel) StatsBaseline() cfg.ServiceStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.statsBaseline
+}
+
+func (s *tcpTunnel) SetStatsBaseline(baseline cfg.ServiceStats) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.statsBaseline = baseline
 }
 
 func (s *tcpTunnel) Close() error {

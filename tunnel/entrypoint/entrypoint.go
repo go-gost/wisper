@@ -113,7 +113,8 @@ func RestartRunning() {
 		index int
 		opts  tunnel.Options
 		fav   bool
-		stats config.ServiceStats
+		stats          config.ServiceStats
+		statsBaseline  config.ServiceStats
 	}
 
 	var pending []restartInfo
@@ -128,7 +129,8 @@ func RestartRunning() {
 			index: i,
 			opts:  ep.Options(),
 			fav:   ep.IsFavorite(),
-			stats: ep.Stats(),
+			stats:         ep.Stats(),
+			statsBaseline: ep.StatsBaseline(),
 		})
 		ep.Close()
 	}
@@ -145,13 +147,15 @@ func RestartRunning() {
 			EnableTLS: p.opts.EnableTLS,
 			Keepalive: p.opts.Keepalive,
 			TTL:       p.opts.TTL,
-			CreatedAt: p.opts.CreatedAt,
+			CreatedAt:     p.opts.CreatedAt,
+			StatsBaseline: p.statsBaseline,
 		})
 		if newEP == nil {
 			continue
 		}
 
 		newEP.SetStats(p.stats)
+		newEP.SetStatsBaseline(p.statsBaseline)
 		newEP.Favorite(p.fav)
 
 		if err := newEP.Run(); err != nil {
@@ -183,7 +187,8 @@ func LoadConfig() {
 			Keepalive: cfg.Keepalive,
 			TTL:       cfg.TTL,
 			CreatedAt: cfg.CreatedAt,
-			Stats:     cfg.Stats,
+			Stats:         cfg.Stats,
+			StatsBaseline: cfg.StatsBaseline,
 		})
 		if ep == nil {
 			continue
@@ -225,7 +230,8 @@ func SaveConfig() error {
 			Favorite:  ep.IsFavorite(),
 			Closed:    ep.IsClosed(),
 			CreatedAt: opts.CreatedAt,
-			Stats:     ep.Stats(),
+			Stats:         ep.Stats(),
+			StatsBaseline: ep.StatsBaseline(),
 		})
 	}
 
@@ -248,6 +254,7 @@ func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
 		tunnel.PasswordOption(opts.Password),
 		tunnel.EnableTLSOption(opts.EnableTLS),
 		tunnel.CreatedAtOption(opts.CreatedAt),
+		tunnel.StatsBaselineOption(opts.StatsBaseline),
 	}
 	switch st {
 	case TCPEntryPoint:
@@ -259,5 +266,6 @@ func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
 	}
 
 	ep.SetStats(opts.Stats)
+	ep.SetStatsBaseline(opts.StatsBaseline)
 	return
 }

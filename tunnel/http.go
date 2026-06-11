@@ -35,6 +35,7 @@ type httpTunnel struct {
 	forward  service.Service
 	favorite atomic.Bool
 	stats    cfg.ServiceStats
+	statsBaseline cfg.ServiceStats
 
 	cclose chan struct{}
 
@@ -246,6 +247,18 @@ func (s *httpTunnel) SetStats(stats cfg.ServiceStats) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stats = stats
+}
+
+func (s *httpTunnel) StatsBaseline() cfg.ServiceStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.statsBaseline
+}
+
+func (s *httpTunnel) SetStatsBaseline(baseline cfg.ServiceStats) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.statsBaseline = baseline
 }
 
 func (s *httpTunnel) Close() error {

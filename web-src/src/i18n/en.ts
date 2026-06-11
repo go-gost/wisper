@@ -35,6 +35,9 @@ const en: Record<string, string> = {
   btnDelete: 'Delete',
   btnCancel: 'Cancel',
   btnCopy: 'Copy',
+  btnResetStats: 'Reset',
+  btnResetInput: 'Reset Upload',
+  btnResetOutput: 'Reset Download',
 
   // Form fields
   fieldName: 'Name',
@@ -76,6 +79,8 @@ const en: Record<string, string> = {
 
   // Notifications
   copiedToClipboard: 'Copied to clipboard',
+  resetStatsConfirmTitle: 'Reset Stats',
+  resetStatsConfirm: 'Reset cumulative traffic to zero?',
   deleteConfirmTitle: 'Confirm Delete',
   deleteConfirmMessage: 'Are you sure you want to delete this item?',
   saveFailed: 'Failed to save',

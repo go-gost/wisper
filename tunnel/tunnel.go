@@ -68,6 +68,7 @@ type Options struct {
 	TTL         int
 	CreatedAt   time.Time
 	Stats       config.ServiceStats
+	StatsBaseline config.ServiceStats
 }
 
 // Option is a functional option for tunnel Options.
@@ -145,6 +146,12 @@ func CreatedAtOption(createdAt time.Time) Option {
 	}
 }
 
+func StatsBaselineOption(baseline config.ServiceStats) Option {
+	return func(opts *Options) {
+		opts.StatsBaseline = baseline
+	}
+}
+
 // ServiceStatus is implemented by services that expose a Status method.
 type ServiceStatus interface {
 	Status() *xservice.Status
@@ -185,6 +192,8 @@ type Tunnel interface {
 	Status() *xservice.Status
 	Stats() config.ServiceStats
 	SetStats(stats config.ServiceStats)
+	StatsBaseline() config.ServiceStats
+	SetStatsBaseline(baseline config.ServiceStats)
 	Favorite(b bool)
 	IsFavorite() bool
 	Close() error
@@ -282,7 +291,8 @@ func RestartRunning() {
 		index int
 		opts  Options
 		fav   bool
-		stats config.ServiceStats
+		stats          config.ServiceStats
+		statsBaseline  config.ServiceStats
 	}
 
 	var pending []restartInfo
@@ -297,7 +307,8 @@ func RestartRunning() {
 			index: i,
 			opts:  t.Options(),
 			fav:   t.IsFavorite(),
-			stats: t.Stats(),
+			stats:         t.Stats(),
+			statsBaseline: t.StatsBaseline(),
 		})
 		t.Close()
 	}
@@ -321,6 +332,7 @@ func RestartRunning() {
 		}
 
 		newT.SetStats(p.stats)
+		newT.SetStatsBaseline(p.statsBaseline)
 		newT.Favorite(p.fav)
 
 		if err := newT.Run(); err != nil {
@@ -388,6 +400,7 @@ func LoadConfig() {
 			FileUpload:  cfg.FileUpload,
 			CreatedAt:   cfg.CreatedAt,
 			Stats:       cfg.Stats,
+			StatsBaseline: cfg.StatsBaseline,
 		})
 		if tun == nil {
 			continue
@@ -432,6 +445,7 @@ func SaveConfig() error {
 			Closed:    tun.IsClosed(),
 			CreatedAt: opts.CreatedAt,
 			Stats:     tun.Stats(),
+			StatsBaseline: tun.StatsBaseline(),
 		})
 	}
 
@@ -472,5 +486,6 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 	}
 
 	t.SetStats(opts.Stats)
+	t.SetStatsBaseline(opts.StatsBaseline)
 	return
 }

@@ -33,6 +33,7 @@ type udpTunnel struct {
 	forward  service.Service
 	favorite atomic.Bool
 	stats    cfg.ServiceStats
+	statsBaseline cfg.ServiceStats
 
 	cclose chan struct{}
 
@@ -204,6 +205,18 @@ func (s *udpTunnel) SetStats(stats cfg.ServiceStats) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stats = stats
+}
+
+func (s *udpTunnel) StatsBaseline() cfg.ServiceStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.statsBaseline
+}
+
+func (s *udpTunnel) SetStatsBaseline(baseline cfg.ServiceStats) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.statsBaseline = baseline
 }
 
 func (s *udpTunnel) Close() error {

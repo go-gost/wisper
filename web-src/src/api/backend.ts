@@ -130,6 +130,12 @@ export class GoBackend {
     return this.request<StatsSnapshot>('GET', '/api/stats');
   }
 
+  resetStats(id: string, isEntrypoint: boolean, kind?: string): Promise<void> {
+    const prefix = isEntrypoint ? '/api/entrypoints/' : '/api/tunnels/';
+    const qs = kind ? `?kind=${kind}` : '';
+    return this.request<void>('POST', `${prefix}${id}/stats/reset${qs}`);
+  }
+
   // ─── Config ─────────────────────────────────────────────────────────────
 
   getConfig(): Promise<AppSettings> {

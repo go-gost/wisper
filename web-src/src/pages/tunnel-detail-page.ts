@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
-import { getTunnels, refresh, remove, start, stop, subscribe } from '../store/tunnel-store';
+import { getTunnels, refresh, remove, start, stop, subscribe, resetStats } from '../store/tunnel-store';
 import { getStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber } from '../utils/format';
@@ -23,6 +23,8 @@ export class TunnelDetailPage extends LitElement {
   @state() private _saving = false;
   @state() private _snackbar = '';
   @state() private _showDeleteDialog = false;
+  @state() private _showResetDialog = false;
+  private _resetKind = '';
 
   // Form fields
   @state() private _name = '';
@@ -210,6 +212,21 @@ export class TunnelDetailPage extends LitElement {
   private async _handleCopy(text: string) {
     await copyToClipboard(text);
     this._showSnackbar(t('copiedToClipboard'));
+  }
+
+  private _handleResetStats(kind: string) {
+    this._resetKind = kind;
+    this._showResetDialog = true;
+  }
+
+  private async _doResetStats() {
+    this._showResetDialog = false;
+    try {
+      await resetStats(this.tunnelId, this._resetKind);
+      this._showSnackbar(t('saved'));
+    } catch {
+      this._showSnackbar(t('saveFailed'));
+    }
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -408,7 +425,15 @@ export class TunnelDetailPage extends LitElement {
     .stat-icon {
       font-size: var(--font-md);
       margin-bottom: 4px;
-    }
+	    }
+
+	    .stat-reset-mini {
+	      display: inline-flex;
+	      align-items: center;
+	      opacity: 0;
+	      transition: opacity 0.15s;
+	    }
+	    .stat-box:hover .stat-reset-mini { opacity: 1; }
 
     .stat-value {
       font-size: var(--font-xl);
@@ -424,10 +449,22 @@ export class TunnelDetailPage extends LitElement {
     }
 
     .stat-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       font-size: var(--font-sm);
       color: var(--text-muted);
       margin-bottom: 4px;
-    }
+	    }
+
+	    .stat-reset-mini {
+	      display: inline-flex;
+	      align-items: center;
+	      opacity: 0;
+	      transition: opacity 0.15s;
+	    }
+	    .stat-box:hover .stat-reset-mini { opacity: 1; }
+
 
     /* ── Form ── */
     .form-group {
@@ -439,7 +476,15 @@ export class TunnelDetailPage extends LitElement {
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
-      text-transform: uppercase;
+	    }
+
+	    .stat-reset-mini {
+	      display: inline-flex;
+	      align-items: center;
+	      opacity: 0;
+	      transition: opacity 0.15s;
+	    }
+	    .stat-box:hover .stat-reset-mini { opacity: 1; }
       letter-spacing: 0.5px;
     }
     .form-input {
@@ -746,23 +791,23 @@ export class TunnelDetailPage extends LitElement {
                       <div class="stat-value">${formatNumber(stats.total_conns)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download</div>
+                      <div class="stat-label">Download <a class="stat-reset-mini" @click=${() => this._handleResetStats('output')}>${icon('rotate-cw')}</a></div>
                       <div class="stat-value">${formatBytes(stats.output_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload</div>
+                      <div class="stat-label">Upload <a class="stat-reset-mini" @click=${() => this._handleResetStats('input')}>${icon('rotate-cw')}</a></div>
                       <div class="stat-value">${formatBytes(stats.input_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.input_rate_bytes)}</div>
                     </div>
                   </div>
-                `
-                : ''}
-            </div>
-          `
-          : ''}
+	                `
+	                : ''}
+	            </div>
+	          `
+	          : ''}
 
-            <!-- Edit button (view mode only) -->
+	            <!-- Edit button (view mode only) -->
             ${this.mode === 'view' && t2
               ? html`
                 <div class="section">
@@ -882,6 +927,26 @@ export class TunnelDetailPage extends LitElement {
           : ''}
 
         ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
+
+
+        ${this._showResetDialog
+          ? html`
+            <div class="dialog-overlay" @click=${() => { this._showResetDialog = false; }}>
+              <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="dialog-title">${t('resetStatsConfirmTitle')}</div>
+                <div class="dialog-message">${t('resetStatsConfirm')}</div>
+                <div class="dialog-actions">
+                  <button class="dialog-btn cancel" @click=${() => { this._showResetDialog = false; }}>
+                    ${t('btnCancel')}
+                  </button>
+                  <button class="dialog-btn danger" @click=${this._doResetStats}>
+                    ${t('btnResetStats')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `
+          : ''}
 
         ${this._showDeleteDialog
           ? html`

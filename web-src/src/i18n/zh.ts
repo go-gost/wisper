@@ -35,6 +35,9 @@ const zh: Record<string, string> = {
   btnDelete: '删除',
   btnCancel: '取消',
   btnCopy: '复制',
+  btnResetStats: '清零',
+  btnResetInput: '清零上传',
+  btnResetOutput: '清零下载',
 
   // Form fields
   fieldName: '名称',
@@ -76,6 +79,8 @@ const zh: Record<string, string> = {
 
   // Notifications
   copiedToClipboard: '已复制到剪贴板',
+  resetStatsConfirmTitle: '重置统计',
+  resetStatsConfirm: '确认清零累计流量？',
   deleteConfirmTitle: '确认删除',
   deleteConfirmMessage: '确定要删除此项吗？',
   saveFailed: '保存失败',
