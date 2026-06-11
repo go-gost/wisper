@@ -425,15 +425,15 @@ export class TunnelDetailPage extends LitElement {
     .stat-icon {
       font-size: var(--font-md);
       margin-bottom: 4px;
-	    }
+    }
 
-	    .stat-reset-mini {
-	      display: inline-flex;
-	      align-items: center;
-	      opacity: 0;
-	      transition: opacity 0.15s;
-	    }
-	    .stat-box:hover .stat-reset-mini { opacity: 1; }
+    .stat-reset-mini {
+      display: inline-flex;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .stat-box:hover .stat-reset-mini { opacity: 1; }
 
     .stat-value {
       font-size: var(--font-xl);
@@ -455,16 +455,7 @@ export class TunnelDetailPage extends LitElement {
       font-size: var(--font-sm);
       color: var(--text-muted);
       margin-bottom: 4px;
-	    }
-
-	    .stat-reset-mini {
-	      display: inline-flex;
-	      align-items: center;
-	      opacity: 0;
-	      transition: opacity 0.15s;
-	    }
-	    .stat-box:hover .stat-reset-mini { opacity: 1; }
-
+    }
 
     /* ── Form ── */
     .form-group {
@@ -476,15 +467,7 @@ export class TunnelDetailPage extends LitElement {
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
-	    }
-
-	    .stat-reset-mini {
-	      display: inline-flex;
-	      align-items: center;
-	      opacity: 0;
-	      transition: opacity 0.15s;
-	    }
-	    .stat-box:hover .stat-reset-mini { opacity: 1; }
+      text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .form-input {
@@ -801,13 +784,11 @@ export class TunnelDetailPage extends LitElement {
                       <div class="stat-rate">${formatRate(stats.input_rate_bytes)}</div>
                     </div>
                   </div>
-	                `
-	                : ''}
-	            </div>
-	          `
-	          : ''}
+                `
+                : ''}
+            </div>
 
-	            <!-- Edit button (view mode only) -->
+            <!-- Edit button (view mode only) -->
             ${this.mode === 'view' && t2
               ? html`
                 <div class="section">
@@ -817,6 +798,8 @@ export class TunnelDetailPage extends LitElement {
                 </div>
               `
               : ''}
+          `
+          : ''}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
         ${this.mode !== 'view'
@@ -927,7 +910,6 @@ export class TunnelDetailPage extends LitElement {
           : ''}
 
         ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
-
 
         ${this._showResetDialog
           ? html`

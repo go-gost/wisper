@@ -389,10 +389,6 @@ export class EntrypointDetailPage extends LitElement {
     .dialog-btn.danger { background: var(--red); color: #fff; }
     .dialog-btn:hover { opacity: 0.85; }
 
-t    /* Reset button */
-	      background: var(--border-subtle);
-	      color: var(--text);
-	    }
     /* ── Edit button at bottom ── */
     .btn-edit-bottom {
       width: 100%;
@@ -491,20 +487,15 @@ t    /* Reset button */
                 </div>
               </div>
             </div>
-          `
-          : ''}
-
 
             <!-- Edit button (view mode only) -->
-            ${this.mode === 'view' && ep
-              ? html`
-                <div class="section">
-                  <button class="btn-edit-bottom" @click=${this._enterEdit}>
-                    ${icon('edit')} ${t('btnEdit')}
-                  </button>
-                </div>
-              `
-              : ''}
+            <div class="section">
+              <button class="btn-edit-bottom" @click=${this._enterEdit}>
+                ${icon('edit')} ${t('btnEdit')}
+              </button>
+            </div>
+          `
+          : ''}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
         ${this.mode !== 'view'

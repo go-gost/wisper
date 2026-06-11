@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-sRwon7Ir.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
-import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i as $,t as k}from"./index-sRwon7Ir.js";import{n as h,r}from"./state-CxJm67SJ.js";import{i as p}from"./app-scaffold-C4JxCz1w.js";import{c as D}from"./clipboard-C3x8_sid.js";var S=Object.defineProperty,E=Object.getOwnPropertyDescriptor,s=(t,a,i,l)=>{for(var d=l>1?void 0:l?E(a,i):a,c=t.length-1,b;c>=0;c--)(b=t[c])&&(d=(l?b(a,i,d):b(d))||d);return l&&d&&S(a,i,d),d};let o=class extends v{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(f(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const i=g().find(l=>l.id===t);i&&(this._entrypoint=i,a?(this.mode="edit",this._populateForm(i)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(i)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-sRwon7Ir.js").then(a=>a.G),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await u(()=>import("./index-sRwon7Ir.js").then(a=>a.G),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await m())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await _(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await x(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await D(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await w(this.entrypointId,this._resetKind),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=this._typeLabel();return n`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CTGHrmHL.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as s,i as $,t as k}from"./index-CTGHrmHL.js";import{n as h,r}from"./state-BZBTxrJb.js";import{i as p}from"./app-scaffold-DoLCQb2f.js";import{c as D}from"./clipboard-C3x8_sid.js";var S=Object.defineProperty,E=Object.getOwnPropertyDescriptor,o=(t,a,i,l)=>{for(var d=l>1?void 0:l?E(a,i):a,c=t.length-1,b;c>=0;c--)(b=t[c])&&(d=(l?b(a,i,d):b(d))||d);return l&&d&&S(a,i,d),d};let n=class extends v{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(f(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const i=g().find(l=>l.id===t);i&&(this._entrypoint=i,a?(this.mode="edit",this._populateForm(i)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(i)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-CTGHrmHL.js").then(a=>a.G),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await u(()=>import("./index-CTGHrmHL.js").then(a=>a.G),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await m())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await _(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await x(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await D(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await w(this.entrypointId,this._resetKind),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=this._typeLabel();return s`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -10,13 +10,13 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
             ${this.mode==="create"?`${e("entrypointNewTitle")} — ${a}`:a+" Entrypoint"}
           </span>
 
-          ${this.mode==="view"&&t?n`
-              ${t.status==="running"?n`<button class="pill-btn danger appbar-action" @click=${this._handleStop}>
+          ${this.mode==="view"&&t?s`
+              ${t.status==="running"?s`<button class="pill-btn danger appbar-action" @click=${this._handleStop}>
                   ■ ${e("btnStop")}
-                </button>`:n`<button class="pill-btn primary appbar-action" @click=${this._handleStart}>
+                </button>`:s`<button class="pill-btn primary appbar-action" @click=${this._handleStart}>
                   ▶ ${e("btnStart")}
                 </button>`}
-            `:n`
+            `:s`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${this._handleSave}>
                 ${p("check")} ${e("btnSave")}
               </button>
@@ -24,12 +24,12 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
         </div>
 
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
-        ${this.mode==="view"&&t?n`
+        ${this.mode==="view"&&t?s`
             <!-- Status banner -->
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
               ${t.status==="running"?e("statusRunning"):t.status==="error"?e("statusError"):e("statusStopped")}
-              ${t.error?n` — ${t.error}`:""}
+              ${t.error?s` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
 
@@ -43,7 +43,7 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
                   <span class="info-value uuid">${t.id??"—"}</span>
-                  ${t.id?n`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
+                  ${t.id?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
                       ${p("copy")}
                     </button>`:""}
                 </div>
@@ -57,20 +57,17 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
                 </div>
               </div>
             </div>
-          `:""}
-
 
             <!-- Edit button (view mode only) -->
-            ${this.mode==="view"&&t?n`
-                <div class="section">
-                  <button class="btn-edit-bottom" @click=${this._enterEdit}>
-                    ${p("edit")} ${e("btnEdit")}
-                  </button>
-                </div>
-              `:""}
+            <div class="section">
+              <button class="btn-edit-bottom" @click=${this._enterEdit}>
+                ${p("edit")} ${e("btnEdit")}
+              </button>
+            </div>
+          `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
-        ${this.mode!=="view"?n`
+        ${this.mode!=="view"?s`
             <div class="section">
               <div class="card" style="padding:16px;">
                 <!-- Type (readonly) -->
@@ -104,7 +101,7 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
                 </div>
 
                 <!-- Danger Zone (edit only) -->
-                ${this.mode==="edit"?n`
+                ${this.mode==="edit"?s`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
@@ -116,9 +113,9 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
             </div>
           `:""}
 
-        ${this._snackbar?n`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?s`<div class="toast">${this._snackbar}</div>`:""}
 
-        ${this._showResetDialog?n`
+        ${this._showResetDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
               <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${e("resetStatsConfirmTitle")}</div>
@@ -135,7 +132,7 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
             </div>
           `:""}
 
-        ${this._showDeleteDialog?n`
+        ${this._showDeleteDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
               <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${e("deleteConfirmTitle")}</div>
@@ -152,7 +149,7 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
             </div>
           `:""}
       </app-scaffold>
-    `}};o.styles=$`
+    `}};n.styles=$`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -330,10 +327,6 @@ import{a as v,f,c as g,j as e,_ as u,w as m,x as y,l as _,n as x,y as w,b as n,i
     .dialog-btn.danger { background: var(--red); color: #fff; }
     .dialog-btn:hover { opacity: 0.85; }
 
-t    /* Reset button */
-	      background: var(--border-subtle);
-	      color: var(--text);
-	    }
     /* ── Edit button at bottom ── */
     .btn-edit-bottom {
       width: 100%;
@@ -353,4 +346,4 @@ t    /* Reset button */
       gap: 6px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;s([h()],o.prototype,"entrypointType",2);s([h()],o.prototype,"entrypointId",2);s([r()],o.prototype,"mode",2);s([r()],o.prototype,"_entrypoint",2);s([r()],o.prototype,"_saving",2);s([r()],o.prototype,"_snackbar",2);s([r()],o.prototype,"_showDeleteDialog",2);s([r()],o.prototype,"_showResetDialog",2);s([r()],o.prototype,"_name",2);s([r()],o.prototype,"_endpoint",2);s([r()],o.prototype,"_tunnelId",2);o=s([k("entrypoint-detail-page")],o);export{o as EntrypointDetailPage};
+  `;o([h()],n.prototype,"entrypointType",2);o([h()],n.prototype,"entrypointId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_entrypoint",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_tunnelId",2);n=o([k("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};

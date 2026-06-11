@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-sRwon7Ir.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
-import{a as g,s as _,g as x,j as a,_ as v,r as y,q as w,k as $,m as k,u as T,v as S,b as e,i as D,t as z}from"./index-sRwon7Ir.js";import{n as m,r}from"./state-CxJm67SJ.js";import{i as d}from"./app-scaffold-C4JxCz1w.js";import{c as C}from"./clipboard-C3x8_sid.js";import{b as u,a as b,f}from"./format-Dx8b12gY.js";var E=Object.defineProperty,F=Object.getOwnPropertyDescriptor,n=(t,s,l,i)=>{for(var p=i>1?void 0:i?F(s,l):s,c=t.length-1,h;c>=0;c--)(h=t[c])&&(p=(i?h(s,l,p):h(p))||p);return i&&p&&E(s,l,p),p};let o=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=x().find(i=>i.id===t);l&&(this._tunnel=l,s?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,username:this._username.trim()||void 0,password:this._password||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this.mode==="create"?(await v(()=>import("./index-sRwon7Ir.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await v(()=>import("./index-sRwon7Ir.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.update(this.tunnelId,t)),this._showSnackbar(a("saved")),this.mode="view",await y())}catch(t){const s=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await w(this.tunnelId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await C(t),this._showSnackbar(a("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await T(this.tunnelId,this._resetKind),this._showSnackbar(a("saved"))}catch{this._showSnackbar(a("saveFailed"))}}_typeLabel(){return a(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,s=t?S(t.id)??t.stats:null,l=this._typeLabel();return e`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CTGHrmHL.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,v as S,b as e,i as D,t as z}from"./index-CTGHrmHL.js";import{n as m,r}from"./state-BZBTxrJb.js";import{i as d}from"./app-scaffold-DoLCQb2f.js";import{c as C}from"./clipboard-C3x8_sid.js";import{b as u,a as b,f}from"./format-Dx8b12gY.js";var E=Object.defineProperty,F=Object.getOwnPropertyDescriptor,n=(t,s,l,i)=>{for(var p=i>1?void 0:i?F(s,l):s,c=t.length-1,h;c>=0;c--)(h=t[c])&&(p=(i?h(s,l,p):h(p))||p);return i&&p&&E(s,l,p),p};let o=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=x().find(i=>i.id===t);l&&(this._tunnel=l,s?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,username:this._username.trim()||void 0,password:this._password||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this.mode==="create"?(await v(()=>import("./index-CTGHrmHL.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await v(()=>import("./index-CTGHrmHL.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.update(this.tunnelId,t)),this._showSnackbar(a("saved")),this.mode="view",await w())}catch(t){const s=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await C(t),this._showSnackbar(a("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await T(this.tunnelId,this._resetKind),this._showSnackbar(a("saved"))}catch{this._showSnackbar(a("saveFailed"))}}_typeLabel(){return a(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,s=t?S(t.id)??t.stats:null,l=this._typeLabel();return e`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -107,11 +107,10 @@ import{a as g,s as _,g as x,j as a,_ as v,r as y,q as w,k as $,m as k,u as T,v a
                       <div class="stat-rate">${b(s.input_rate_bytes)}</div>
                     </div>
                   </div>
-	                `:""}
-	            </div>
-	          `:""}
+                `:""}
+            </div>
 
-	            <!-- Edit button (view mode only) -->
+            <!-- Edit button (view mode only) -->
             ${this.mode==="view"&&t?e`
                 <div class="section">
                   <button class="btn-edit-bottom" @click=${this._enterEdit}>
@@ -119,6 +118,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as y,q as w,k as $,m as k,u as T,v a
                   </button>
                 </div>
               `:""}
+          `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
         ${this.mode!=="view"?e`
@@ -215,7 +215,6 @@ import{a as g,s as _,g as x,j as a,_ as v,r as y,q as w,k as $,m as k,u as T,v a
           `:""}
 
         ${this._snackbar?e`<div class="toast">${this._snackbar}</div>`:""}
-
 
         ${this._showResetDialog?e`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
@@ -439,15 +438,15 @@ import{a as g,s as _,g as x,j as a,_ as v,r as y,q as w,k as $,m as k,u as T,v a
     .stat-icon {
       font-size: var(--font-md);
       margin-bottom: 4px;
-	    }
+    }
 
-	    .stat-reset-mini {
-	      display: inline-flex;
-	      align-items: center;
-	      opacity: 0;
-	      transition: opacity 0.15s;
-	    }
-	    .stat-box:hover .stat-reset-mini { opacity: 1; }
+    .stat-reset-mini {
+      display: inline-flex;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .stat-box:hover .stat-reset-mini { opacity: 1; }
 
     .stat-value {
       font-size: var(--font-xl);
@@ -469,16 +468,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as y,q as w,k as $,m as k,u as T,v a
       font-size: var(--font-sm);
       color: var(--text-muted);
       margin-bottom: 4px;
-	    }
-
-	    .stat-reset-mini {
-	      display: inline-flex;
-	      align-items: center;
-	      opacity: 0;
-	      transition: opacity 0.15s;
-	    }
-	    .stat-box:hover .stat-reset-mini { opacity: 1; }
-
+    }
 
     /* ── Form ── */
     .form-group {
@@ -490,15 +480,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as y,q as w,k as $,m as k,u as T,v a
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
-	    }
-
-	    .stat-reset-mini {
-	      display: inline-flex;
-	      align-items: center;
-	      opacity: 0;
-	      transition: opacity 0.15s;
-	    }
-	    .stat-box:hover .stat-reset-mini { opacity: 1; }
+      text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .form-input {
