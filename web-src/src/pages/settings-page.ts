@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { t, onLocaleChange } from '../i18n/i18n';
+import { icon } from '../utils/icons';
 import { getSettings, updateSettings, subscribe } from '../store/settings-store';
 import type { ThemePreference, LanguagePreference } from '../api/types';
 import '../components/app-scaffold';
@@ -24,8 +25,8 @@ export class SettingsPage extends LitElement {
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _snackbar = '';
+  @state() private _saving = false;
 
-  private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _unsubs: (() => void)[] = [];
 
   connectedCallback() {
@@ -63,31 +64,47 @@ export class SettingsPage extends LitElement {
 
   private _showSnackbar(msg: string) {
     this._snackbar = msg;
-    setTimeout(() => { this._snackbar = ''; this.requestUpdate(); }, 2000);
+    setTimeout(() => {
+      this._snackbar = '';
+      this.requestUpdate();
+    }, 2000);
   }
 
-  private _debouncedSave(field: string, value: string | boolean) {
-    if (this._debounceTimer) clearTimeout(this._debounceTimer);
-    this._debounceTimer = setTimeout(async () => {
-      try {
-        await updateSettings({ [field]: value });
-        this._showSnackbar('✓ ' + t('saved'));
-      } catch {
-        this._showSnackbar(t('saveFailed'));
-      }
-    }, 600);
+  private async _saveSettings() {
+    this._saving = true;
+    try {
+      await updateSettings({
+        server: this._server,
+        entrypoint: this._entrypoint,
+        insecure: this._insecure,
+      });
+      this._showSnackbar('✓ ' + t('saved'));
+    } catch {
+      this._showSnackbar(t('saveFailed'));
+    }
+    this._saving = false;
   }
 
   private async _setTheme(theme: ThemePreference) {
     this._theme = theme;
-    await updateSettings({ theme });
-    this._showSnackbar('✓ ' + t('saved'));
+    this.requestUpdate();
+    this._showSnackbar('✓ ' + t(THEME_OPTIONS.find(o => o.value === theme)?.labelKey ?? 'settingsThemeSystem'));
+    try {
+      await updateSettings({ theme });
+    } catch {
+      // UI already updated optimistically
+    }
   }
 
   private async _setLang(lang: LanguagePreference) {
     this._lang = lang;
-    await updateSettings({ lang });
-    this._showSnackbar('✓ ' + t('saved'));
+    this.requestUpdate();
+    this._showSnackbar('✓ ' + t(LANG_OPTIONS.find(o => o.value === lang)?.labelKey ?? 'settingsLangEn'));
+    try {
+      await updateSettings({ lang });
+    } catch {
+      // UI already updated optimistically
+    }
   }
 
   private _cycleOption<T>(current: T, options: T[]): T {
@@ -96,112 +113,142 @@ export class SettingsPage extends LitElement {
   }
 
   static styles = css`
-    /* ── AppBar ── */
+    /* ── Back nav ── */
     .back-btn {
       background: none; border: none; cursor: pointer;
-      font-size: 1.3rem; color: var(--color-text-primary); padding: 4px 8px;
-      border-radius: 8px; display: flex; align-items: center;
+      color: var(--text); padding: 4px; border-radius: var(--radius-sm);
+      display: flex; align-items: center;
     }
-    .back-btn:hover { background: var(--color-surface-variant); }
-    .page-title { font-size: 1.15rem; font-weight: 600; }
+    .back-btn:hover { background: var(--border-subtle); }
 
-    /* ── Settings header (matching prototype) ── */
-    .settings-header {
+    .page-title { font-size: 13px; font-weight: 600; flex: 1; }
+
+    /* ── App info ── */
+    .app-info {
       text-align: center;
-      padding: 32px 16px 24px;
+      padding: 28px 16px 20px;
     }
-    .settings-icon {
-      width: 80px; height: 80px;
-      background: var(--color-primary);
-      border-radius: 18px;
-      margin: 0 auto 16px;
+    .app-logo {
+      width: 64px; height: 64px;
+      background: var(--accent);
+      border-radius: var(--radius-lg);
+      margin: 0 auto 12px;
       display: flex; align-items: center; justify-content: center;
-      color: white; font-weight: 700; font-size: 1.8rem;
+      color: var(--accent-fg);
+      font-weight: 700; font-size: 24px;
     }
-    .settings-app-name { font-weight: 600; font-size: 1.2rem; margin-bottom: 4px; }
-    .settings-version { color: var(--color-stopped); font-size: 0.9rem; }
+    .app-name {
+      font-size: 16px; font-weight: 600;
+      color: var(--text); margin-bottom: 2px;
+    }
+    .app-version {
+      font-size: 11px; color: var(--text-muted);
+    }
+
+    /* ── Section ── */
+    .section { padding: 0 16px 16px; }
+    .section-title {
+      font-size: 11px; font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
 
     /* ── Card ── */
-    .detail-section { margin: 0 16px 16px; }
-    .detail-card {
-      background: var(--color-surface);
+    .card {
+      background: var(--surface);
       border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-card);
-      padding: 0;
-      transition: background var(--transition-fast);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
     }
-    .card-padded { padding: 20px; }
-    .card-title {
-      font-size: 14px; font-weight: 600; color: var(--color-text-primary);
-      margin-bottom: 12px;
-    }
+    .card-padded { padding: 16px; }
 
-    /* ── Form fields ── */
+    /* ── Form ── */
     .form-group { margin-bottom: 12px; }
+    .form-group:last-child { margin-bottom: 0; }
     .form-label {
       display: block;
-      font-size: 0.8rem; font-weight: 500;
-      color: var(--color-stopped);
-      margin-bottom: 6px;
+      font-size: 8px; font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 4px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .form-input {
-      width: 100%; padding: 12px 14px;
-      border: 1.5px solid var(--color-input-border);
-      border-radius: var(--radius-md); background: var(--color-input-bg);
-      color: var(--color-text-primary); font-size: 0.95rem;
-      font-family: inherit; outline: none; box-sizing: border-box;
-      transition: border-color var(--transition-fast), background var(--transition-fast);
+      width: 100%; padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface); color: var(--text);
+      font-size: 12px; font-family: inherit; outline: none;
+      box-sizing: border-box;
+      transition: border-color var(--transition-fast);
     }
-    .form-input:focus { border-color: var(--color-primary); }
-    .hint { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+    .form-input:focus { border-color: var(--accent); }
+    .hint {
+      font-size: 9px; color: var(--text-muted); margin-top: 2px;
+    }
 
-    /* ── Switch row ── */
-    .switch-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .switch-label { font-size: 0.95rem; color: var(--color-text-primary); }
-    .switch-desc { font-size: 12px; color: var(--color-text-muted); }
-    .switch {
-      width: 44px; height: 24px; border-radius: 12px;
-      background: var(--color-stopped); position: relative;
-      cursor: pointer; transition: background var(--transition-fast); flex-shrink: 0;
-    }
-    .switch.on { background: var(--color-primary); }
-    .switch-knob {
-      width: 20px; height: 20px; border-radius: 50%;
-      background: white; position: absolute; top: 2px; left: 2px;
-      transition: left var(--transition-fast);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
-    .switch.on .switch-knob { left: 22px; }
-
-    /* ── Selector rows (matching prototype) ── */
-    .selector-field {
+    /* ── Switch ── */
+    .switch-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px; border-bottom: 1px solid var(--color-divider);
+      padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
+    }
+    .switch-row:last-child { border-bottom: none; }
+    .switch-label { font-size: 11px; color: var(--text); }
+    .switch-desc { font-size: 9px; color: var(--text-muted); }
+    .switch {
+      width: 40px; height: 22px; border-radius: 11px;
+      background: var(--border); position: relative;
+      cursor: pointer; transition: background var(--transition-fast);
+      flex-shrink: 0;
+    }
+    .switch.on { background: var(--accent); }
+    .switch-knob {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; position: absolute; top: 2px; left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+    .switch.on .switch-knob { left: 20px; }
+
+    /* ── Selector rows ── */
+    .selector-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--border-subtle);
       cursor: pointer;
     }
-    .selector-field:last-child { border-bottom: none; }
-    .selector-field:hover { background: var(--color-surface-variant); }
-    .selector-label { font-size: 0.95rem; }
+    .selector-row:last-child { border-bottom: none; }
+    .selector-row:hover { background: var(--border-subtle); }
+    .selector-label { font-size: 11px; color: var(--text); }
     .selector-value {
       display: flex; align-items: center; gap: 4px;
-      color: var(--color-stopped); font-size: 0.9rem;
+      color: var(--text-muted); font-size: 10px;
     }
+
+    /* ── Save button ── */
+    .save-btn {
+      width: 100%; padding: 10px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: var(--accent); color: var(--accent-fg);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      font-family: inherit;
+      margin-top: 12px;
+      transition: opacity var(--transition-fast);
+    }
+    .save-btn:hover { opacity: 0.85; }
+    .save-btn:disabled { opacity: 0.5; cursor: default; }
 
     /* ── Toast ── */
     .toast {
       position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-      background: var(--color-toast-bg); color: var(--color-toast-fg);
-      padding: 12px 24px; border-radius: 12px;
+      background: var(--surface); color: var(--text);
+      padding: 10px 20px; border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-size: 0.9rem; z-index: 100;
-      display: flex; align-items: center; gap: 8px;
-      max-width: 400px; transition: background var(--transition-fast);
+      font-size: 12px; z-index: 100;
       animation: toast-in 0.3s ease;
     }
     @keyframes toast-in {
-      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
   `;
@@ -211,68 +258,76 @@ export class SettingsPage extends LitElement {
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
-          <button class="back-btn" @click=${() => this._navigate('/')}>←</button>
+          <button class="back-btn" @click=${() => this._navigate('/')}>
+            ${icon('chevron-left')}
+          </button>
           <span class="page-title">${t('settingsTitle')}</span>
         </div>
 
-        <!-- App Info Header -->
-        <div class="settings-header">
-          <div class="settings-icon">W</div>
-          <div class="settings-app-name">${t('appName')}</div>
-          <div class="settings-version">v0.1.0</div>
+        <!-- App Info -->
+        <div class="app-info">
+          <div class="app-logo">W</div>
+          <div class="app-name">${t('appName')}</div>
+          <div class="app-version">v1.0.0 · GOST Tunnel Manager</div>
         </div>
 
-        <!-- Server Settings -->
-        <div class="detail-section">
-          <div class="detail-card">
+        <!-- Server Configuration -->
+        <div class="section">
+          <div class="section-title">Server Configuration</div>
+          <div class="card">
             <div class="card-padded">
-              <div class="card-title">Server</div>
               <div class="form-group">
                 <label class="form-label">${t('settingsServer')}</label>
                 <input class="form-input" .value=${this._server}
                   placeholder=${t('settingsServerHint')}
-                  @input=${(e: Event) => {
-                    this._server = (e.target as HTMLInputElement).value;
-                    this._debouncedSave('server', this._server);
-                  }}>
+                  @input=${(e: Event) => { this._server = (e.target as HTMLInputElement).value; }}>
                 <div class="hint">${t('settingsServerHint')}</div>
               </div>
               <div class="form-group">
                 <label class="form-label">${t('settingsEntrypoint')}</label>
                 <input class="form-input" .value=${this._entrypoint}
                   placeholder=${t('settingsEntrypointHint')}
-                  @input=${(e: Event) => {
-                    this._entrypoint = (e.target as HTMLInputElement).value;
-                    this._debouncedSave('entrypoint', this._entrypoint);
-                  }}>
+                  @input=${(e: Event) => { this._entrypoint = (e.target as HTMLInputElement).value; }}>
                 <div class="hint">${t('settingsEntrypointHint')}</div>
               </div>
-              <div class="switch-row">
+              <div class="switch-row" style="border-bottom:none;">
                 <div>
                   <div class="switch-label">${t('settingsInsecure')}</div>
                   <div class="switch-desc">${t('settingsInsecureDesc')}</div>
                 </div>
-                <div class="switch ${this._insecure ? 'on' : ''}" @click=${() => {
-                  this._insecure = !this._insecure;
-                  this._debouncedSave('insecure', this._insecure);
-                }}>
+                <div class="switch ${this._insecure ? 'on' : ''}"
+                  @click=${() => { this._insecure = !this._insecure; }}>
                   <div class="switch-knob"></div>
                 </div>
               </div>
+              <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
+                ${icon('check')} ${t('btnSave')}
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- Theme & Language -->
-        <div class="detail-section">
-          <div class="detail-card">
-            <div class="selector-field" @click=${() => this._setLang(this._cycleOption(this._lang, LANG_OPTIONS.map(o => o.value)))}>
+        <!-- Preferences -->
+        <div class="section">
+          <div class="section-title">Preferences</div>
+          <div class="card">
+            <div class="selector-row" @click=${() => this._setLang(
+              this._cycleOption(this._lang, LANG_OPTIONS.map(o => o.value))
+            )}>
               <span class="selector-label">${t('settingsLanguage')}</span>
-              <span class="selector-value">${t(LANG_OPTIONS.find(o => o.value === this._lang)?.labelKey ?? 'settingsLangEn')} ▶</span>
+              <span class="selector-value">
+                ${t(LANG_OPTIONS.find(o => o.value === this._lang)?.labelKey ?? 'settingsLangEn')}
+                ${icon('chevron-right')}
+              </span>
             </div>
-            <div class="selector-field" @click=${() => this._setTheme(this._cycleOption(this._theme, THEME_OPTIONS.map(o => o.value)))}>
+            <div class="selector-row" @click=${() => this._setTheme(
+              this._cycleOption(this._theme, THEME_OPTIONS.map(o => o.value))
+            )}>
               <span class="selector-label">${t('settingsTheme')}</span>
-              <span class="selector-value">${t(THEME_OPTIONS.find(o => o.value === this._theme)?.labelKey ?? 'settingsThemeSystem')} ▶</span>
+              <span class="selector-value">
+                ${t(THEME_OPTIONS.find(o => o.value === this._theme)?.labelKey ?? 'settingsThemeSystem')}
+                ${icon('chevron-right')}
+              </span>
             </div>
           </div>
         </div>

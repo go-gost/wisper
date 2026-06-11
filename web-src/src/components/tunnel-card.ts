@@ -1,30 +1,42 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { formatBytes, formatRate, formatNumber } from '../utils/format';
-import { t } from '../i18n/i18n';
-import type { ServiceStats, ServiceStatus } from '../api/types';
+import { icon } from '../utils/icons';
+import type { ServiceStatus } from '../api/types';
 
 /**
- * TunnelCard — displays a tunnel or entrypoint summary card in lists.
- * Matches prototype design with two-column layout:
- *   left: name, meta (TYPE · status), endpoint
- *   right: stats rows
- *   status dot: absolutely positioned at top-right
+ * TunnelCard — list row for a tunnel or entrypoint.
  *
- * @attr name - Display name
- * @attr type - Tunnel/entrypoint type label (e.g. "HTTP", "TCP")
- * @attr endpoint - Local endpoint address
- * @attr status - Current service status (running/stopped/error)
- * @attr error - Error message if status === error
- * @attr stats - ServiceStats object with live metrics
+ * Layout: status-dot · name + meta · traffic column · chevron
+ * Renders separately inside its own Shadow DOM with design-token colours.
+ *
+ * @attr name     - Display name.
+ * @attr meta     - Secondary line text (e.g. "HTTP · Running").
+ * @attr status   - running | stopped | error (drives dot colour).
+ * @attr endpoint - Copyable address shown in expanded/standalone mode.
+ * @attr expanded - Whether the inline expand panel is open.
+ * @attr compact  - When true, hides the traffic column (used on home list).
  */
 @customElement('tunnel-card')
 export class TunnelCard extends LitElement {
   @property() name = '';
-  @property() type = '';
-  @property() endpoint = '';
+  @property() meta = '';
   @property() status: ServiceStatus = 'stopped';
-  @property() stats: ServiceStats | null = null;
+  @property() endpoint = '';
+
+  // Stats (optional — only shown when running)
+  @property({ type: Number }) currentConns = 0;
+  @property({ type: Number }) totalConns = 0;
+  @property({ type: Number }) requestRate = 0;
+  @property({ type: Number }) inputBytes = 0;
+  @property({ type: Number }) outputBytes = 0;
+  @property({ type: Number }) inputRate = 0;
+  @property({ type: Number }) outputRate = 0;
+
+  @property({ type: Boolean }) expanded = false;
+  @property({ type: Boolean }) compact = true;
+
+  /** Error message — displayed in an inline banner when non-empty. */
   @property() error = '';
 
   static styles = css`
@@ -32,154 +44,154 @@ export class TunnelCard extends LitElement {
       display: block;
     }
 
-    .card {
-      position: relative;
-      background: var(--color-surface);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-card);
-      padding: 20px 24px;
-      margin: 0 16px 16px;
-      cursor: pointer;
-      transition: background var(--transition-fast), box-shadow var(--transition-fast), transform 0.1s;
-    }
-
-    .card:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-card-hover);
-    }
-
-    .card:active {
-      transform: translateY(0);
-    }
-
-    /* ── Two-column body ── */
-    .tunnel-card-body {
+    .row {
       display: flex;
-      gap: 24px;
-      align-items: flex-start;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      gap: 10px;
     }
 
-    .tunnel-card-left {
+    .row:hover {
+      background: var(--border-subtle);
+    }
+
+    .row.stopped {
+      opacity: 0.55;
+    }
+
+    /* ── Status dot ── */
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--text-muted);
+    }
+
+    .dot.running {
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .dot.error {
+      background: var(--red);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+    }
+
+    /* ── Info column ── */
+    .info {
       flex: 1;
       min-width: 0;
     }
 
-    .tunnel-card-right {
+    .name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    /* ── Traffic column ── */
+    .traffic {
       flex-shrink: 0;
       text-align: right;
-      padding-top: 20px;
-      --stats-justify: flex-end;
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      min-width: 60px;
     }
 
-    /* ── Header ── */
-    .tunnel-card-header {
+    .traffic-row {
       display: flex;
       align-items: center;
-      margin-bottom: 8px;
+      justify-content: flex-end;
+      gap: 2px;
     }
 
-    .tunnel-name {
-      font-weight: 600;
-      font-size: 1.1rem;
+    .traffic-total {
+      color: var(--text-secondary);
+      font-size: 11px;
     }
 
-    /* ── Status dot — absolute top-right ── */
-    .status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      position: absolute;
-      top: 20px;
-      right: 24px;
+    /* ── Chevron ── */
+    .chevron {
+      flex-shrink: 0;
+      color: var(--text-muted);
+      transition: transform var(--transition-fast);
+      display: flex;
+      align-items: center;
     }
 
-    .status-dot.running {
-      background: var(--color-running);
+    .chevron.open {
+      transform: rotate(90deg);
     }
 
-    .status-dot.stopped {
-      background: var(--color-stopped);
-    }
-
-    .status-dot.error {
-      background: var(--color-error);
-    }
-
-    /* ── Meta ── */
-    .tunnel-meta {
-      color: var(--color-stopped);
-      font-size: 0.9rem;
-      margin-bottom: 4px;
-    }
-
-    .tunnel-endpoint {
-      font-size: 0.95rem;
-      color: var(--color-text-primary);
-      opacity: 0.8;
-    }
-
-    /* ── Error banner ── */
+    /* ── Error ── */
     .error-banner {
-      margin-top: 12px;
-      padding: 8px 12px;
-      background: var(--color-error-bg);
+      margin: 0 16px 8px 34px;
+      padding: 6px 10px;
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
       border-radius: var(--radius-sm);
-      font-size: 0.8rem;
-      color: var(--color-error);
-    }
-
-    /* ── Responsive ── */
-    @media (max-width: 600px) {
-      .tunnel-card-body {
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .tunnel-card-right {
-        text-align: left;
-        padding-top: 0;
-        --stats-justify: flex-start;
-      }
+      font-size: 9px;
+      color: var(--red-text);
     }
   `;
 
-  private _statusLabel(s: ServiceStatus): string {
-    switch (s) {
-      case 'running': return t('statusRunning');
-      case 'stopped': return t('statusStopped');
-      case 'error': return t('statusError');
-    }
+  private _onRowClick(e: Event) {
+    this.dispatchEvent(new CustomEvent('card-click', { bubbles: true, composed: true }));
+  }
+
+  private _onChevronClick(e: Event) {
+    e.stopPropagation();
+    this.dispatchEvent(new CustomEvent('chevron-click', { bubbles: true, composed: true }));
   }
 
   render() {
-    const s = this.stats;
+    const stopped = this.status === 'stopped';
 
     return html`
-      <div class="card">
-        <span class="status-dot ${this.status}"></span>
+      <div class="row ${stopped ? 'stopped' : ''}" @click=${this._onRowClick}>
+        <span class="dot ${this.status}"></span>
 
-        <div class="tunnel-card-body">
-          <!-- Left: info -->
-          <div class="tunnel-card-left">
-            <div class="tunnel-card-header">
-              <span class="tunnel-name">${this.name}</span>
-            </div>
-            <div class="tunnel-meta">${this.type} · ${this._statusLabel(this.status)}</div>
-            <div class="tunnel-endpoint">${this.endpoint}</div>
-          </div>
-
-          <!-- Right: stats -->
-          ${s ? html`
-            <div class="tunnel-card-right">
-              <stats-row icon="↕" .value=${`${formatNumber(s.current_conns)} / ${formatNumber(s.total_conns)}`} .rate=${formatRate(s.request_rate)}></stats-row>
-              <stats-row icon="↑" .value=${formatBytes(s.input_bytes)} .rate=${formatRate(s.input_rate_bytes)}></stats-row>
-              <stats-row icon="↓" .value=${formatBytes(s.output_bytes)} .rate=${formatRate(s.output_rate_bytes)}></stats-row>
-            </div>
-          ` : ''}
+        <div class="info">
+          <div class="name">${this.name}</div>
+          <div class="meta">${this.meta}</div>
         </div>
 
-        ${this.error ? html`<div class="error-banner">${this.error}</div>` : ''}
+        ${this.status === 'running' ? html`
+          <div class="traffic">
+            <div class="traffic-row">
+              <span class="traffic-total">${formatBytes(this.inputBytes)}</span>
+              <span>↑ ${formatRate(this.inputRate)}</span>
+            </div>
+            <div class="traffic-row">
+              <span class="traffic-total">${formatBytes(this.outputBytes)}</span>
+              <span>↓ ${formatRate(this.outputRate)}</span>
+            </div>
+          </div>
+        ` : ''}
+
+        <span class="chevron ${this.expanded ? 'open' : ''}" @click=${this._onChevronClick}>
+          ${icon('chevron-right')}
+        </span>
       </div>
+
+      ${this.error ? html`<div class="error-banner">${this.error}</div>` : ''}
     `;
   }
 }

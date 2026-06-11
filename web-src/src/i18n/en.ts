@@ -7,6 +7,13 @@ const en: Record<string, string> = {
   homeEmptyEntrypoints: 'No entrypoints yet',
   homeFavoritesTooltip: 'Show favorites',
   homeAllTooltip: 'Show all',
+  homeNoFavorites: 'No favorites yet',
+  homeNoFavTunnelHint: 'Tap the star on any tunnel to add it to your favorites.',
+  homeNoFavEntryHint: 'Tap the star on any entrypoint to add it to your favorites.',
+  homeShowAllTunnels: 'Show all tunnels',
+  homeShowAllEntrypoints: 'Show all entrypoints',
+  homeEmptyTunnelDesc: 'Create your first tunnel to expose a local service to the internet.',
+  homeEmptyEntryDesc: 'Create an entrypoint to forward traffic from a tunnel to a local port.',
   tunnelNewTitle: 'New Tunnel',
   entrypointNewTitle: 'New Entrypoint',
   settingsTitle: 'Settings',
@@ -53,6 +60,7 @@ const en: Record<string, string> = {
   statusRunning: 'Running',
   statusStopped: 'Stopped',
   statusError: 'Error',
+  activeConnections: 'active connections',
 
   // Type descriptions
   typeFile: 'File',

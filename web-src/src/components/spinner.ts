@@ -1,6 +1,9 @@
 import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
+/**
+ * WisperSpinner — simple loading indicator using the accent color.
+ */
 @customElement('wisper-spinner')
 export class WisperSpinner extends LitElement {
   static styles = css`
@@ -13,8 +16,8 @@ export class WisperSpinner extends LitElement {
     .spinner {
       width: 100%;
       height: 100%;
-      border: 3px solid var(--color-border);
-      border-top-color: var(--color-primary);
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.6s linear infinite;
     }

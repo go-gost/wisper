@@ -7,6 +7,13 @@ const zh: Record<string, string> = {
   homeEmptyEntrypoints: '暂无入口',
   homeFavoritesTooltip: '显示收藏',
   homeAllTooltip: '显示全部',
+  homeNoFavorites: '暂无收藏',
+  homeNoFavTunnelHint: '点击任意隧道上的星标将其添加到收藏。',
+  homeNoFavEntryHint: '点击任意入口上的星标将其添加到收藏。',
+  homeShowAllTunnels: '显示全部隧道',
+  homeShowAllEntrypoints: '显示全部入口',
+  homeEmptyTunnelDesc: '创建您的第一个隧道，将本地服务暴露到互联网。',
+  homeEmptyEntryDesc: '创建入口，将隧道流量转发到本地端口。',
   tunnelNewTitle: '新建隧道',
   entrypointNewTitle: '新建入口',
   settingsTitle: '设置',
@@ -53,6 +60,7 @@ const zh: Record<string, string> = {
   statusRunning: '运行中',
   statusStopped: '已停止',
   statusError: '错误',
+  activeConnections: '个活跃连接',
 
   // Type descriptions
   typeFile: '文件',

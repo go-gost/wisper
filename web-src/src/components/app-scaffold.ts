@@ -1,20 +1,18 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement } from 'lit/decorators.js';
 
 /**
- * AppScaffold — centers content within max-width 1200px.
+ * AppScaffold — layout wrapper that centers content at max-width.
  *
- * The app bar is only shown when content is provided in the `appBar` slot,
- * allowing the home page to render without a sticky header.
+ * Sticky appbar at top (always shown), scrollable content body, and an
+ * optional floating action button anchored to the bottom-right.
  *
- * @slot - Default slot for page content.
- * @slot appBar - Optional sticky top app bar.
- * @slot fab - Optional floating action button.
+ * @slot appBar  - Content for the sticky top app bar (back button, title, actions).
+ * @slot         - Default slot for page content.
+ * @slot fab     - Optional floating action button.
  */
 @customElement('app-scaffold')
 export class AppScaffold extends LitElement {
-  @state() private _hasAppBar = false;
-
   static styles = css`
     :host {
       display: block;
@@ -22,7 +20,7 @@ export class AppScaffold extends LitElement {
     }
 
     .shell {
-      max-width: var(--max-content-width, 1200px);
+      max-width: var(--max-content-width, 800px);
       margin: 0 auto;
       min-height: 100vh;
       position: relative;
@@ -30,17 +28,21 @@ export class AppScaffold extends LitElement {
       flex-direction: column;
     }
 
-    .app-bar {
+    .appbar {
       display: flex;
       align-items: center;
       padding: 12px 16px;
-      background: var(--color-appbar-bg);
-      box-shadow: var(--color-appbar-shadow);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border-subtle);
       position: sticky;
       top: 0;
       z-index: 10;
       gap: 8px;
-      transition: background var(--transition-fast);
+    }
+
+    .appbar ::slotted(*) {
+      flex: 1;
+      min-width: 0;
     }
 
     .content {
@@ -49,29 +51,30 @@ export class AppScaffold extends LitElement {
       flex-direction: column;
     }
 
-    .fab-container {
-      position: absolute;
+    .fab-slot {
+      position: fixed;
       bottom: 24px;
       right: 24px;
       z-index: 20;
     }
-  `;
 
-  private _onAppBarSlotChange(e: Event) {
-    const slot = e.target as HTMLSlotElement;
-    this._hasAppBar = slot.assignedNodes().length > 0;
-  }
+    @media (min-width: 848px) {
+      .fab-slot {
+        right: calc((100vw - var(--max-content-width, 800px)) / 2 + 24px);
+      }
+    }
+  `;
 
   render() {
     return html`
       <div class="shell">
-        <div class="app-bar" style="${this._hasAppBar ? '' : 'display:none;'}">
-          <slot name="appBar" @slotchange=${this._onAppBarSlotChange}></slot>
+        <div class="appbar">
+          <slot name="appBar"></slot>
         </div>
         <div class="content">
           <slot></slot>
         </div>
-        <div class="fab-container">
+        <div class="fab-slot">
           <slot name="fab"></slot>
         </div>
       </div>

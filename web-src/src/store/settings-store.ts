@@ -1,7 +1,33 @@
 import { GoBackend } from '../api/backend';
 import type { AppSettings, AppSettingsUpdate, ThemePreference, LanguagePreference } from '../api/types';
-import { applyTheme, getStoredTheme } from '../styles/theme';
 import { setLocale } from '../i18n/i18n';
+
+// ─── Theme controller (moved from styles/theme.ts) ─────────────────────────
+
+const THEME_KEY = 'wisper-theme';
+
+export function applyTheme(pref: ThemePreference): void {
+  const root = document.documentElement;
+  let resolved: 'light' | 'dark';
+
+  if (pref === 'system') {
+    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } else {
+    resolved = pref;
+  }
+
+  if (resolved === 'dark') {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+
+  localStorage.setItem(THEME_KEY, pref);
+}
+
+export function getStoredTheme(): ThemePreference {
+  return (localStorage.getItem(THEME_KEY) as ThemePreference) || 'system';
+}
 
 // ─── State ───────────────────────────────────────────────────────────────────
 

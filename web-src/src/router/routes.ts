@@ -77,6 +77,17 @@ export function createRouter(host: ReactiveControllerHost) {
           return true;
         },
       },
+      {
+        path: '/*',
+        render: () => html`
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center;color:var(--text-muted);gap:12px">
+            <div style="font-size:48px;font-weight:300;color:var(--text-muted)">404</div>
+            <div style="font-size:14px;color:var(--text-secondary)">Page not found</div>
+            <a href="/" style="color:var(--accent);font-size:12px;text-decoration:none;margin-top:8px">Go to Home</a>
+          </div>
+        `,
+        enter: async () => true,
+      },
     ],
   );
 }

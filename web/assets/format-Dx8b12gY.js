@@ -1,0 +1,1 @@
+function a(t){if(t===0)return"0 B";if(t<0)return"—";const o=["B","KB","MB","GB","TB"],r=Math.floor(Math.log(t)/Math.log(1024)),n=t/Math.pow(1024,r);return r===0?`${n} B`:`${n.toFixed(1)} ${o[r]}`}function f(t){return t===0?"0 B/s":t<0?"—":a(t)+"/s"}function i(t){return t.toLocaleString()}export{f as a,i as b,a as f};

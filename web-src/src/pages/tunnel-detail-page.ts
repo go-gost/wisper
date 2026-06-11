@@ -1,15 +1,13 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
-import { getTunnels, refresh, remove, start, stop, toggleFavorite, subscribe } from '../store/tunnel-store';
+import { icon } from '../utils/icons';
+import { getTunnels, refresh, remove, start, stop, subscribe } from '../store/tunnel-store';
 import { getStats } from '../store/stats-store';
-import { formatBytes, formatRate, formatNumber } from '../utils/format';
 import { copyToClipboard } from '../utils/clipboard';
+import { formatBytes, formatRate, formatNumber } from '../utils/format';
 import type { Tunnel, TunnelType } from '../api/types';
 import '../components/app-scaffold';
-import '../components/stats-row';
-import '../components/form-fields/file-form-fields';
-import '../components/form-fields/http-form-fields';
 
 type PageMode = 'view' | 'edit' | 'create';
 
@@ -18,24 +16,28 @@ export class TunnelDetailPage extends LitElement {
   @property() tunnelType: TunnelType = 'tcp';
   @property() tunnelId = '';
 
+  // ── State ────────────────────────────────────────────────────────────
+
   @state() private mode: PageMode = 'view';
   @state() private _tunnel: Tunnel | null = null;
   @state() private _saving = false;
   @state() private _snackbar = '';
   @state() private _showDeleteDialog = false;
 
-  // Form state
+  // Form fields
   @state() private _name = '';
   @state() private _endpoint = '';
   @state() private _hostname = '';
   @state() private _username = '';
   @state() private _password = '';
-  @state() private _basicAuth = false;
   @state() private _enableTLS = false;
   @state() private _rewriteHost = false;
   @state() private _fileUpload = false;
+  @state() private _showAuth = false;
 
   private _unsubs: (() => void)[] = [];
+
+  // ── Lifecycle ────────────────────────────────────────────────────────
 
   connectedCallback() {
     super.connectedCallback();
@@ -57,28 +59,48 @@ export class TunnelDetailPage extends LitElement {
 
   private _load() {
     const id = this.tunnelId;
+    // Check for ?edit query in URL
+    const isEdit = window.location.search.includes('edit');
+
     if (id === 'new' || !id) {
+      // Guard: don't reset form fields on every store update (stats polling).
+      if (this.mode === 'create') return;
       this.mode = 'create';
       this._tunnel = null;
-      this._name = '';
-      this._endpoint = '';
-      this._hostname = '';
-      this._username = '';
-      this._password = '';
-      this._basicAuth = false;
-      this._enableTLS = false;
-      this._rewriteHost = false;
-      this._fileUpload = false;
+      this._resetForm();
       return;
     }
+
+    // Guard: when already editing this tunnel, skip re-population triggered
+    // by store updates (e.g. stats polling every 1s).
+    if (this.mode === 'edit' && this._tunnel?.id === id) return;
 
     const existing = getTunnels().find(t => t.id === id);
     if (existing) {
       this._tunnel = existing;
-      if (this.mode !== 'edit') {
+      if (isEdit) {
+        this.mode = 'edit';
         this._populateForm(existing);
+      } else {
+        // Only reset to view if we weren't already in edit mode for this tunnel
+        if (this.mode !== 'edit' || this._tunnel?.id !== id) {
+          this.mode = 'view';
+          this._populateForm(existing);
+        }
       }
     }
+  }
+
+  private _resetForm() {
+    this._name = '';
+    this._endpoint = '';
+    this._hostname = '';
+    this._username = '';
+    this._password = '';
+    this._enableTLS = false;
+    this._rewriteHost = false;
+    this._fileUpload = false;
+    this._showAuth = false;
   }
 
   private _populateForm(t: Tunnel) {
@@ -87,11 +109,13 @@ export class TunnelDetailPage extends LitElement {
     this._hostname = t.options.hostname ?? '';
     this._username = t.options.username ?? '';
     this._password = t.options.password ?? '';
-    this._basicAuth = t.options.basic_auth ?? false;
     this._enableTLS = t.options.enableTLS ?? false;
     this._rewriteHost = t.options.rewriteHost ?? false;
     this._fileUpload = t.options.file_upload ?? false;
+    this._showAuth = !!(t.options.username || t.options.basic_auth);
   }
+
+  // ── Navigation ───────────────────────────────────────────────────────
 
   private _navigate(path: string) {
     window.history.pushState({}, '', path);
@@ -99,14 +123,23 @@ export class TunnelDetailPage extends LitElement {
   }
 
   private _enterEdit() {
-    if (this._tunnel) this._populateForm(this._tunnel);
-    this.mode = 'edit';
+    if (this._tunnel) {
+      this._populateForm(this._tunnel);
+      this.mode = 'edit';
+    }
   }
+
+  // ── Snackbar ─────────────────────────────────────────────────────────
 
   private _showSnackbar(msg: string) {
     this._snackbar = msg;
-    setTimeout(() => { this._snackbar = ''; this.requestUpdate(); }, 3000);
+    setTimeout(() => {
+      this._snackbar = '';
+      this.requestUpdate();
+    }, 2500);
   }
+
+  // ── Actions ──────────────────────────────────────────────────────────
 
   private async _handleSave() {
     if (!this._name.trim()) {
@@ -174,330 +207,700 @@ export class TunnelDetailPage extends LitElement {
     }
   }
 
-  private async _handleFavorite() {
-    await toggleFavorite(this.tunnelId);
+  private async _handleCopy(text: string) {
+    await copyToClipboard(text);
+    this._showSnackbar(t('copiedToClipboard'));
   }
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+
+  private _typeLabel(): string {
+    return t(`type${this.tunnelType.charAt(0).toUpperCase() + this.tunnelType.slice(1)}`);
+  }
+
+  // ── Styles ───────────────────────────────────────────────────────────
 
   static styles = css`
     /* ── AppBar ── */
     .back-btn {
-      background: none; border: none; cursor: pointer;
-      font-size: 1.3rem; color: var(--color-text-primary); padding: 4px 8px;
-      border-radius: 8px; display: flex; align-items: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text);
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
     }
-    .back-btn:hover { background: var(--color-surface-variant); }
+    .back-btn:hover {
+      background: var(--border-subtle);
+    }
 
-    .page-title { font-size: 1.15rem; font-weight: 600; flex: 1; }
+    .page-title {
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1;
+    }
 
-    /* Buttons matching prototype */
     .appbar-btn {
-      background: none; border: none; cursor: pointer;
-      padding: 6px 10px; border-radius: 8px; color: var(--color-text-primary);
-      font-size: 0.9rem; display: flex; align-items: center; gap: 4px;
-      transition: background var(--transition-fast);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
       font-family: inherit;
-    }
-    .appbar-btn:hover { background: var(--color-surface-variant); }
-
-    .primary-btn {
-      background: var(--color-primary); color: var(--color-primary-text);
-      border-radius: 20px; padding: 6px 16px; font-weight: 500;
-      border: none; cursor: pointer; font-size: 0.9rem; font-family: inherit;
       transition: background var(--transition-fast);
     }
-    .primary-btn:hover { opacity: 0.9; }
-
-    .stop-btn {
-      background: var(--color-error); color: white;
-      border-radius: 20px; padding: 6px 16px; font-weight: 500;
-      border: none; cursor: pointer; font-size: 0.9rem; font-family: inherit;
-      transition: background var(--transition-fast);
-    }
-    .stop-btn:hover { opacity: 0.9; }
-
-    .danger-btn {
-      color: var(--color-error);
-      background: none; border: none; cursor: pointer;
-      padding: 6px 10px; border-radius: 8px;
-      font-size: 0.9rem; font-family: inherit;
-    }
-    .danger-btn:hover { background: var(--color-error-bg); }
-
-    .fav-btn {
-      font-size: 1.1rem; transition: color var(--transition-fast), transform 0.15s;
-      background: none; border: none; cursor: pointer; padding: 6px 10px;
-      border-radius: 8px; display: flex; align-items: center;
-    }
-    .fav-btn.active { color: var(--color-fav); }
-    .fav-btn.inactive { color: var(--color-fav-off); }
-    .fav-btn:active { transform: scale(1.3); }
-
-    /* ── Detail Section ── */
-    .detail-section {
-      margin: 16px;
+    .appbar-btn:hover {
+      background: var(--border-subtle);
     }
 
-    .detail-card {
-      background: var(--color-surface);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-card);
-      padding: 20px;
-      transition: background var(--transition-fast);
+    .pill-btn {
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pill-btn.primary {
+      background: var(--accent);
+      color: var(--accent-fg);
+    }
+    .pill-btn.danger {
+      background: var(--red);
+      color: #fff;
+    }
+    .pill-btn:hover {
+      opacity: 0.85;
+    }
+    .pill-btn.appbar-action {
+      margin-left: auto;
     }
 
-    /* ── Copyable rows ── */
-    .copyable-row {
-      display: flex; align-items: center;
-      padding: 8px 12px;
-      background: var(--color-surface-variant);
+    /* ── Layout ── */
+    .section {
+      padding: 16px;
+    }
+
+    /* ── Status banner ── */
+    .status-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      margin: 0 16px;
       border-radius: var(--radius-md);
-      margin-bottom: 10px;
-      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
-      font-size: 0.85rem;
-      word-break: break-all;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .status-banner.running {
+      background: var(--green-bg);
+      color: var(--green-text);
+      border: 1px solid var(--green-border);
+    }
+    .status-banner.stopped {
+      background: var(--border-subtle);
+      color: var(--text-muted);
+    }
+    .status-banner.error {
+      background: var(--red-bg);
+      color: var(--red-text);
+      border: 1px solid var(--red-border);
+    }
+
+    .status-dot-mini {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status-spacer {
+      flex: 1;
+    }
+
+    /* ── Info card ── */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+    }
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
       gap: 8px;
     }
-    .copyable-text { flex: 1; }
-    .copy-btn {
-      background: none; border: none; cursor: pointer;
-      font-size: 1rem; color: var(--color-primary);
-      padding: 4px; border-radius: 6px;
+    .info-row:last-child {
+      border-bottom: none;
     }
-    .copy-btn:hover { background: rgba(0,0,0,0.08); }
 
-    /* ── Form fields ── */
-    .form-group { margin-bottom: 16px; }
+    .info-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      width: 80px;
+      flex-shrink: 0;
+    }
+
+    .info-value {
+      font-size: 15px;
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      flex: 1;
+      word-break: break-all;
+    }
+
+    .info-value.text {
+      font-family: inherit;
+      font-size: 15px;
+    }
+
+    .info-value.uuid {
+      font-size: 12px;
+    }
+
+    .copy-btn-mini {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      color: var(--text-muted);
+      display: flex;
+      border-radius: 3px;
+    }
+    .copy-btn-mini:hover {
+      background: var(--border-subtle);
+      color: var(--text);
+    }
+
+    /* ── Stats grid ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px;
+    }
+
+    .stat-icon {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    }
+
+    .stat-rate {
+      font-size: 11px;
+      color: var(--green-text);
+      margin-top: 2px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    /* ── Form ── */
+    .form-group {
+      margin-bottom: 14px;
+    }
     .form-label {
       display: block;
-      font-size: 0.8rem;
+      font-size: 8px;
       font-weight: 500;
-      color: var(--color-stopped);
-      margin-bottom: 6px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .form-input {
       width: 100%;
-      padding: 12px 14px;
-      border: 1.5px solid var(--color-input-border);
+      padding: 10px 12px;
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
-      background: var(--color-input-bg);
-      color: var(--color-text-primary);
-      font-size: 0.95rem;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
       font-family: inherit;
       outline: none;
-      transition: border-color var(--transition-fast), background var(--transition-fast);
       box-sizing: border-box;
+      transition: border-color var(--transition-fast);
     }
-    .form-input:focus { border-color: var(--color-primary); }
+    .form-input:focus {
+      border-color: var(--accent);
+    }
     .form-input[readonly] {
-      background: transparent;
-      border-color: transparent;
-      cursor: default;
-    }
-    .form-input.error { border-color: var(--color-error); }
-    .form-error {
-      font-size: 0.8rem; color: var(--color-error); margin-top: 4px;
+      background: var(--border-subtle);
+      color: var(--text-muted);
     }
 
-    /* ── Stats ── */
-    .stats-section { margin-top: 16px; }
-    .stats-title { font-weight: 600; margin-bottom: 12px; font-size: 0.95rem; }
-
-    .stats-badges {
-      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;
+    /* ── Switch ── */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-subtle);
     }
-    .stats-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      background: var(--color-surface-variant);
-      padding: 4px 10px; border-radius: 12px;
-      font-size: 0.8rem; margin-right: 6px; margin-bottom: 4px;
+    .switch-label {
+      font-size: 11px;
+      color: var(--text);
+    }
+    .switch {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      flex-shrink: 0;
+    }
+    .switch.on {
+      background: var(--accent);
+    }
+    .switch-knob {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    }
+    .switch.on .switch-knob {
+      left: 20px;
     }
 
-    /* ── Error banner ── */
-    .error-banner {
-      padding: 12px; background: var(--color-error-bg);
-      border-radius: var(--radius-md); font-size: 0.85rem;
-      color: var(--color-error); margin: 0 16px;
+    /* ── Danger zone ── */
+    .danger-zone {
+      margin-top: 20px;
+      padding: 14px;
+      border: 1px solid var(--red-border);
+      border-radius: var(--radius-md);
+    }
+    .danger-zone-label {
+      font-size: 8px;
+      font-weight: 600;
+      color: var(--red-text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
     }
 
-    /* ── Toast (top, like prototype) ── */
+    /* ── Toast ── */
     .toast {
-      position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-      background: var(--color-toast-bg); color: var(--color-toast-fg);
-      padding: 12px 24px; border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-size: 0.9rem; z-index: 100;
-      display: flex; align-items: center; gap: 8px;
-      max-width: 400px; transition: background var(--transition-fast);
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: var(--radius-lg);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-size: 12px;
+      z-index: 100;
       animation: toast-in 0.3s ease;
     }
     @keyframes toast-in {
-      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
-    /* ── Delete Dialog Overlay ── */
+    /* ── Delete dialog ── */
     .dialog-overlay {
-      position: fixed; inset: 0;
-      background: var(--color-overlay);
-      display: flex; align-items: center; justify-content: center;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       z-index: 200;
-      animation: fade-in 0.2s ease;
+      animation: fade-in 0.15s ease;
     }
     @keyframes fade-in { from { opacity: 0; } }
     .dialog-box {
-      background: var(--color-surface);
+      background: var(--surface);
       border-radius: var(--radius-lg);
-      padding: 24px; max-width: 340px; width: 90%;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      padding: 24px;
+      max-width: 320px;
+      width: 90%;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     }
-    .dialog-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 12px; text-align: center; }
-    .dialog-message { color: var(--color-stopped); font-size: 0.9rem; margin-bottom: 20px; text-align: center; line-height: 1.5; }
-    .dialog-actions { display: flex; gap: 12px; justify-content: center; }
+    .dialog-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .dialog-message {
+      color: var(--text-secondary);
+      font-size: 12px;
+      margin-bottom: 20px;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .dialog-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
     .dialog-btn {
-      padding: 10px 24px; border-radius: 20px; border: none;
-      cursor: pointer; font-size: 0.9rem; font-weight: 500;
-      transition: background var(--transition-fast);
+      padding: 8px 20px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
       font-family: inherit;
+      transition: opacity var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     .dialog-btn.cancel {
-      background: var(--color-surface-variant); color: var(--color-text-primary);
+      background: var(--border-subtle);
+      color: var(--text);
     }
     .dialog-btn.danger {
-      background: var(--color-error); color: white;
+      background: var(--red);
+      color: #fff;
     }
-    .dialog-btn:hover { opacity: 0.9; }
+    .dialog-btn:hover { opacity: 0.85; }
+
+    /* ── Edit button at bottom ── */
+    .btn-edit-bottom {
+      width: 100%;
+      padding: 8px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-edit-bottom:hover { opacity: 0.8; }
   `;
+
+  // ── Render ───────────────────────────────────────────────────────────
 
   render() {
     const t2 = this._tunnel;
     const stats = t2 ? (getStats(t2.id) ?? t2.stats) : null;
-
-    const typeLabel = this.tunnelType.charAt(0).toUpperCase() + this.tunnelType.slice(1);
+    const typeLabel = this._typeLabel();
 
     return html`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
-          <button class="back-btn" @click=${() => this._navigate('/')}>←</button>
-          <span class="page-title">${this.mode === 'create' ? `${t('tunnelNewTitle')} — ${typeLabel}` : typeLabel}</span>
+          <button class="back-btn" @click=${() => this._navigate('/')}>
+            ${icon('chevron-left')}
+          </button>
+          <span class="page-title">
+            ${this.mode === 'create'
+              ? `${t('tunnelNewTitle')} — ${typeLabel}`
+              : typeLabel + ' Tunnel'}
+          </span>
 
-          ${this.mode === 'view' && t2 ? html`
-            <button class="fav-btn ${t2.favorite ? 'active' : 'inactive'}" @click=${this._handleFavorite}>★</button>
-            ${t2.status === 'running'
-              ? html`<button class="stop-btn" @click=${this._handleStop}>■ ${t('btnStop')}</button>`
-              : html`<button class="primary-btn" @click=${this._handleStart}>▶ ${t('btnStart')}</button>`
-            }
-            <button class="danger-btn" @click=${() => { this._showDeleteDialog = true; }}>🗑</button>
-            <button class="appbar-btn" @click=${this._enterEdit}>✏ ${t('btnEdit')}</button>
-          ` : html`
-            <button class="primary-btn" ?disabled=${this._saving} @click=${this._handleSave}>
-              ✓ ${t('btnSave')}
-            </button>
-          `}
+          ${this.mode === 'view' && t2
+            ? html`
+              ${t2.status === 'running'
+                ? html`<button class="pill-btn danger appbar-action" @click=${this._handleStop}>
+                  ■ ${t('btnStop')}
+                </button>`
+                : html`<button class="pill-btn primary appbar-action" @click=${this._handleStart}>
+                  ▶ ${t('btnStart')}
+                </button>`}
+            `
+            : html`
+              <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${this._handleSave}>
+                ${icon('check')} ${t('btnSave')}
+              </button>
+            `}
         </div>
 
-        ${this.mode === 'view' && t2 ? html`
-          <!-- Error banner -->
-          ${t2.error ? html`<div class="error-banner">${t2.error}</div>` : ''}
-
-          <!-- View mode -->
-          <div class="detail-section">
-            <div class="detail-card">
-              <!-- Copyable ID -->
-              <div class="copyable-row">
-                <span class="copyable-text">${t2.id}</span>
-                <button class="copy-btn" @click=${async () => { await copyToClipboard(t2.id); this._showSnackbar('📋 ' + t('copiedToClipboard')); }}>📋</button>
-              </div>
-              <!-- Copyable Entrypoint -->
-              <div class="copyable-row">
-                <span class="copyable-text">${t2.entrypoint}</span>
-                <button class="copy-btn" @click=${async () => { await copyToClipboard(t2.entrypoint); this._showSnackbar('📋 ' + t('copiedToClipboard')); }}>📋</button>
-              </div>
-
-              <!-- Name (read-only) -->
-              <div class="form-group">
-                <label class="form-label">${t('fieldName')}</label>
-                <input class="form-input" readonly .value=${t2.name}>
-              </div>
-              <!-- Endpoint (read-only) -->
-              ${this.tunnelType !== 'file' ? html`
-                <div class="form-group" style="margin-bottom:0;">
-                  <label class="form-label">${t('fieldEndpoint')}</label>
-                  <input class="form-input" readonly .value=${t2.endpoint}>
-                </div>
-              ` : ''}
+        <!-- ── VIEW MODE ───────────────────────────────────────────── -->
+        ${this.mode === 'view' && t2
+          ? html`
+            <!-- Status banner -->
+            <div class="status-banner ${t2.status}">
+              <span class="status-dot-mini"></span>
+              ${t2.status === 'running'
+                ? t('statusRunning') + ' · ' + formatNumber(t2.stats.current_conns) + ' ' + t('activeConnections')
+                : t2.status === 'error'
+                  ? t('statusError')
+                  : t('statusStopped')}
+              ${t2.error ? html` — ${t2.error}` : ''}
+              <span class="status-spacer"></span>
             </div>
 
-            <!-- Stats -->
-            ${stats ? html`
-              <div class="stats-section">
-                <div class="detail-card">
-                  <div class="stats-title">${t('labelStatistics')}</div>
-                  <div class="stats-badges">
-                    <span class="stats-badge">↕ ${formatNumber(stats.current_conns)} / ${formatNumber(stats.total_conns)} connections</span>
-                    <span class="stats-badge">⚡ ${formatRate(stats.request_rate)}</span>
-                  </div>
-                  <stats-row icon="↑" .value=${formatBytes(stats.input_bytes) + ' total'} .rate=${formatRate(stats.input_rate_bytes)}></stats-row>
-                  <stats-row icon="↓" .value=${formatBytes(stats.output_bytes) + ' total'} .rate=${formatRate(stats.output_rate_bytes)}></stats-row>
+            <!-- Info card -->
+            <div class="section">
+              <div class="card">
+                <div class="info-row">
+                  <span class="info-label">Type</span>
+                  <span class="info-value text">${typeLabel} Tunnel</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Target</span>
+                  <span class="info-value">${t2.endpoint}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Entrypoint</span>
+                  <span class="info-value">${t2.entrypoint}</span>
+                  <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
+                    ${icon('copy')}
+                  </button>
+                </div>
+                ${t2.options.hostname
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">Hostname</span>
+                      <span class="info-value text">${t2.options.hostname}</span>
+                    </div>
+                  `
+                  : ''}
+                ${this.tunnelType === 'http'
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">TLS</span>
+                      <span class="info-value text">${t2.options.enableTLS ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                  `
+                  : ''}
+                ${t2.options.username
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">Auth</span>
+                      <span class="info-value text">Basic · ${t2.options.username}</span>
+                    </div>
+                  `
+                  : ''}
+                ${this.tunnelType === 'file'
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">Upload</span>
+                      <span class="info-value text">${t2.options.file_upload ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                  `
+                  : ''}
+                <div class="info-row">
+                  <span class="info-label">ID</span>
+                  <span class="info-value uuid">${t2.id}</span>
+                  <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.id)}>
+                    ${icon('copy')}
+                  </button>
                 </div>
               </div>
-            ` : ''}
-          </div>
-        ` : html`
-          <!-- Edit/Create mode -->
-          <div class="detail-section">
-            <div class="detail-card">
-              <div class="form-group">
-                <label class="form-label">${t('fieldName')}</label>
-                <input class="form-input" .value=${this._name} placeholder="Enter tunnel name"
-                  @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
-              </div>
-              ${this.tunnelType !== 'file' ? html`
+
+              <!-- Stats grid -->
+              ${stats
+                ? html`
+                  <div class="stats-grid">
+                    <div class="stat-box">
+                      <div class="stat-label">Current Conns</div>
+                      <div class="stat-value">${formatNumber(stats.current_conns)}</div>
+                      <div class="stat-rate">${formatRate(stats.request_rate)}</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="stat-label">Total Conns</div>
+                      <div class="stat-value">${formatNumber(stats.total_conns)}</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="stat-label">Download</div>
+                      <div class="stat-value">${formatBytes(stats.output_bytes)}</div>
+                      <div class="stat-rate">${formatRate(stats.output_rate_bytes)}</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="stat-label">Upload</div>
+                      <div class="stat-value">${formatBytes(stats.input_bytes)}</div>
+                      <div class="stat-rate">${formatRate(stats.input_rate_bytes)}</div>
+                    </div>
+                  </div>
+                `
+                : ''}
+            </div>
+          `
+          : ''}
+
+            <!-- Edit button (view mode only) -->
+            ${this.mode === 'view' && t2
+              ? html`
+                <div class="section">
+                  <button class="btn-edit-bottom" @click=${this._enterEdit}>
+                    ${icon('edit')} ${t('btnEdit')}
+                  </button>
+                </div>
+              `
+              : ''}
+
+        <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
+        ${this.mode !== 'view'
+          ? html`
+            <div class="section">
+              <div class="card" style="padding:16px;">
+                <!-- Type (readonly) -->
                 <div class="form-group">
-                  <label class="form-label">${t('fieldEndpoint')}</label>
+                  <label class="form-label">Type</label>
+                  <input class="form-input" readonly .value=${typeLabel + ' Tunnel'}>
+                </div>
+
+                <!-- Name -->
+                <div class="form-group">
+                  <label class="form-label">${t('fieldName')}</label>
+                  <input class="form-input" .value=${this._name} placeholder="My Tunnel"
+                    @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
+                </div>
+
+                <!-- Target / Directory -->
+                <div class="form-group">
+                  <label class="form-label">
+                    ${this.tunnelType === 'file' ? t('fieldDirectory') : t('fieldEndpoint')}
+                  </label>
                   <input class="form-input" .value=${this._endpoint}
-                    placeholder=${this.tunnelType === 'http' ? 'http://host:port' : 'host:port'}
+                    placeholder=${this.tunnelType === 'http' ? 'http://localhost:3000' : this.tunnelType === 'file' ? '/path/to/dir' : 'host:port'}
                     @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
                 </div>
-              ` : ''}
 
-              ${this.tunnelType === 'file' ? html`
-                <file-form-fields
-                  .directory=${this._endpoint}
-                  .basicAuth=${this._basicAuth}
-                  .username=${this._username}
-                  .password=${this._password}
-                  .fileUpload=${this._fileUpload}
-                ></file-form-fields>
-              ` : ''}
+                <!-- Hostname (HTTP/File) -->
+                ${this.tunnelType === 'http' || this.tunnelType === 'file'
+                  ? html`
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldHostname')}</label>
+                      <input class="form-input" .value=${this._hostname} placeholder="example.com"
+                        @input=${(e: Event) => { this._hostname = (e.target as HTMLInputElement).value; }}>
+                    </div>
+                  `
+                  : ''}
 
-              ${this.tunnelType === 'http' ? html`
-                <http-form-fields
-                  .rewriteHost=${this._rewriteHost}
-                  .hostname=${this._hostname}
-                  .enableTLS=${this._enableTLS}
-                ></http-form-fields>
-              ` : ''}
+                <!-- TLS toggle (HTTP only) -->
+                ${this.tunnelType === 'http'
+                  ? html`
+                    <div class="switch-row">
+                      <span class="switch-label">${t('switchEnableTLS')}</span>
+                      <div class="switch ${this._enableTLS ? 'on' : ''}"
+                        @click=${() => { this._enableTLS = !this._enableTLS; }}>
+                        <div class="switch-knob"></div>
+                      </div>
+                    </div>
+                  `
+                  : ''}
+
+                <!-- Auth section (HTTP/File) -->
+                ${this.tunnelType === 'http' || this.tunnelType === 'file'
+                  ? html`
+                    <div class="switch-row" style="border-bottom:none;">
+                      <span class="switch-label">${t('switchBasicAuth')}</span>
+                      <div class="switch ${this._showAuth ? 'on' : ''}"
+                        @click=${() => { this._showAuth = !this._showAuth; }}>
+                        <div class="switch-knob"></div>
+                      </div>
+                    </div>
+
+                    ${this._showAuth
+                      ? html`
+                        <div class="form-group" style="margin-top:12px;">
+                          <label class="form-label">${t('fieldUsername')}</label>
+                          <input class="form-input" .value=${this._username} placeholder="admin"
+                            @input=${(e: Event) => { this._username = (e.target as HTMLInputElement).value; }}>
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">${t('fieldPassword')}</label>
+                          <input class="form-input" type="password" .value=${this._password} placeholder="••••"
+                            @input=${(e: Event) => { this._password = (e.target as HTMLInputElement).value; }}>
+                        </div>
+                      `
+                      : ''}
+
+                    ${this.tunnelType === 'file'
+                      ? html`
+                        <div class="switch-row">
+                          <span class="switch-label">${t('switchFileUpload')}</span>
+                          <div class="switch ${this._fileUpload ? 'on' : ''}"
+                            @click=${() => { this._fileUpload = !this._fileUpload; }}>
+                            <div class="switch-knob"></div>
+                          </div>
+                        </div>
+                      `
+                      : ''}
+                  `
+                  : ''}
+
+                <!-- Danger Zone (edit only) -->
+                ${this.mode === 'edit'
+                  ? html`
+                    <div class="danger-zone">
+                      <div class="danger-zone-label">Danger Zone</div>
+                      <button class="pill-btn danger" @click=${() => { this._showDeleteDialog = true; }}>
+                        ${icon('trash')} ${t('btnDelete')}
+                      </button>
+                    </div>
+                  `
+                  : ''}
+              </div>
             </div>
-          </div>
-        `}
+          `
+          : ''}
 
         ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
 
-        ${this._showDeleteDialog ? html`
-          <div class="dialog-overlay" @click=${() => { this._showDeleteDialog = false; }}>
-            <div class="dialog-box" @click=${(e: Event) => { e.stopPropagation(); }}>
-              <div class="dialog-title">${t('deleteConfirmTitle')}</div>
-              <div class="dialog-message">${t('deleteConfirmMessage')}</div>
-              <div class="dialog-actions">
-                <button class="dialog-btn cancel" @click=${() => { this._showDeleteDialog = false; }}>${t('btnCancel')}</button>
-                <button class="dialog-btn danger" @click=${this._handleDelete}>${t('btnDelete')}</button>
+        ${this._showDeleteDialog
+          ? html`
+            <div class="dialog-overlay" @click=${() => { this._showDeleteDialog = false; }}>
+              <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="dialog-title">${t('deleteConfirmTitle')}</div>
+                <div class="dialog-message">${t('deleteConfirmMessage')}</div>
+                <div class="dialog-actions">
+                  <button class="dialog-btn cancel" @click=${() => { this._showDeleteDialog = false; }}>
+                    ${t('btnCancel')}
+                  </button>
+                  <button class="dialog-btn danger" @click=${this._handleDelete}>
+                    ${t('btnDelete')}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ` : ''}
+          `
+          : ''}
       </app-scaffold>
     `;
   }

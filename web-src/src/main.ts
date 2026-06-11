@@ -1,4 +1,4 @@
-import './styles/global.css';
+import './styles/theme.css';
 import './app.ts';
 
 // Lit component registrations happen via @customElement decorators in each file.

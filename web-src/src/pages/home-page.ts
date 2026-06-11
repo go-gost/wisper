@@ -1,28 +1,56 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
-import { getTunnels, isLoading as tunnelsLoading, toggleFavorite } from '../store/tunnel-store';
-import { getEntrypoints, isLoading as entrypointsLoading, toggleFavorite as toggleEntrypointFavorite } from '../store/entrypoint-store';
-import { subscribe as subTunnel } from '../store/tunnel-store';
-import { subscribe as subEntrypoint } from '../store/entrypoint-store';
+import { icon } from '../utils/icons';
+import { copyToClipboard } from '../utils/clipboard';
+import { formatRate, formatNumber } from '../utils/format';
+import {
+  getTunnels,
+  isLoading as tunnelsLoading,
+  toggleFavorite,
+  start as startTunnel,
+  stop as stopTunnel,
+  subscribe as subTunnel,
+} from '../store/tunnel-store';
+import {
+  getEntrypoints,
+  isLoading as entrypointsLoading,
+  toggleFavorite as toggleEntrypointFavorite,
+  start as startEntrypoint,
+  stop as stopEntrypoint,
+  subscribe as subEntrypoint,
+} from '../store/entrypoint-store';
 import { subscribe as subSettings } from '../store/settings-store';
+import type { Tunnel, Entrypoint, ServiceStatus } from '../api/types';
 import '../components/app-scaffold';
 import '../components/nav-tabs';
 import '../components/tunnel-card';
 
+type Item =
+  | { kind: 'tunnel'; data: Tunnel }
+  | { kind: 'entrypoint'; data: Entrypoint };
+
 @customElement('home-page')
 export class HomePage extends LitElement {
-  @state() private tabIndex = 0;
+  @state() private tabIndex = 0; // 0 = tunnels, 1 = entrypoints
   @state() private showFavorites = false;
-  @state() private _tunnels = getTunnels();
-  @state() private _entrypoints = getEntrypoints();
-  @state() private _tunnelsLoading = tunnelsLoading();
-  @state() private _entrypointsLoading = entrypointsLoading();
+  @state() private _tunnels: Tunnel[] = [];
+  @state() private _entrypoints: Entrypoint[] = [];
+  @state() private _tunnelsLoading = false;
+  @state() private _entrypointsLoading = false;
+
+  /** ID of the row whose inline panel is currently expanded (null = none). */
+  @state() private _expandedId: string | null = null;
 
   private _unsubs: (() => void)[] = [];
 
   connectedCallback() {
     super.connectedCallback();
+    this._tunnels = getTunnels();
+    this._entrypoints = getEntrypoints();
+    this._tunnelsLoading = tunnelsLoading();
+    this._entrypointsLoading = entrypointsLoading();
+
     this._unsubs.push(
       subTunnel(() => {
         this._tunnels = getTunnels();
@@ -40,73 +68,294 @@ export class HomePage extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    for (const unsub of this._unsubs) unsub();
+    for (const fn of this._unsubs) fn();
     this._unsubs = [];
   }
 
+  private _navigate(path: string) {
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+
+  private _toggleFavorites() {
+    this.showFavorites = !this.showFavorites;
+    this._expandedId = null;
+  }
+
+  private _toggleExpand(id: string) {
+    this._expandedId = this._expandedId === id ? null : id;
+  }
+
+  // ── Filters ───────────────────────────────────────────────────────────
+
+  private get _filteredTunnels(): Tunnel[] {
+    return this.showFavorites
+      ? this._tunnels.filter(t => t.favorite)
+      : this._tunnels;
+  }
+
+  private get _filteredEntrypoints(): Entrypoint[] {
+    return this.showFavorites
+      ? this._entrypoints.filter(e => e.favorite)
+      : this._entrypoints;
+  }
+
+  private get _items(): Item[] {
+    if (this.tabIndex === 0) {
+      return this._filteredTunnels.map(t => ({ kind: 'tunnel' as const, data: t }));
+    }
+    return this._filteredEntrypoints.map(e => ({ kind: 'entrypoint' as const, data: e }));
+  }
+
+  private _isLoading(): boolean {
+    return this.tabIndex === 0 ? this._tunnelsLoading : this._entrypointsLoading;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+
+  private _statusLabel(s: ServiceStatus): string {
+    switch (s) {
+      case 'running': return t('statusRunning');
+      case 'stopped': return t('statusStopped');
+      case 'error': return t('statusError');
+    }
+  }
+
+  private _metaLine(item: Item): string {
+    const type = item.data.type.toUpperCase();
+    const status = this._statusLabel(item.data.status);
+    if (item.data.status === 'running') {
+      return `${type} · ${formatNumber(item.data.stats.current_conns)} conns`;
+    }
+    return `${type} · ${status}`;
+  }
+
+  // ── Empty state ───────────────────────────────────────────────────────
+
+  private _renderEmptyState() {
+    const isTunnel = this.tabIndex === 0;
+    const allEmpty = isTunnel
+      ? this._tunnels.length === 0
+      : this._entrypoints.length === 0;
+
+    if (this.showFavorites) {
+      return html`
+        <div class="empty">
+          <div class="empty-icon-wrap">${icon('star')}</div>
+          <div class="empty-title">${t('homeNoFavorites')}</div>
+          <div class="empty-desc">${isTunnel ? t('homeNoFavTunnelHint') : t('homeNoFavEntryHint')}</div>
+          <button class="empty-sub-link" @click=${this._toggleFavorites}>
+            ${isTunnel ? t('homeShowAllTunnels') : t('homeShowAllEntrypoints')}
+          </button>
+        </div>
+      `;
+    }
+
+    if (allEmpty) {
+      const fabPath = isTunnel ? '/tunnel/new' : '/entrypoint/new';
+      return html`
+        <div class="empty">
+          <div class="empty-icon-wrap">${icon(isTunnel ? 'link' : 'broadcast')}</div>
+          <div class="empty-title">${isTunnel ? t('homeEmptyTunnels') : t('homeEmptyEntrypoints')}</div>
+          <div class="empty-desc">${isTunnel ? t('homeEmptyTunnelDesc') : t('homeEmptyEntryDesc')}</div>
+          <button class="empty-action" @click=${() => this._navigate(fabPath)}>
+            ${isTunnel ? t('tunnelNewTitle') : t('entrypointNewTitle')}
+          </button>
+        </div>
+      `;
+    }
+
+    return html``;
+  }
+
+  // ── Styles ────────────────────────────────────────────────────────────
+
   static styles = css`
-    /* ── Home Header ── */
+    /* ── Home header (inside appbar slot) ── */
     .home-header {
       display: flex;
       align-items: center;
-      padding: 16px;
-      gap: 12px;
+      width: 100%;
+      gap: 8px;
     }
 
     .app-icon {
-      width: 42px;
-      height: 42px;
-      background: var(--color-primary);
-      border-radius: 10px;
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
+      color: var(--accent-fg);
       font-weight: 700;
-      font-size: 1.1rem;
+      font-size: 12px;
+      flex-shrink: 0;
     }
 
-    .header-actions {
-      margin-left: auto;
-      display: flex;
-      gap: 4px;
+    .appbar-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .header-spacer {
+      flex: 1;
     }
 
     .icon-btn {
       background: none;
       border: none;
       cursor: pointer;
-      padding: 6px 10px;
-      border-radius: 8px;
-      color: var(--color-text-primary);
-      font-size: 1.1rem;
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background var(--transition-fast);
-      width: 36px;
-      height: 36px;
+      transition: background var(--transition-fast), color var(--transition-fast);
+      width: 28px;
+      height: 28px;
     }
 
     .icon-btn:hover {
-      background: var(--color-surface-variant);
+      background: var(--border-subtle);
+      color: var(--text);
     }
 
     .icon-btn.active {
-      color: var(--color-fav);
-    }
-
-    /* ── Nav wrapper ── */
-    .nav-wrapper {
-      margin: 0 16px 12px;
+      color: var(--amber);
     }
 
     /* ── List ── */
     .list {
+      flex: 1;
+      padding-bottom: 80px;
+    }
+
+    /* ── Expand panel ── */
+    .expand-panel {
+      padding: 12px 16px 12px 30px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
       display: flex;
       flex-direction: column;
-      gap: 0;
-      padding-bottom: 80px;
+      gap: 8px;
+    }
+
+    .expand-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+
+    .expand-row .mono {
+      flex: 1;
+      color: var(--text);
+    }
+
+    .expand-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .action-btn {
+      padding: 5px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .action-btn:hover {
+      background: var(--border-subtle);
+    }
+
+    .action-btn.start {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+    }
+
+    .action-btn.stop {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red);
+    }
+
+    .action-btn.danger {
+      color: var(--red);
+      border-color: var(--red-border);
+    }
+
+    .expand-error {
+      font-size: 9px;
+      color: var(--red-text);
+      padding: 4px 8px;
+      background: var(--red-bg);
+      border-radius: var(--radius-sm);
+    }
+
+    /* ── Expand detail card ── */
+    .detail-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .detail-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row .dlabel {
+      color: var(--text-muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .detail-row .dval {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 14px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .detail-row.error {
+      background: var(--red-bg);
+    }
+    .detail-row .error-text {
+      color: var(--red-text);
+    }
+    .copy-btn-mini {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      color: var(--text-muted);
+      display: flex;
+      border-radius: 3px;
+    }
+    .copy-btn-mini:hover {
+      background: var(--border-subtle);
+      color: var(--text);
     }
 
     /* ── Empty state ── */
@@ -116,18 +365,69 @@ export class HomePage extends LitElement {
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 40px;
-      color: var(--color-stopped);
+      padding: 48px 40px;
+      color: var(--text-muted);
+      gap: 8px;
+      text-align: center;
     }
 
-    .empty-icon {
-      font-size: 3rem;
-      margin-bottom: 12px;
-      opacity: 0.4;
+    .empty-icon-wrap {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+      color: var(--text-muted);
     }
 
-    .empty-text {
-      font-size: 1rem;
+    .empty-title {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .empty-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      max-width: 240px;
+      line-height: 1.5;
+      margin-bottom: 4px;
+    }
+
+    .empty-action {
+      padding: 7px 18px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: var(--accent);
+      color: var(--accent-fg);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+    }
+
+    .empty-action:hover {
+      opacity: 0.85;
+    }
+
+    .empty-sub-link {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: underline;
+      padding: 4px 8px;
+    }
+
+    .empty-sub-link:hover {
+      color: var(--text);
     }
 
     /* ── Loading ── */
@@ -137,127 +437,357 @@ export class HomePage extends LitElement {
       padding: 24px;
     }
 
-    /* ── FAB (rounded square, like prototype) ── */
+    /* ── FAB ── */
     .fab {
-      width: 56px;
-      height: 56px;
-      border-radius: 16px;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-lg);
       border: none;
-      background: var(--color-primary);
-      color: var(--color-primary-text);
-      font-size: 1.5rem;
+      background: var(--accent);
+      color: var(--accent-fg);
       cursor: pointer;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.1s, background var(--transition-fast);
+      transition: transform 0.1s, opacity var(--transition-fast);
     }
 
     .fab:hover {
-      transform: scale(1.05);
+      opacity: 0.9;
     }
 
     .fab:active {
-      transform: scale(0.97);
+      transform: scale(0.96);
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: var(--radius-lg);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-size: 12px;
+      z-index: 100;
+      animation: toast-in 0.3s ease;
+    }
+
+    @keyframes toast-in {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    /* ── Delete dialog ── */
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      animation: fade-in 0.15s ease;
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; }
+    }
+
+    .dialog-box {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      max-width: 320px;
+      width: 90%;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .dialog-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .dialog-message {
+      color: var(--text-secondary);
+      font-size: 12px;
+      margin-bottom: 20px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .dialog-btn {
+      padding: 8px 20px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .dialog-btn.cancel {
+      background: var(--border-subtle);
+      color: var(--text);
+    }
+
+    .dialog-btn.danger {
+      background: var(--red);
+      color: #fff;
+    }
+
+    .dialog-btn:hover {
+      opacity: 0.85;
     }
   `;
 
-  private _handleTabChange(e: CustomEvent) {
-    this.tabIndex = e.detail.index;
-    this.showFavorites = false;
+  // ── Action state ─────────────────────────────────────────────────────
+
+  @state() private _snackbar = '';
+  @state() private _deleteTarget: { kind: 'tunnel' | 'entrypoint'; id: string; name: string } | null = null;
+
+  private _showSnackbar(msg: string) {
+    this._snackbar = msg;
+    setTimeout(() => {
+      this._snackbar = '';
+      this.requestUpdate();
+    }, 2500);
   }
 
-  private _toggleFavorites() {
-    this.showFavorites = !this.showFavorites;
+  private async _handleStart(item: Item) {
+    try {
+      if (item.kind === 'tunnel') {
+        await startTunnel(item.data.id);
+      } else {
+        await startEntrypoint(item.data.id);
+      }
+      this._showSnackbar(t('started'));
+    } catch {
+      this._showSnackbar(t('startFailed'));
+    }
   }
 
-  private _navigate(path: string) {
-    window.history.pushState({}, '', path);
-    window.dispatchEvent(new PopStateEvent('popstate'));
+  private async _handleStop(item: Item) {
+    try {
+      if (item.kind === 'tunnel') {
+        await stopTunnel(item.data.id);
+      } else {
+        await stopEntrypoint(item.data.id);
+      }
+      this._showSnackbar(t('stopped'));
+    } catch {
+      this._showSnackbar(t('stopFailed'));
+    }
   }
 
-  private get _filteredTunnels() {
-    return this.showFavorites
-      ? this._tunnels.filter(t => t.favorite)
-      : this._tunnels;
+  private _confirmDelete(kind: 'tunnel' | 'entrypoint', id: string, name: string) {
+    this._deleteTarget = { kind, id, name };
   }
 
-  private get _filteredEntrypoints() {
-    return this.showFavorites
-      ? this._entrypoints.filter(e => e.favorite)
-      : this._entrypoints;
+  private async _handleDelete() {
+    if (!this._deleteTarget) return;
+    const { kind, id } = this._deleteTarget;
+    this._deleteTarget = null;
+    try {
+      if (kind === 'tunnel') {
+        await import('../store/tunnel-store').then(m => m.remove(id));
+      } else {
+        await import('../store/entrypoint-store').then(m => m.remove(id));
+      }
+      this._expandedId = null;
+      this._showSnackbar(t('deleted'));
+    } catch {
+      this._showSnackbar(t('deleteFailed'));
+    }
   }
 
-  private get _list() {
-    return this.tabIndex === 0 ? this._filteredTunnels : this._filteredEntrypoints;
+  private async _handleFavorite(item: Item) {
+    if (item.kind === 'tunnel') {
+      await toggleFavorite(item.data.id);
+    } else {
+      await toggleEntrypointFavorite(item.data.id);
+    }
   }
 
-  private get _isLoading() {
-    return this.tabIndex === 0 ? this._tunnelsLoading : this._entrypointsLoading;
-  }
+  // ── Render ───────────────────────────────────────────────────────────
 
   render() {
-    const items = this._list;
+    const items = this._items;
+    const isLoading = this._isLoading();
     const emptyLabel = this.tabIndex === 0 ? t('homeEmptyTunnels') : t('homeEmptyEntrypoints');
     const fabPath = this.tabIndex === 0 ? '/tunnel/new' : '/entrypoint/new';
 
     return html`
       <app-scaffold>
-        <!-- Home Header (NOT in appBar slot — renders as page content) -->
-        <div class="home-header">
+        <!-- Appbar -->
+        <div slot="appBar" class="home-header">
           <div class="app-icon">W</div>
-          <div class="header-actions">
-            <button
-              class="icon-btn ${this.showFavorites ? 'active' : ''}"
-              title=${this.showFavorites ? t('homeAllTooltip') : t('homeFavoritesTooltip')}
-              @click=${this._toggleFavorites}
-            >${this.showFavorites ? '★' : '☆'}</button>
-            <button class="icon-btn" title=${t('settingsTitle')} @click=${() => this._navigate('/settings')}>⚙</button>
-          </div>
+          <span class="appbar-title">${t('appName')}</span>
+          <span class="header-spacer"></span>
+          <button
+            class="icon-btn ${this.showFavorites ? 'active' : ''}"
+            @click=${this._toggleFavorites}
+          >
+            ${icon(this.showFavorites ? 'star-filled' : 'star')}
+          </button>
+          <button class="icon-btn" @click=${() => this._navigate('/settings')}>
+            ${icon('settings')}
+          </button>
         </div>
 
-        <div class="nav-wrapper">
-          <nav-tabs
-            .tabs=${[t('homeTabTunnel'), t('homeTabEntrypoint')]}
-            .activeIndex=${this.tabIndex}
-            @tab-change=${this._handleTabChange}
-          ></nav-tabs>
-        </div>
+        <!-- Tabs -->
+        <nav-tabs
+          .tabs=${[t('homeTabTunnel'), t('homeTabEntrypoint')]}
+          .activeIndex=${this.tabIndex}
+          @tab-change=${(e: CustomEvent) => {
+            this.tabIndex = e.detail.index;
+            this._expandedId = null;
+          }}
+        ></nav-tabs>
 
-        ${this._isLoading
+        <!-- Body -->
+        ${isLoading
           ? html`<div class="loading"><wisper-spinner></wisper-spinner></div>`
           : items.length === 0
-            ? html`
-              <div class="empty">
-                <span class="empty-icon">☁️</span>
-                <span class="empty-text">${emptyLabel}</span>
-              </div>
-            `
+            ? this._renderEmptyState()
             : html`
               <div class="list">
-                ${items.map(item => html`
-                  <div @click=${() => {
-                    const prefix = this.tabIndex === 0 ? '/tunnel' : '/entrypoint';
-                    this._navigate(`${prefix}/${item.type}/${item.id}`);
-                  }}>
-                    <tunnel-card
-                      .name=${item.name}
-                      .type=${item.type.toUpperCase()}
-                      .endpoint=${item.endpoint}
-                      .status=${item.status}
-                      .stats=${item.stats}
-                      .error=${item.error}
-                    ></tunnel-card>
-                  </div>
-                `)}
+                ${items.map(item => {
+                  const detailPath =
+                    item.kind === 'tunnel'
+                      ? `/tunnel/${item.data.type}/${item.data.id}`
+                      : `/entrypoint/${item.data.type}/${item.data.id}`;
+                  const isExpanded = this._expandedId === item.data.id;
+
+                  return html`
+                    <div>
+                      <tunnel-card
+                        .name=${item.data.name}
+                        .meta=${this._metaLine(item)}
+                        .status=${item.data.status}
+                        .endpoint=${item.data.endpoint}
+                        .error=${item.data.error}
+                        .currentConns=${item.data.stats.current_conns}
+                        .totalConns=${item.data.stats.total_conns}
+                        .requestRate=${item.data.stats.request_rate}
+                        .inputBytes=${item.data.stats.input_bytes}
+                        .outputBytes=${item.data.stats.output_bytes}
+                        .inputRate=${item.data.stats.input_rate_bytes}
+                        .outputRate=${item.data.stats.output_rate_bytes}
+                        .expanded=${isExpanded}
+                        .compact=${true}
+                        @card-click=${() => this._navigate(detailPath)}
+                        @chevron-click=${() => this._toggleExpand(item.data.id)}
+                      ></tunnel-card>
+
+                      ${isExpanded
+                        ? html`
+                          <div class="expand-panel">
+                            <div class="detail-card">
+                              <div class="detail-row">
+                                <span class="dlabel">${item.kind === 'tunnel' ? 'Entrypoint' : 'Endpoint'}</span>
+                                <span class="dval">${item.data.entrypoint}
+                                  <button class="copy-btn-mini" @click=${async (e: Event) => { e.stopPropagation(); await copyToClipboard(item.data.entrypoint); this._showSnackbar(t('copiedToClipboard')); }}>
+                                    ${icon('copy')}
+                                  </button>
+                                </span>
+                              </div>
+                              <div class="detail-row">
+                                <span class="dlabel">${item.kind === 'tunnel' ? 'Target' : 'Bind'}</span>
+                                <span class="dval">${item.data.endpoint}</span>
+                              </div>
+                              ${item.kind === 'tunnel' && (item.data as import('../api/types').Tunnel).options?.hostname
+                                ? html`<div class="detail-row">
+                                  <span class="dlabel">Host Rewrite</span>
+                                  <span class="dval">${(item.data as import('../api/types').Tunnel).options.hostname}</span>
+                                </div>`
+                                : ''}
+                              ${item.data.error
+                                ? html`<div class="detail-row error"><span class="dlabel">Error</span><span class="dval error-text">${item.data.error}</span></div>`
+                                : ''}
+                            </div>
+                            <div class="expand-actions">
+                              ${item.data.status === 'running'
+                                ? html`
+                                  <button class="action-btn stop" @click=${(e: Event) => {
+                                    e.stopPropagation();
+                                    this._handleStop(item);
+                                  }}>■ ${t('btnStop')}</button>
+                                `
+                                : html`
+                                  <button class="action-btn start" @click=${(e: Event) => {
+                                    e.stopPropagation();
+                                    this._handleStart(item);
+                                  }}>▶ ${t('btnStart')}</button>
+                                `}
+                              <button class="action-btn" @click=${(e: Event) => {
+                                e.stopPropagation();
+                                this._navigate(detailPath + '?edit');
+                              }}>${icon('edit')} ${t('btnEdit')}</button>
+                              <button class="action-btn danger" @click=${(e: Event) => {
+                                e.stopPropagation();
+                                this._confirmDelete(item.kind, item.data.id, item.data.name);
+                              }}>${icon('trash')} ${t('btnDelete')}</button>
+                            </div>
+                          </div>
+                        `
+                        : ''}
+                    </div>
+                  `;
+                })}
               </div>
             `}
 
+        <!-- FAB -->
         <div slot="fab">
-          <button class="fab" @click=${() => this._navigate(fabPath)}>+</button>
+          <button class="fab" @click=${() => this._navigate(fabPath)}>
+            ${icon('plus')}
+          </button>
         </div>
       </app-scaffold>
+
+      ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
+
+      ${this._deleteTarget
+        ? html`
+          <div class="dialog-overlay" @click=${() => { this._deleteTarget = null; }}>
+            <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+              <div class="dialog-title">${t('deleteConfirmTitle')}</div>
+              <div class="dialog-message">${t('deleteConfirmMessage')}</div>
+              <div class="dialog-actions">
+                <button class="dialog-btn cancel" @click=${() => { this._deleteTarget = null; }}>
+                  ${t('btnCancel')}
+                </button>
+                <button class="dialog-btn danger" @click=${this._handleDelete}>
+                  ${t('btnDelete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        `
+        : ''}
     `;
   }
 }
