@@ -91,7 +91,7 @@ export class EntrypointDetailPage extends LitElement {
     this._name = ep.name;
     // ep.entrypoint is the local bind address (e.g. :8080)
     this._endpoint = ep.entrypoint;
-    this._tunnelId = ep.options.hostname ?? '';
+    this._tunnelId = ep.id ?? '';
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ export class EntrypointDetailPage extends LitElement {
         name: this._name.trim(),
         type: this.entrypointType,
         endpoint: this._endpoint.trim(),
-        hostname: this._tunnelId.trim() || undefined,
+        id: this._tunnelId.trim() || undefined,
       };
 
       if (this.mode === 'create') {
@@ -453,9 +453,9 @@ export class EntrypointDetailPage extends LitElement {
                 </div>
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
-                  <span class="info-value uuid">${ep.options.hostname ?? '—'}</span>
-                  ${ep.options.hostname
-                    ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(ep.options.hostname)}>
+                  <span class="info-value uuid">${ep.id ?? '—'}</span>
+                  ${ep.id
+                    ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(ep.id)}>
                       ${icon('copy')}
                     </button>`
                     : ''}

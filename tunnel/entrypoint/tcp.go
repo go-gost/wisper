@@ -55,10 +55,6 @@ func NewTCPEntryPoint(opts ...tunnel.Option) EntryPoint {
 	v := md5.Sum([]byte(options.ID))
 	endpoint := hex.EncodeToString(v[:8])
 
-	if options.Endpoint == "" {
-		options.Endpoint = "localhost:8000"
-	}
-
 	if options.Name == "" {
 		options.Name = endpoint
 	}
@@ -81,10 +77,10 @@ func (s *tcpEntryPoint) Name() string { return s.opts.Name }
 func (s *tcpEntryPoint) Endpoint() string {
 	return fmt.Sprintf("%s.%s", s.endpoint, tunnel.GetEndpointAddr())
 }
-func (s *tcpEntryPoint) Entrypoint() string { return s.opts.Endpoint }
+func (s *tcpEntryPoint) Entrypoint() string      { return s.opts.Endpoint }
 func (s *tcpEntryPoint) Options() tunnel.Options { return s.opts }
-func (s *tcpEntryPoint) Favorite(b bool)  { s.favorite.Store(b) }
-func (s *tcpEntryPoint) IsFavorite() bool { return s.favorite.Load() }
+func (s *tcpEntryPoint) Favorite(b bool)         { s.favorite.Store(b) }
+func (s *tcpEntryPoint) IsFavorite() bool        { return s.favorite.Load() }
 
 func (s *tcpEntryPoint) init() error {
 	tcpSvc := &config.ServiceConfig{

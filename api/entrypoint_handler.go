@@ -10,19 +10,19 @@ import (
 
 // entrypointCreateRequest is the JSON body for creating a new entrypoint.
 type entrypointCreateRequest struct {
-	Name      string `json:"name"`
+	ID        string `json:"id,omitempty"`
 	Type      string `json:"type"`
+	Name      string `json:"name"`
 	Endpoint  string `json:"endpoint"`
-	Hostname  string `json:"hostname,omitempty"`
 	Keepalive bool   `json:"keepalive,omitempty"`
 	TTL       int    `json:"ttl,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 	return []tunnel.Option{
+		tunnel.IDOption(r.ID),
 		tunnel.NameOption(r.Name),
 		tunnel.EndpointOption(r.Endpoint),
-		tunnel.HostnameOption(r.Hostname),
 		tunnel.KeepaliveOption(r.Keepalive),
 		tunnel.TTLOption(r.TTL),
 	}

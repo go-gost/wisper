@@ -55,10 +55,6 @@ func NewUDPEntryPoint(opts ...tunnel.Option) EntryPoint {
 	v := md5.Sum([]byte(options.ID))
 	endpoint := hex.EncodeToString(v[:8])
 
-	if options.Endpoint == "" {
-		options.Endpoint = "localhost:8000"
-	}
-
 	if options.Name == "" {
 		options.Name = endpoint
 	}
@@ -81,10 +77,10 @@ func (s *udpEntryPoint) Name() string { return s.opts.Name }
 func (s *udpEntryPoint) Endpoint() string {
 	return fmt.Sprintf("%s.%s", s.endpoint, tunnel.GetEndpointAddr())
 }
-func (s *udpEntryPoint) Entrypoint() string { return s.opts.Endpoint }
+func (s *udpEntryPoint) Entrypoint() string      { return s.opts.Endpoint }
 func (s *udpEntryPoint) Options() tunnel.Options { return s.opts }
-func (s *udpEntryPoint) Favorite(b bool)  { s.favorite.Store(b) }
-func (s *udpEntryPoint) IsFavorite() bool { return s.favorite.Load() }
+func (s *udpEntryPoint) Favorite(b bool)         { s.favorite.Store(b) }
+func (s *udpEntryPoint) IsFavorite() bool        { return s.favorite.Load() }
 
 func (s *udpEntryPoint) init() error {
 	udpSvc := &config.ServiceConfig{
