@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wisper Redesign — Interactive Prototype</title>
+<style>
+  :root {
+    --bg: #fafafa; --surface: #fff; --border: #e5e7eb; --border-subtle: #f3f4f6;
+    --text: #111827; --text-secondary: #6b7280; --text-muted: #9ca3af; --text-disabled: #d1d5db;
+    --green: #10b981; --green-bg: #ecfdf5; --green-border: #d1fae5; --green-text: #059669;
+    --red: #ef4444; --red-bg: #fef2f2; --red-border: #fecaca; --red-text: #dc2626;
+    --accent: #374151; --accent-fg: #fff; --input-bg: #fff; --input-border: #d1d5db;
+    --tab-active-bg: #e5e7eb; --tab-inactive: #9ca3af;
+    --danger-border: #fecaca; --danger-bg: #fef2f2;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px;
+  }
+  .dark {
+    --bg: #1a1a2e; --surface: #222240; --border: #3a3a5c; --border-subtle: #2a2a45;
+    --text: #e8e8f0; --text-secondary: #a0a0b8; --text-muted: #6e6e88; --text-disabled: #484860;
+    --green: #4ade80; --green-bg: #0d2818; --green-border: #1a4a2a; --green-text: #4ade80;
+    --red: #f87171; --red-bg: #2d1518; --red-border: #4a2025; --red-text: #f87171;
+    --accent: #818cf8; --accent-fg: #fff; --input-bg: #1e1e38; --input-border: #3a3a5c;
+    --tab-active-bg: #2a2a4a; --tab-inactive: #6e6e88;
+    --danger-border: #4a2025; --danger-bg: #2d1518;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: var(--font); background: #f0f0f0; display: flex; justify-content: center; align-items: flex-start; padding: 24px 16px; min-height: 100vh; }
+  body.dark-bg { background: #010409; }
+
+  .phone {
+    width: 400px; max-width: 100%; border: 1px solid var(--border); border-radius: 16px;
+    overflow: hidden; background: var(--bg); box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    display: flex; flex-direction: column; height: 760px; position: relative;
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .screen { display: none; flex-direction: column; flex: 1; overflow: hidden; animation: fadeIn 0.2s ease; }
+  .screen.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+  /* AppBar */
+  .appbar { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); gap: 8px; flex-shrink: 0; background: var(--bg); }
+  .appbar .back { color: var(--text-secondary); font-size: 14px; cursor: pointer; user-select: none; }
+  .appbar .back:hover { color: var(--text); }
+  .appbar .title { font-weight: 700; font-size: 18px; color: var(--text); flex:1; }
+  .appbar .actions { display: flex; gap: 10px; align-items: center; }
+  .appbar .actions span { cursor: pointer; font-size: 16px; color: var(--text-muted); user-select: none; }
+  .appbar .actions span:hover { color: var(--text); }
+  .logo { width:28px; height:28px; background:var(--accent); color:var(--accent-fg); border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+  .logo.lg { width:40px; height:40px; border-radius:10px; font-size:18px; }
+
+  /* Tabs */
+  .tabs { display: flex; padding: 8px 14px; gap: 4px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--bg); justify-content: center; }
+  .tab { padding: 5px 14px; border-radius: var(--radius-md); font-size: 15px; font-weight: 500; color: var(--tab-inactive); cursor: pointer; user-select: none; transition: all 0.15s; }
+  .tab.active { background: var(--tab-active-bg); color: var(--text); font-weight: 600; }
+  .tab:hover:not(.active) { color: var(--text-secondary); }
+  .fav-toggle { font-size: 14px; color: var(--text-disabled); cursor: pointer; user-select: none; padding: 4px 6px; border-radius: var(--radius-sm); transition: all 0.15s; }
+  .fav-toggle.active { color: #f59e0b; }
+  .row .speed { font-size:12px; color:var(--text-muted); text-align:right; flex-shrink:0; min-width:60px; line-height:1.4; display:none; font-family:var(--mono); }
+  .row.running-row .speed { display:block; }
+  .row .speed .total { color:var(--text-secondary); font-size:11px; }
+  @media (max-width:400px) { .row .speed { display:none !important; } }
+
+  /* Row */
+  .row { display: flex; align-items: center; padding: 10px 14px; gap: 10px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; user-select: none; transition: background 0.15s; }
+  .row:hover { background: var(--surface); }
+  .row.stopped { opacity: 0.5; }
+  .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; transition: box-shadow 0.3s; }
+  .dot.running { background: var(--green); box-shadow: 0 0 8px rgba(16,185,129,0.3); }
+  .dot.error   { background: var(--red);   box-shadow: 0 0 8px rgba(239,68,68,0.3); }
+  .dot.stopped { background: var(--text-muted); }
+  .row .info { flex:1; min-width:0; }
+  .row .info .name { font-weight:600; font-size:16px; color:var(--text); }
+  .row .info .meta { font-size:14px; color:var(--text-secondary); margin-top:1px; }
+  .badge { padding:3px 8px; border-radius:var(--radius-sm); font-size:12px; font-weight:600; }
+  .badge.running { background:var(--green-bg); color:var(--green-text); border:1px solid var(--green-border); }
+  .badge.error   { background:var(--red-bg);   color:var(--red-text);   border:1px solid var(--red-border); }
+  .badge.stopped { background:var(--surface);   color:var(--text-muted);  border:1px solid var(--border); }
+  .chevron { font-size:18px; color:var(--text-disabled); transition:transform 0.2s; padding:3px; cursor:pointer; font-weight:300; }
+  .chevron.open { transform: rotate(90deg); }
+
+  /* Expand panel */
+  .expand-panel { display:none; padding:12px 14px 14px 14px; background:var(--surface); border-bottom:1px solid var(--border); }
+  .expand-panel.open { display:block; }
+  .detail-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; }
+  .detail-row { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid var(--border-subtle); }
+  .detail-row:last-child { border-bottom:none; }
+  .detail-row .dlabel { color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+  .detail-row .dval { font-family:var(--mono); font-size:14px; color:var(--text); display:flex; align-items:center; gap:4px; }
+  .detail-row .dval .cp { color:var(--text-muted); cursor:pointer; font-size:12px; }
+  .detail-row.error { background:var(--red-bg); }
+  .detail-row.error .dval { color:var(--red-text); }
+  .expand-actions { display:flex; gap:6px; margin-top:8px; }
+  .btn { flex:1; padding:7px; font-size:14px; font-weight:600; border-radius:5px; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text); text-align:center; user-select:none; transition:all 0.15s; }
+  .btn:hover { opacity:0.8; }
+  .btn.start { color:var(--green); border-color:var(--green-border); background:var(--green-bg); }
+  .btn.danger { color:var(--red); border-color:var(--red-border); background:var(--red-bg); }
+
+  /* FAB */
+  .fab { position:absolute; bottom:20px; right:18px; width:38px; height:38px; border-radius:9px; background:var(--accent); color:var(--accent-fg); border:none; font-size:20px; font-weight:300; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 10px rgba(0,0,0,0.15); transition:all 0.2s; z-index:50; line-height:1; }
+  .fab:hover { transform:scale(1.06); }
+
+  /* Detail page */
+  .status-banner { margin:12px 14px; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:var(--radius-md); background:var(--green-bg); border:1px solid var(--green-border); }
+  .status-banner.err { background:var(--red-bg); border-color:var(--red-border); }
+  .status-banner .bdot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 6px rgba(16,185,129,0.3); flex-shrink:0; }
+  .status-banner.err .bdot { background:var(--red); box-shadow:0 0 6px rgba(239,68,68,0.3); }
+  .status-banner .btxt { font-weight:600; font-size:15px; color:var(--green-text); flex:1; }
+  .status-banner.err .btxt { color:var(--red-text); }
+  .status-banner .bact { padding:5px 12px; border-radius:var(--radius-sm); font-size:12px; font-weight:700; cursor:pointer; background:var(--surface); border:1px solid var(--red-border); color:var(--red-text); user-select:none; white-space:nowrap; }
+  .info-card { margin:0 14px 10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+  .info-row { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border-subtle); }
+  .info-row:last-child { border-bottom:none; }
+  .info-row .ilabel { color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+  .info-row .ivalue { font-size:15px; color:var(--text); display:flex; align-items:center; gap:4px; font-family:var(--mono); }
+  .stats-section { margin:0 14px 14px 14px; }
+  .sheading { font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px; margin-bottom:6px; font-weight:600; }
+  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .stat-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px; }
+  .stat-box .sl { font-size:12px; color:var(--text-muted); margin-bottom:4px; }
+  .stat-box .sv { font-size:20px; font-weight:700; color:var(--text); font-family:var(--mono); }
+  .stat-box .ss { font-size:11px; color:var(--green-text); margin-top:2px; }
+
+  /* Type select */
+  .type-list { padding:14px; display:flex; flex-direction:column; gap:8px; }
+  .type-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:14px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all 0.15s; user-select:none; }
+  .type-card:hover { border-color:var(--accent); }
+  .type-card .ticon { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .type-card .tname { font-weight:600; font-size:16px; color:var(--text); }
+  .type-card .tdesc { font-size:14px; color:var(--text-secondary); margin-top:2px; }
+  .type-card .tarrow { color:var(--text-disabled); font-size:18px; }
+
+  /* Form */
+  .form { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+  .fg label { display:block; font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px; margin-bottom:4px; font-weight:600; }
+  .fg input, .fg .readonly { width:100%; padding:8px 10px; background:var(--input-bg); border:1px solid var(--input-border); border-radius:5px; color:var(--text); font-size:15px; font-family:var(--mono); }
+  .fg input:focus { outline:none; border-color:var(--accent); }
+  .fg input::placeholder { color:var(--text-muted); }
+  .fg .readonly { background:var(--surface); border:1px solid var(--border-subtle); color:var(--text-muted); }
+
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; }
+  .toggle-label { font-size:14px; color:var(--text); }
+  .toggle-hint { font-size:12px; color:var(--text-muted); margin-top:1px; display:block; }
+  .toggle-switch { width:34px; height:20px; border-radius:10px; background:var(--border); cursor:pointer; position:relative; transition:background 0.2s; flex-shrink:0; }
+  .toggle-switch.on { background:var(--green); }
+  .toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:white; transition:transform 0.2s; }
+  .toggle-switch.on::after { transform:translateX(14px); }
+
+  /* Danger zone */
+  .danger-zone { margin:8px 14px 14px 14px; border:1px solid var(--danger-border); border-radius:var(--radius-md); overflow:hidden; flex-shrink:0; }
+  .dz-head { padding:8px 12px; background:var(--danger-bg); font-size:12px; text-transform:uppercase; color:var(--red-text); letter-spacing:0.5px; font-weight:600; }
+  .dz-body { padding:10px 12px; display:flex; align-items:center; justify-content:space-between; background:var(--surface); }
+  .dz-body span { font-size:15px; color:var(--text); }
+  .dz-body .dz-btn { padding:5px 12px; border-radius:var(--radius-sm); font-size:12px; font-weight:600; cursor:pointer; background:var(--danger-bg); color:var(--red-text); border:1px solid var(--danger-border); }
+
+  /* Overlay */
+  .overlay { display:none; position:absolute; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+  .overlay.show { display:flex; }
+  .dialog { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px; width:280px; box-shadow:0 8px 30px rgba(0,0,0,0.2); }
+  .dialog h3 { font-size:18px; margin-bottom:6px; color:var(--text); }
+  .dialog p { font-size:15px; color:var(--text-secondary); margin-bottom:16px; }
+  .dialog .dbuttons { display:flex; gap:8px; justify-content:flex-end; }
+  .dialog .dbuttons button { padding:8px 18px; border-radius:5px; font-size:14px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text); }
+  .dialog .dbuttons button.danger-btn { background:var(--red); color:#fff; border-color:var(--red); }
+
+  /* Snackbar */
+  .snackbar { position:absolute; top:12px; left:50%; transform:translateX(-50%) translateY(-80px); background:var(--accent); color:var(--accent-fg); padding:8px 18px; border-radius:20px; font-size:15px; font-weight:600; z-index:300; transition:transform 0.3s ease; white-space:nowrap; pointer-events:none; }
+  .snackbar.show { transform:translateX(-50%) translateY(0); }
+
+  /* Settings */
+  .settings-section { padding:12px 14px 6px 14px; }
+  .sect-title { font-size:12px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.5px; margin-bottom:8px; font-weight:600; }
+  .settings-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border-subtle); cursor:pointer; user-select:none; }
+  .settings-row:last-child { border-bottom:none; }
+  .settings-row .sr-label { font-size:14px; color:var(--text); }
+  .settings-row .sr-hint { font-size:12px; color:var(--text-muted); margin-top:1px; display:block; }
+  .settings-row .sr-arrow { color:var(--text-muted); font-size:14px; flex-shrink:0; }
+  .app-info { padding:16px 14px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border); }
+
+      /* Empty state */
+  .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 24px; text-align:center; }
+  .empty-state .empty-icon { width:48px; height:48px; border-radius:50%; background:var(--surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; margin-bottom:16px; color:var(--text-muted); }
+  .empty-state .empty-title { font-weight:600; font-size:15px; color:var(--text); margin-bottom:6px; }
+  .empty-state .empty-desc { font-size:13px; color:var(--text-secondary); margin-bottom:16px; max-width:240px; line-height:1.5; }
+  .empty-state .empty-action { padding:7px 18px; border-radius:var(--radius-md); font-size:13px; font-weight:600; background:var(--accent); color:var(--accent-fg); border:none; cursor:pointer; transition:opacity 0.15s; }
+  .empty-state .empty-action:hover { opacity:0.85; }
+  .empty-state .empty-sub { font-size:12px; color:var(--text-muted); margin-top:10px; }
+
+  /* Spinner / Loading */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn.loading, .bact.loading, .dz-btn.loading, .fab.loading { pointer-events: none; opacity: 0.5; }
+  .btn.loading::before, .bact.loading::before { content: ""; display: inline-block; width: 10px; height: 10px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 5px; }
+</style>
+</head>
+<body style="background:#f0f0f0" id="bodybg">
+<div class="phone" id="phone">
+
+  <!-- SCREEN 1: HOME -->
+  <div class="screen active" id="screen-home">
+    <div class="appbar">
+      <div class="logo">W</div><span class="title">Wisper</span>
+      <div class="actions"><span class="fav-toggle" id="favToggle"></span><span id="settingsBtn" style="cursor:pointer"></span></div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="tunnels">Tunnels</div>
+      <div class="tab" data-tab="entrypoints">Entrypoints</div>
+    </div>
+    <div class="scroll"><div class="list-rows" id="tunnelsList"></div><div class="list-rows" id="entrypointsList" style="display:none"></div></div>
+    <button class="fab" id="fabBtn">+</button>
+  </div>
+
+  <!-- SCREEN 2: TYPE SELECT -->
+  <div class="screen" id="screen-type-select">
+    <div class="appbar"><span class="back"></span><span class="title" id="typeSelectTitle">New Tunnel</span></div>
+    <div class="scroll"><div class="type-list" id="typeList"></div></div>
+  </div>
+
+  <!-- SCREEN 3: DETAIL -->
+  <div class="screen" id="screen-detail">
+    <div class="appbar">
+      <span class="back"></span><span class="title" id="detailTitle">Tunnel</span>
+      <div class="actions"><span id="detailFav"></span><span id="detailDeleteBtn"></span></div>
+    </div>
+    <div class="scroll" id="detailScroll"></div>
+    <div style="padding:10px 14px 14px 14px;flex-shrink:0">
+      <div class="btn" style="width:100%;padding:8px" id="detailEditBtn">Edit</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: EDIT -->
+  <div class="screen" id="screen-edit">
+    <div class="appbar">
+      <span class="back"></span><span class="title" id="editTitle">Edit</span>
+      <div class="actions"><span style="color:#58a6ff;font-weight:600;font-size:10px;cursor:pointer" id="editSaveBtn">Save</span></div>
+    </div>
+    <div class="scroll" id="editScroll"></div>
+    <div id="editDangerZone"></div>
+  </div>
+
+  <!-- SCREEN 5: SETTINGS -->
+  <div class="screen" id="screen-settings">
+    <div class="appbar"><span class="back"></span><span class="title">Settings</span></div>
+    <div class="scroll" id="settingsScroll"></div>
+  </div>
+
+  <!-- OVERLAYS -->
+  <div class="overlay" id="deleteOverlay">
+    <div class="dialog">
+      <h3 id="deleteTitle">Delete?</h3>
+      <p id="deleteMsg">This action cannot be undone.</p>
+      <div class="dbuttons">
+        <button id="deleteCancelBtn">Cancel</button>
+        <button class="danger-btn" id="deleteConfirmBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+  <div class="snackbar" id="snackbar"></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+  var T = document.getElementById.bind(document);
+  var phone = T('phone');
+  var snackbar = T('snackbar');
+  var snackTimer;
+
+  // DATA
+  var tunnels = [
+    {id:'a1b2c3d4-e5f6-7890-abcd-ef1234567890',name:'api-gateway',type:'http',status:'running',entrypoint:'api-8f3a.gost.run',target:'localhost:3000',hostRewrite:'api.example.com',enableTLS:false,username:'admin',password:'secret',conns:12,totalConns:'1.2k',down:'8.7 MB',downRate:'1.2 MB/s',up:'1.2 MB',upRate:'240 KB/s',fav:true},
+    {id:'b2c3d4e5-f6a7-8901-bcde-f12345678901',name:'db-tunnel',type:'tcp',status:'error',entrypoint:'db-c91a.gost.run',target:'localhost:5432',error:'connect: connection refused',conns:0,totalConns:'45',fav:false},
+    {id:'c3d4e5f6-a7b8-9012-cdef-123456789012',name:'old-proxy',type:'tcp',status:'stopped',entrypoint:'old-f72b.gost.run',target:'localhost:9090',conns:0,totalConns:'89',fav:false},
+    {id:'d4e5f6a7-b8c9-0123-defa-234567890123',name:'docs-server',type:'file',status:'running',entrypoint:'docs-e81d.gost.run',target:'/home/docs',fileUpload:false,conns:3,totalConns:'320',down:'42 MB',downRate:'580 KB/s',up:'0 B',upRate:'0 B/s',fav:true}
+  ];
+  var entrypoints = [
+    {id:'e5f6a7b8-c9d0-1234-efab-345678901234',name:'local-8080',type:'tcp',status:'running',entrypoint:':8080',target:'8f3a.gost.run',tunnelId:'a1b2c3d4-e5f6-7890-abcd-ef1234567890',tunnelName:'api-gateway',conns:5,totalConns:'210',down:'3.1 MB',downRate:'110 KB/s',up:'8.7 MB',upRate:'420 KB/s',fav:false},
+    {id:'f6a7b8c9-d0e1-2345-fabc-456789012345',name:'dns-proxy',type:'udp',status:'stopped',entrypoint:':5353',target:'c91a.gost.run',tunnelId:'a1b2c3d4-e5f6-7890-abcd-ef1234567890',tunnelName:'api-gateway',conns:0,totalConns:'15',fav:false}
+  ];
+  var curTab = 'tunnels', showFavs = false, expandedRow = null, selItem = null, selType = 'tunnel', delId = null;
+
+  function toast(m) {
+    snackbar.textContent = m;
+    snackbar.classList.add('show');
+    clearTimeout(snackTimer);
+    snackTimer = setTimeout(function(){snackbar.classList.remove('show');},1800);
+  }
+
+  // Loading state helper — shows spinner on button, calls cb after ms
+  function setLoading(el, ms, cb) {
+    if (!el || el.classList.contains('loading')) return;
+    el.classList.add('loading');
+    el.disabled = true;
+    setTimeout(function () {
+      el.classList.remove('loading');
+      el.disabled = false;
+      if (cb) cb();
+    }, ms);
+  }
+
+  function copyText(t) {
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(function(){toast('Copied!');});
+    else toast('Copied: '+t);
+  }
+
+  function switchScreen(id) {
+    document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
+    T('screen-'+id).classList.add('active');
+  }
+
+  function goHome() { expandedRow=null; selItem=null; switchScreen('home'); renderList(); }
+  function goBack() {
+    var cur = document.querySelector('.screen.active');
+    if (cur.id === 'screen-edit' && selItem && selItem.id !== 'new') {
+      switchScreen('detail'); renderDetail(selItem.id);
+    } else { goHome(); }
+  }
+
+  function goDetail(id) {
+    var items = curTab==='tunnels'?tunnels:entrypoints;
+    var it = items.filter(function(i){return i.id===id;})[0];
+    if (!it) return;
+    switchScreen('detail'); renderDetail(id);
+  }
+
+  function goEdit() {
+    if (!selItem) return;
+    switchScreen('edit');
+    if (selItem.id==='new') renderCreateForm(selItem.type);
+    else renderEdit(selItem.id);
+  }
+
+  function goCreate() {
+    selType = curTab==='entrypoints'?'entrypoint':'tunnel';
+    switchScreen('type-select'); renderTypeSelect();
+  }
+
+  function goCreateForm(type) {
+    selType = T('typeSelectTitle').textContent.indexOf('Entrypoint')>=0?'entrypoint':'tunnel';
+    switchScreen('edit'); renderCreateForm(type);
+  }
+
+  function switchTab(tab) {
+    curTab=tab; expandedRow=null; selItem=null; showFavs=false;
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+    document.querySelector('[data-tab="'+tab+'"]').classList.add('active');
+    T('favToggle').classList.remove('active');
+    renderList();
+  }
+
+  function toggleFavs() {
+    showFavs=!showFavs; expandedRow=null;
+    T('favToggle').innerHTML = svgIcon(showFavs?'star-filled':'star');
+    T('favToggle').classList.toggle('active',showFavs);
+    renderList();
+  }
+
+  function toggleExpand(id) {
+    expandedRow = expandedRow===id?null:id; renderList();
+  }
+
+  // ===== SVG ICONS =====
+  function svgIcon(name) {
+    var s = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+    switch(name) {
+      case 'chevron-left':  return s+'<polyline points="15 18 9 12 15 6"/></svg>';
+      case 'chevron-right': return s+'<polyline points="9 18 15 12 9 6"/></svg>';
+      case 'chevron-down':  return s+'<polyline points="6 9 12 15 18 9"/></svg>';
+      case 'star':          return s+'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+      case 'star-filled':   return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+      case 'settings':      return s+'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+      case 'trash':         return s+'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+      case 'copy':          return s+'<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      case 'folder':        return s+'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+      case 'globe':         return s+'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+      case 'link':          return s+'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+      case 'broadcast':     return s+'<circle cx="12" cy="12" r="1"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>';
+      default: return '';
+    }
+  }
+
+  // ===== RENDER LIST =====
+  function renderList() {
+    var items = curTab==='tunnels'?tunnels:entrypoints;
+    var filtered = showFavs?items.filter(function(i){return i.fav;}):items;
+    var cid = curTab==='tunnels'?'tunnelsList':'entrypointsList';
+    var oid = curTab==='tunnels'?'entrypointsList':'tunnelsList';
+    T(oid).style.display='none';
+    var c = T(cid); c.style.display='block'; c.innerHTML='';
+
+    if (filtered.length === 0) {
+      var isTunnel = curTab==='tunnels';
+      var allEmpty = items.length === 0;
+      var h = '<div class="empty-state">';
+      if (showFavs) {
+        h += '<div class="empty-icon">'+svgIcon('star')+'</div>';
+        h += '<div class="empty-title">No favorites yet</div>';
+        h += '<div class="empty-desc">Tap the '+svgIcon('star')+' on any '+(isTunnel?'tunnel':'entrypoint')+' to add it to your favorites.</div>';
+        h += '<div class="empty-sub" onclick="app.toggleFavs()">Show all '+(isTunnel?'tunnels':'entrypoints')+'</div>';
+      } else if (isTunnel) {
+        h += '<div class="empty-icon">'+svgIcon('link')+'</div>';
+        h += '<div class="empty-title">No tunnels yet</div>';
+        h += '<div class="empty-desc">Create your first tunnel to expose a local service to the internet.</div>';
+        h += '<button class="empty-action" onclick="app.goCreate()">Create Tunnel</button>';
+      } else {
+        h += '<div class="empty-icon">'+svgIcon('broadcast')+'</div>';
+        h += '<div class="empty-title">No entrypoints yet</div>';
+        h += '<div class="empty-desc">Create an entrypoint to forward traffic from a tunnel to a local port.</div>';
+        h += '<button class="empty-action" onclick="app.goCreate()">Create Entrypoint</button>';
+      }
+      h += '</div>';
+      c.innerHTML = h;
+    } else {
+    filtered.forEach(function(it){
+      var exp = expandedRow===it.id;
+      var meta = it.type.toUpperCase();
+      if (it.status==='running') meta += ' · '+it.conns+' conns';
+      else if (it.status==='error') meta += ' · tap to view';
+      else meta += ' · stopped';
+
+      var h = '';
+      h += '<div class="row'+(it.status==='stopped'?' stopped':'')+(it.status==='running'?' running-row':'')+'" data-id="'+it.id+'" onclick="app.goDetail(\''+it.id+'\')">';
+      h += '<div class="dot '+it.status+'"></div>';
+      h += '<div class="info"><div class="name">'+it.name+'</div><div class="meta">'+meta+'</div></div>';
+      if (it.status==='running') {
+        h += '<div class="speed"><div><span class="total">'+it.up+'</span> ↑ '+it.upRate+'</div><div><span class="total">'+it.down+'</span> ↓ '+it.downRate+'</div></div>';
+      } else {
+        h += '<div class="speed"></div>';
+      }
+      h += '<div class="chevron'+(exp?' open':'')+'" onclick="event.stopPropagation();app.toggleExpand(\''+it.id+'\')">'+svgIcon('chevron-right')+'</div>';
+      h += '</div>';
+
+      if (exp) {
+        h += '<div class="expand-panel open">';
+        h += '<div class="detail-card">';
+        h += '<div class="detail-row"><span class="dlabel">Entrypoint</span><span class="dval">'+it.entrypoint+' <span class="cp" onclick="app.copyText(\''+it.entrypoint+'\')">'+svgIcon('copy')+'</span></span></div>';
+        h += '<div class="detail-row"><span class="dlabel">Target</span><span class="dval">'+it.target+'</span></div>';
+        if (it.hostRewrite) h += '<div class="detail-row"><span class="dlabel">Host Rewrite</span><span class="dval">'+it.hostRewrite+'</span></div>';
+        if (it.error) h += '<div class="detail-row error"><span class="dlabel">Error</span><span class="dval">'+it.error+'</span></div>';
+        h += '</div>';
+        h += '<div class="expand-actions">';
+        if (it.status==='running') h += '<div class="btn danger" onclick="app.stopItem(\''+it.id+'\')">Stop</div>';
+        else h += '<div class="btn start" onclick="app.startItem(\''+it.id+'\')">Start</div>';
+        h += '<div class="btn" onclick="app.goDetail(\''+it.id+'\');setTimeout(function(){app.goEdit();},100)">Edit</div>';
+        h += '<div class="btn danger" onclick="app.deleteItem(\''+it.id+'\')">Delete</div>';
+        h += '</div></div>';
+      }
+      c.innerHTML += h;
+    });
+    }
+
+  }
+
+  // ===== RENDER TYPE SELECT =====
+  function renderTypeSelect() {
+    var types = selType==='tunnel'?[
+      {type:'file',icon:'folder',name:'File Server',desc:'Share a local directory over HTTPS',bg:'#ecfdf5',fg:'#059669'},
+      {type:'http',icon:'globe',name:'HTTP Tunnel',desc:'Forward HTTP traffic to a local web server',bg:'#eff6ff',fg:'#3b82f6'},
+      {type:'tcp',icon:'link',name:'TCP Tunnel',desc:'Expose any TCP service through the tunnel',bg:'#fef2f2',fg:'#dc2626'},
+      {type:'udp',icon:'broadcast',name:'UDP Tunnel',desc:'Forward UDP datagrams through the tunnel',bg:'#fefce8',fg:'#d97706'}
+    ]:[
+      {type:'tcp',icon:'link',name:'TCP Entrypoint',desc:'Listen locally and forward through tunnel',bg:'#fef2f2',fg:'#dc2626'},
+      {type:'udp',icon:'broadcast',name:'UDP Entrypoint',desc:'Forward UDP through an existing tunnel',bg:'#fefce8',fg:'#d97706'}
+    ];
+    T('typeSelectTitle').textContent = selType==='tunnel'?'New Tunnel':'New Entrypoint';
+    T('typeList').innerHTML = types.map(function(t){
+      return '<div class="type-card" onclick="app.goCreateForm(\''+t.type+'\')">'+
+        '<div class="ticon" style="background:'+t.bg+';color:'+t.fg+'">'+svgIcon(t.icon)+'</div>'+
+        '<div style="flex:1"><div class="tname">'+t.name+'</div><div class="tdesc">'+t.desc+'</div></div>'+
+        '<span class="tarrow">'+svgIcon('chevron-right')+'</span></div>';
+    }).join('');
+  }
+
+  // ===== RENDER DETAIL =====
+  function renderDetail(id) {
+    var items = curTab==='tunnels'?tunnels:entrypoints;
+    var it = items.filter(function(i){return i.id===id;})[0];
+    if (!it) return; selItem = it;
+    T('detailTitle').textContent = it.name;
+    T('detailFav').innerHTML = svgIcon(it.fav?'star-filled':'star');
+    T('detailFav').style.color = it.fav?'#f59e0b':'';
+    T('detailDeleteBtn').innerHTML = svgIcon('trash');
+
+    var h = '';
+    h += '<div class="status-banner'+(it.status==='error'?' err':'')+'">';
+    h += '<div class="bdot"></div>';
+    var btxt = it.status==='running'?'Running · '+it.conns+' active connections':it.status==='error'?'Error · '+(it.error||''):'Service is stopped';
+    h += '<span class="btxt">'+btxt+'</span>';
+    if (it.status==='running') h += '<div class="bact" onclick="app.stopItem(\''+it.id+'\')">Stop</div>';
+    else if (it.status==='error'||it.status==='stopped') h += '<div class="bact" style="color:var(--green);border-color:var(--green-border);background:var(--green-bg)" onclick="app.startItem(\''+it.id+'\')">Start</div>';
+    h += '</div>';
+
+    var isT = curTab==='tunnels';
+    h += '<div class="info-card">';
+    if (isT) {
+      h += '<div class="info-row"><span class="ilabel">Type</span><span class="ivalue">'+it.type.toUpperCase()+' Tunnel</span></div>';
+      h += '<div class="info-row"><span class="ilabel">Target</span><span class="ivalue">'+it.target+'</span></div>';
+      h += '<div class="info-row"><span class="ilabel">Entrypoint</span><span class="ivalue">'+it.entrypoint+' <span style="color:var(--text-muted);cursor:pointer;font-family:inherit" onclick="app.copyText(\''+it.entrypoint+'\')">'+svgIcon('copy')+'</span></span></div>';
+      if (it.hostRewrite) h += '<div class="info-row"><span class="ilabel">Host Rewrite</span><span class="ivalue">'+it.hostRewrite+'</span></div>';
+      if (it.type==='http' && it.enableTLS !== undefined) h += '<div class="info-row"><span class="ilabel">TLS</span><span class="ivalue" style="font-family:inherit;font-size:10px">'+(it.enableTLS?'Enabled':'Disabled')+'</span></div>';
+      if (it.username) h += '<div class="info-row"><span class="ilabel">Auth</span><span class="ivalue" style="font-family:inherit;font-size:10px">Basic · '+it.username+'</span></div>';
+      if (it.type==='file' && it.fileUpload !== undefined) h += '<div class="info-row"><span class="ilabel">Upload</span><span class="ivalue" style="font-family:inherit;font-size:10px">'+(it.fileUpload?'Enabled':'Disabled')+'</span></div>';
+      h += '<div class="info-row"><span class="ilabel">ID</span><span class="ivalue" style="font-size:12px">'+it.id+' <span style="color:var(--text-muted);cursor:pointer;font-family:inherit" onclick="app.copyText(\''+it.id+'\')">'+svgIcon('copy')+'</span></span></div>';
+    } else {
+      h += '<div class="info-row"><span class="ilabel">Type</span><span class="ivalue">'+it.type.toUpperCase()+' Entrypoint</span></div>';
+      h += '<div class="info-row"><span class="ilabel">Tunnel ID</span><span class="ivalue" style="font-size:12px">'+(it.tunnelId||'a1b2c3d4-e5f6-7890-abcd-ef1234567890')+' <span style="color:var(--text-muted);cursor:pointer;font-family:inherit" onclick="app.copyText(\''+(it.tunnelId||'a1b2c3d4-e5f6-7890-abcd-ef1234567890')+'\')">'+svgIcon('copy')+'</span></span></div>';
+      h += '<div class="info-row"><span class="ilabel">Name</span><span class="ivalue" style="font-family:inherit">'+it.name+'</span></div>';
+      h += '<div class="info-row"><span class="ilabel">Bind Address</span><span class="ivalue">'+it.target+'</span></div>';
+      h += '<div class="info-row"><span class="ilabel">Entrypoint</span><span class="ivalue">'+it.entrypoint+' <span style="color:var(--text-muted);cursor:pointer;font-family:inherit" onclick="app.copyText(\''+it.entrypoint+'\')">'+svgIcon('copy')+'</span></span></div>';
+    }
+    if (it.error) h += '<div class="info-row" style="background:var(--red-bg)"><span class="ilabel">Error</span><span class="ivalue" style="color:var(--red-text)">'+it.error+'</span></div>';
+    h += '</div>';
+
+    if (it.status==='running') {
+      h += '<div class="stats-section"><div class="sheading">Live Stats</div><div class="stats-grid">';
+      h += '<div class="stat-box"><div class="sl">Current Conns</div><div class="sv">'+it.conns+'</div><div class="ss">+2 /min</div></div>';
+      h += '<div class="stat-box"><div class="sl">Total Conns</div><div class="sv">'+it.totalConns+'</div><div class="ss" style="color:var(--text-muted)">all time</div></div>';
+      h += '<div class="stat-box"><div class="sl">Download</div><div class="sv" style="font-size:13px">'+it.down+'</div><div class="ss">'+it.downRate+'</div></div>';
+      h += '<div class="stat-box"><div class="sl">Upload</div><div class="sv" style="font-size:13px">'+it.up+'</div><div class="ss">'+it.upRate+'</div></div>';
+      h += '</div></div>';
+    }
+    T('detailScroll').innerHTML = h;
+  }
+
+  // ===== RENDER EDIT =====
+  function renderEdit(id) {
+    var items = curTab==='tunnels'?tunnels:entrypoints;
+    var it = items.filter(function(i){return i.id===id;})[0];
+    if (!it) return; selItem = it;
+    var isT = curTab==='tunnels';
+    T('editTitle').textContent = 'Edit '+it.name;
+
+    var h = '<div class="form">';
+    h += '<div class="fg"><label>Type</label><div class="readonly">'+it.type.toUpperCase()+' '+(isT?'Tunnel':'Entrypoint')+'</div></div>';
+    if (!isT) {
+      h += '<div class="fg"><label>Tunnel ID</label><div class="readonly">'+(it.tunnelId||'a1b2c3d4-e5f6-7890-abcd-ef1234567890')+'</div></div>';
+    }
+    h += '<div class="fg"><label>Name</label><input id="editName" value="'+it.name+'"></div>';
+    h += '<div class="fg"><label>'+(isT?'Target':'Bind Address')+'</label><input id="editTarget" value="'+it.target+'"></div>';
+    if (isT && (it.type==='http'||it.type==='file')) {
+      h += '<div class="fg"><label>Hostname (optional)</label><input id="editHostname" value="'+(it.hostRewrite||'')+'" placeholder="e.g. api.example.com"></div>';
+    }
+    if (isT && it.type==='http') {
+      h += '<div class="toggle-row"><div><span class="toggle-label">Enable TLS</span><span class="toggle-hint">Connect to target over HTTPS</span></div><div class="toggle-switch'+(it.enableTLS?' on':'')+'" id="tlsToggle"></div></div>';
+    }
+    if (isT && (it.type==='http'||it.type==='file')) {
+      h += '<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:10px">';
+      h += '<div style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin-bottom:8px;font-weight:600">Authentication (optional)</div>';
+      h += '<div class="fg"><label>Username</label><input id="editUsername" value="'+(it.username||'')+'" placeholder="Basic auth username"></div>';
+      h += '<div class="fg"><label>Password</label><input id="editPassword" type="password" value="'+(it.password||'')+'" placeholder="Basic auth password"></div>';
+      h += '</div>';
+    }
+    if (isT && it.type==='file') {
+      h += '<div class="toggle-row"><div><span class="toggle-label">File Upload</span><span class="toggle-hint">Allow PUT/write access to the directory</span></div><div class="toggle-switch'+(it.fileUpload?' on':'')+'" id="uploadToggle"></div></div>';
+    }
+    h += '</div>';
+    T('editScroll').innerHTML = h;
+
+    T('editDangerZone').innerHTML =
+      '<div class="danger-zone"><div class="dz-head">Danger Zone</div>'+
+      '<div class="dz-body"><span>Delete this '+(isT?'tunnel':'entrypoint')+'</span>'+
+      '<button class="dz-btn" onclick="app.deleteItem(\''+it.id+'\')">Delete</button></div></div>';
+  }
+
+  // ===== RENDER CREATE FORM =====
+  function renderCreateForm(type) {
+    selItem = {id:'new',name:'',type:type,target:'',entrypoint:'',conns:0,totalConns:'0',down:'0 B',downRate:'0 B/s',up:'0 B',upRate:'0 B/s',fav:false,status:'stopped'};
+    var isT = selType==='tunnel';
+    T('editTitle').textContent = 'New '+type.toUpperCase()+' '+(isT?'Tunnel':'Entrypoint');
+
+    var h = '<div class="form">';
+    h += '<div class="fg"><label>Type</label><div class="readonly">'+type.toUpperCase()+' '+(isT?'Tunnel':'Entrypoint')+'</div></div>';
+    if (!isT) {
+      h += '<div class="fg"><label>Tunnel ID</label><input id="editTunnelId" placeholder="Paste a tunnel UUID"></div>';
+    }
+    h += '<div class="fg"><label>Name</label><input id="editName" placeholder="My '+type.toUpperCase()+'"></div>';
+    h += '<div class="fg"><label>'+(isT?'Target':'Bind Address')+'</label><input id="editTarget" placeholder="'+(isT?'localhost:3000':':8080')+'"></div>';
+    if (isT && (type==='http'||type==='file')) {
+      h += '<div class="fg"><label>Hostname (optional)</label><input id="editHostname" placeholder="e.g. api.example.com"></div>';
+    }
+    if (isT && type==='http') {
+      h += '<div class="toggle-row"><div><span class="toggle-label">Enable TLS</span><span class="toggle-hint">Connect to target over HTTPS</span></div><div class="toggle-switch" id="tlsToggle"></div></div>';
+    }
+    if (isT && (type==='http'||type==='file')) {
+      h += '<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:10px">';
+      h += '<div style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin-bottom:8px;font-weight:600">Authentication (optional)</div>';
+      h += '<div class="fg"><label>Username</label><input id="editUsername" placeholder="Basic auth username"></div>';
+      h += '<div class="fg"><label>Password</label><input id="editPassword" type="password" placeholder="Basic auth password"></div>';
+      h += '</div>';
+    }
+    if (isT && type==='file') {
+      h += '<div class="toggle-row"><div><span class="toggle-label">File Upload</span><span class="toggle-hint">Allow PUT/write access to the directory</span></div><div class="toggle-switch" id="uploadToggle"></div></div>';
+    }
+    h += '</div>';
+    T('editScroll').innerHTML = h;
+    T('editDangerZone').innerHTML = '';
+  }
+
+  // ===== RENDER SETTINGS =====
+  function renderSettings() {
+    T('settingsScroll').innerHTML =
+      '<div class="app-info">'+
+        '<div class="logo lg">W</div>'+
+        '<div><div style="font-weight:700;font-size:12px;color:var(--text)">Wisper</div>'+
+        '<div style="font-size:13px;color:var(--text-secondary);margin-top:2px">v1.0.0 · GOST Tunnel Manager</div></div>'+
+      '</div>'+
+
+      '<div class="settings-section">'+
+        '<div class="sect-title">Server Configuration</div>'+
+        '<div class="fg" style="margin-bottom:8px"><label>Tunnel Server</label><input id="cfgServer" value="tunnel.gost.run"></div>'+
+        '<div class="fg" style="margin-bottom:8px"><label>Entrypoint Domain</label><input id="cfgEntrypoint" value="gost.run"></div>'+
+        '<div class="toggle-row">'+
+          '<div><span class="toggle-label">Skip TLS Verify</span><span class="toggle-hint">Allow self-signed certificates</span></div>'+
+          '<div class="toggle-switch" id="tlsToggle"></div>'+
+        '</div>'+
+        '<div style="text-align:right;margin-top:6px">'+
+          '<button class="btn" style="padding:6px 16px;font-size:10px" onclick="app.saveSettings()">Save Settings</button>'+
+        '</div>'+
+      '</div>'+
+
+      '<div class="settings-section">'+
+        '<div class="sect-title">Preferences</div>'+
+        '<div class="settings-row" id="langRow">'+
+          '<div><div class="sr-label">Language</div><span class="sr-hint" id="langHint">English</span></div>'+
+          '<span class="sr-arrow">'+svgIcon('chevron-right')+'</span>'+
+        '</div>'+
+        '<div class="settings-row" id="themeRow">'+
+          '<div><div class="sr-label">Theme</div><span class="sr-hint" id="themeHint">System</span></div>'+
+          '<span class="sr-arrow">'+svgIcon('chevron-right')+'</span>'+
+        '</div>'+
+      '</div>';
+
+    // Language cycling
+    var langs = ['English','中文'], langI = 0;
+    T('langRow').onclick = function(){
+      langI=(langI+1)%2;
+      T('langHint').textContent = langs[langI];
+      toast('Language: '+langs[langI]);
+    };
+
+    // Theme cycling
+    var themes = ['System','Dark','Light'], themeI = 0;
+    T('themeRow').onclick = function(){
+      themeI=(themeI+1)%3;
+      T('themeHint').textContent = themes[themeI];
+      if (themeI===0) applyTheme('system');
+      else if (themeI===1) applyTheme('dark');
+      else applyTheme('light');
+      toast('Theme: '+themes[themeI]);
+    };
+
+    // TLS toggle
+    T('tlsToggle').onclick = function(){ this.classList.toggle('on'); };
+  }
+
+  // ===== SETTINGS SAVE =====
+  function saveSettings() {
+    var srv = T('cfgServer').value;
+    var ep = T('cfgEntrypoint').value;
+    if (!srv.trim() || !ep.trim()) { toast('Server and domain required'); return; }
+    toast('Saving settings...');
+    setTimeout(function(){
+      toast('Settings saved \u00b7 restarting tunnels...');
+    }, 600);
+  }
+
+  // ===== ACTIONS =====
+  function deleteItem(id) {
+    delId = id;
+    var items = curTab==='tunnels'?tunnels:entrypoints;
+    var it = items.filter(function(i){return i.id===id;})[0];
+    T('deleteTitle').textContent = 'Delete '+(it?it.name:'item')+'?';
+    T('deleteMsg').textContent = 'This action cannot be undone. All tunnel data will be permanently removed.';
+    T('deleteOverlay').classList.add('show');
+  }
+  function showDeleteDialog() { if(selItem) deleteItem(selItem.id); }
+  function hideDeleteDialog() { T('deleteOverlay').classList.remove('show'); delId=null; }
+
+  function confirmDelete() {
+    if (!delId) return;
+    T('deleteConfirmBtn').classList.add('loading');
+    T('deleteConfirmBtn').disabled = true;
+    setTimeout(function(){
+      var arr = curTab==='tunnels'?tunnels:entrypoints;
+      var idx = -1, name = '';
+      for(var i=0;i<arr.length;i++){ if(arr[i].id===delId){ idx=i; name=arr[i].name; break; } }
+      if(idx>=0) arr.splice(idx,1);
+      T('deleteOverlay').classList.remove('show');
+      T('deleteConfirmBtn').classList.remove('loading');
+      T('deleteConfirmBtn').disabled = false;
+      delId=null; expandedRow=null; selItem=null;
+      toast(name+' deleted');
+      renderList(); goHome();
+    }, 500);
+  }
+
+  function startItem(id) {
+    toast('Starting...');
+    setTimeout(function(){
+      var arr = curTab==='tunnels'?tunnels:entrypoints;
+      for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ arr[i].status='running'; arr[i].error=null; break; } }
+      if(selItem&&selItem.id===id) selItem.status='running';
+      toast('Started');
+      renderList();
+      if(T('screen-detail').classList.contains('active')) renderDetail(id);
+    }, 700);
+  }
+
+  function stopItem(id) {
+    toast('Stopping...');
+    setTimeout(function(){
+      var arr = curTab==='tunnels'?tunnels:entrypoints;
+      for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ arr[i].status='stopped'; break; } }
+      if(selItem&&selItem.id===id) selItem.status='stopped';
+      toast('Stopped');
+      renderList();
+      if(T('screen-detail').classList.contains('active')) renderDetail(id);
+    }, 600);
+  }
+
+  function saveEdit() {
+    var nameEl = T('editName');
+    var name = nameEl?nameEl.value:'';
+    if (!name.trim()){ toast('Name is required'); nameEl&&nameEl.focus(); return; }
+    toast('Saving...');
+    setTimeout(function(){
+      if (selItem) selItem.name = name;
+      toast('Saved');
+      renderList();
+      if (selItem && selItem.id!=='new') goDetail(selItem.id);
+      else goHome();
+    }, 500);
+  }
+
+  function toggleDetailFav() {
+    if(!selItem) return;
+    selItem.fav=!selItem.fav;
+    T('detailFav').innerHTML = svgIcon(selItem.fav?'star-filled':'star');
+    T('detailFav').style.color = selItem.fav?'#f59e0b':'';
+    toast(selItem.fav?'Added to favorites':'Removed from favorites');
+    renderList();
+  }
+
+  // ===== THEME =====
+  function applyTheme(mode) {
+    if (mode==='dark') { phone.classList.add('dark'); T('bodybg').classList.add('dark-bg'); }
+    else if (mode==='light') { phone.classList.remove('dark'); T('bodybg').classList.remove('dark-bg'); }
+    else {
+      var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyTheme(isDark?'dark':'light');
+    }
+  }
+
+  // ===== EVENT BINDINGS =====
+  T('settingsBtn').addEventListener('click',function(){ switchScreen('settings'); renderSettings(); });
+  T('fabBtn').addEventListener('click',goCreate);
+  T('favToggle').addEventListener('click',toggleFavs);
+  T('detailFav').addEventListener('click',toggleDetailFav);
+  T('detailDeleteBtn').addEventListener('click',showDeleteDialog);
+  T('detailEditBtn').addEventListener('click',goEdit);
+  T('editSaveBtn').addEventListener('click',saveEdit);
+  T('deleteCancelBtn').addEventListener('click',hideDeleteDialog);
+  T('deleteConfirmBtn').addEventListener('click',confirmDelete);
+  T('deleteOverlay').addEventListener('click',function(e){if(e.target===this)hideDeleteDialog();});
+
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click',function(){switchTab(this.dataset.tab);});
+  });
+  document.querySelectorAll('.appbar .back').forEach(function(b){
+    b.addEventListener('click',goBack);
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){
+      if(T('deleteOverlay').classList.contains('show')) hideDeleteDialog();
+      else goHome();
+    }
+  });
+
+  // Expose to onclick handlers
+  window.app = {
+    goHome:goHome, goDetail:goDetail, goEdit:goEdit, goCreate:goCreate,
+    goCreateForm:goCreateForm, toggleExpand:toggleExpand,
+    startItem:startItem, stopItem:stopItem, deleteItem:deleteItem,
+    copyText:copyText, saveSettings:saveSettings
+  };
+
+  // INIT
+  applyTheme('system');
+  renderList();
+  T('favToggle').innerHTML = svgIcon('star');
+  T('settingsBtn').innerHTML = svgIcon('settings');
+  document.querySelectorAll('.appbar .back').forEach(function(b){ b.innerHTML = svgIcon('chevron-left'); });
+})();
+</script>
+</body>
+</html>
