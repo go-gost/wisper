@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BxnSyTkH.js","assets/index-BIEgSipt.css"])))=>i.map(i=>d[i]);
-import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b as s,i as S,t as D}from"./index-BxnSyTkH.js";import{n as m,r}from"./state-Bzr_HZxS.js";import{i as p}from"./app-scaffold-8MQz_NNd.js";import{c as z}from"./clipboard-C3x8_sid.js";import{b as h,a as b,f}from"./format-Dx8b12gY.js";var E=Object.defineProperty,C=Object.getOwnPropertyDescriptor,n=(t,e,l,o)=>{for(var d=o>1?void 0:o?C(e,l):e,c=t.length-1,u;c>=0;c--)(u=t[c])&&(d=(o?u(e,l,d):u(d))||d);return o&&d&&E(e,l,d),d};let i=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=x().find(o=>o.id===t);l&&(this._tunnel=l,e?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,username:this._username.trim()||void 0,password:this._password||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this.mode==="create"?(await v(()=>import("./index-BxnSyTkH.js").then(e=>e.D),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await v(()=>import("./index-BxnSyTkH.js").then(e=>e.D),__vite__mapDeps([0,1])).then(e=>e.update(this.tunnelId,t)),this._showSnackbar(a("saved")),this.mode="view",await w())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await z(t),this._showSnackbar(a("copiedToClipboard"))}_typeLabel(){return a(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,e=t?T(t.id)??t.stats:null,l=this._typeLabel();return s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DfMtSSNX.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b as s,i as S,t as D}from"./index-DfMtSSNX.js";import{n as m,r}from"./state-BsUqSr6m.js";import{i as p}from"./app-scaffold-CzdYAXUG.js";import{c as z}from"./clipboard-C3x8_sid.js";import{b as h,a as b,f}from"./format-Dx8b12gY.js";var E=Object.defineProperty,C=Object.getOwnPropertyDescriptor,n=(t,e,l,o)=>{for(var d=o>1?void 0:o?C(e,l):e,c=t.length-1,u;c>=0;c--)(u=t[c])&&(d=(o?u(e,l,d):u(d))||d);return o&&d&&E(e,l,d),d};let i=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=x().find(o=>o.id===t);l&&(this._tunnel=l,e?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,username:this._username.trim()||void 0,password:this._password||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this.mode==="create"?(await v(()=>import("./index-DfMtSSNX.js").then(e=>e.D),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await v(()=>import("./index-DfMtSSNX.js").then(e=>e.D),__vite__mapDeps([0,1])).then(e=>e.update(this.tunnelId,t)),this._showSnackbar(a("saved")),this.mode="view",await w())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await z(t),this._showSnackbar(a("copiedToClipboard"))}_typeLabel(){return a(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,e=t?T(t.id)??t.stats:null,l=this._typeLabel();return s`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -250,7 +250,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
     }
 
     .page-title {
-      font-size: 13px;
+      font-size: var(--font-md);
       font-weight: 600;
       flex: 1;
     }
@@ -262,7 +262,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       padding: 4px 8px;
       border-radius: var(--radius-sm);
       color: var(--text-secondary);
-      font-size: 11px;
+      font-size: var(--font-sm);
       display: flex;
       align-items: center;
       gap: 3px;
@@ -278,7 +278,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       border-radius: var(--radius-pill);
       border: none;
       cursor: pointer;
-      font-size: 11px;
+      font-size: var(--font-sm);
       font-weight: 500;
       font-family: inherit;
       transition: opacity var(--transition-fast);
@@ -314,7 +314,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       padding: 10px 16px;
       margin: 0 16px;
       border-radius: var(--radius-md);
-      font-size: 11px;
+      font-size: var(--font-sm);
       font-weight: 500;
     }
     .status-banner.running {
@@ -363,7 +363,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
     }
 
     .info-label {
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
@@ -373,7 +373,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
     }
 
     .info-value {
-      font-size: 15px;
+      font-size: var(--font-lg);
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       flex: 1;
@@ -382,11 +382,11 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
 
     .info-value.text {
       font-family: inherit;
-      font-size: 15px;
+      font-size: var(--font-lg);
     }
 
     .info-value.uuid {
-      font-size: 12px;
+      font-size: var(--font-sm);
     }
 
     .copy-btn-mini {
@@ -419,25 +419,25 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
     }
 
     .stat-icon {
-      font-size: 14px;
+      font-size: var(--font-md);
       margin-bottom: 4px;
     }
 
     .stat-value {
-      font-size: 20px;
+      font-size: var(--font-xl);
       font-weight: 700;
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
     }
 
     .stat-rate {
-      font-size: 11px;
+      font-size: var(--font-sm);
       color: var(--green-text);
       margin-top: 2px;
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: var(--font-sm);
       color: var(--text-muted);
       margin-bottom: 4px;
     }
@@ -448,7 +448,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
     }
     .form-label {
       display: block;
-      font-size: 8px;
+      font-size: var(--font-xs);
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
@@ -462,7 +462,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       border-radius: var(--radius-md);
       background: var(--surface);
       color: var(--text);
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-family: inherit;
       outline: none;
       box-sizing: border-box;
@@ -485,7 +485,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       border-bottom: 1px solid var(--border-subtle);
     }
     .switch-label {
-      font-size: 11px;
+      font-size: var(--font-sm);
       color: var(--text);
     }
     .switch {
@@ -524,7 +524,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       border-radius: var(--radius-md);
     }
     .danger-zone-label {
-      font-size: 8px;
+      font-size: var(--font-xs);
       font-weight: 600;
       color: var(--red-text);
       text-transform: uppercase;
@@ -543,7 +543,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       padding: 10px 20px;
       border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      font-size: 12px;
+      font-size: var(--font-sm);
       z-index: 100;
       animation: toast-in 0.3s ease;
     }
@@ -574,13 +574,13 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
     }
     .dialog-title {
       font-weight: 600;
-      font-size: 14px;
+      font-size: var(--font-md);
       margin-bottom: 8px;
       text-align: center;
     }
     .dialog-message {
       color: var(--text-secondary);
-      font-size: 12px;
+      font-size: var(--font-sm);
       margin-bottom: 20px;
       text-align: center;
       line-height: 1.5;
@@ -595,7 +595,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       border-radius: var(--radius-pill);
       border: none;
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 500;
       font-family: inherit;
       transition: opacity var(--transition-fast);
@@ -621,7 +621,7 @@ import{a as g,s as _,g as x,j as a,_ as v,r as w,q as y,k as $,m as k,u as T,b a
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;

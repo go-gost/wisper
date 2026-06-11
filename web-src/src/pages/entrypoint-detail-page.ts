@@ -91,7 +91,7 @@ export class EntrypointDetailPage extends LitElement {
     this._name = ep.name;
     // ep.entrypoint is the local bind address (e.g. :8080)
     this._endpoint = ep.entrypoint;
-    this._tunnelId = ep.options.tunnel_id ?? '';
+    this._tunnelId = ep.options.hostname ?? '';
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -202,12 +202,12 @@ export class EntrypointDetailPage extends LitElement {
     }
     .back-btn:hover { background: var(--border-subtle); }
 
-    .page-title { font-size: 13px; font-weight: 600; flex: 1; }
+    .page-title { font-size: var(--font-md); font-weight: 600; flex: 1; }
 
     .appbar-btn {
       background: none; border: none; cursor: pointer;
       padding: 4px 8px; border-radius: var(--radius-sm);
-      color: var(--text-secondary); font-size: 11px;
+      color: var(--text-secondary); font-size: var(--font-sm);
       display: flex; align-items: center; gap: 3px;
       font-family: inherit;
       transition: background var(--transition-fast);
@@ -217,7 +217,7 @@ export class EntrypointDetailPage extends LitElement {
     .pill-btn {
       padding: 5px 14px; border-radius: var(--radius-pill);
       border: none; cursor: pointer;
-      font-size: 11px; font-weight: 500; font-family: inherit;
+      font-size: var(--font-sm); font-weight: 500; font-family: inherit;
       transition: opacity var(--transition-fast);
       display: inline-flex;
       align-items: center;
@@ -235,7 +235,7 @@ export class EntrypointDetailPage extends LitElement {
     .status-banner {
       display: flex; align-items: center; gap: 8px;
       padding: 10px 16px; margin: 0 16px;
-      border-radius: var(--radius-md); font-size: 11px; font-weight: 500;
+      border-radius: var(--radius-md); font-size: var(--font-sm); font-weight: 500;
     }
     .status-banner.running {
       background: var(--green-bg); color: var(--green-text);
@@ -271,20 +271,20 @@ export class EntrypointDetailPage extends LitElement {
     .info-row:last-child { border-bottom: none; }
 
     .info-label {
-      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      font-size: var(--font-sm); font-weight: 600; color: var(--text-muted);
       text-transform: uppercase; letter-spacing: 0.5px;
       width: 80px; flex-shrink: 0;
     }
     .info-value {
-      font-size: 15px; color: var(--text);
+      font-size: var(--font-lg); color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       flex: 1; word-break: break-all;
     }
     .info-value.text {
-      font-family: inherit; font-size: 15px;
+      font-family: inherit; font-size: var(--font-lg);
     }
     .info-value.uuid {
-      font-size: 12px;
+      font-size: var(--font-sm);
     }
 
     .copy-btn-mini {
@@ -298,7 +298,7 @@ export class EntrypointDetailPage extends LitElement {
     .form-group { margin-bottom: 14px; }
     .form-label {
       display: block;
-      font-size: 8px; font-weight: 500; color: var(--text-muted);
+      font-size: var(--font-xs); font-weight: 500; color: var(--text-muted);
       margin-bottom: 4px;
       text-transform: uppercase; letter-spacing: 0.5px;
     }
@@ -307,7 +307,7 @@ export class EntrypointDetailPage extends LitElement {
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background: var(--surface); color: var(--text);
-      font-size: 12px; font-family: inherit; outline: none;
+      font-size: var(--font-sm); font-family: inherit; outline: none;
       box-sizing: border-box;
       transition: border-color var(--transition-fast);
     }
@@ -323,7 +323,7 @@ export class EntrypointDetailPage extends LitElement {
       border-radius: var(--radius-md);
     }
     .danger-zone-label {
-      font-size: 8px; font-weight: 600; color: var(--red-text);
+      font-size: var(--font-xs); font-weight: 600; color: var(--red-text);
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
     }
 
@@ -333,7 +333,7 @@ export class EntrypointDetailPage extends LitElement {
       background: var(--surface); color: var(--text);
       padding: 10px 20px; border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-size: 12px; z-index: 100;
+      font-size: var(--font-sm); z-index: 100;
       animation: toast-in 0.3s ease;
     }
     @keyframes toast-in {
@@ -356,13 +356,13 @@ export class EntrypointDetailPage extends LitElement {
       padding: 24px; max-width: 320px; width: 90%;
       box-shadow: 0 8px 24px rgba(0,0,0,0.2);
     }
-    .dialog-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; text-align: center; }
-    .dialog-message { color: var(--text-secondary); font-size: 12px; margin-bottom: 20px; text-align: center; line-height: 1.5; }
+    .dialog-title { font-weight: 600; font-size: var(--font-md); margin-bottom: 8px; text-align: center; }
+    .dialog-message { color: var(--text-secondary); font-size: var(--font-sm); margin-bottom: 20px; text-align: center; line-height: 1.5; }
     .dialog-actions { display: flex; gap: 10px; justify-content: center; }
     .dialog-btn {
       padding: 8px 20px; border-radius: var(--radius-pill);
       border: none; cursor: pointer;
-      font-size: 12px; font-weight: 500; font-family: inherit;
+      font-size: var(--font-sm); font-weight: 500; font-family: inherit;
       transition: opacity var(--transition-fast);
       display: inline-flex;
       align-items: center;
@@ -380,7 +380,7 @@ export class EntrypointDetailPage extends LitElement {
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
@@ -453,9 +453,9 @@ export class EntrypointDetailPage extends LitElement {
                 </div>
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
-                  <span class="info-value uuid">${ep.options.tunnel_id ?? '—'}</span>
-                  ${ep.options.tunnel_id
-                    ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(ep.options.tunnel_id)}>
+                  <span class="info-value uuid">${ep.options.hostname ?? '—'}</span>
+                  ${ep.options.hostname
+                    ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(ep.options.hostname)}>
                       ${icon('copy')}
                     </button>`
                     : ''}

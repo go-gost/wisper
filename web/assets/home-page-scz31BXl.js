@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BxnSyTkH.js","assets/index-BIEgSipt.css"])))=>i.map(i=>d[i]);
-import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h as I,j as a,k as S,l as z,m as L,n as j,_ as E,o as D,p as R}from"./index-BxnSyTkH.js";import{n as p,r as v}from"./state-Bzr_HZxS.js";import{i as h}from"./app-scaffold-8MQz_NNd.js";import{c as B}from"./clipboard-C3x8_sid.js";import{f as C,a as T,b as N}from"./format-Dx8b12gY.js";var O=Object.defineProperty,q=Object.getOwnPropertyDescriptor,m=(t,n,r,e)=>{for(var s=e>1?void 0:e?q(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(e?o(n,r,s):o(s))||s);return e&&s&&O(n,r,s),s};let x=class extends f{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DfMtSSNX.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h as I,j as e,k as S,l as z,m as L,n as j,_ as E,o as D,p as R}from"./index-DfMtSSNX.js";import{n as p,r as v}from"./state-BsUqSr6m.js";import{i as h}from"./app-scaffold-CzdYAXUG.js";import{c as B}from"./clipboard-C3x8_sid.js";import{f as C,a as T,b as N}from"./format-Dx8b12gY.js";var O=Object.defineProperty,q=Object.getOwnPropertyDescriptor,m=(t,n,r,a)=>{for(var s=a>1?void 0:a?q(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&O(n,r,s),s};let f=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
       <div class="pill-group">
         ${this.tabs.map((t,n)=>i`
             <button class=${n===this.activeIndex?"active":""} @click=${()=>this._handleClick(n)}>
@@ -7,7 +7,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
             </button>
           `)}
       </div>
-    `}};x.styles=g`
+    `}};f.styles=g`
     :host {
       display: flex;
       justify-content: center;
@@ -29,7 +29,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       border: none;
       background: transparent;
       color: var(--text-secondary);
-      font-size: 15px;
+      font-size: var(--font-lg);
       font-weight: 500;
       cursor: pointer;
       letter-spacing: 0.3px;
@@ -44,7 +44,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       font-weight: 600;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
-  `;m([p({type:Array})],x.prototype,"tabs",2);m([p({type:Number})],x.prototype,"activeIndex",2);x=m([y("nav-tabs")],x);var A=Object.defineProperty,H=Object.getOwnPropertyDescriptor,l=(t,n,r,e)=>{for(var s=e>1?void 0:e?H(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(e?o(n,r,s):o(s))||s);return e&&s&&A(n,r,s),s};let d=class extends f{constructor(){super(...arguments),this.name="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.expanded=!1,this.compact=!0,this.error=""}_onRowClick(t){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return i`
+  `;m([p({type:Array})],f.prototype,"tabs",2);m([p({type:Number})],f.prototype,"activeIndex",2);f=m([y("nav-tabs")],f);var A=Object.defineProperty,H=Object.getOwnPropertyDescriptor,l=(t,n,r,a)=>{for(var s=a>1?void 0:a?H(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&A(n,r,s),s};let d=class extends x{constructor(){super(...arguments),this.name="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.expanded=!1,this.compact=!0,this.error=""}_onRowClick(t){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return i`
       <div class="row ${t?"stopped":""}" @click=${this._onRowClick}>
         <span class="dot ${this.status}"></span>
 
@@ -121,7 +121,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
     }
 
     .name {
-      font-size: 14px;
+      font-size: var(--font-md);
       font-weight: 600;
       color: var(--text);
       overflow: hidden;
@@ -130,7 +130,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
     }
 
     .meta {
-      font-size: 12px;
+      font-size: var(--font-sm);
       color: var(--text-muted);
       margin-top: 1px;
     }
@@ -139,7 +139,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
     .traffic {
       flex-shrink: 0;
       text-align: right;
-      font-size: 12px;
+      font-size: var(--font-sm);
       color: var(--text);
       line-height: 1.4;
       display: flex;
@@ -157,7 +157,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
 
     .traffic-total {
       color: var(--text-secondary);
-      font-size: 11px;
+      font-size: var(--font-sm);
     }
 
     /* ── Chevron ── */
@@ -180,33 +180,33 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       background: var(--red-bg);
       border: 1px solid var(--red-border);
       border-radius: var(--radius-sm);
-      font-size: 9px;
+      font-size: var(--font-xs);
       color: var(--red-text);
     }
-  `;l([p()],d.prototype,"name",2);l([p()],d.prototype,"meta",2);l([p()],d.prototype,"status",2);l([p()],d.prototype,"endpoint",2);l([p({type:Number})],d.prototype,"currentConns",2);l([p({type:Number})],d.prototype,"totalConns",2);l([p({type:Number})],d.prototype,"requestRate",2);l([p({type:Number})],d.prototype,"inputBytes",2);l([p({type:Number})],d.prototype,"outputBytes",2);l([p({type:Number})],d.prototype,"inputRate",2);l([p({type:Number})],d.prototype,"outputRate",2);l([p({type:Boolean})],d.prototype,"expanded",2);l([p({type:Boolean})],d.prototype,"compact",2);l([p()],d.prototype,"error",2);d=l([y("tunnel-card")],d);var U=Object.defineProperty,M=Object.getOwnPropertyDescriptor,b=(t,n,r,e)=>{for(var s=e>1?void 0:e?M(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(e?o(n,r,s):o(s))||s);return e&&s&&U(n,r,s),s};let u=class extends f{constructor(){super(...arguments),this.tabIndex=0,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null}connectedCallback(){super.connectedCallback(),this._tunnels=_(),this._entrypoints=$(),this._tunnelsLoading=w(),this._entrypointsLoading=k(),this._unsubs.push(F(()=>{this._tunnels=_(),this._tunnelsLoading=w(),this.requestUpdate()}),P(()=>{this._entrypoints=$(),this._entrypointsLoading=k(),this.requestUpdate()}),I(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return this.showFavorites?this._tunnels.filter(t=>t.favorite):this._tunnels}get _filteredEntrypoints(){return this.showFavorites?this._entrypoints.filter(t=>t.favorite):this._entrypoints}get _items(){return this.tabIndex===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this.tabIndex===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return a("statusRunning");case"stopped":return a("statusStopped");case"error":return a("statusError")}}_metaLine(t){const n=t.data.type.toUpperCase(),r=this._statusLabel(t.data.status);return t.data.status==="running"?`${n} · ${N(t.data.stats.current_conns)} conns`:`${n} · ${r}`}_renderEmptyState(){const t=this.tabIndex===0,n=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return i`
+  `;l([p()],d.prototype,"name",2);l([p()],d.prototype,"meta",2);l([p()],d.prototype,"status",2);l([p()],d.prototype,"endpoint",2);l([p({type:Number})],d.prototype,"currentConns",2);l([p({type:Number})],d.prototype,"totalConns",2);l([p({type:Number})],d.prototype,"requestRate",2);l([p({type:Number})],d.prototype,"inputBytes",2);l([p({type:Number})],d.prototype,"outputBytes",2);l([p({type:Number})],d.prototype,"inputRate",2);l([p({type:Number})],d.prototype,"outputRate",2);l([p({type:Boolean})],d.prototype,"expanded",2);l([p({type:Boolean})],d.prototype,"compact",2);l([p()],d.prototype,"error",2);d=l([y("tunnel-card")],d);var U=Object.defineProperty,M=Object.getOwnPropertyDescriptor,b=(t,n,r,a)=>{for(var s=a>1?void 0:a?M(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&U(n,r,s),s};let u=class extends x{constructor(){super(...arguments),this.tabIndex=0,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null}connectedCallback(){super.connectedCallback(),this._tunnels=_(),this._entrypoints=$(),this._tunnelsLoading=w(),this._entrypointsLoading=k(),this._unsubs.push(F(()=>{this._tunnels=_(),this._tunnelsLoading=w(),this.requestUpdate()}),P(()=>{this._entrypoints=$(),this._entrypointsLoading=k(),this.requestUpdate()}),I(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return this.showFavorites?this._tunnels.filter(t=>t.favorite):this._tunnels}get _filteredEntrypoints(){return this.showFavorites?this._entrypoints.filter(t=>t.favorite):this._entrypoints}get _items(){return this.tabIndex===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this.tabIndex===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){const n=t.data.type.toUpperCase(),r=this._statusLabel(t.data.status);return t.data.status==="running"?`${n} · ${N(t.data.stats.current_conns)} conns`:`${n} · ${r}`}_renderEmptyState(){const t=this.tabIndex===0,n=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return i`
         <div class="empty">
           <div class="empty-icon-wrap">${h("star")}</div>
-          <div class="empty-title">${a("homeNoFavorites")}</div>
-          <div class="empty-desc">${t?a("homeNoFavTunnelHint"):a("homeNoFavEntryHint")}</div>
+          <div class="empty-title">${e("homeNoFavorites")}</div>
+          <div class="empty-desc">${t?e("homeNoFavTunnelHint"):e("homeNoFavEntryHint")}</div>
           <button class="empty-sub-link" @click=${this._toggleFavorites}>
-            ${t?a("homeShowAllTunnels"):a("homeShowAllEntrypoints")}
+            ${t?e("homeShowAllTunnels"):e("homeShowAllEntrypoints")}
           </button>
         </div>
       `;if(n){const r=t?"/tunnel/new":"/entrypoint/new";return i`
         <div class="empty">
           <div class="empty-icon-wrap">${h(t?"link":"broadcast")}</div>
-          <div class="empty-title">${t?a("homeEmptyTunnels"):a("homeEmptyEntrypoints")}</div>
-          <div class="empty-desc">${t?a("homeEmptyTunnelDesc"):a("homeEmptyEntryDesc")}</div>
+          <div class="empty-title">${t?e("homeEmptyTunnels"):e("homeEmptyEntrypoints")}</div>
+          <div class="empty-desc">${t?e("homeEmptyTunnelDesc"):e("homeEmptyEntryDesc")}</div>
           <button class="empty-action" @click=${()=>this._navigate(r)}>
-            ${t?a("tunnelNewTitle"):a("entrypointNewTitle")}
+            ${t?e("tunnelNewTitle"):e("entrypointNewTitle")}
           </button>
         </div>
-      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await S(t.data.id):await z(t.data.id),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await L(t.data.id):await j(t.data.id),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-BxnSyTkH.js").then(r=>r.D),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await E(()=>import("./index-BxnSyTkH.js").then(r=>r.E),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(a("deleted"))}catch{this._showSnackbar(a("deleteFailed"))}}async _handleFavorite(t){t.kind==="tunnel"?await D(t.data.id):await R(t.data.id)}render(){const t=this._items,n=this._isLoading();this.tabIndex===0?a("homeEmptyTunnels"):a("homeEmptyEntrypoints");const r=this.tabIndex===0?"/tunnel/new":"/entrypoint/new";return i`
+      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await S(t.data.id):await z(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await L(t.data.id):await j(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-DfMtSSNX.js").then(r=>r.D),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await E(()=>import("./index-DfMtSSNX.js").then(r=>r.E),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}async _handleFavorite(t){t.kind==="tunnel"?await D(t.data.id):await R(t.data.id)}render(){const t=this._items,n=this._isLoading();this.tabIndex===0?e("homeEmptyTunnels"):e("homeEmptyEntrypoints");const r=this.tabIndex===0?"/tunnel/new":"/entrypoint/new";return i`
       <app-scaffold>
         <!-- Appbar -->
         <div slot="appBar" class="home-header">
           <div class="app-icon">W</div>
-          <span class="appbar-title">${a("appName")}</span>
+          <span class="appbar-title">${e("appName")}</span>
           <span class="header-spacer"></span>
           <button
             class="icon-btn ${this.showFavorites?"active":""}"
@@ -221,64 +221,64 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
 
         <!-- Tabs -->
         <nav-tabs
-          .tabs=${[a("homeTabTunnel"),a("homeTabEntrypoint")]}
+          .tabs=${[e("homeTabTunnel"),e("homeTabEntrypoint")]}
           .activeIndex=${this.tabIndex}
-          @tab-change=${e=>{this.tabIndex=e.detail.index,this._expandedId=null}}
+          @tab-change=${a=>{this.tabIndex=a.detail.index,this._expandedId=null}}
         ></nav-tabs>
 
         <!-- Body -->
         ${n?i`<div class="loading"><wisper-spinner></wisper-spinner></div>`:t.length===0?this._renderEmptyState():i`
               <div class="list">
-                ${t.map(e=>{const s=e.kind==="tunnel"?`/tunnel/${e.data.type}/${e.data.id}`:`/entrypoint/${e.data.type}/${e.data.id}`,c=this._expandedId===e.data.id;return i`
+                ${t.map(a=>{const s=a.kind==="tunnel"?`/tunnel/${a.data.type}/${a.data.id}`:`/entrypoint/${a.data.type}/${a.data.id}`,c=this._expandedId===a.data.id;return i`
                     <div>
                       <tunnel-card
-                        .name=${e.data.name}
-                        .meta=${this._metaLine(e)}
-                        .status=${e.data.status}
-                        .endpoint=${e.data.endpoint}
-                        .error=${e.data.error}
-                        .currentConns=${e.data.stats.current_conns}
-                        .totalConns=${e.data.stats.total_conns}
-                        .requestRate=${e.data.stats.request_rate}
-                        .inputBytes=${e.data.stats.input_bytes}
-                        .outputBytes=${e.data.stats.output_bytes}
-                        .inputRate=${e.data.stats.input_rate_bytes}
-                        .outputRate=${e.data.stats.output_rate_bytes}
+                        .name=${a.data.name}
+                        .meta=${this._metaLine(a)}
+                        .status=${a.data.status}
+                        .endpoint=${a.data.endpoint}
+                        .error=${a.data.error}
+                        .currentConns=${a.data.stats.current_conns}
+                        .totalConns=${a.data.stats.total_conns}
+                        .requestRate=${a.data.stats.request_rate}
+                        .inputBytes=${a.data.stats.input_bytes}
+                        .outputBytes=${a.data.stats.output_bytes}
+                        .inputRate=${a.data.stats.input_rate_bytes}
+                        .outputRate=${a.data.stats.output_rate_bytes}
                         .expanded=${c}
                         .compact=${!0}
                         @card-click=${()=>this._navigate(s)}
-                        @chevron-click=${()=>this._toggleExpand(e.data.id)}
+                        @chevron-click=${()=>this._toggleExpand(a.data.id)}
                       ></tunnel-card>
 
                       ${c?i`
                           <div class="expand-panel">
                             <div class="detail-card">
                               <div class="detail-row">
-                                <span class="dlabel">${e.kind==="tunnel"?"Entrypoint":"Endpoint"}</span>
-                                <span class="dval">${e.data.entrypoint}
-                                  <button class="copy-btn-mini" @click=${async o=>{o.stopPropagation(),await B(e.data.entrypoint),this._showSnackbar(a("copiedToClipboard"))}}>
+                                <span class="dlabel">${a.kind==="tunnel"?"Entrypoint":"Endpoint"}</span>
+                                <span class="dval">${a.data.entrypoint}
+                                  <button class="copy-btn-mini" @click=${async o=>{o.stopPropagation(),await B(a.data.entrypoint),this._showSnackbar(e("copiedToClipboard"))}}>
                                     ${h("copy")}
                                   </button>
                                 </span>
                               </div>
                               <div class="detail-row">
-                                <span class="dlabel">${e.kind==="tunnel"?"Target":"Bind"}</span>
-                                <span class="dval">${e.data.endpoint}</span>
+                                <span class="dlabel">${a.kind==="tunnel"?"Target":"Bind"}</span>
+                                <span class="dval">${a.data.endpoint}</span>
                               </div>
-                              ${e.kind==="tunnel"&&e.data.options?.hostname?i`<div class="detail-row">
+                              ${a.kind==="tunnel"&&a.data.options?.hostname?i`<div class="detail-row">
                                   <span class="dlabel">Host Rewrite</span>
-                                  <span class="dval">${e.data.options.hostname}</span>
+                                  <span class="dval">${a.data.options.hostname}</span>
                                 </div>`:""}
-                              ${e.data.error?i`<div class="detail-row error"><span class="dlabel">Error</span><span class="dval error-text">${e.data.error}</span></div>`:""}
+                              ${a.data.error?i`<div class="detail-row error"><span class="dlabel">Error</span><span class="dval error-text">${a.data.error}</span></div>`:""}
                             </div>
                             <div class="expand-actions">
-                              ${e.data.status==="running"?i`
-                                  <button class="action-btn stop" @click=${o=>{o.stopPropagation(),this._handleStop(e)}}>■ ${a("btnStop")}</button>
+                              ${a.data.status==="running"?i`
+                                  <button class="action-btn stop" @click=${o=>{o.stopPropagation(),this._handleStop(a)}}>■ ${e("btnStop")}</button>
                                 `:i`
-                                  <button class="action-btn start" @click=${o=>{o.stopPropagation(),this._handleStart(e)}}>▶ ${a("btnStart")}</button>
+                                  <button class="action-btn start" @click=${o=>{o.stopPropagation(),this._handleStart(a)}}>▶ ${e("btnStart")}</button>
                                 `}
-                              <button class="action-btn" @click=${o=>{o.stopPropagation(),this._navigate(s+"?edit")}}>${h("edit")} ${a("btnEdit")}</button>
-                              <button class="action-btn danger" @click=${o=>{o.stopPropagation(),this._confirmDelete(e.kind,e.data.id,e.data.name)}}>${h("trash")} ${a("btnDelete")}</button>
+                              <button class="action-btn" @click=${o=>{o.stopPropagation(),this._navigate(s+"?edit")}}>${h("edit")} ${e("btnEdit")}</button>
+                              <button class="action-btn danger" @click=${o=>{o.stopPropagation(),this._confirmDelete(a.kind,a.data.id,a.data.name)}}>${h("trash")} ${e("btnDelete")}</button>
                             </div>
                           </div>
                         `:""}
@@ -299,15 +299,15 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
 
       ${this._deleteTarget?i`
           <div class="dialog-overlay" @click=${()=>{this._deleteTarget=null}}>
-            <div class="dialog-box" @click=${e=>e.stopPropagation()}>
-              <div class="dialog-title">${a("deleteConfirmTitle")}</div>
-              <div class="dialog-message">${a("deleteConfirmMessage")}</div>
+            <div class="dialog-box" @click=${a=>a.stopPropagation()}>
+              <div class="dialog-title">${e("deleteConfirmTitle")}</div>
+              <div class="dialog-message">${e("deleteConfirmMessage")}</div>
               <div class="dialog-actions">
                 <button class="dialog-btn cancel" @click=${()=>{this._deleteTarget=null}}>
-                  ${a("btnCancel")}
+                  ${e("btnCancel")}
                 </button>
                 <button class="dialog-btn danger" @click=${this._handleDelete}>
-                  ${a("btnDelete")}
+                  ${e("btnDelete")}
                 </button>
               </div>
             </div>
@@ -332,12 +332,12 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       justify-content: center;
       color: var(--accent-fg);
       font-weight: 700;
-      font-size: 12px;
+      font-size: var(--font-sm);
       flex-shrink: 0;
     }
 
     .appbar-title {
-      font-size: 13px;
+      font-size: var(--font-md);
       font-weight: 600;
       color: var(--text);
     }
@@ -390,7 +390,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 10px;
+      font-size: var(--font-xs);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       color: var(--text-secondary);
       word-break: break-all;
@@ -413,7 +413,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 10px;
+      font-size: var(--font-xs);
       cursor: pointer;
       font-family: inherit;
       transition: background var(--transition-fast);
@@ -444,7 +444,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
     }
 
     .expand-error {
-      font-size: 9px;
+      font-size: var(--font-xs);
       color: var(--red-text);
       padding: 4px 8px;
       background: var(--red-bg);
@@ -468,14 +468,14 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
     .detail-row:last-child { border-bottom: none; }
     .detail-row .dlabel {
       color: var(--text-muted);
-      font-size: 12px;
+      font-size: var(--font-sm);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 600;
     }
     .detail-row .dval {
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      font-size: 14px;
+      font-size: var(--font-md);
       color: var(--text);
       display: flex;
       align-items: center;
@@ -529,12 +529,12 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
 
     .empty-title {
       font-weight: 600;
-      font-size: 15px;
+      font-size: var(--font-lg);
       color: var(--text);
     }
 
     .empty-desc {
-      font-size: 13px;
+      font-size: var(--font-md);
       color: var(--text-secondary);
       max-width: 240px;
       line-height: 1.5;
@@ -547,7 +547,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       border: none;
       background: var(--accent);
       color: var(--accent-fg);
-      font-size: 13px;
+      font-size: var(--font-md);
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
@@ -562,7 +562,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       background: none;
       border: none;
       color: var(--text-muted);
-      font-size: 12px;
+      font-size: var(--font-sm);
       cursor: pointer;
       font-family: inherit;
       text-decoration: underline;
@@ -615,7 +615,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       padding: 10px 20px;
       border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      font-size: 12px;
+      font-size: var(--font-sm);
       z-index: 100;
       animation: toast-in 0.3s ease;
     }
@@ -658,14 +658,14 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
 
     .dialog-title {
       font-weight: 600;
-      font-size: 14px;
+      font-size: var(--font-md);
       margin-bottom: 8px;
       text-align: center;
     }
 
     .dialog-message {
       color: var(--text-secondary);
-      font-size: 12px;
+      font-size: var(--font-sm);
       margin-bottom: 20px;
       text-align: center;
       line-height: 1.5;
@@ -682,7 +682,7 @@ import{i as g,a as f,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       border-radius: var(--radius-pill);
       border: none;
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 500;
       font-family: inherit;
       transition: opacity var(--transition-fast);

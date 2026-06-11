@@ -237,7 +237,7 @@ export class TunnelDetailPage extends LitElement {
     }
 
     .page-title {
-      font-size: 13px;
+      font-size: var(--font-md);
       font-weight: 600;
       flex: 1;
     }
@@ -249,7 +249,7 @@ export class TunnelDetailPage extends LitElement {
       padding: 4px 8px;
       border-radius: var(--radius-sm);
       color: var(--text-secondary);
-      font-size: 11px;
+      font-size: var(--font-sm);
       display: flex;
       align-items: center;
       gap: 3px;
@@ -265,7 +265,7 @@ export class TunnelDetailPage extends LitElement {
       border-radius: var(--radius-pill);
       border: none;
       cursor: pointer;
-      font-size: 11px;
+      font-size: var(--font-sm);
       font-weight: 500;
       font-family: inherit;
       transition: opacity var(--transition-fast);
@@ -301,7 +301,7 @@ export class TunnelDetailPage extends LitElement {
       padding: 10px 16px;
       margin: 0 16px;
       border-radius: var(--radius-md);
-      font-size: 11px;
+      font-size: var(--font-sm);
       font-weight: 500;
     }
     .status-banner.running {
@@ -350,7 +350,7 @@ export class TunnelDetailPage extends LitElement {
     }
 
     .info-label {
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
@@ -360,7 +360,7 @@ export class TunnelDetailPage extends LitElement {
     }
 
     .info-value {
-      font-size: 15px;
+      font-size: var(--font-lg);
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       flex: 1;
@@ -369,11 +369,11 @@ export class TunnelDetailPage extends LitElement {
 
     .info-value.text {
       font-family: inherit;
-      font-size: 15px;
+      font-size: var(--font-lg);
     }
 
     .info-value.uuid {
-      font-size: 12px;
+      font-size: var(--font-sm);
     }
 
     .copy-btn-mini {
@@ -406,25 +406,25 @@ export class TunnelDetailPage extends LitElement {
     }
 
     .stat-icon {
-      font-size: 14px;
+      font-size: var(--font-md);
       margin-bottom: 4px;
     }
 
     .stat-value {
-      font-size: 20px;
+      font-size: var(--font-xl);
       font-weight: 700;
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
     }
 
     .stat-rate {
-      font-size: 11px;
+      font-size: var(--font-sm);
       color: var(--green-text);
       margin-top: 2px;
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: var(--font-sm);
       color: var(--text-muted);
       margin-bottom: 4px;
     }
@@ -435,7 +435,7 @@ export class TunnelDetailPage extends LitElement {
     }
     .form-label {
       display: block;
-      font-size: 8px;
+      font-size: var(--font-xs);
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
@@ -449,7 +449,7 @@ export class TunnelDetailPage extends LitElement {
       border-radius: var(--radius-md);
       background: var(--surface);
       color: var(--text);
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-family: inherit;
       outline: none;
       box-sizing: border-box;
@@ -472,7 +472,7 @@ export class TunnelDetailPage extends LitElement {
       border-bottom: 1px solid var(--border-subtle);
     }
     .switch-label {
-      font-size: 11px;
+      font-size: var(--font-sm);
       color: var(--text);
     }
     .switch {
@@ -511,7 +511,7 @@ export class TunnelDetailPage extends LitElement {
       border-radius: var(--radius-md);
     }
     .danger-zone-label {
-      font-size: 8px;
+      font-size: var(--font-xs);
       font-weight: 600;
       color: var(--red-text);
       text-transform: uppercase;
@@ -530,7 +530,7 @@ export class TunnelDetailPage extends LitElement {
       padding: 10px 20px;
       border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      font-size: 12px;
+      font-size: var(--font-sm);
       z-index: 100;
       animation: toast-in 0.3s ease;
     }
@@ -561,13 +561,13 @@ export class TunnelDetailPage extends LitElement {
     }
     .dialog-title {
       font-weight: 600;
-      font-size: 14px;
+      font-size: var(--font-md);
       margin-bottom: 8px;
       text-align: center;
     }
     .dialog-message {
       color: var(--text-secondary);
-      font-size: 12px;
+      font-size: var(--font-sm);
       margin-bottom: 20px;
       text-align: center;
       line-height: 1.5;
@@ -582,7 +582,7 @@ export class TunnelDetailPage extends LitElement {
       border-radius: var(--radius-pill);
       border: none;
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 500;
       font-family: inherit;
       transition: opacity var(--transition-fast);
@@ -608,7 +608,7 @@ export class TunnelDetailPage extends LitElement {
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;

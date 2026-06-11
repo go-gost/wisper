@@ -85,7 +85,7 @@ export interface TunnelCreateRequest {
 export interface EntrypointOptions {
   keepalive: boolean;
   ttl: number;
-  tunnel_id: string;
+  hostname: string;  // tunnel ID (API returns it as "hostname")
 }
 
 export interface Entrypoint {

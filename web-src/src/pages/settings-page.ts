@@ -121,7 +121,7 @@ export class SettingsPage extends LitElement {
     }
     .back-btn:hover { background: var(--border-subtle); }
 
-    .page-title { font-size: 13px; font-weight: 600; flex: 1; }
+    .page-title { font-size: var(--font-md); font-weight: 600; flex: 1; }
 
     /* ── App info ── */
     .app-info {
@@ -135,20 +135,20 @@ export class SettingsPage extends LitElement {
       margin: 0 auto 12px;
       display: flex; align-items: center; justify-content: center;
       color: var(--accent-fg);
-      font-weight: 700; font-size: 24px;
+      font-weight: 700; font-size: var(--font-2xl);
     }
     .app-name {
-      font-size: 16px; font-weight: 600;
+      font-size: var(--font-lg); font-weight: 600;
       color: var(--text); margin-bottom: 2px;
     }
     .app-version {
-      font-size: 11px; color: var(--text-muted);
+      font-size: var(--font-sm); color: var(--text-muted);
     }
 
     /* ── Section ── */
     .section { padding: 0 16px 16px; }
     .section-title {
-      font-size: 11px; font-weight: 600;
+      font-size: var(--font-sm); font-weight: 600;
       color: var(--text-secondary);
       margin-bottom: 8px;
     }
@@ -167,7 +167,7 @@ export class SettingsPage extends LitElement {
     .form-group:last-child { margin-bottom: 0; }
     .form-label {
       display: block;
-      font-size: 8px; font-weight: 500;
+      font-size: var(--font-xs); font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
       text-transform: uppercase;
@@ -178,13 +178,13 @@ export class SettingsPage extends LitElement {
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background: var(--surface); color: var(--text);
-      font-size: 12px; font-family: inherit; outline: none;
+      font-size: var(--font-sm); font-family: inherit; outline: none;
       box-sizing: border-box;
       transition: border-color var(--transition-fast);
     }
     .form-input:focus { border-color: var(--accent); }
     .hint {
-      font-size: 9px; color: var(--text-muted); margin-top: 2px;
+      font-size: var(--font-xs); color: var(--text-muted); margin-top: 2px;
     }
 
     /* ── Switch ── */
@@ -193,8 +193,8 @@ export class SettingsPage extends LitElement {
       padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
     }
     .switch-row:last-child { border-bottom: none; }
-    .switch-label { font-size: 11px; color: var(--text); }
-    .switch-desc { font-size: 9px; color: var(--text-muted); }
+    .switch-label { font-size: var(--font-sm); color: var(--text); }
+    .switch-desc { font-size: var(--font-xs); color: var(--text-muted); }
     .switch {
       width: 40px; height: 22px; border-radius: 11px;
       background: var(--border); position: relative;
@@ -218,10 +218,10 @@ export class SettingsPage extends LitElement {
     }
     .selector-row:last-child { border-bottom: none; }
     .selector-row:hover { background: var(--border-subtle); }
-    .selector-label { font-size: 11px; color: var(--text); }
+    .selector-label { font-size: var(--font-sm); color: var(--text); }
     .selector-value {
       display: flex; align-items: center; gap: 4px;
-      color: var(--text-muted); font-size: 10px;
+      color: var(--text-muted); font-size: var(--font-xs);
     }
 
     /* ── Save button ── */
@@ -230,7 +230,7 @@ export class SettingsPage extends LitElement {
       border-radius: var(--radius-md);
       border: none;
       background: var(--accent); color: var(--accent-fg);
-      font-size: 12px; font-weight: 500; cursor: pointer;
+      font-size: var(--font-sm); font-weight: 500; cursor: pointer;
       font-family: inherit;
       margin-top: 12px;
       transition: opacity var(--transition-fast);
@@ -244,7 +244,7 @@ export class SettingsPage extends LitElement {
       background: var(--surface); color: var(--text);
       padding: 10px 20px; border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-size: 12px; z-index: 100;
+      font-size: var(--font-sm); z-index: 100;
       animation: toast-in 0.3s ease;
     }
     @keyframes toast-in {

@@ -1,4 +1,4 @@
-import{a as v,j as r,b as c,i as u,t as g}from"./index-BxnSyTkH.js";import{i as s}from"./app-scaffold-8MQz_NNd.js";import{E as b}from"./types-yEFWF7Vr.js";var f=Object.getOwnPropertyDescriptor,y=(t,o,l,n)=>{for(var e=n>1?void 0:n?f(o,l):o,a=t.length-1,p;a>=0;a--)(p=t[a])&&(e=p(e)||e);return e};const x={tcp:"link",udp:"broadcast"},d={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"}};let i=class extends v{_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return c`
+import{a as v,j as r,b as d,i as f,t as u}from"./index-DfMtSSNX.js";import{i as s}from"./app-scaffold-CzdYAXUG.js";import{E as g}from"./types-yEFWF7Vr.js";var b=Object.getOwnPropertyDescriptor,y=(t,i,l,n)=>{for(var e=n>1?void 0:n?b(i,l):i,a=t.length-1,p;a>=0;a--)(p=t[a])&&(e=p(e)||e);return e};const x={tcp:"link",udp:"broadcast"},c={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"}};let o=class extends v{_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return d`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
@@ -8,9 +8,9 @@ import{a as v,j as r,b as c,i as u,t as g}from"./index-BxnSyTkH.js";import{i as 
         </div>
 
         <div class="list">
-          ${b.map(t=>c`
+          ${g.map(t=>d`
             <div class="type-card" @click=${()=>this._navigate(`/entrypoint/${t.value}/new`)}>
-              <div class="type-icon" style="background:${d[t.value].bg};color:${d[t.value].fg}">${s(x[t.value])}</div>
+              <div class="type-icon" style="background:${c[t.value].bg};color:${c[t.value].fg}">${s(x[t.value])}</div>
               <div class="type-content">
                 <div class="type-title">
                   ${r(`type${t.value.charAt(0).toUpperCase()+t.value.slice(1)}`)} Entrypoint
@@ -24,7 +24,7 @@ import{a as v,j as r,b as c,i as u,t as g}from"./index-BxnSyTkH.js";import{i as 
           `)}
         </div>
       </app-scaffold>
-    `}};i.styles=u`
+    `}};o.styles=f`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -32,7 +32,7 @@ import{a as v,j as r,b as c,i as u,t as g}from"./index-BxnSyTkH.js";import{i as 
     }
     .back-btn:hover { background: var(--border-subtle); }
 
-    .page-title { font-size: 13px; font-weight: 600; }
+    .page-title { font-size: var(--font-md); font-weight: 600; }
 
     .list {
       padding: 8px 16px 0;
@@ -65,10 +65,10 @@ import{a as v,j as r,b as c,i as u,t as g}from"./index-BxnSyTkH.js";import{i as 
     }
 
     .type-content { flex: 1; min-width: 0; }
-    .type-title { font-size: 13px; font-weight: 600; color: var(--text); }
-    .type-desc { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .type-title { font-size: var(--font-md); font-weight: 600; color: var(--text); }
+    .type-desc { font-size: var(--font-xs); color: var(--text-muted); margin-top: 2px; }
 
     .type-arrow {
       color: var(--text-muted); flex-shrink: 0;
     }
-  `;i=y([g("entrypoint-type-select-page")],i);export{i as EntrypointTypeSelectPage};
+  `;o=y([u("entrypoint-type-select-page")],o);export{o as EntrypointTypeSelectPage};

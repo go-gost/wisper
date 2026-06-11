@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BxnSyTkH.js","assets/index-BIEgSipt.css"])))=>i.map(i=>d[i]);
-import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i as w,t as $}from"./index-BxnSyTkH.js";import{n as h,r as s}from"./state-Bzr_HZxS.js";import{i as p}from"./app-scaffold-8MQz_NNd.js";import{c as k}from"./clipboard-C3x8_sid.js";var D=Object.defineProperty,E=Object.getOwnPropertyDescriptor,r=(t,a,i,l)=>{for(var d=l>1?void 0:l?E(a,i):a,c=t.length-1,b;c>=0;c--)(b=t[c])&&(d=(l?b(a,i,d):b(d))||d);return l&&d&&D(a,i,d),d};let o=class extends f{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(v(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const i=g().find(l=>l.id===t);i&&(this._entrypoint=i,a?(this.mode="edit",this._populateForm(i)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(i)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.options.tunnel_id??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),hostname:this._tunnelId.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-BxnSyTkH.js").then(a=>a.E),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await u(()=>import("./index-BxnSyTkH.js").then(a=>a.E),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await m())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await x(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await y(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await _(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await k(t),this._showSnackbar(e("copiedToClipboard"))}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=this._typeLabel();return n`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DfMtSSNX.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{a as f,f as v,c as m,j as e,_ as u,v as g,w as y,l as x,n as _,b as i,i as w,t as $}from"./index-DfMtSSNX.js";import{n as h,r as s}from"./state-BsUqSr6m.js";import{i as p}from"./app-scaffold-CzdYAXUG.js";import{c as k}from"./clipboard-C3x8_sid.js";var D=Object.defineProperty,E=Object.getOwnPropertyDescriptor,r=(t,a,n,l)=>{for(var d=l>1?void 0:l?E(a,n):a,c=t.length-1,b;c>=0;c--)(b=t[c])&&(d=(l?b(a,n,d):b(d))||d);return l&&d&&D(a,n,d),d};let o=class extends f{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(v(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const n=m().find(l=>l.id===t);n&&(this._entrypoint=n,a?(this.mode="edit",this._populateForm(n)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(n)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.options.hostname??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),hostname:this._tunnelId.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-DfMtSSNX.js").then(a=>a.E),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await u(()=>import("./index-DfMtSSNX.js").then(a=>a.E),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await g())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await x(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await _(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await k(t),this._showSnackbar(e("copiedToClipboard"))}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=this._typeLabel();return i`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -10,13 +10,13 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
             ${this.mode==="create"?`${e("entrypointNewTitle")} — ${a}`:a+" Entrypoint"}
           </span>
 
-          ${this.mode==="view"&&t?n`
-              ${t.status==="running"?n`<button class="pill-btn danger appbar-action" @click=${this._handleStop}>
+          ${this.mode==="view"&&t?i`
+              ${t.status==="running"?i`<button class="pill-btn danger appbar-action" @click=${this._handleStop}>
                   ■ ${e("btnStop")}
-                </button>`:n`<button class="pill-btn primary appbar-action" @click=${this._handleStart}>
+                </button>`:i`<button class="pill-btn primary appbar-action" @click=${this._handleStart}>
                   ▶ ${e("btnStart")}
                 </button>`}
-            `:n`
+            `:i`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${this._handleSave}>
                 ${p("check")} ${e("btnSave")}
               </button>
@@ -24,12 +24,12 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
         </div>
 
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
-        ${this.mode==="view"&&t?n`
+        ${this.mode==="view"&&t?i`
             <!-- Status banner -->
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
               ${t.status==="running"?e("statusRunning"):t.status==="error"?e("statusError"):e("statusStopped")}
-              ${t.error?n` — ${t.error}`:""}
+              ${t.error?i` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
 
@@ -42,8 +42,8 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
                 </div>
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
-                  <span class="info-value uuid">${t.options.tunnel_id??"—"}</span>
-                  ${t.options.tunnel_id?n`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.options.tunnel_id)}>
+                  <span class="info-value uuid">${t.options.hostname??"—"}</span>
+                  ${t.options.hostname?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.options.hostname)}>
                       ${p("copy")}
                     </button>`:""}
                 </div>
@@ -60,7 +60,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
           `:""}
 
             <!-- Edit button (view mode only) -->
-            ${this.mode==="view"&&t?n`
+            ${this.mode==="view"&&t?i`
                 <div class="section">
                   <button class="btn-edit-bottom" @click=${this._enterEdit}>
                     ${p("edit")} ${e("btnEdit")}
@@ -69,7 +69,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
               `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
-        ${this.mode!=="view"?n`
+        ${this.mode!=="view"?i`
             <div class="section">
               <div class="card" style="padding:16px;">
                 <!-- Type (readonly) -->
@@ -85,25 +85,25 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
                     ?readonly=${this.mode==="edit"}
                     .value=${this._tunnelId}
                     placeholder="Paste tunnel UUID"
-                    @input=${i=>{this._tunnelId=i.target.value}}>
+                    @input=${n=>{this._tunnelId=n.target.value}}>
                 </div>
 
                 <!-- Name -->
                 <div class="form-group">
                   <label class="form-label">${e("fieldName")}</label>
                   <input class="form-input" .value=${this._name} placeholder="My Entrypoint"
-                    @input=${i=>{this._name=i.target.value}}>
+                    @input=${n=>{this._name=n.target.value}}>
                 </div>
 
                 <!-- Bind Address -->
                 <div class="form-group">
                   <label class="form-label">${e("fieldBindAddress")}</label>
                   <input class="form-input" .value=${this._endpoint} placeholder="0.0.0.0:9090"
-                    @input=${i=>{this._endpoint=i.target.value}}>
+                    @input=${n=>{this._endpoint=n.target.value}}>
                 </div>
 
                 <!-- Danger Zone (edit only) -->
-                ${this.mode==="edit"?n`
+                ${this.mode==="edit"?i`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
@@ -115,11 +115,11 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
             </div>
           `:""}
 
-        ${this._snackbar?n`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:""}
 
-        ${this._showDeleteDialog?n`
+        ${this._showDeleteDialog?i`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
-              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
+              <div class="dialog-box" @click=${n=>n.stopPropagation()}>
                 <div class="dialog-title">${e("deleteConfirmTitle")}</div>
                 <div class="dialog-message">${e("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
@@ -142,12 +142,12 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
     }
     .back-btn:hover { background: var(--border-subtle); }
 
-    .page-title { font-size: 13px; font-weight: 600; flex: 1; }
+    .page-title { font-size: var(--font-md); font-weight: 600; flex: 1; }
 
     .appbar-btn {
       background: none; border: none; cursor: pointer;
       padding: 4px 8px; border-radius: var(--radius-sm);
-      color: var(--text-secondary); font-size: 11px;
+      color: var(--text-secondary); font-size: var(--font-sm);
       display: flex; align-items: center; gap: 3px;
       font-family: inherit;
       transition: background var(--transition-fast);
@@ -157,7 +157,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
     .pill-btn {
       padding: 5px 14px; border-radius: var(--radius-pill);
       border: none; cursor: pointer;
-      font-size: 11px; font-weight: 500; font-family: inherit;
+      font-size: var(--font-sm); font-weight: 500; font-family: inherit;
       transition: opacity var(--transition-fast);
       display: inline-flex;
       align-items: center;
@@ -175,7 +175,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
     .status-banner {
       display: flex; align-items: center; gap: 8px;
       padding: 10px 16px; margin: 0 16px;
-      border-radius: var(--radius-md); font-size: 11px; font-weight: 500;
+      border-radius: var(--radius-md); font-size: var(--font-sm); font-weight: 500;
     }
     .status-banner.running {
       background: var(--green-bg); color: var(--green-text);
@@ -211,20 +211,20 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
     .info-row:last-child { border-bottom: none; }
 
     .info-label {
-      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      font-size: var(--font-sm); font-weight: 600; color: var(--text-muted);
       text-transform: uppercase; letter-spacing: 0.5px;
       width: 80px; flex-shrink: 0;
     }
     .info-value {
-      font-size: 15px; color: var(--text);
+      font-size: var(--font-lg); color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       flex: 1; word-break: break-all;
     }
     .info-value.text {
-      font-family: inherit; font-size: 15px;
+      font-family: inherit; font-size: var(--font-lg);
     }
     .info-value.uuid {
-      font-size: 12px;
+      font-size: var(--font-sm);
     }
 
     .copy-btn-mini {
@@ -238,7 +238,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
     .form-group { margin-bottom: 14px; }
     .form-label {
       display: block;
-      font-size: 8px; font-weight: 500; color: var(--text-muted);
+      font-size: var(--font-xs); font-weight: 500; color: var(--text-muted);
       margin-bottom: 4px;
       text-transform: uppercase; letter-spacing: 0.5px;
     }
@@ -247,7 +247,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background: var(--surface); color: var(--text);
-      font-size: 12px; font-family: inherit; outline: none;
+      font-size: var(--font-sm); font-family: inherit; outline: none;
       box-sizing: border-box;
       transition: border-color var(--transition-fast);
     }
@@ -263,7 +263,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
       border-radius: var(--radius-md);
     }
     .danger-zone-label {
-      font-size: 8px; font-weight: 600; color: var(--red-text);
+      font-size: var(--font-xs); font-weight: 600; color: var(--red-text);
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
     }
 
@@ -273,7 +273,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
       background: var(--surface); color: var(--text);
       padding: 10px 20px; border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-size: 12px; z-index: 100;
+      font-size: var(--font-sm); z-index: 100;
       animation: toast-in 0.3s ease;
     }
     @keyframes toast-in {
@@ -296,13 +296,13 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
       padding: 24px; max-width: 320px; width: 90%;
       box-shadow: 0 8px 24px rgba(0,0,0,0.2);
     }
-    .dialog-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; text-align: center; }
-    .dialog-message { color: var(--text-secondary); font-size: 12px; margin-bottom: 20px; text-align: center; line-height: 1.5; }
+    .dialog-title { font-weight: 600; font-size: var(--font-md); margin-bottom: 8px; text-align: center; }
+    .dialog-message { color: var(--text-secondary); font-size: var(--font-sm); margin-bottom: 20px; text-align: center; line-height: 1.5; }
     .dialog-actions { display: flex; gap: 10px; justify-content: center; }
     .dialog-btn {
       padding: 8px 20px; border-radius: var(--radius-pill);
       border: none; cursor: pointer;
-      font-size: 12px; font-weight: 500; font-family: inherit;
+      font-size: var(--font-sm); font-weight: 500; font-family: inherit;
       transition: opacity var(--transition-fast);
       display: inline-flex;
       align-items: center;
@@ -320,7 +320,7 @@ import{a as f,f as v,c as g,j as e,_ as u,v as m,w as x,l as y,n as _,b as n,i a
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;

@@ -30,7 +30,7 @@ export class TunnelTypeSelectPage extends LitElement {
     }
     .back-btn:hover { background: var(--border-subtle); }
 
-    .page-title { font-size: 13px; font-weight: 600; }
+    .page-title { font-size: var(--font-md); font-weight: 600; }
 
     /* ── Type cards ── */
     .list {
@@ -64,8 +64,8 @@ export class TunnelTypeSelectPage extends LitElement {
     }
 
     .type-content { flex: 1; min-width: 0; }
-    .type-title { font-size: 13px; font-weight: 600; color: var(--text); }
-    .type-desc { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .type-title { font-size: var(--font-md); font-weight: 600; color: var(--text); }
+    .type-desc { font-size: var(--font-xs); color: var(--text-muted); margin-top: 2px; }
 
     .type-arrow {
       color: var(--text-muted); flex-shrink: 0;

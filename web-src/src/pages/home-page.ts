@@ -189,12 +189,12 @@ export class HomePage extends LitElement {
       justify-content: center;
       color: var(--accent-fg);
       font-weight: 700;
-      font-size: 12px;
+      font-size: var(--font-sm);
       flex-shrink: 0;
     }
 
     .appbar-title {
-      font-size: 13px;
+      font-size: var(--font-md);
       font-weight: 600;
       color: var(--text);
     }
@@ -247,7 +247,7 @@ export class HomePage extends LitElement {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 10px;
+      font-size: var(--font-xs);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       color: var(--text-secondary);
       word-break: break-all;
@@ -270,7 +270,7 @@ export class HomePage extends LitElement {
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 10px;
+      font-size: var(--font-xs);
       cursor: pointer;
       font-family: inherit;
       transition: background var(--transition-fast);
@@ -301,7 +301,7 @@ export class HomePage extends LitElement {
     }
 
     .expand-error {
-      font-size: 9px;
+      font-size: var(--font-xs);
       color: var(--red-text);
       padding: 4px 8px;
       background: var(--red-bg);
@@ -325,14 +325,14 @@ export class HomePage extends LitElement {
     .detail-row:last-child { border-bottom: none; }
     .detail-row .dlabel {
       color: var(--text-muted);
-      font-size: 12px;
+      font-size: var(--font-sm);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 600;
     }
     .detail-row .dval {
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      font-size: 14px;
+      font-size: var(--font-md);
       color: var(--text);
       display: flex;
       align-items: center;
@@ -386,12 +386,12 @@ export class HomePage extends LitElement {
 
     .empty-title {
       font-weight: 600;
-      font-size: 15px;
+      font-size: var(--font-lg);
       color: var(--text);
     }
 
     .empty-desc {
-      font-size: 13px;
+      font-size: var(--font-md);
       color: var(--text-secondary);
       max-width: 240px;
       line-height: 1.5;
@@ -404,7 +404,7 @@ export class HomePage extends LitElement {
       border: none;
       background: var(--accent);
       color: var(--accent-fg);
-      font-size: 13px;
+      font-size: var(--font-md);
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
@@ -419,7 +419,7 @@ export class HomePage extends LitElement {
       background: none;
       border: none;
       color: var(--text-muted);
-      font-size: 12px;
+      font-size: var(--font-sm);
       cursor: pointer;
       font-family: inherit;
       text-decoration: underline;
@@ -472,7 +472,7 @@ export class HomePage extends LitElement {
       padding: 10px 20px;
       border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      font-size: 12px;
+      font-size: var(--font-sm);
       z-index: 100;
       animation: toast-in 0.3s ease;
     }
@@ -515,14 +515,14 @@ export class HomePage extends LitElement {
 
     .dialog-title {
       font-weight: 600;
-      font-size: 14px;
+      font-size: var(--font-md);
       margin-bottom: 8px;
       text-align: center;
     }
 
     .dialog-message {
       color: var(--text-secondary);
-      font-size: 12px;
+      font-size: var(--font-sm);
       margin-bottom: 20px;
       text-align: center;
       line-height: 1.5;
@@ -539,7 +539,7 @@ export class HomePage extends LitElement {
       border-radius: var(--radius-pill);
       border: none;
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-sm);
       font-weight: 500;
       font-family: inherit;
       transition: opacity var(--transition-fast);

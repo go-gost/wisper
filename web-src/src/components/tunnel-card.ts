@@ -88,7 +88,7 @@ export class TunnelCard extends LitElement {
     }
 
     .name {
-      font-size: 14px;
+      font-size: var(--font-md);
       font-weight: 600;
       color: var(--text);
       overflow: hidden;
@@ -97,7 +97,7 @@ export class TunnelCard extends LitElement {
     }
 
     .meta {
-      font-size: 12px;
+      font-size: var(--font-sm);
       color: var(--text-muted);
       margin-top: 1px;
     }
@@ -106,7 +106,7 @@ export class TunnelCard extends LitElement {
     .traffic {
       flex-shrink: 0;
       text-align: right;
-      font-size: 12px;
+      font-size: var(--font-sm);
       color: var(--text);
       line-height: 1.4;
       display: flex;
@@ -124,7 +124,7 @@ export class TunnelCard extends LitElement {
 
     .traffic-total {
       color: var(--text-secondary);
-      font-size: 11px;
+      font-size: var(--font-sm);
     }
 
     /* ── Chevron ── */
@@ -147,7 +147,7 @@ export class TunnelCard extends LitElement {
       background: var(--red-bg);
       border: 1px solid var(--red-border);
       border-radius: var(--radius-sm);
-      font-size: 9px;
+      font-size: var(--font-xs);
       color: var(--red-text);
     }
   `;
