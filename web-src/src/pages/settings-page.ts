@@ -33,6 +33,8 @@ export class SettingsPage extends LitElement {
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 1;
+  @state() private _inspectorUrl = '';
+  @state() private _inspectorConnected = false;
   @state() private _snackbar = '';
   @state() private _saving = false;
 
@@ -47,6 +49,7 @@ export class SettingsPage extends LitElement {
     this._theme = s.theme;
     this._lang = s.lang;
     this._statsInterval = s.stats_interval || 1;
+    this._inspectorUrl = s.inspector_url || '';
 
     this._unsubs.push(
       subscribe(() => {
@@ -57,6 +60,7 @@ export class SettingsPage extends LitElement {
         this._theme = s2.theme;
         this._lang = s2.lang;
         this._statsInterval = s2.stats_interval || 1;
+        this._inspectorUrl = s2.inspector_url || '';
         this.requestUpdate();
       }),
       onLocaleChange(() => this.requestUpdate()),
@@ -66,6 +70,7 @@ export class SettingsPage extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     for (const fn of this._unsubs) fn();
+    if (this._livenessTimer) clearTimeout(this._livenessTimer);
   }
 
   private _navigate(path: string) {
@@ -126,6 +131,37 @@ export class SettingsPage extends LitElement {
       await updateSettings({ stats_interval: secs });
     } catch {
       // UI already updated optimistically
+    }
+  }
+
+  private _livenessTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private _onInspectorUrlChange(url: string) {
+    this._inspectorUrl = url;
+    if (this._livenessTimer) clearTimeout(this._livenessTimer);
+    this._livenessTimer = setTimeout(() => this._checkLiveness(), 500);
+  }
+
+  private async _checkLiveness() {
+    if (!this._inspectorUrl) {
+      this._inspectorConnected = false;
+      return;
+    }
+    try {
+      const res = await fetch(`${this._inspectorUrl.replace(/\/$/, '')}/liveness`);
+      this._inspectorConnected = res.ok;
+    } catch {
+      this._inspectorConnected = false;
+    }
+    this.requestUpdate();
+  }
+
+  private async _saveInspectorUrl() {
+    try {
+      await updateSettings({ inspector_url: this._inspectorUrl });
+      this._showSnackbar('✓ ' + t('saved'));
+    } catch {
+      this._showSnackbar(t('saveFailed'));
     }
   }
 
@@ -323,6 +359,36 @@ export class SettingsPage extends LitElement {
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inspector -->
+        <div class="section">
+          <div class="section-title">🔍 Inspector</div>
+          <div class="card">
+            <div class="card-padded">
+              <p style="font-size:var(--font-xs);color:var(--text-muted);margin-bottom:12px;">
+                ${t('inspectorSettingsDesc')}
+              </p>
+              <div class="form-group">
+                <label class="form-label">${t('inspectorSettingsLabel')}</label>
+                <input class="form-input" .value=${this._inspectorUrl}
+                  placeholder=${t('inspectorUrlPlaceholder')}
+                  @input=${(e: Event) => this._onInspectorUrlChange((e.target as HTMLInputElement).value)}
+                  @blur=${() => this._saveInspectorUrl()}>
+                <p class="hint">Leave empty to disable traffic inspection.</p>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;font-size:var(--font-sm);padding-top:8px;">
+                <span style="display:flex;align-items:center;gap:6px;color:var(--text-muted);">
+                  <span style="width:8px;height:8px;border-radius:50%;background:${this._inspectorConnected ? 'var(--green)' : 'var(--red)'};display:inline-block;"></span>
+                  ${this._inspectorConnected ? t('inspectorConnected') : this._inspectorUrl ? t('inspectorUnreachable') : '—'}
+                </span>
+                <button class="save-btn" style="width:auto;padding:6px 16px;margin:0;"
+                  @click=${() => this._checkLiveness()}>
+                  ${t('inspectorTest')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
