@@ -128,6 +128,7 @@ export interface AppSettings {
   lang: LanguagePreference;
   theme: ThemePreference;
   stats_interval: number;
+  inspector_url?: string;
 }
 
 export interface AppSettingsUpdate {
@@ -137,4 +138,89 @@ export interface AppSettingsUpdate {
   lang?: string;
   theme?: string;
   stats_interval?: number;
+  inspector_url?: string;
 }
+
+// ─── Inspector ───────────────────────────────────────────────────────────
+
+export interface HttpRecord {
+  host: string;
+  method: string;
+  proto: string;
+  scheme: string;
+  uri: string;
+  statusCode: number;
+  request: { header: string; body: string };   // body = base64
+  response: { header: string; body: string };  // body = base64
+}
+
+export interface WsRecord {
+  from: string;
+  fin: boolean;
+  rsv1: boolean;
+  rsv2: boolean;
+  rsv3: boolean;
+  opcode: number;
+  masked: boolean;
+  maskKey?: number;
+  length: number;
+  payload: string;  // base64
+}
+
+export interface TlsRecord {
+  serverName: string;
+  cipherSuite: number;
+  compressionMethod: number;
+  proto: string;
+  version: number;
+  clientHello: string;  // hex
+  serverHello: string;  // hex
+}
+
+export interface DnsRecord {
+  id: number;
+  name: string;
+  class: number;
+  type: number;
+  question: string;
+  answer: string;
+  cached: boolean;
+}
+
+export interface InspectorRecord {
+  node?: string;
+  service: string;
+  network: string;
+  remote: string;
+  local: string;
+  host: string;
+  dst: string;
+  proto?: string;
+  clientIP: string;
+  clientID?: string;
+  http?: HttpRecord;
+  websocket?: WsRecord;
+  tls?: TlsRecord;
+  dns?: DnsRecord;
+  route?: string;
+  inputBytes: number;
+  outputBytes: number;
+  redirect?: string;
+  err?: string;
+  sid: string;
+  duration: number;
+  time: string;
+}
+
+export interface InspectorQueryResponse {
+  code: number;
+  data: {
+    list: InspectorRecord[];
+    before?: string;
+    after?: string;
+  };
+  msg: string;
+  error?: string;
+}
+
+export type ProtocolType = 'http' | 'websocket' | 'tls' | 'dns';
