@@ -1,20 +1,25 @@
 package api
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/runner"
+	"github.com/go-gost/wisper/runner/task"
 	"github.com/go-gost/wisper/tunnel"
 	"github.com/go-gost/wisper/tunnel/entrypoint"
 )
 
 // configResponse is the JSON representation of app settings.
 type configResponse struct {
-	Server     string `json:"server"`
-	Entrypoint string `json:"entrypoint"`
-	Insecure   bool   `json:"insecure"`
-	Lang       string `json:"lang"`
-	Theme      string `json:"theme"`
+	Server        string `json:"server"`
+	Entrypoint    string `json:"entrypoint"`
+	Insecure      bool   `json:"insecure"`
+	Lang          string `json:"lang"`
+	Theme         string `json:"theme"`
+	StatsInterval int    `json:"stats_interval"`
 }
 
 func handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -24,22 +29,29 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		settings = &config.Settings{}
 	}
 
+	statsInterval := settings.StatsInterval
+	if statsInterval <= 0 {
+		statsInterval = 1
+	}
+
 	writeJSON(w, http.StatusOK, configResponse{
-		Server:     settings.Server,
-		Entrypoint: settings.Entrypoint,
-		Insecure:   settings.Insecure,
-		Lang:       settings.Lang,
-		Theme:      settings.Theme,
+		Server:        settings.Server,
+		Entrypoint:    settings.Entrypoint,
+		Insecure:      settings.Insecure,
+		Lang:          settings.Lang,
+		Theme:         settings.Theme,
+		StatsInterval: statsInterval,
 	})
 }
 
 // configUpdateRequest is the JSON body for updating settings.
 type configUpdateRequest struct {
-	Server     *string `json:"server,omitempty"`
-	Entrypoint *string `json:"entrypoint,omitempty"`
-	Insecure   *bool   `json:"insecure,omitempty"`
-	Lang       *string `json:"lang,omitempty"`
-	Theme      *string `json:"theme,omitempty"`
+	Server        *string `json:"server,omitempty"`
+	Entrypoint    *string `json:"entrypoint,omitempty"`
+	Insecure      *bool   `json:"insecure,omitempty"`
+	Lang          *string `json:"lang,omitempty"`
+	Theme         *string `json:"theme,omitempty"`
+	StatsInterval *int    `json:"stats_interval,omitempty"`
 }
 
 func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +68,7 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	serverChanged := req.Server != nil && *req.Server != cfg.Settings.Server
 	entrypointChanged := req.Entrypoint != nil && *req.Entrypoint != cfg.Settings.Entrypoint
 	insecureChanged := req.Insecure != nil && *req.Insecure != cfg.Settings.Insecure
+	intervalChanged := req.StatsInterval != nil && *req.StatsInterval != cfg.Settings.StatsInterval
 
 	if req.Server != nil {
 		cfg.Settings.Server = *req.Server
@@ -72,6 +85,9 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if req.Theme != nil {
 		cfg.Settings.Theme = *req.Theme
 	}
+	if req.StatsInterval != nil && *req.StatsInterval > 0 {
+		cfg.Settings.StatsInterval = *req.StatsInterval
+	}
 
 	config.Set(cfg)
 	cfg.Write()
@@ -81,6 +97,16 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if serverChanged || entrypointChanged || insecureChanged {
 		tunnel.RestartRunning()
 		entrypoint.RestartRunning()
+	}
+
+	// Restart stats runner with the new interval.
+	if intervalChanged {
+		interval := time.Duration(cfg.Settings.StatsInterval) * time.Second
+		runner.Exec(context.Background(), task.UpdateStats(),
+			runner.WithAsync(true),
+			runner.WithInterval(interval),
+			runner.WithCancel(true),
+		)
 	}
 
 	handleGetConfig(w, r)

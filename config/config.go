@@ -109,8 +109,9 @@ type Settings struct {
 	Entrypoint string
 	// Skip TLS certificate verification for the tunnel server.
 	Insecure bool
-	Lang     string
-	Theme    string
+	Lang          string
+	Theme         string
+	StatsInterval int `yaml:"stats_interval,omitempty" json:"stats_interval,omitempty"`
 }
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.

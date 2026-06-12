@@ -95,6 +95,14 @@ const zh: Record<string, string> = {
   favoriteRemoved: '已从收藏移除',
   requiredField: '此字段为必填项',
 
+  // Stats interval
+  settingsStatsInterval: '统计更新频率',
+  settingsInterval1s: '1 秒',
+  settingsInterval2s: '2 秒',
+  settingsInterval5s: '5 秒',
+  settingsInterval10s: '10 秒',
+  settingsInterval30s: '30 秒',
+
   // Settings
   settingsFavorites: '收藏',
   settingsServer: '隧道服务器',

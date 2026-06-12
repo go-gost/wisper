@@ -95,6 +95,14 @@ const en: Record<string, string> = {
   favoriteRemoved: 'Removed from favorites',
   requiredField: 'This field is required',
 
+  // Stats interval
+  settingsStatsInterval: 'Stats update frequency',
+  settingsInterval1s: '1 second',
+  settingsInterval2s: '2 seconds',
+  settingsInterval5s: '5 seconds',
+  settingsInterval10s: '10 seconds',
+  settingsInterval30s: '30 seconds',
+
   // Settings
   settingsFavorites: 'Favorites',
   settingsServer: 'Tunnel Server',

@@ -2,6 +2,7 @@ import { GoBackend } from '../api/backend';
 import type { ItemStats } from '../api/types';
 import { applyStats as applyTunnelStats } from './tunnel-store';
 import { applyStats as applyEntrypointStats } from './entrypoint-store';
+import { getSettings } from './settings-store';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -23,11 +24,12 @@ export function setItemStats(id: string, s: ItemStats): void {
   stats.set(id, { ...s });
 }
 
-/** Start polling stats every 1 second. */
+/** Start polling stats with the configured interval (default 1s). */
 export function startPolling(): void {
   if (pollTimer !== null) return;
+  const intervalSec = getSettings().stats_interval || 1;
   poll();
-  pollTimer = setInterval(poll, 1000);
+  pollTimer = setInterval(poll, intervalSec * 1000);
 }
 
 /** Stop polling stats. */
@@ -36,6 +38,14 @@ export function stopPolling(): void {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+}
+
+/** Restart polling timer with a new interval (in seconds). No-op if timer is not running. */
+export function updatePollingInterval(intervalSec: number): void {
+  if (pollTimer === null) return;
+  const ms = (intervalSec > 0 ? intervalSec : 1) * 1000;
+  clearInterval(pollTimer);
+  pollTimer = setInterval(poll, ms);
 }
 
 // ─── Internal ────────────────────────────────────────────────────────────────

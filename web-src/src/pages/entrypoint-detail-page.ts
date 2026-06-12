@@ -342,6 +342,7 @@ export class EntrypointDetailPage extends LitElement {
     .stat-reset-mini {
       display: inline-flex;
       align-items: center;
+      margin-left: auto;
       opacity: 0;
       transition: opacity 0.15s;
       cursor: pointer;

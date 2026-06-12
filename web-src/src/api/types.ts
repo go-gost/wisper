@@ -125,6 +125,7 @@ export interface AppSettings {
   insecure: boolean;
   lang: LanguagePreference;
   theme: ThemePreference;
+  stats_interval: number;
 }
 
 export interface AppSettingsUpdate {
@@ -133,4 +134,5 @@ export interface AppSettingsUpdate {
   insecure?: boolean;
   lang?: string;
   theme?: string;
+  stats_interval?: number;
 }

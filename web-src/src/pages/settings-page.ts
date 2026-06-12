@@ -17,6 +17,14 @@ const LANG_OPTIONS: { value: LanguagePreference; labelKey: string }[] = [
   { value: 'zh', labelKey: 'settingsLangZh' },
 ];
 
+const INTERVAL_OPTIONS: { value: number; labelKey: string }[] = [
+  { value: 1, labelKey: 'settingsInterval1s' },
+  { value: 2, labelKey: 'settingsInterval2s' },
+  { value: 5, labelKey: 'settingsInterval5s' },
+  { value: 10, labelKey: 'settingsInterval10s' },
+  { value: 30, labelKey: 'settingsInterval30s' },
+];
+
 @customElement('settings-page')
 export class SettingsPage extends LitElement {
   @state() private _server = '';
@@ -24,6 +32,7 @@ export class SettingsPage extends LitElement {
   @state() private _insecure = false;
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
+  @state() private _statsInterval = 1;
   @state() private _snackbar = '';
   @state() private _saving = false;
 
@@ -37,6 +46,7 @@ export class SettingsPage extends LitElement {
     this._insecure = s.insecure;
     this._theme = s.theme;
     this._lang = s.lang;
+    this._statsInterval = s.stats_interval || 1;
 
     this._unsubs.push(
       subscribe(() => {
@@ -46,6 +56,7 @@ export class SettingsPage extends LitElement {
         this._insecure = s2.insecure;
         this._theme = s2.theme;
         this._lang = s2.lang;
+        this._statsInterval = s2.stats_interval || 1;
         this.requestUpdate();
       }),
       onLocaleChange(() => this.requestUpdate()),
@@ -102,6 +113,17 @@ export class SettingsPage extends LitElement {
     this._showSnackbar('✓ ' + t(LANG_OPTIONS.find(o => o.value === lang)?.labelKey ?? 'settingsLangEn'));
     try {
       await updateSettings({ lang });
+    } catch {
+      // UI already updated optimistically
+    }
+  }
+
+  private async _setInterval(secs: number) {
+    this._statsInterval = secs;
+    this.requestUpdate();
+    this._showSnackbar('✓ ' + t(INTERVAL_OPTIONS.find(o => o.value === secs)?.labelKey ?? 'settingsInterval1s'));
+    try {
+      await updateSettings({ stats_interval: secs });
     } catch {
       // UI already updated optimistically
     }
@@ -326,6 +348,15 @@ export class SettingsPage extends LitElement {
               <span class="selector-label">${t('settingsTheme')}</span>
               <span class="selector-value">
                 ${t(THEME_OPTIONS.find(o => o.value === this._theme)?.labelKey ?? 'settingsThemeSystem')}
+                ${icon('chevron-right')}
+              </span>
+            </div>
+            <div class="selector-row" @click=${() => this._setInterval(
+              this._cycleOption(this._statsInterval, INTERVAL_OPTIONS.map(o => o.value))
+            )}>
+              <span class="selector-label">${t('settingsStatsInterval')}</span>
+              <span class="selector-value">
+                ${t(INTERVAL_OPTIONS.find(o => o.value === this._statsInterval)?.labelKey ?? 'settingsInterval1s')}
                 ${icon('chevron-right')}
               </span>
             </div>

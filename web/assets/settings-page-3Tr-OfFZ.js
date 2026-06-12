@@ -1,4 +1,4 @@
-import{a as f,z as b,h as m,A as x,B as v,j as e,b as g,i as _,t as y}from"./index-Dk6fy_Gb.js";import{r as n}from"./state-4VaTXaoL.js";import{i as l}from"./app-scaffold-Dp_B18FD.js";var w=Object.defineProperty,k=Object.getOwnPropertyDescriptor,r=(t,s,o,c)=>{for(var i=c>1?void 0:c?k(s,o):s,d=t.length-1,p;d>=0;d--)(p=t[d])&&(i=(c?p(s,o,i):p(i))||i);return c&&i&&w(s,o,i),i};const h=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],u=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}];let a=class extends f{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._theme="system",this._lang="en",this._snackbar="",this._saving=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback();const t=b();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._theme=t.theme,this._lang=t.lang,this._unsubs.push(m(()=>{const s=b();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._theme=s.theme,this._lang=s.lang,this.requestUpdate()}),x(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t()}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await v({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(h.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await v({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await v({lang:t})}catch{}}_cycleOption(t,s){const o=s.indexOf(t);return s[(o+1)%s.length]}render(){return g`
+import{a as m,z as g,h as _,A as x,B as d,j as e,b as f,i as y,t as w}from"./index-_NNrTiB-.js";import{r as i}from"./state-BqsBkMiP.js";import{i as l}from"./app-scaffold-CfbwovvP.js";var k=Object.defineProperty,$=Object.getOwnPropertyDescriptor,r=(t,s,o,c)=>{for(var n=c>1?void 0:c?$(s,o):s,p=t.length-1,v;p>=0;p--)(v=t[p])&&(n=(c?v(s,o,n):v(n))||n);return c&&n&&k(s,o,n),n};const h=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],u=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],b=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];let a=class extends m{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._theme="system",this._lang="en",this._statsInterval=1,this._snackbar="",this._saving=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback();const t=g();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._unsubs.push(_(()=>{const s=g();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this.requestUpdate()}),x(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t()}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await d({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(h.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await d({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await d({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e(b.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await d({stats_interval:t})}catch{}}_cycleOption(t,s){const o=s.indexOf(t);return s[(o+1)%s.length]}render(){return f`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -69,12 +69,19 @@ import{a as f,z as b,h as m,A as x,B as v,j as e,b as g,i as _,t as y}from"./ind
                 ${l("chevron-right")}
               </span>
             </div>
+            <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,b.map(t=>t.value)))}>
+              <span class="selector-label">${e("settingsStatsInterval")}</span>
+              <span class="selector-value">
+                ${e(b.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
+                ${l("chevron-right")}
+              </span>
+            </div>
           </div>
         </div>
 
-        ${this._snackbar?g`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?f`<div class="toast">${this._snackbar}</div>`:""}
       </app-scaffold>
-    `}};a.styles=_`
+    `}};a.styles=y`
     /* ── Back nav ── */
     .back-btn {
       background: none; border: none; cursor: pointer;
@@ -213,4 +220,4 @@ import{a as f,z as b,h as m,A as x,B as v,j as e,b as g,i as _,t as y}from"./ind
       from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-  `;r([n()],a.prototype,"_server",2);r([n()],a.prototype,"_entrypoint",2);r([n()],a.prototype,"_insecure",2);r([n()],a.prototype,"_theme",2);r([n()],a.prototype,"_lang",2);r([n()],a.prototype,"_snackbar",2);r([n()],a.prototype,"_saving",2);a=r([y("settings-page")],a);export{a as SettingsPage};
+  `;r([i()],a.prototype,"_server",2);r([i()],a.prototype,"_entrypoint",2);r([i()],a.prototype,"_insecure",2);r([i()],a.prototype,"_theme",2);r([i()],a.prototype,"_lang",2);r([i()],a.prototype,"_statsInterval",2);r([i()],a.prototype,"_snackbar",2);r([i()],a.prototype,"_saving",2);a=r([w("settings-page")],a);export{a as SettingsPage};

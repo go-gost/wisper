@@ -36,10 +36,14 @@ func main() {
 	tunnel.LoadConfig()
 	entrypoint.LoadConfig()
 
-	// Start periodic stats update (every second).
+	// Start periodic stats update.
+	statsInterval := 1
+	if s := config.Get().Settings; s != nil && s.StatsInterval > 0 {
+		statsInterval = s.StatsInterval
+	}
 	runner.Exec(context.Background(), task.UpdateStats(),
 		runner.WithAsync(true),
-		runner.WithInterval(time.Second),
+		runner.WithInterval(time.Duration(statsInterval)*time.Second),
 		runner.WithCancel(true),
 	)
 

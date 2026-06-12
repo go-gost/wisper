@@ -37,6 +37,7 @@ let settings: AppSettings = {
   insecure: false,
   lang: 'en',
   theme: 'system',
+  stats_interval: 1,
 };
 
 const listeners = new Set<() => void>();
@@ -69,6 +70,7 @@ export async function loadSettings(): Promise<void> {
       insecure: cfg.insecure || false,
       lang: cfg.lang || 'en',
       theme: cfg.theme || getStoredTheme(),
+      stats_interval: cfg.stats_interval || 1,
     };
   } catch {
     // Backend unavailable — use stored/local preferences.
@@ -100,6 +102,9 @@ export async function updateSettings(update: AppSettingsUpdate): Promise<void> {
   if (update.theme !== undefined) {
     settings.theme = update.theme as ThemePreference;
     applyTheme(settings.theme);
+  }
+  if (update.stats_interval !== undefined) {
+    settings.stats_interval = update.stats_interval;
   }
 
   notify();

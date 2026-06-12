@@ -1,10 +1,10 @@
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { createRouter } from './router/routes';
-import { loadSettings } from './store/settings-store';
+import { loadSettings, subscribe, getSettings } from './store/settings-store';
 import { refresh as refreshTunnels } from './store/tunnel-store';
 import { refresh as refreshEntrypoints } from './store/entrypoint-store';
-import { startPolling, stopPolling } from './store/stats-store';
+import { startPolling, stopPolling, updatePollingInterval } from './store/stats-store';
 
 /**
  * WisperApp — root application component.
@@ -32,6 +32,12 @@ export class WisperApp extends LitElement {
 
     // Begin live stats polling.
     startPolling();
+
+    // React to polling interval changes from settings.
+    subscribe(() => {
+      const s = getSettings();
+      updatePollingInterval(s.stats_interval);
+    });
   }
 
   disconnectedCallback() {
