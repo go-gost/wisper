@@ -151,17 +151,19 @@ export class TunnelDetailPage extends LitElement {
 
     this._saving = true;
     try {
-      const body = {
+      const body: Record<string, unknown> = {
         name: this._name.trim(),
         type: this.tunnelType,
         endpoint: this._endpoint.trim(),
         hostname: this._hostname.trim() || undefined,
-        username: this._username.trim() || undefined,
-        password: this._password || undefined,
         enableTLS: this._enableTLS,
         rewriteHost: this._rewriteHost,
         file_upload: this._fileUpload,
       };
+      if (this._showAuth) {
+        body.username = this._username.trim() || undefined;
+        body.password = this._password || undefined;
+      }
 
       if (this.mode === 'create') {
         await import('../store/tunnel-store').then(m => m.create(body));
@@ -774,13 +776,13 @@ export class TunnelDetailPage extends LitElement {
                 ? html`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">Current Conns</div>
-                      <div class="stat-value">${formatNumber(stats.current_conns)}</div>
-                      <div class="stat-rate">${formatRate(stats.request_rate)}</div>
+                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${() => this._handleResetStats('conns')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-value">${formatNumber(stats.total_conns)}</div>
+                      <div class="stat-rate">${formatNumber(stats.current_conns)} active · ${stats.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Total Conns</div>
-                      <div class="stat-value">${formatNumber(stats.total_conns)}</div>
+                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${() => this._handleResetStats('errors')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-value">${formatNumber(stats.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Download <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
@@ -868,7 +870,7 @@ export class TunnelDetailPage extends LitElement {
                     <div class="switch-row" style="border-bottom:none;">
                       <span class="switch-label">${t('switchBasicAuth')}</span>
                       <div class="switch ${this._showAuth ? 'on' : ''}"
-                        @click=${() => { this._showAuth = !this._showAuth; }}>
+                        @click=${() => { this._showAuth = !this._showAuth; if (!this._showAuth) { this._username = ''; this._password = ''; } }}>
                         <div class="switch-knob"></div>
                       </div>
                     </div>

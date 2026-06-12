@@ -38,6 +38,7 @@ type tunnelOptionsResp struct {
 type statsResponse struct {
 	CurrentConns    uint64  `json:"current_conns"`
 	TotalConns      uint64  `json:"total_conns"`
+	TotalErrs       uint64  `json:"total_errs"`
 	RequestRate     float64 `json:"request_rate"`
 	InputBytes      uint64  `json:"input_bytes"`
 	OutputBytes     uint64  `json:"output_bytes"`
@@ -94,6 +95,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
 			TotalConns:      safeSub(s.TotalConns, bl.TotalConns),
+			TotalErrs:       safeSub(s.TotalErrs, bl.TotalErrs),
 			RequestRate:     s.RequestRate,
 			InputBytes:      safeSub(s.InputBytes, bl.InputBytes),
 			OutputBytes:     safeSub(s.OutputBytes, bl.OutputBytes),
@@ -238,6 +240,7 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t.SetStats(old.Stats())
+		t.SetStatsBaseline(old.StatsBaseline())
 	t.Favorite(old.IsFavorite())
 
 	if err := t.Run(); err != nil {
@@ -313,6 +316,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newT.SetStats(t.Stats())
+		newT.SetStatsBaseline(t.StatsBaseline())
 	newT.Favorite(t.IsFavorite())
 
 	if err := newT.Run(); err != nil {
@@ -362,6 +366,10 @@ func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
 		bl.InputBytes = s.InputBytes
 	case "output":
 		bl.OutputBytes = s.OutputBytes
+	case "conns":
+		bl.TotalConns = s.TotalConns
+	case "errors":
+		bl.TotalErrs = s.TotalErrs
 	default:
 		bl = config.ServiceStats{
 			TotalConns: s.TotalConns,

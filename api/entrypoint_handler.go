@@ -123,6 +123,7 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ep.SetStats(old.Stats())
+		ep.SetStatsBaseline(old.StatsBaseline())
 	ep.Favorite(old.IsFavorite())
 
 	if err := ep.Run(); err != nil {
@@ -191,6 +192,7 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newEP.SetStats(ep.Stats())
+		newEP.SetStatsBaseline(ep.StatsBaseline())
 	newEP.Favorite(ep.IsFavorite())
 
 	if err := newEP.Run(); err != nil {
@@ -240,6 +242,10 @@ func handleResetEntrypointStats(w http.ResponseWriter, r *http.Request) {
 		bl.InputBytes = s.InputBytes
 	case "output":
 		bl.OutputBytes = s.OutputBytes
+	case "conns":
+		bl.TotalConns = s.TotalConns
+	case "errors":
+		bl.TotalErrs = s.TotalErrs
 	default:
 		bl = config.ServiceStats{
 			TotalConns: s.TotalConns,

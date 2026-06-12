@@ -147,7 +147,6 @@ func (s *udpEntryPoint) Run() (err error) {
 		pStats := xstats.NewStats(false)
 		{
 			prev := s.Stats()
-			pStats.Add(stats.KindCurrentConns, int64(prev.CurrentConns))
 			pStats.Add(stats.KindInputBytes, int64(prev.InputBytes))
 			pStats.Add(stats.KindOutputBytes, int64(prev.OutputBytes))
 			pStats.Add(stats.KindTotalConns, int64(prev.TotalConns))

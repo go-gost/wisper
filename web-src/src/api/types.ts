@@ -23,6 +23,7 @@ export const ENTRYPOINT_TYPES: { value: EntrypointType; label: string; desc: str
 export interface ServiceStats {
   current_conns: number;
   total_conns: number;
+  total_errs: number;
   request_rate: number;
   input_bytes: number;
   output_bytes: number;
@@ -33,6 +34,7 @@ export interface ServiceStats {
 export interface ItemStats {
   current_conns: number;
   total_conns: number;
+  total_errs: number;
   request_rate: number;
   input_bytes: number;
   output_bytes: number;

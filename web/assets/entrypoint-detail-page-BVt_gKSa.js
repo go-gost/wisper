@@ -1,12 +1,12 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-C0gfZ4yn.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
-import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v as D,b as i,i as z,t as C}from"./index-C0gfZ4yn.js";import{n as g,r as l}from"./state-B6WnLpSO.js";import{i as p}from"./app-scaffold-Hqzdpc3a.js";import{c as I,b as h,a as u,f}from"./format-B-__ZPmv.js";var E=Object.defineProperty,R=Object.getOwnPropertyDescriptor,r=(t,e,n,s)=>{for(var d=s>1?void 0:s?R(e,n):e,c=t.length-1,b;c>=0;c--)(b=t[c])&&(d=(s?b(e,n,d):b(d))||d);return s&&d&&E(e,n,d),d};let o=class extends m{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const n=y().find(s=>s.id===t);n&&(this._entrypoint=n,e?(this.mode="edit",this._populateForm(n)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(n)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0};this.mode==="create"?(await v(()=>import("./index-C0gfZ4yn.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await v(()=>import("./index-C0gfZ4yn.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.update(this.entrypointId,t)),this._showSnackbar(a("saved")),this.mode="view",await x())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await w(this.entrypointId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await $(this.entrypointId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(a("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(a("saved"))}catch{this._showSnackbar(a("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,e=t?t.stats:null,n=this._typeLabel();return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-O67Tiz1x.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{a as m,f as _,c as x,j as a,_ as u,w as y,x as $,l as w,n as k,y as S,v as D,b as i,i as z,t as E}from"./index-O67Tiz1x.js";import{n as g,r as d}from"./state-Cl7TSpAo.js";import{i as l}from"./app-scaffold-DnlFs8T_.js";import{c as I,b as v,f as h,a as f}from"./format-B-__ZPmv.js";var R=Object.defineProperty,C=Object.getOwnPropertyDescriptor,r=(t,e,o,s)=>{for(var p=s>1?void 0:s?C(e,o):e,c=t.length-1,b;c>=0;c--)(b=t[c])&&(p=(s?b(e,o,p):b(p))||p);return s&&p&&R(e,o,p),p};let n=class extends m{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const o=x().find(s=>s.id===t);o&&(this._entrypoint=o,e?(this.mode="edit",this._populateForm(o)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(o)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-O67Tiz1x.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await u(()=>import("./index-O67Tiz1x.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.update(this.entrypointId,t)),this._showSnackbar(a("saved")),this.mode="view",await y())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await $(this.entrypointId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await w(this.entrypointId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(a("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(a("saved"))}catch{this._showSnackbar(a("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,e=t?t.stats:null,o=this._typeLabel();return i`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
-            ${p("chevron-left")}
+            ${l("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${a("entrypointNewTitle")} — ${n}`:n+" Entrypoint"}
+            ${this.mode==="create"?`${a("entrypointNewTitle")} — ${o}`:o+" Entrypoint"}
           </span>
 
           ${this.mode==="view"&&t?i`
@@ -17,7 +17,7 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
                 </button>`}
             `:i`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
-                ${p("check")} ${a("btnSave")}
+                ${l("check")} ${a("btnSave")}
               </button>
             `}
         </div>
@@ -35,13 +35,13 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${n} Entrypoint</span>
+                  <span class="info-value text">${o} Entrypoint</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
                   <span class="info-value uuid">${t.id??"—"}</span>
                   ${t.id?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
-                      ${p("copy")}
+                      ${l("copy")}
                     </button>`:""}
                 </div>
                 <div class="info-row">
@@ -58,23 +58,23 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
               ${e?i`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">Current Conns</div>
-                      <div class="stat-value">${h(e.current_conns)}</div>
-                      <div class="stat-rate">${u(e.request_rate)}</div>
+                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${a("btnResetStats")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${v(e.total_conns)}</div>
+                      <div class="stat-rate">${v(e.current_conns)} active · ${e.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Total Conns</div>
-                      <div class="stat-value">${h(e.total_conns)}</div>
+                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${a("btnResetStats")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${v(e.total_errs)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${a("btnResetOutput")}">${p("rotate-cw")}</span></div>
-                      <div class="stat-value">${f(e.output_bytes)}</div>
-                      <div class="stat-rate">${u(e.output_rate_bytes)}</div>
+                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${a("btnResetOutput")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${h(e.output_bytes)}</div>
+                      <div class="stat-rate">${f(e.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${a("btnResetInput")}">${p("rotate-cw")}</span></div>
-                      <div class="stat-value">${f(e.input_bytes)}</div>
-                      <div class="stat-rate">${u(e.input_rate_bytes)}</div>
+                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${a("btnResetInput")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${h(e.input_bytes)}</div>
+                      <div class="stat-rate">${f(e.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
@@ -82,7 +82,7 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
 
             <div class="section">
               <button class="btn-edit-bottom" @click=${()=>this._enterEdit()}>
-                ${p("edit")} ${a("btnEdit")}
+                ${l("edit")} ${a("btnEdit")}
               </button>
             </div>
           `:""}
@@ -93,7 +93,7 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
               <div class="card" style="padding:16px;">
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${n+" Entrypoint"}>
+                  <input class="form-input" readonly .value=${o+" Entrypoint"}>
                 </div>
 
                 <div class="form-group">
@@ -121,7 +121,7 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
-                        ${p("trash")} ${a("btnDelete")}
+                        ${l("trash")} ${a("btnDelete")}
                       </button>
                     </div>
                   `:""}
@@ -165,7 +165,7 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
             </div>
           `:""}
       </app-scaffold>
-    `}};o.styles=z`
+    `}};n.styles=z`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -403,4 +403,4 @@ import{a as m,f as _,c as y,j as a,_ as v,w as x,x as w,l as $,n as k,y as S,v a
       gap: 6px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;r([g()],o.prototype,"entrypointType",2);r([g()],o.prototype,"entrypointId",2);r([l()],o.prototype,"mode",2);r([l()],o.prototype,"_entrypoint",2);r([l()],o.prototype,"_saving",2);r([l()],o.prototype,"_snackbar",2);r([l()],o.prototype,"_showDeleteDialog",2);r([l()],o.prototype,"_showResetDialog",2);r([l()],o.prototype,"_name",2);r([l()],o.prototype,"_endpoint",2);r([l()],o.prototype,"_tunnelId",2);o=r([C("entrypoint-detail-page")],o);export{o as EntrypointDetailPage};
+  `;r([g()],n.prototype,"entrypointType",2);r([g()],n.prototype,"entrypointId",2);r([d()],n.prototype,"mode",2);r([d()],n.prototype,"_entrypoint",2);r([d()],n.prototype,"_saving",2);r([d()],n.prototype,"_snackbar",2);r([d()],n.prototype,"_showDeleteDialog",2);r([d()],n.prototype,"_showResetDialog",2);r([d()],n.prototype,"_name",2);r([d()],n.prototype,"_endpoint",2);r([d()],n.prototype,"_tunnelId",2);n=r([E("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
