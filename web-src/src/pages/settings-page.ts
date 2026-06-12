@@ -303,14 +303,12 @@ export class SettingsPage extends LitElement {
                 <input class="form-input" .value=${this._server}
                   placeholder=${t('settingsServerHint')}
                   @input=${(e: Event) => { this._server = (e.target as HTMLInputElement).value; }}>
-                <div class="hint">${t('settingsServerHint')}</div>
               </div>
               <div class="form-group">
                 <label class="form-label">${t('settingsEntrypoint')}</label>
                 <input class="form-input" .value=${this._entrypoint}
                   placeholder=${t('settingsEntrypointHint')}
                   @input=${(e: Event) => { this._entrypoint = (e.target as HTMLInputElement).value; }}>
-                <div class="hint">${t('settingsEntrypointHint')}</div>
               </div>
               <div class="switch-row" style="border-bottom:none;">
                 <div>
