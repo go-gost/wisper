@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getTunnels, refresh, remove, start, stop, subscribe, resetStats } from '../store/tunnel-store';
-import { getStats } from '../store/stats-store';
+import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber } from '../utils/format';
 import type { Tunnel, TunnelType } from '../api/types';
@@ -223,6 +223,11 @@ export class TunnelDetailPage extends LitElement {
     this._showResetDialog = false;
     try {
       await resetStats(this.tunnelId, this._resetKind);
+      // Immediately sync the stats cache from the refreshed tunnel data so
+      // the detail page shows the correct baseline-subtracted values.
+      if (this._tunnel) {
+        setItemStats(this.tunnelId, this._tunnel.stats);
+      }
       this._showSnackbar(t('saved'));
     } catch {
       this._showSnackbar(t('saveFailed'));
@@ -432,8 +437,11 @@ export class TunnelDetailPage extends LitElement {
       align-items: center;
       opacity: 0;
       transition: opacity 0.15s;
+      cursor: pointer;
+      color: var(--text-muted);
     }
     .stat-box:hover .stat-reset-mini { opacity: 1; }
+    .stat-reset-mini:hover { color: var(--accent); }
 
     .stat-value {
       font-size: var(--font-xl);
@@ -653,7 +661,7 @@ export class TunnelDetailPage extends LitElement {
 
   render() {
     const t2 = this._tunnel;
-    const stats = t2 ? (getStats(t2.id) ?? t2.stats) : null;
+    const stats = t2 ? t2.stats : null;
     const typeLabel = this._typeLabel();
 
     return html`
@@ -672,15 +680,15 @@ export class TunnelDetailPage extends LitElement {
           ${this.mode === 'view' && t2
             ? html`
               ${t2.status === 'running'
-                ? html`<button class="pill-btn danger appbar-action" @click=${this._handleStop}>
+                ? html`<button class="pill-btn danger appbar-action" @click=${() => this._handleStop()}>
                   ■ ${t('btnStop')}
                 </button>`
-                : html`<button class="pill-btn primary appbar-action" @click=${this._handleStart}>
+                : html`<button class="pill-btn primary appbar-action" @click=${() => this._handleStart()}>
                   ▶ ${t('btnStart')}
                 </button>`}
             `
             : html`
-              <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${this._handleSave}>
+              <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${() => this._handleSave()}>
                 ${icon('check')} ${t('btnSave')}
               </button>
             `}
@@ -774,12 +782,12 @@ export class TunnelDetailPage extends LitElement {
                       <div class="stat-value">${formatNumber(stats.total_conns)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download <a class="stat-reset-mini" @click=${() => this._handleResetStats('output')}>${icon('rotate-cw')}</a></div>
+                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatBytes(stats.output_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload <a class="stat-reset-mini" @click=${() => this._handleResetStats('input')}>${icon('rotate-cw')}</a></div>
+                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${() => this._handleResetStats('input')} title="${t('btnResetInput')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatBytes(stats.input_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.input_rate_bytes)}</div>
                     </div>
@@ -792,7 +800,7 @@ export class TunnelDetailPage extends LitElement {
             ${this.mode === 'view' && t2
               ? html`
                 <div class="section">
-                  <button class="btn-edit-bottom" @click=${this._enterEdit}>
+                  <button class="btn-edit-bottom" @click=${() => this._enterEdit()}>
                     ${icon('edit')} ${t('btnEdit')}
                   </button>
                 </div>
@@ -921,7 +929,7 @@ export class TunnelDetailPage extends LitElement {
                   <button class="dialog-btn cancel" @click=${() => { this._showResetDialog = false; }}>
                     ${t('btnCancel')}
                   </button>
-                  <button class="dialog-btn danger" @click=${this._doResetStats}>
+                  <button class="dialog-btn danger" @click=${() => this._doResetStats()}>
                     ${t('btnResetStats')}
                   </button>
                 </div>
@@ -940,7 +948,7 @@ export class TunnelDetailPage extends LitElement {
                   <button class="dialog-btn cancel" @click=${() => { this._showDeleteDialog = false; }}>
                     ${t('btnCancel')}
                   </button>
-                  <button class="dialog-btn danger" @click=${this._handleDelete}>
+                  <button class="dialog-btn danger" @click=${() => this._handleDelete()}>
                     ${t('btnDelete')}
                   </button>
                 </div>

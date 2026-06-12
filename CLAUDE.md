@@ -5,19 +5,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-# Build Go backend for current platform
+# ⚠️ BUILD ORDER: web FIRST, then backend.
+# The Go binary embeds web/ via //go:embed, so the web build must exist
+# before go build runs. `make all` enforces this; plain go build does not.
+
+# Step 1: Build Lit web UI
+# ⚠️ MUST use `make web` — NEVER run `npx vite build` directly.
+# The Makefile handles conditional rebuild (stamp-based) and cleanup.
+make web
+
+# Step 2: Build Go backend for current platform (embeds web/)
 go build -o wisper .
 
-# Build all platforms (linux, darwin, windows) into dist/
+# Or build all platforms (linux, darwin, windows) — runs web + go build
 make all
 
 # Build Go backend for a specific target (from Makefile)
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/linux-amd64/wisper .
-
-# Build Lit web UI for embedding into Go binary
-# ⚠️ MUST use `make web` — NEVER run `npx vite build` directly.
-# The Makefile handles conditional rebuild (stamp-based) and cleanup.
-make web
 
 # Force web rebuild (ignore stamp)
 make web-force

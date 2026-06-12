@@ -12,6 +12,7 @@ import (
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/listener"
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
@@ -139,13 +140,21 @@ func (s *tcpEntryPoint) Run() (err error) {
 			return
 		}
 
-		stats := xstats.NewStats(false)
+		pStats := xstats.NewStats(false)
+		{
+			prev := s.Stats()
+			pStats.Add(stats.KindCurrentConns, int64(prev.CurrentConns))
+			pStats.Add(stats.KindInputBytes, int64(prev.InputBytes))
+			pStats.Add(stats.KindOutputBytes, int64(prev.OutputBytes))
+			pStats.Add(stats.KindTotalConns, int64(prev.TotalConns))
+			pStats.Add(stats.KindTotalErrs, int64(prev.TotalErrs))
+		}
 
 		cfg := s.config.Services[0]
 		ln := tcp.NewListener(
 			listener.AddrOption(cfg.Addr),
 			listener.LoggerOption(log.WithFields(map[string]any{"kind": "listener", "listener": "tcp"})),
-			listener.StatsOption(stats),
+			listener.StatsOption(pStats),
 		)
 		if err = ln.Init(mdx.NewMetadata(cfg.Listener.Metadata)); err != nil {
 			return
@@ -172,7 +181,7 @@ func (s *tcpEntryPoint) Run() (err error) {
 		}
 		s.forward = xservice.NewService(s.opts.Name, ln, h,
 			xservice.LoggerOption(log),
-			xservice.StatsOption(stats),
+			xservice.StatsOption(pStats),
 		)
 	}
 

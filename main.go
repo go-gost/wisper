@@ -22,7 +22,7 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:8900", "HTTP API listen address")
+	addr := flag.String("addr", ":8900", "HTTP API listen address")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
@@ -38,7 +38,7 @@ func main() {
 
 	// Start periodic stats update (every second).
 	runner.Exec(context.Background(), task.UpdateStats(),
-		runner.WithAync(true),
+		runner.WithAsync(true),
 		runner.WithInterval(time.Second),
 		runner.WithCancel(true),
 	)

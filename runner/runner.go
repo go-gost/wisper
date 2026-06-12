@@ -34,7 +34,7 @@ type Options struct {
 type Option func(opts *Options)
 
 // WithAync sets whether the task runs asynchronously.
-func WithAync(async bool) Option {
+func WithAsync(async bool) Option {
 	return func(opts *Options) {
 		opts.Async = async
 	}

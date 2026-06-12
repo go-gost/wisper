@@ -15,6 +15,14 @@ export function getStats(id: string): ItemStats | undefined {
   return stats.get(id);
 }
 
+/** Immediately update cached stats for an item.
+ *  Called by resetStats to sync the cache with the freshly-refreshed store
+ *  data, so the detail page shows the correct baseline-subtracted values
+ *  without waiting for the next poll cycle. */
+export function setItemStats(id: string, s: ItemStats): void {
+  stats.set(id, { ...s });
+}
+
 /** Start polling stats every 1 second. */
 export function startPolling(): void {
   if (pollTimer !== null) return;

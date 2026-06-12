@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
+import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
 import type { Entrypoint, EntrypointType } from '../api/types';
 import '../components/app-scaffold';
@@ -56,7 +57,6 @@ export class EntrypointDetailPage extends LitElement {
     const isEdit = window.location.search.includes('edit');
 
     if (id === 'new' || !id) {
-      // Guard: don't reset form fields on every store update (stats polling).
       if (this.mode === 'create') return;
       this.mode = 'create';
       this._entrypoint = null;
@@ -64,8 +64,6 @@ export class EntrypointDetailPage extends LitElement {
       return;
     }
 
-    // Guard: when already editing this entrypoint, skip re-population triggered
-    // by store updates (e.g. stats polling every 1s).
     if (this.mode === 'edit' && this._entrypoint?.id === id) return;
 
     const existing = getEntrypoints().find(e => e.id === id);
@@ -91,12 +89,9 @@ export class EntrypointDetailPage extends LitElement {
 
   private _populateForm(ep: Entrypoint) {
     this._name = ep.name;
-    // ep.entrypoint is the local bind address (e.g. :8080)
     this._endpoint = ep.entrypoint;
     this._tunnelId = ep.id ?? '';
   }
-
-  // ── Navigation ───────────────────────────────────────────────────────
 
   private _navigate(path: string) {
     window.history.pushState({}, '', path);
@@ -110,8 +105,6 @@ export class EntrypointDetailPage extends LitElement {
     }
   }
 
-  // ── Snackbar ─────────────────────────────────────────────────────────
-
   private _showSnackbar(msg: string) {
     this._snackbar = msg;
     setTimeout(() => {
@@ -119,8 +112,6 @@ export class EntrypointDetailPage extends LitElement {
       this.requestUpdate();
     }, 2500);
   }
-
-  // ── Actions ──────────────────────────────────────────────────────────
 
   private async _handleSave() {
     if (!this._name.trim()) {
@@ -197,13 +188,15 @@ export class EntrypointDetailPage extends LitElement {
     this._showResetDialog = false;
     try {
       await resetStats(this.entrypointId, this._resetKind);
+      // Immediately sync the stats cache from the refreshed entrypoint data.
+      if (this._entrypoint) {
+        setItemStats(this.entrypointId, this._entrypoint.stats);
+      }
       this._showSnackbar(t('saved'));
     } catch {
       this._showSnackbar(t('saveFailed'));
     }
   }
-
-  // ── Helpers ──────────────────────────────────────────────────────────
 
   private _typeLabel(): string {
     return this.entrypointType.toUpperCase();
@@ -245,10 +238,8 @@ export class EntrypointDetailPage extends LitElement {
     .pill-btn:hover { opacity: 0.85; }
     .pill-btn.appbar-action { margin-left: auto; }
 
-    /* ── Layout ── */
     .section { padding: 16px; }
 
-    /* ── Status banner ── */
     .status-banner {
       display: flex; align-items: center; gap: 8px;
       padding: 10px 16px; margin: 0 16px;
@@ -271,7 +262,6 @@ export class EntrypointDetailPage extends LitElement {
     }
     .status-spacer { flex: 1; }
 
-    /* ── Info card ── */
     .card {
       background: var(--surface);
       border-radius: var(--radius-lg);
@@ -311,7 +301,48 @@ export class EntrypointDetailPage extends LitElement {
     }
     .copy-btn-mini:hover { background: var(--border-subtle); color: var(--text); }
 
-    /* ── Form ── */
+    /* ── Stats grid ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px;
+    }
+
+    .stat-value {
+      font-size: var(--font-xl);
+      font-weight: 700;
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    }
+
+    .stat-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-reset-mini {
+      display: inline-flex;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 0.15s;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+    .stat-box:hover .stat-reset-mini { opacity: 1; }
+    .stat-reset-mini:hover { color: var(--accent); }
+
     .form-group { margin-bottom: 14px; }
     .form-label {
       display: block;
@@ -333,7 +364,6 @@ export class EntrypointDetailPage extends LitElement {
       background: var(--border-subtle); color: var(--text-muted);
     }
 
-    /* ── Danger zone ── */
     .danger-zone {
       margin-top: 20px; padding: 14px;
       border: 1px solid var(--red-border);
@@ -344,7 +374,6 @@ export class EntrypointDetailPage extends LitElement {
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
     }
 
-    /* ── Toast ── */
     .toast {
       position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
       background: var(--surface); color: var(--text);
@@ -358,7 +387,6 @@ export class EntrypointDetailPage extends LitElement {
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
-    /* ── Delete dialog ── */
     .dialog-overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.4);
@@ -389,7 +417,6 @@ export class EntrypointDetailPage extends LitElement {
     .dialog-btn.danger { background: var(--red); color: #fff; }
     .dialog-btn:hover { opacity: 0.85; }
 
-    /* ── Edit button at bottom ── */
     .btn-edit-bottom {
       width: 100%;
       padding: 8px;
@@ -414,11 +441,11 @@ export class EntrypointDetailPage extends LitElement {
 
   render() {
     const ep = this._entrypoint;
+    const stats = ep ? ep.stats : null;
     const typeLabel = this._typeLabel();
 
     return html`
       <app-scaffold>
-        <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${() => this._navigate('/')}>
             ${icon('chevron-left')}
@@ -432,15 +459,15 @@ export class EntrypointDetailPage extends LitElement {
           ${this.mode === 'view' && ep
             ? html`
               ${ep.status === 'running'
-                ? html`<button class="pill-btn danger appbar-action" @click=${this._handleStop}>
+                ? html`<button class="pill-btn danger appbar-action" @click=${() => this._handleStop()}>
                   ■ ${t('btnStop')}
                 </button>`
-                : html`<button class="pill-btn primary appbar-action" @click=${this._handleStart}>
+                : html`<button class="pill-btn primary appbar-action" @click=${() => this._handleStart()}>
                   ▶ ${t('btnStart')}
                 </button>`}
             `
             : html`
-              <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${this._handleSave}>
+              <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${() => this._handleSave()}>
                 ${icon('check')} ${t('btnSave')}
               </button>
             `}
@@ -449,7 +476,6 @@ export class EntrypointDetailPage extends LitElement {
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
         ${this.mode === 'view' && ep
           ? html`
-            <!-- Status banner -->
             <div class="status-banner ${ep.status}">
               <span class="status-dot-mini"></span>
               ${ep.status === 'running'
@@ -461,7 +487,6 @@ export class EntrypointDetailPage extends LitElement {
               <span class="status-spacer"></span>
             </div>
 
-            <!-- Info card -->
             <div class="section">
               <div class="card">
                 <div class="info-row">
@@ -486,11 +511,34 @@ export class EntrypointDetailPage extends LitElement {
                   <span class="info-value">${ep.entrypoint}</span>
                 </div>
               </div>
+
+              <!-- Stats grid -->
+              ${stats
+                ? html`
+                  <div class="stats-grid">
+                    <div class="stat-box">
+                      <div class="stat-label">Current Conns</div>
+                      <div class="stat-value">${this._fmtNum(stats.current_conns)}</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="stat-label">Total Conns</div>
+                      <div class="stat-value">${this._fmtNum(stats.total_conns)}</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-value">${this._fmtBytes(stats.output_bytes)}</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${() => this._handleResetStats('input')} title="${t('btnResetInput')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-value">${this._fmtBytes(stats.input_bytes)}</div>
+                    </div>
+                  </div>
+                `
+                : ''}
             </div>
 
-            <!-- Edit button (view mode only) -->
             <div class="section">
-              <button class="btn-edit-bottom" @click=${this._enterEdit}>
+              <button class="btn-edit-bottom" @click=${() => this._enterEdit()}>
                 ${icon('edit')} ${t('btnEdit')}
               </button>
             </div>
@@ -502,13 +550,11 @@ export class EntrypointDetailPage extends LitElement {
           ? html`
             <div class="section">
               <div class="card" style="padding:16px;">
-                <!-- Type (readonly) -->
                 <div class="form-group">
                   <label class="form-label">Type</label>
                   <input class="form-input" readonly .value=${typeLabel + ' Entrypoint'}>
                 </div>
 
-                <!-- Tunnel ID -->
                 <div class="form-group">
                   <label class="form-label">Tunnel ID</label>
                   <input class="form-input"
@@ -518,21 +564,18 @@ export class EntrypointDetailPage extends LitElement {
                     @input=${(e: Event) => { this._tunnelId = (e.target as HTMLInputElement).value; }}>
                 </div>
 
-                <!-- Name -->
                 <div class="form-group">
                   <label class="form-label">${t('fieldName')}</label>
                   <input class="form-input" .value=${this._name} placeholder="My Entrypoint"
                     @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
                 </div>
 
-                <!-- Bind Address -->
                 <div class="form-group">
                   <label class="form-label">${t('fieldBindAddress')}</label>
                   <input class="form-input" .value=${this._endpoint} placeholder="0.0.0.0:9090"
                     @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
                 </div>
 
-                <!-- Danger Zone (edit only) -->
                 ${this.mode === 'edit'
                   ? html`
                     <div class="danger-zone">
@@ -560,7 +603,7 @@ export class EntrypointDetailPage extends LitElement {
                   <button class="dialog-btn cancel" @click=${() => { this._showResetDialog = false; }}>
                     ${t('btnCancel')}
                   </button>
-                  <button class="dialog-btn danger" @click=${this._doResetStats}>
+                  <button class="dialog-btn danger" @click=${() => this._doResetStats()}>
                     ${t('btnResetStats')}
                   </button>
                 </div>
@@ -579,7 +622,7 @@ export class EntrypointDetailPage extends LitElement {
                   <button class="dialog-btn cancel" @click=${() => { this._showDeleteDialog = false; }}>
                     ${t('btnCancel')}
                   </button>
-                  <button class="dialog-btn danger" @click=${this._handleDelete}>
+                  <button class="dialog-btn danger" @click=${() => this._handleDelete()}>
                     ${t('btnDelete')}
                   </button>
                 </div>
@@ -589,5 +632,18 @@ export class EntrypointDetailPage extends LitElement {
           : ''}
       </app-scaffold>
     `;
+  }
+
+  private _fmtNum(n: number): string {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return String(n);
+  }
+
+  private _fmtBytes(n: number): string {
+    if (n >= 1_073_741_824) return (n / 1_073_741_824).toFixed(1) + ' GB';
+    if (n >= 1_048_576) return (n / 1_048_576).toFixed(1) + ' MB';
+    if (n >= 1_024) return (n / 1_024).toFixed(1) + ' KB';
+    return n + ' B';
   }
 }
