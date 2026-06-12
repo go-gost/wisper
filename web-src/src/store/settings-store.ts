@@ -38,6 +38,7 @@ let settings: AppSettings = {
   lang: 'en',
   theme: 'system',
   stats_interval: 1,
+  inspector_url: '',
 };
 
 const listeners = new Set<() => void>();
@@ -71,6 +72,7 @@ export async function loadSettings(): Promise<void> {
       lang: cfg.lang || 'en',
       theme: cfg.theme || getStoredTheme(),
       stats_interval: cfg.stats_interval || 1,
+      inspector_url: cfg.inspector_url || '',
     };
   } catch {
     // Backend unavailable — use stored/local preferences.
@@ -105,6 +107,9 @@ export async function updateSettings(update: AppSettingsUpdate): Promise<void> {
   }
   if (update.stats_interval !== undefined) {
     settings.stats_interval = update.stats_interval;
+  }
+  if (update.inspector_url !== undefined) {
+    settings.inspector_url = update.inspector_url;
   }
 
   notify();
