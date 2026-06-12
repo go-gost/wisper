@@ -9,6 +9,7 @@ const tunnelDetailPage = () => import('../pages/tunnel-detail-page');
 const entrypointTypeSelectPage = () => import('../pages/entrypoint-type-select-page');
 const entrypointDetailPage = () => import('../pages/entrypoint-detail-page');
 const settingsPage = () => import('../pages/settings-page');
+const inspectorPage = () => import('../pages/inspector-page');
 
 /**
  * Create the Lit router with all application routes.
@@ -66,6 +67,32 @@ export function createRouter(host: ReactiveControllerHost) {
           ></entrypoint-detail-page>`,
         enter: async () => {
           await entrypointDetailPage();
+          return true;
+        },
+      },
+      {
+        path: '/tunnel/:type/:id/inspector',
+        render: (params: { type?: string; id?: string }) =>
+          html`<inspector-page
+            .parentKind=${'tunnel'}
+            .parentType=${params.type ?? ''}
+            .parentId=${params.id ?? ''}
+          ></inspector-page>`,
+        enter: async () => {
+          await inspectorPage();
+          return true;
+        },
+      },
+      {
+        path: '/entrypoint/:type/:id/inspector',
+        render: (params: { type?: string; id?: string }) =>
+          html`<inspector-page
+            .parentKind=${'entrypoint'}
+            .parentType=${params.type ?? ''}
+            .parentId=${params.id ?? ''}
+          ></inspector-page>`,
+        enter: async () => {
+          await inspectorPage();
           return true;
         },
       },
