@@ -5,6 +5,7 @@ import { icon } from '../utils/icons';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
+import { formatBytes, formatRate, formatNumber } from '../utils/format';
 import type { Entrypoint, EntrypointType } from '../api/types';
 import '../components/app-scaffold';
 
@@ -323,6 +324,12 @@ export class EntrypointDetailPage extends LitElement {
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
     }
 
+    .stat-rate {
+      font-size: var(--font-sm);
+      color: var(--green-text);
+      margin-top: 2px;
+    }
+
     .stat-label {
       display: flex;
       align-items: center;
@@ -518,19 +525,22 @@ export class EntrypointDetailPage extends LitElement {
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">Current Conns</div>
-                      <div class="stat-value">${this._fmtNum(stats.current_conns)}</div>
+                      <div class="stat-value">${formatNumber(stats.current_conns)}</div>
+                      <div class="stat-rate">${formatRate(stats.request_rate)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Total Conns</div>
-                      <div class="stat-value">${this._fmtNum(stats.total_conns)}</div>
+                      <div class="stat-value">${formatNumber(stats.total_conns)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Download <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
-                      <div class="stat-value">${this._fmtBytes(stats.output_bytes)}</div>
+                      <div class="stat-value">${formatBytes(stats.output_bytes)}</div>
+                      <div class="stat-rate">${formatRate(stats.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Upload <span class="stat-reset-mini" @click=${() => this._handleResetStats('input')} title="${t('btnResetInput')}">${icon('rotate-cw')}</span></div>
-                      <div class="stat-value">${this._fmtBytes(stats.input_bytes)}</div>
+                      <div class="stat-value">${formatBytes(stats.input_bytes)}</div>
+                      <div class="stat-rate">${formatRate(stats.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `
@@ -634,16 +644,4 @@ export class EntrypointDetailPage extends LitElement {
     `;
   }
 
-  private _fmtNum(n: number): string {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return String(n);
-  }
-
-  private _fmtBytes(n: number): string {
-    if (n >= 1_073_741_824) return (n / 1_073_741_824).toFixed(1) + ' GB';
-    if (n >= 1_048_576) return (n / 1_048_576).toFixed(1) + ' MB';
-    if (n >= 1_024) return (n / 1_024).toFixed(1) + ' KB';
-    return n + ' B';
-  }
 }
