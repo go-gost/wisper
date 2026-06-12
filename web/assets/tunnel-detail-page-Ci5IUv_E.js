@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-O67Tiz1x.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
-import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v as T,b as e,i as D,t as z}from"./index-O67Tiz1x.js";import{n as m,r}from"./state-Cl7TSpAo.js";import{i as d}from"./app-scaffold-DnlFs8T_.js";import{c as E,b as c,f as v,a as f}from"./format-B-__ZPmv.js";var C=Object.defineProperty,R=Object.getOwnPropertyDescriptor,n=(t,a,l,i)=>{for(var p=i>1?void 0:i?R(a,l):a,h=t.length-1,u;h>=0;h--)(u=t[h])&&(p=(i?u(a,l,p):u(p))||p);return i&&p&&C(a,l,p),p};let o=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=x().find(i=>i.id===t);l&&(this._tunnel=l,a?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(s("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this._showAuth&&(t.username=this._username.trim()||void 0,t.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-O67Tiz1x.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(s("saved")),this._navigate("/")):(await b(()=>import("./index-O67Tiz1x.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.update(this.tunnelId,t)),this._showSnackbar(s("saved")),this.mode="view",await w())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${s("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(s("deleted")),this._navigate("/")}catch{this._showSnackbar(s("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(s("started"))}catch{this._showSnackbar(s("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(s("stopped"))}catch{this._showSnackbar(s("stopFailed"))}}async _handleCopy(t){await E(t),this._showSnackbar(s("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.tunnelId,this._resetKind),this._tunnel&&T(this.tunnelId,this._tunnel.stats),this._showSnackbar(s("saved"))}catch{this._showSnackbar(s("saveFailed"))}}_typeLabel(){return s(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,a=t?t.stats:null,l=this._typeLabel();return e`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-bPX0qC2e.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v as T,b as a,w as D,i as z,t as E}from"./index-bPX0qC2e.js";import{n as m,r}from"./state-JOUnWVOA.js";import{i as d}from"./app-scaffold-BhgK30aJ.js";import{c as C,b as c,f as v,a as f}from"./format-B-__ZPmv.js";var R=Object.defineProperty,F=Object.getOwnPropertyDescriptor,o=(t,e,l,i)=>{for(var p=i>1?void 0:i?F(e,l):e,h=t.length-1,u;h>=0;h--)(u=t[h])&&(p=(i?u(e,l,p):u(p))||p);return i&&p&&R(e,l,p),p};let n=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=x().find(i=>i.id===t);l&&(this._tunnel=l,e?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(s("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this._showAuth&&(t.username=this._username.trim()||void 0,t.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-bPX0qC2e.js").then(e=>e.F),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(s("saved")),this._navigate("/")):(await b(()=>import("./index-bPX0qC2e.js").then(e=>e.F),__vite__mapDeps([0,1])).then(e=>e.update(this.tunnelId,t)),this._showSnackbar(s("saved")),this.mode="view",await w())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${s("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(s("deleted")),this._navigate("/")}catch{this._showSnackbar(s("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(s("started"))}catch{this._showSnackbar(s("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(s("stopped"))}catch{this._showSnackbar(s("stopFailed"))}}async _handleCopy(t){await C(t),this._showSnackbar(s("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.tunnelId,this._resetKind),this._tunnel&&T(this.tunnelId,this._tunnel.stats),this._showSnackbar(s("saved"))}catch{this._showSnackbar(s("saveFailed"))}}_typeLabel(){return s(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,e=t?t.stats:null,l=this._typeLabel();return a`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -10,13 +10,13 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
             ${this.mode==="create"?`${s("tunnelNewTitle")} — ${l}`:l+" Tunnel"}
           </span>
 
-          ${this.mode==="view"&&t?e`
-              ${t.status==="running"?e`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
+          ${this.mode==="view"&&t?a`
+              ${t.status==="running"?a`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
                   ■ ${s("btnStop")}
-                </button>`:e`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
+                </button>`:a`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
                   ▶ ${s("btnStart")}
                 </button>`}
-            `:e`
+            `:a`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
                 ${d("check")} ${s("btnSave")}
               </button>
@@ -24,12 +24,12 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
         </div>
 
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
-        ${this.mode==="view"&&t?e`
+        ${this.mode==="view"&&t?a`
             <!-- Status banner -->
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
               ${t.status==="running"?s("statusRunning")+" · "+c(t.stats.current_conns)+" "+s("activeConnections"):t.status==="error"?s("statusError"):s("statusStopped")}
-              ${t.error?e` — ${t.error}`:""}
+              ${t.error?a` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
 
@@ -51,25 +51,25 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
                     ${d("copy")}
                   </button>
                 </div>
-                ${t.options.hostname?e`
+                ${t.options.hostname?a`
                     <div class="info-row">
                       <span class="info-label">Hostname</span>
                       <span class="info-value text">${t.options.hostname}</span>
                     </div>
                   `:""}
-                ${this.tunnelType==="http"?e`
+                ${this.tunnelType==="http"?a`
                     <div class="info-row">
                       <span class="info-label">TLS</span>
                       <span class="info-value text">${t.options.enableTLS?"Enabled":"Disabled"}</span>
                     </div>
                   `:""}
-                ${t.options.username?e`
+                ${t.options.username?a`
                     <div class="info-row">
                       <span class="info-label">Auth</span>
                       <span class="info-value text">Basic · ${t.options.username}</span>
                     </div>
                   `:""}
-                ${this.tunnelType==="file"?e`
+                ${this.tunnelType==="file"?a`
                     <div class="info-row">
                       <span class="info-label">Upload</span>
                       <span class="info-value text">${t.options.file_upload?"Enabled":"Disabled"}</span>
@@ -85,33 +85,52 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
               </div>
 
               <!-- Stats grid -->
-              ${a?e`
+              ${e?a`
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${s("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${c(a.total_conns)}</div>
-                      <div class="stat-rate">${c(a.current_conns)} active · ${a.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-value">${c(e.total_conns)}</div>
+                      <div class="stat-rate">${c(e.current_conns)} active · ${e.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${s("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${c(a.total_errs)}</div>
+                      <div class="stat-value">${c(e.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${s("btnResetOutput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(a.output_bytes)}</div>
-                      <div class="stat-rate">${f(a.output_rate_bytes)}</div>
+                      <div class="stat-value">${v(e.output_bytes)}</div>
+                      <div class="stat-rate">${f(e.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${s("btnResetInput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(a.input_bytes)}</div>
-                      <div class="stat-rate">${f(a.input_rate_bytes)}</div>
+                      <div class="stat-value">${v(e.input_bytes)}</div>
+                      <div class="stat-rate">${f(e.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
             </div>
 
+            <!-- Inspector entry (only when inspector URL is configured) -->
+            ${this.mode==="view"&&t&&D().inspector_url?a`
+                <div class="section">
+                  <div class="card" style="padding:0;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                      background:linear-gradient(135deg,var(--accent-bg-subtle, rgba(88,166,255,0.06)),rgba(163,113,247,0.04));
+                      border-radius:var(--radius-lg);cursor:pointer;"
+                      @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/inspector`)}>
+                      <span style="font-size:20px;">&#128269;</span>
+                      <div style="flex:1;">
+                        <div style="font-size:var(--font-sm);font-weight:600;">${s("inspectorEntryTitle")}</div>
+                        <div style="font-size:var(--font-xs);color:var(--text-muted);">${s("inspectorEntryDesc")}</div>
+                      </div>
+                      <span style="color:var(--text-muted);">&rarr;</span>
+                    </div>
+                  </div>
+                </div>
+              `:""}
+
             <!-- Edit button (view mode only) -->
-            ${this.mode==="view"&&t?e`
+            ${this.mode==="view"&&t?a`
                 <div class="section">
                   <button class="btn-edit-bottom" @click=${()=>this._enterEdit()}>
                     ${d("edit")} ${s("btnEdit")}
@@ -121,7 +140,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
           `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
-        ${this.mode!=="view"?e`
+        ${this.mode!=="view"?a`
             <div class="section">
               <div class="card" style="padding:16px;">
                 <!-- Type (readonly) -->
@@ -148,7 +167,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
                 </div>
 
                 <!-- Hostname (HTTP/File) -->
-                ${this.tunnelType==="http"||this.tunnelType==="file"?e`
+                ${this.tunnelType==="http"||this.tunnelType==="file"?a`
                     <div class="form-group">
                       <label class="form-label">${s("fieldHostname")}</label>
                       <input class="form-input" .value=${this._hostname} placeholder="example.com"
@@ -157,7 +176,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
                   `:""}
 
                 <!-- TLS toggle (HTTP only) -->
-                ${this.tunnelType==="http"?e`
+                ${this.tunnelType==="http"?a`
                     <div class="switch-row">
                       <span class="switch-label">${s("switchEnableTLS")}</span>
                       <div class="switch ${this._enableTLS?"on":""}"
@@ -168,7 +187,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
                   `:""}
 
                 <!-- Auth section (HTTP/File) -->
-                ${this.tunnelType==="http"||this.tunnelType==="file"?e`
+                ${this.tunnelType==="http"||this.tunnelType==="file"?a`
                     <div class="switch-row" style="border-bottom:none;">
                       <span class="switch-label">${s("switchBasicAuth")}</span>
                       <div class="switch ${this._showAuth?"on":""}"
@@ -177,7 +196,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
                       </div>
                     </div>
 
-                    ${this._showAuth?e`
+                    ${this._showAuth?a`
                         <div class="form-group" style="margin-top:12px;">
                           <label class="form-label">${s("fieldUsername")}</label>
                           <input class="form-input" .value=${this._username} placeholder="admin"
@@ -190,7 +209,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
                         </div>
                       `:""}
 
-                    ${this.tunnelType==="file"?e`
+                    ${this.tunnelType==="file"?a`
                         <div class="switch-row">
                           <span class="switch-label">${s("switchFileUpload")}</span>
                           <div class="switch ${this._fileUpload?"on":""}"
@@ -202,7 +221,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
                   `:""}
 
                 <!-- Danger Zone (edit only) -->
-                ${this.mode==="edit"?e`
+                ${this.mode==="edit"?a`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
@@ -214,9 +233,9 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
             </div>
           `:""}
 
-        ${this._snackbar?e`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?a`<div class="toast">${this._snackbar}</div>`:""}
 
-        ${this._showResetDialog?e`
+        ${this._showResetDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
               <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${s("resetStatsConfirmTitle")}</div>
@@ -233,7 +252,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
             </div>
           `:""}
 
-        ${this._showDeleteDialog?e`
+        ${this._showDeleteDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
               <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${s("deleteConfirmTitle")}</div>
@@ -250,7 +269,7 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
             </div>
           `:""}
       </app-scaffold>
-    `}};o.styles=D`
+    `}};n.styles=z`
     /* ── AppBar ── */
     .back-btn {
       background: none;
@@ -664,4 +683,4 @@ import{a as g,s as _,g as x,j as s,_ as b,r as w,q as y,k as $,m as k,u as S,v a
       gap: 6px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;n([m()],o.prototype,"tunnelType",2);n([m()],o.prototype,"tunnelId",2);n([r()],o.prototype,"mode",2);n([r()],o.prototype,"_tunnel",2);n([r()],o.prototype,"_saving",2);n([r()],o.prototype,"_snackbar",2);n([r()],o.prototype,"_showDeleteDialog",2);n([r()],o.prototype,"_showResetDialog",2);n([r()],o.prototype,"_name",2);n([r()],o.prototype,"_endpoint",2);n([r()],o.prototype,"_hostname",2);n([r()],o.prototype,"_username",2);n([r()],o.prototype,"_password",2);n([r()],o.prototype,"_enableTLS",2);n([r()],o.prototype,"_rewriteHost",2);n([r()],o.prototype,"_fileUpload",2);n([r()],o.prototype,"_showAuth",2);o=n([z("tunnel-detail-page")],o);export{o as TunnelDetailPage};
+  `;o([m()],n.prototype,"tunnelType",2);o([m()],n.prototype,"tunnelId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_tunnel",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_hostname",2);o([r()],n.prototype,"_username",2);o([r()],n.prototype,"_password",2);o([r()],n.prototype,"_enableTLS",2);o([r()],n.prototype,"_rewriteHost",2);o([r()],n.prototype,"_fileUpload",2);o([r()],n.prototype,"_showAuth",2);n=o([E("tunnel-detail-page")],n);export{n as TunnelDetailPage};

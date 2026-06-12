@@ -1,12 +1,12 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-O67Tiz1x.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
-import{a as m,f as _,c as x,j as a,_ as u,w as y,x as $,l as w,n as k,y as S,v as D,b as i,i as z,t as E}from"./index-O67Tiz1x.js";import{n as g,r as d}from"./state-Cl7TSpAo.js";import{i as l}from"./app-scaffold-DnlFs8T_.js";import{c as I,b as v,f as h,a as f}from"./format-B-__ZPmv.js";var R=Object.defineProperty,C=Object.getOwnPropertyDescriptor,r=(t,e,o,s)=>{for(var p=s>1?void 0:s?C(e,o):e,c=t.length-1,b;c>=0;c--)(b=t[c])&&(p=(s?b(e,o,p):b(p))||p);return s&&p&&R(e,o,p),p};let n=class extends m{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const o=x().find(s=>s.id===t);o&&(this._entrypoint=o,e?(this.mode="edit",this._populateForm(o)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(o)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-O67Tiz1x.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await u(()=>import("./index-O67Tiz1x.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.update(this.entrypointId,t)),this._showSnackbar(a("saved")),this.mode="view",await y())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await $(this.entrypointId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await w(this.entrypointId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(a("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(a("saved"))}catch{this._showSnackbar(a("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,e=t?t.stats:null,o=this._typeLabel();return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-bPX0qC2e.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{a as m,f as y,c as x,j as a,_ as u,x as _,y as $,l as w,n as k,z as S,v as D,b as i,w as z,i as E,t as I}from"./index-bPX0qC2e.js";import{n as g,r as d}from"./state-JOUnWVOA.js";import{i as l}from"./app-scaffold-BhgK30aJ.js";import{c as R,b as v,f as h,a as f}from"./format-B-__ZPmv.js";var C=Object.defineProperty,T=Object.getOwnPropertyDescriptor,o=(t,e,r,s)=>{for(var p=s>1?void 0:s?T(e,r):e,c=t.length-1,b;c>=0;c--)(b=t[c])&&(p=(s?b(e,r,p):b(p))||p);return s&&p&&C(e,r,p),p};let n=class extends m{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(y(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const r=x().find(s=>s.id===t);r&&(this._entrypoint=r,e?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(a("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-bPX0qC2e.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(a("saved")),this._navigate("/")):(await u(()=>import("./index-bPX0qC2e.js").then(e=>e.G),__vite__mapDeps([0,1])).then(e=>e.update(this.entrypointId,t)),this._showSnackbar(a("saved")),this.mode="view",await _())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await $(this.entrypointId),this._showSnackbar(a("deleted")),this._navigate("/")}catch{this._showSnackbar(a("deleteFailed"))}}async _handleStart(){try{await w(this.entrypointId),this._showSnackbar(a("started"))}catch{this._showSnackbar(a("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(a("stopped"))}catch{this._showSnackbar(a("stopFailed"))}}async _handleCopy(t){await R(t),this._showSnackbar(a("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(a("saved"))}catch{this._showSnackbar(a("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,e=t?t.stats:null,r=this._typeLabel();return i`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
             ${l("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${a("entrypointNewTitle")} — ${o}`:o+" Entrypoint"}
+            ${this.mode==="create"?`${a("entrypointNewTitle")} — ${r}`:r+" Entrypoint"}
           </span>
 
           ${this.mode==="view"&&t?i`
@@ -35,7 +35,7 @@ import{a as m,f as _,c as x,j as a,_ as u,w as y,x as $,l as w,n as k,y as S,v a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${o} Entrypoint</span>
+                  <span class="info-value text">${r} Entrypoint</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
@@ -80,6 +80,25 @@ import{a as m,f as _,c as x,j as a,_ as u,w as y,x as $,l as w,n as k,y as S,v a
                 `:""}
             </div>
 
+            <!-- Inspector entry (only when inspector URL is configured) -->
+            ${this.mode==="view"&&t&&z().inspector_url?i`
+                <div class="section">
+                  <div class="card" style="padding:0;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
+                      background:linear-gradient(135deg,var(--accent-bg-subtle, rgba(88,166,255,0.06)),rgba(163,113,247,0.04));
+                      border-radius:var(--radius-lg);cursor:pointer;"
+                      @click=${()=>this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/inspector`)}>
+                      <span style="font-size:20px;">&#128269;</span>
+                      <div style="flex:1;">
+                        <div style="font-size:var(--font-sm);font-weight:600;">${a("inspectorEntryTitle")}</div>
+                        <div style="font-size:var(--font-xs);color:var(--text-muted);">${a("inspectorEntryDesc")}</div>
+                      </div>
+                      <span style="color:var(--text-muted);">&rarr;</span>
+                    </div>
+                  </div>
+                </div>
+              `:""}
+
             <div class="section">
               <button class="btn-edit-bottom" @click=${()=>this._enterEdit()}>
                 ${l("edit")} ${a("btnEdit")}
@@ -93,7 +112,7 @@ import{a as m,f as _,c as x,j as a,_ as u,w as y,x as $,l as w,n as k,y as S,v a
               <div class="card" style="padding:16px;">
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${o+" Entrypoint"}>
+                  <input class="form-input" readonly .value=${r+" Entrypoint"}>
                 </div>
 
                 <div class="form-group">
@@ -165,7 +184,7 @@ import{a as m,f as _,c as x,j as a,_ as u,w as y,x as $,l as w,n as k,y as S,v a
             </div>
           `:""}
       </app-scaffold>
-    `}};n.styles=z`
+    `}};n.styles=E`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -403,4 +422,4 @@ import{a as m,f as _,c as x,j as a,_ as u,w as y,x as $,l as w,n as k,y as S,v a
       gap: 6px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;r([g()],n.prototype,"entrypointType",2);r([g()],n.prototype,"entrypointId",2);r([d()],n.prototype,"mode",2);r([d()],n.prototype,"_entrypoint",2);r([d()],n.prototype,"_saving",2);r([d()],n.prototype,"_snackbar",2);r([d()],n.prototype,"_showDeleteDialog",2);r([d()],n.prototype,"_showResetDialog",2);r([d()],n.prototype,"_name",2);r([d()],n.prototype,"_endpoint",2);r([d()],n.prototype,"_tunnelId",2);n=r([E("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
+  `;o([g()],n.prototype,"entrypointType",2);o([g()],n.prototype,"entrypointId",2);o([d()],n.prototype,"mode",2);o([d()],n.prototype,"_entrypoint",2);o([d()],n.prototype,"_saving",2);o([d()],n.prototype,"_snackbar",2);o([d()],n.prototype,"_showDeleteDialog",2);o([d()],n.prototype,"_showResetDialog",2);o([d()],n.prototype,"_name",2);o([d()],n.prototype,"_endpoint",2);o([d()],n.prototype,"_tunnelId",2);n=o([I("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
