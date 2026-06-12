@@ -20,6 +20,7 @@ type configResponse struct {
 	Lang          string `json:"lang"`
 	Theme         string `json:"theme"`
 	StatsInterval int    `json:"stats_interval"`
+	InspectorURL  string `json:"inspector_url"`
 }
 
 func handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +42,7 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		Lang:          settings.Lang,
 		Theme:         settings.Theme,
 		StatsInterval: statsInterval,
+		InspectorURL:  settings.InspectorURL,
 	})
 }
 
@@ -52,6 +54,7 @@ type configUpdateRequest struct {
 	Lang          *string `json:"lang,omitempty"`
 	Theme         *string `json:"theme,omitempty"`
 	StatsInterval *int    `json:"stats_interval,omitempty"`
+	InspectorURL  *string `json:"inspector_url,omitempty"`
 }
 
 func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +90,9 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.StatsInterval != nil && *req.StatsInterval > 0 {
 		cfg.Settings.StatsInterval = *req.StatsInterval
+	}
+	if req.InspectorURL != nil {
+		cfg.Settings.InspectorURL = *req.InspectorURL
 	}
 
 	config.Set(cfg)
