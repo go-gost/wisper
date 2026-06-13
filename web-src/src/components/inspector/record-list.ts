@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { InspectorRecord, ProtocolType } from '../../api/types';
 import { t } from '../../i18n/i18n';
+import { formatBytes } from '../../utils/format';
 import './record-detail';
 import '../spinner';
 
@@ -103,8 +104,8 @@ export class RecordList extends LitElement {
           <span style="color:${statusColor(httpStatus)};font-weight:600;font-size:var(--font-xs)">${httpStatus}</span>
         ` : ''}
         <div class="right">
-          <div>↓${(r.inputBytes / 1024).toFixed(1)}K</div>
-          <div>↑${(r.outputBytes / 1024).toFixed(1)}K</div>
+          <div>↓${formatBytes(r.inputBytes)}</div>
+          <div>↑${formatBytes(r.outputBytes)}</div>
         </div>
       </div>
       ${this.selectedIndex === i ? html`<record-detail .record=${r}></record-detail>` : ''}
