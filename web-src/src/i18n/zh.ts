@@ -120,7 +120,7 @@ const zh: Record<string, string> = {
   inspectorNotConfiguredDesc: '在设置中配置 Inspector API URL 以启用流量检查。',
   inspectorSettingsLabel: 'Inspector API URL',
   inspectorSettingsDesc: '流量检查服务地址。设置后，隧道详情页会出现"流量检查"按钮。',
-  inspectorUrlPlaceholder: '例如 http://inspector.local:8000',
+  inspectorUrlPlaceholder: 'https://inspector.gost.run',
   inspectorConnected: '已连接',
   inspectorUnreachable: '无法访问',
   inspectorTest: '测试',

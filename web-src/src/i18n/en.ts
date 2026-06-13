@@ -120,7 +120,7 @@ const en: Record<string, string> = {
   inspectorNotConfiguredDesc: 'Set the inspector API URL in Settings to enable traffic inspection.',
   inspectorSettingsLabel: 'Inspector API URL',
   inspectorSettingsDesc: 'Traffic inspection service base URL. When set, a "Traffic Inspection" button appears on tunnel detail pages.',
-  inspectorUrlPlaceholder: 'e.g. http://inspector.local:8000',
+  inspectorUrlPlaceholder: 'https://inspector.gost.run',
   inspectorConnected: 'Connected',
   inspectorUnreachable: 'Unreachable',
   inspectorTest: 'Test',
