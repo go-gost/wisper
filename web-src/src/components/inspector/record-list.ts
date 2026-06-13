@@ -53,7 +53,9 @@ export class RecordList extends LitElement {
     .method-default { background: rgba(139,148,158,0.15); color: var(--text-muted); }
     .details { flex: 1; min-width: 0; }
     .host { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .meta { font-size: var(--font-sm); color: var(--text-muted); margin-top: 1px; display: flex; gap: 8px; }
+    .meta { font-size: var(--font-sm); color: var(--text-muted); margin-top: 1px; display: flex; gap: 8px; min-width: 0; }
+    .uri { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .proto { flex-shrink: 0; }
     .right { text-align: right; font-size: var(--font-sm); color: var(--text-muted); }
     .sentinel { height: 1px; }
     .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: var(--font-sm); }
@@ -96,8 +98,8 @@ export class RecordList extends LitElement {
         <div class="details">
           <div class="host">${httpHost || r.service}</div>
           <div class="meta">
-            <span>${httpUri || r.dst || r.network}</span>
-            <span>${r.proto || ''}</span>
+            <span class="uri">${httpUri || r.dst || r.network}</span>
+            <span class="proto">${r.proto || ''}</span>
           </div>
         </div>
         ${httpStatus ? html`

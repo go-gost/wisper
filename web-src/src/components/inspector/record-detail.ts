@@ -27,6 +27,9 @@ export class RecordDetail extends LitElement {
     .meta-item { display: flex; justify-content: space-between; padding: 2px 0; }
     .meta-label { color: var(--text-muted); }
     .meta-value { font-family: var(--font-mono, 'SF Mono', monospace); }
+    .uri-item { grid-column: 1 / -1; justify-content: flex-start; gap: 8px; }
+    .uri-item .meta-label { flex-shrink: 0; }
+    .uri-text { word-break: break-all; min-width: 0; flex: 1; }
     pre {
       font-family: var(--font-mono, 'SF Mono', monospace);
       font-size: var(--font-sm); background: #0d1117;
@@ -50,7 +53,7 @@ export class RecordDetail extends LitElement {
             <div class="meta-item"><span class="meta-label">Local</span><span class="meta-value">${r.local}</span></div>
             <div class="meta-item"><span class="meta-label">Client IP</span><span class="meta-value">${r.clientIP}</span></div>
             <div class="meta-item"><span class="meta-label">Service</span><span class="meta-value">${r.service}</span></div>
-            <div class="meta-item"><span class="meta-label">Proto</span><span class="meta-value">${r.proto || '—'}</span></div>
+            <div class="meta-item"><span class="meta-label">Proto</span><span class="meta-value">${r.http?.proto || r.proto || '—'}</span></div>
             <div class="meta-item"><span class="meta-label">Bytes ↓</span><span class="meta-value">${r.inputBytes.toLocaleString()}</span></div>
             <div class="meta-item"><span class="meta-label">Bytes ↑</span><span class="meta-value">${r.outputBytes.toLocaleString()}</span></div>
             <div class="meta-item"><span class="meta-label">Duration</span><span class="meta-value">${(r.duration / 1e6).toFixed(1)}ms</span></div>
@@ -59,6 +62,14 @@ export class RecordDetail extends LitElement {
         </div>
 
         ${r.http ? html`
+          <div class="section">
+            <div class="section-title">Request</div>
+            <div class="meta-grid">
+              <div class="meta-item"><span class="meta-label">Method</span><span class="meta-value">${r.http.method || '—'}</span></div>
+              <div class="meta-item"><span class="meta-label">Host</span><span class="meta-value">${r.http.host || '—'}</span></div>
+              <div class="meta-item uri-item"><span class="meta-label">URI</span><span class="meta-value uri-text">${r.http.uri || '—'}</span></div>
+            </div>
+          </div>
           <div class="section">
             <div class="section-title">${t('inspectorDetailHeaders')} — Request</div>
             <pre>${formatHeaders(r.http.request.header)}</pre>
