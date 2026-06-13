@@ -31,6 +31,32 @@ export function formatNumber(n: number): string {
 }
 
 /**
+ * Format an ISO 8601 timestamp as "2026-01-02 15:04:05.000" in local time
+ * with fixed 3-digit milliseconds — matches go-gost/inspector's fmtTime().
+ */
+export function formatTimestamp(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  const base =
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${base}.${pad(d.getMilliseconds(), 3)}`;
+}
+
+/**
+ * Format a nanosecond duration as "<1ms" / "Nµs" / "N.Nms" / "N.Ns" —
+ * matches go-gost/inspector's fmtDuration().
+ */
+export function formatDuration(ns: number): string {
+  if (!ns || ns <= 0) return '<1ms';
+  if (ns < 1_000_000) return `${Math.round(ns / 1000)}µs`;
+  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(1)}ms`;
+  return `${(ns / 1_000_000_000).toFixed(1)}s`;
+}
+
+/**
  * Format HTTP headers (a map of name → values) into readable "Name: value" lines.
  * Accepts the `map[string][]string` shape serialized from Go's `http.Header`;
  * passes strings through unchanged so a raw header block also renders correctly.

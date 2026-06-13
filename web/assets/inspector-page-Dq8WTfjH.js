@@ -1,13 +1,13 @@
-import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./index-DHPLTGL-.js";import{n as d,r as h}from"./state-BabtTR2u.js";import{i as R}from"./app-scaffold-DlOclPUo.js";import{c as E,f as M}from"./format-CZNH9DXL.js";class W{constructor(t){this.baseUrl=t.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(t){const r=new URLSearchParams;r.set("client_id",t.client_id),t.type&&r.set("type",t.type),t.service&&r.set("service",t.service),t.sid&&r.set("sid",t.sid),t.start!==void 0&&r.set("start",String(t.start)),t.end!==void 0&&r.set("end",String(t.end)),t.before&&r.set("before",t.before),t.after&&r.set("after",t.after),t.limit!==void 0&&r.set("limit",String(t.limit));const i=await fetch(`${this.baseUrl}/api/records/query?${r.toString()}`);if(!i.ok)throw new Error(`Inspector query failed: ${i.status}`);return i.json()}connectTail(t){const r=new URLSearchParams;r.set("client_id",t.client_id),t.type&&r.set("type",t.type),t.service&&r.set("service",t.service),t.sid&&r.set("sid",t.sid);const i=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${i}/api/records/tail?${r.toString()}`)}}function N(e){const t=atob(e),r=new Uint8Array(t.length);for(let i=0;i<t.length;i++)r[i]=t.charCodeAt(i);return r}var H=Object.defineProperty,F=Object.getOwnPropertyDescriptor,j=(e,t,r,i)=>{for(var s=i>1?void 0:i?F(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&H(t,r,s),s};const A=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let w=class extends v{constructor(){super(...arguments),this.active="http"}render(){return a`
+import{i as b,a as f,j as l,b as a,t as m,h as N,w as U,c as M,g as W}from"./index-DyvI71Ep.js";import{n as d,r as h}from"./state-BrmbBA5L.js";import{i as j}from"./app-scaffold-DaaAmwHi.js";import{c as z,d as F,f as D,e as H}from"./format-CsvuTgp2.js";class A{constructor(t){this.baseUrl=t.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(t){const r=new URLSearchParams;r.set("client_id",t.client_id),t.type&&r.set("type",t.type),t.service&&r.set("service",t.service),t.sid&&r.set("sid",t.sid),t.start!==void 0&&r.set("start",String(t.start)),t.end!==void 0&&r.set("end",String(t.end)),t.before&&r.set("before",t.before),t.after&&r.set("after",t.after),t.limit!==void 0&&r.set("limit",String(t.limit));const o=await fetch(`${this.baseUrl}/api/records/query?${r.toString()}`);if(!o.ok)throw new Error(`Inspector query failed: ${o.status}`);return o.json()}connectTail(t){const r=new URLSearchParams;r.set("client_id",t.client_id),t.type&&r.set("type",t.type),t.service&&r.set("service",t.service),t.sid&&r.set("sid",t.sid);const o=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${o}/api/records/tail?${r.toString()}`)}}function K(e){const t=atob(e),r=new Uint8Array(t.length);for(let o=0;o<t.length;o++)r[o]=t.charCodeAt(o);return r}var G=Object.defineProperty,J=Object.getOwnPropertyDescriptor,q=(e,t,r,o)=>{for(var s=o>1?void 0:o?J(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&G(t,r,s),s};const X=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let P=class extends f{constructor(){super(...arguments),this.active="http"}render(){return a`
       <div class="tabs">
-        ${A.map(e=>a`
+        ${X.map(e=>a`
           <button class="tab ${this.active===e.type?"active":""}"
             @click=${()=>this.dispatchEvent(new CustomEvent("protocol-change",{detail:e.type,bubbles:!0,composed:!0}))}>
             ${l(e.labelKey)}
           </button>
         `)}
       </div>
-    `}};w.styles=u`
+    `}};P.styles=b`
     :host { display: block; }
     .tabs {
       display: flex; gap: 2px;
@@ -24,14 +24,14 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
     }
     .tab.active { background: var(--accent); color: var(--accent-fg, #fff); }
     .tab:hover:not(.active) { color: var(--text); }
-  `;j([d()],w.prototype,"active",2);w=j([b("protocol-tabs")],w);var K=Object.defineProperty,J=Object.getOwnPropertyDescriptor,z=(e,t,r,i)=>{for(var s=i>1?void 0:i?J(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&K(t,r,s),s};let C=class extends v{constructor(){super(...arguments),this.mode="query"}render(){return a`
+  `;q([d()],P.prototype,"active",2);P=q([m("protocol-tabs")],P);var Q=Object.defineProperty,V=Object.getOwnPropertyDescriptor,B=(e,t,r,o)=>{for(var s=o>1?void 0:o?V(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&Q(t,r,s),s};let S=class extends f{constructor(){super(...arguments),this.mode="query"}render(){return a`
       <div class="toggle">
         <button class="btn ${this.mode==="query"?"active":""}"
           @click=${()=>this._setMode("query")}>${l("inspectorQuery")}</button>
         <button class="btn ${this.mode==="live"?"active":""}"
           @click=${()=>this._setMode("live")}>${l("inspectorLive")}</button>
       </div>
-    `}_setMode(e){this.mode=e,this.dispatchEvent(new CustomEvent("mode-change",{detail:e,bubbles:!0,composed:!0}))}};C.styles=u`
+    `}_setMode(e){this.mode=e,this.dispatchEvent(new CustomEvent("mode-change",{detail:e,bubbles:!0,composed:!0}))}};S.styles=b`
     :host { display: block; }
     .toggle {
       display: flex; background: var(--bg);
@@ -44,7 +44,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
       color: var(--text-muted); transition: all 0.15s;
     }
     .btn.active { background: var(--border-subtle); color: var(--text); font-weight: 500; }
-  `;z([d()],C.prototype,"mode",2);C=z([b("mode-toggle")],C);var G=Object.defineProperty,Q=Object.getOwnPropertyDescriptor,P=(e,t,r,i)=>{for(var s=i>1?void 0:i?Q(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&G(t,r,s),s};const V=[{minutes:5,label:"5m"},{minutes:15,label:"15m"},{minutes:60,label:"1h"},{minutes:360,label:"6h"},{minutes:1440,label:"24h"}];let m=class extends v{constructor(){super(...arguments),this.sid="",this.mode="query",this.range="all",this._debounceTimer=null}_fireChange(){this._debounceTimer&&clearTimeout(this._debounceTimer),this._debounceTimer=setTimeout(()=>{this.dispatchEvent(new CustomEvent("filter-change",{detail:{sid:this.sid},bubbles:!0,composed:!0}))},400)}disconnectedCallback(){super.disconnectedCallback(),this._debounceTimer&&clearTimeout(this._debounceTimer)}render(){return a`
+  `;B([d()],S.prototype,"mode",2);S=B([m("mode-toggle")],S);var Y=Object.defineProperty,Z=Object.getOwnPropertyDescriptor,O=(e,t,r,o)=>{for(var s=o>1?void 0:o?Z(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&Y(t,r,s),s};const ee=[{minutes:5,label:"5m"},{minutes:15,label:"15m"},{minutes:60,label:"1h"},{minutes:360,label:"6h"},{minutes:1440,label:"24h"}];let x=class extends f{constructor(){super(...arguments),this.sid="",this.mode="query",this.range="all",this._debounceTimer=null}_fireChange(){this._debounceTimer&&clearTimeout(this._debounceTimer),this._debounceTimer=setTimeout(()=>{this.dispatchEvent(new CustomEvent("filter-change",{detail:{sid:this.sid},bubbles:!0,composed:!0}))},400)}disconnectedCallback(){super.disconnectedCallback(),this._debounceTimer&&clearTimeout(this._debounceTimer)}render(){return a`
       <div class="filter-row">
         <input .value=${this.sid} placeholder=${l("inspectorFilterSid")}
           @input=${e=>{this.sid=e.target.value,this._fireChange()}}>
@@ -53,7 +53,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
         <div class="range-row">
           <span class="range-label">${l("inspectorTime")}</span>
           <div class="pills">
-            ${V.map(e=>a`
+            ${ee.map(e=>a`
               <button class="pill ${this.range===e.minutes?"active":""}"
                 @click=${()=>this.dispatchEvent(new CustomEvent("range-change",{detail:e.minutes,bubbles:!0,composed:!0}))}>
                 ${e.label}
@@ -66,7 +66,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
           </div>
         </div>
       `:""}
-    `}};m.styles=u`
+    `}};x.styles=b`
     :host { display: block; }
     .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
     input {
@@ -87,7 +87,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
     }
     .pill.active { background: var(--accent); color: var(--accent-fg, #fff); }
     .pill:hover:not(.active) { color: var(--text); }
-  `;P([d()],m.prototype,"sid",2);P([d()],m.prototype,"mode",2);P([d()],m.prototype,"range",2);m=P([b("inspector-filter-bar")],m);var X=Object.defineProperty,Y=Object.getOwnPropertyDescriptor,O=(e,t,r,i)=>{for(var s=i>1?void 0:i?Y(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&X(t,r,s),s};const $=4096;let x=class extends v{constructor(){super(...arguments),this.body="",this._tab="text"}_decode(){if(!this.body)return new Uint8Array(0);try{return N(this.body)}catch{return new TextEncoder().encode(this.body)}}_renderContent(){const e=this._decode();switch(this._tab){case"hex":return this._renderHexdump(e);case"json":try{const t=new TextDecoder().decode(e);return JSON.stringify(JSON.parse(t),null,2)}catch{return new TextDecoder().decode(e)}default:return new TextDecoder().decode(e)}}_renderHexdump(e){const t=e.length>$?e.slice(0,$):e,r=[];for(let i=0;i<t.length;i+=16){let s="",o="";for(let n=0;n<16;n++){n===8&&(s+=" ");const I=i+n;if(I>=t.length)s+="   ";else{const y=t[I];s+=y.toString(16).padStart(2,"0")+" ",o+=y>=32&&y<=126?String.fromCharCode(y):"."}}r.push(`${i.toString(16).padStart(8,"0")}  ${s} |${o}|`)}return e.length>$&&r.push(`... (${(e.length-$).toLocaleString()} more bytes not shown)`),r.join(`
+  `;O([d()],x.prototype,"sid",2);O([d()],x.prototype,"mode",2);O([d()],x.prototype,"range",2);x=O([m("inspector-filter-bar")],x);var te=Object.defineProperty,se=Object.getOwnPropertyDescriptor,E=(e,t,r,o)=>{for(var s=o>1?void 0:o?se(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&te(t,r,s),s};const k=4096;let C=class extends f{constructor(){super(...arguments),this.body="",this._tab="text"}_decode(){if(!this.body)return new Uint8Array(0);try{return K(this.body)}catch{return new TextEncoder().encode(this.body)}}_renderContent(){const e=this._decode();switch(this._tab){case"hex":return this._renderHexdump(e);case"json":try{const t=new TextDecoder().decode(e);return JSON.stringify(JSON.parse(t),null,2)}catch{return new TextDecoder().decode(e)}default:return new TextDecoder().decode(e)}}_renderHexdump(e){const t=e.length>k?e.slice(0,k):e,r=[];for(let o=0;o<t.length;o+=16){let s="",i="";for(let n=0;n<16;n++){n===8&&(s+=" ");const w=o+n;if(w>=t.length)s+="   ";else{const u=t[w];s+=u.toString(16).padStart(2,"0")+" ",i+=u>=32&&u<=126?String.fromCharCode(u):"."}}r.push(`${o.toString(16).padStart(8,"0")}  ${s} |${i}|`)}return e.length>k&&r.push(`... (${(e.length-k).toLocaleString()} more bytes not shown)`),r.join(`
 `)}_copyContent(){navigator.clipboard.writeText(this._renderContent())}render(){return a`
       <div class="toolbar">
         <div class="tabs">
@@ -98,7 +98,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
         <button class="copy-btn" @click=${()=>this._copyContent()}>${l("inspectorBtnCopy")}</button>
       </div>
       <pre class="${this._tab==="hex"?"hex":""}">${this._renderContent()}</pre>
-    `}};x.styles=u`
+    `}};C.styles=b`
     :host { display: block; }
     .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
     .tab {
@@ -122,7 +122,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
       background: var(--border-subtle); border: none; border-radius: 4px;
       color: var(--text-muted); font-family: inherit; margin-left: auto;
     }
-  `;O([d()],x.prototype,"body",2);O([h()],x.prototype,"_tab",2);x=O([b("body-viewer")],x);var Z=Object.defineProperty,ee=Object.getOwnPropertyDescriptor,q=(e,t,r,i)=>{for(var s=i>1?void 0:i?ee(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&Z(t,r,s),s};let S=class extends v{constructor(){super(...arguments),this.record=null}render(){const e=this.record;return e?a`
+  `;E([d()],C.prototype,"body",2);E([h()],C.prototype,"_tab",2);C=E([m("body-viewer")],C);var re=Object.defineProperty,oe=Object.getOwnPropertyDescriptor,L=(e,t,r,o)=>{for(var s=o>1?void 0:o?oe(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&re(t,r,s),s};let T=class extends f{constructor(){super(...arguments),this.record=null}render(){const e=this.record;return e?a`
       <div class="panel">
         <div class="section">
           <div class="section-title">Overview</div>
@@ -151,11 +151,11 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
           </div>
           <div class="section">
             <div class="section-title">${l("inspectorDetailHeaders")} — Request</div>
-            <pre>${E(e.http.request.header)}</pre>
+            <pre>${z(e.http.request.header)}</pre>
           </div>
           <div class="section">
             <div class="section-title">${l("inspectorDetailHeaders")} — Response</div>
-            <pre>${E(e.http.response.header)}</pre>
+            <pre>${z(e.http.response.header)}</pre>
           </div>
           ${e.http.request.body?a`
             <div class="section">
@@ -186,7 +186,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
           </div>
         `:""}
       </div>
-    `:a``}};S.styles=u`
+    `:a``}};T.styles=b`
     :host { display: block; }
     .panel {
       background: var(--bg); border-radius: var(--radius-md);
@@ -214,7 +214,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
       white-space: pre-wrap; word-break: break-all; max-height: 200px;
       overflow-y: auto; margin: 0;
     }
-  `;q([d({attribute:!1})],S.prototype,"record",2);S=q([b("record-detail")],S);var te=Object.getOwnPropertyDescriptor,se=(e,t,r,i)=>{for(var s=i>1?void 0:i?te(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=n(s)||s);return s};let T=class extends v{render(){return a`<div class="spinner"></div>`}};T.styles=u`
+  `;L([d({attribute:!1})],T.prototype,"record",2);T=L([m("record-detail")],T);var ie=Object.getOwnPropertyDescriptor,ne=(e,t,r,o)=>{for(var s=o>1?void 0:o?ie(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=n(s)||s);return s};let R=class extends f{render(){return a`<div class="spinner"></div>`}};R.styles=b`
     :host {
       display: inline-block;
       width: 32px;
@@ -233,30 +233,45 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-  `;T=se([b("wisper-spinner")],T);var re=Object.defineProperty,ie=Object.getOwnPropertyDescriptor,g=(e,t,r,i)=>{for(var s=i>1?void 0:i?ie(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&re(t,r,s),s};function oe(e){const t=e.toUpperCase();return t==="GET"?"method-green":t==="POST"||t==="PUT"||t==="PATCH"?"method-blue":t==="CONNECT"?"method-yellow":t==="DELETE"?"method-red":"method-default"}function ne(e){return e>=200&&e<300?"var(--green)":e>=400?"var(--red)":"var(--text-muted)"}let f=class extends v{constructor(){super(...arguments),this.records=[],this.protocol="http",this.selectedIndex=-1,this.hasMore=!1,this.loading=!1,this._observer=null}updated(){this._observer&&this._observer.disconnect(),this._observer=new IntersectionObserver(t=>{t[0]?.isIntersecting&&this.hasMore&&this.dispatchEvent(new CustomEvent("load-more",{bubbles:!0,composed:!0}))});const e=this.shadowRoot?.querySelector(".sentinel");e&&this._observer.observe(e)}disconnectedCallback(){super.disconnectedCallback(),this._observer?.disconnect()}_renderRow(e,t){const r=e.http?.host||e.host,i=e.http?.method||"",s=e.http?.uri||"",o=e.http?.statusCode||0,n=e.websocket?.opcode;return a`
+  `;R=ne([m("wisper-spinner")],R);var ae=Object.defineProperty,le=Object.getOwnPropertyDescriptor,$=(e,t,r,o)=>{for(var s=o>1?void 0:o?le(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&ae(t,r,s),s};function ce(e){const t=e.toUpperCase();return t==="GET"?"method-green":t==="POST"||t==="PUT"||t==="PATCH"?"method-blue":t==="CONNECT"?"method-yellow":t==="DELETE"?"method-red":"method-default"}function de(e){return e>0&&e<300?"status-green":e>=300&&e<400?"status-yellow":e>=400?"status-red":"status-muted"}function pe(e){if(e==null)return null;switch(e){case 1:return{label:"TEXT",cls:"op-text"};case 2:return{label:"BINARY",cls:"op-binary"};case 8:return{label:"CLOSE",cls:"op-close"};case 9:return{label:"PING",cls:"op-default"};case 10:return{label:"PONG",cls:"op-default"};default:return{label:`#${e}`,cls:"op-default"}}}let _=class extends f{constructor(){super(...arguments),this.records=[],this.protocol="http",this.selectedIndex=-1,this.hasMore=!1,this.loading=!1,this._observer=null}updated(){this._observer&&this._observer.disconnect(),this._observer=new IntersectionObserver(t=>{t[0]?.isIntersecting&&this.hasMore&&this.dispatchEvent(new CustomEvent("load-more",{bubbles:!0,composed:!0}))});const e=this.shadowRoot?.querySelector(".sentinel");e&&this._observer.observe(e)}disconnectedCallback(){super.disconnectedCallback(),this._observer?.disconnect()}_renderRow(e,t){const r=e.http?.host||e.host||e.service,o=e.http?.uri||"",s=e.time?F(e.time):"",i=e.http?.proto||e.proto||"",n=a`<span class="muted">↓${D(e.inputBytes)} ↑${D(e.outputBytes)}</span>`,w=H(e.duration);let u;if(e.http){const v=e.http.method||"",g=e.http.statusCode||0;u=a`
+        <div class="line">
+          <span class="status ${de(g)}">${g||"—"}</span>
+          ${v?a`<span class="method-badge ${ce(v)}">${v}</span>`:""}
+          <span class="host">${r}</span>
+          <span class="muted">${w}</span>
+        </div>
+        ${o?a`<div class="uri">${o}</div>`:""}
+        <div class="line">
+          ${n}
+          ${i?a`<span class="muted">${i}</span>`:""}
+          ${s?a`<span class="time">${s}</span>`:""}
+        </div>
+      `}else if(e.websocket){const v=e.websocket.from,g=pe(e.websocket.opcode);u=a`
+        <div class="line">
+          <span class="dir ${v==="client"?"dir-in":"dir-out"}">${v==="client"?"→":"←"}</span>
+          <span class="host">${r}</span>
+          ${g?a`<span class="opcode ${g.cls}">${g.label}</span>`:""}
+        </div>
+        ${o?a`<div class="uri">${o}</div>`:""}
+        <div class="line">
+          <span class="muted">${D(e.websocket.length??0)}</span>
+          ${s?a`<span class="time">${s}</span>`:""}
+        </div>
+      `}else{const v=o||e.dst||e.network;u=a`
+        <div class="line">
+          <span class="host">${r}</span>
+          <span class="muted">${w}</span>
+        </div>
+        ${v?a`<div class="uri">${v}</div>`:""}
+        <div class="line">
+          ${n}
+          ${i?a`<span class="muted">${i}</span>`:""}
+          ${s?a`<span class="time">${s}</span>`:""}
+        </div>
+      `}return a`
       <div class="row ${this.selectedIndex===t?"selected":""}"
         @click=${()=>this.dispatchEvent(new CustomEvent("record-select",{detail:t,bubbles:!0,composed:!0}))}>
-        ${i?a`
-          <span class="method-badge ${oe(i)}">${i}</span>
-        `:n!==void 0?a`
-          <span class="method-badge method-default">WS</span>
-        `:a`
-          <span class="method-badge method-default">—</span>
-        `}
-        <div class="details">
-          <div class="host">${r||e.service}</div>
-          <div class="meta">
-            <span class="uri">${s||e.dst||e.network}</span>
-            <span class="proto">${e.proto||""}</span>
-          </div>
-        </div>
-        ${o?a`
-          <span style="color:${ne(o)};font-weight:600;font-size:var(--font-sm)">${o}</span>
-        `:""}
-        <div class="right">
-          <div>↓${M(e.inputBytes)}</div>
-          <div>↑${M(e.outputBytes)}</div>
-        </div>
+        ${u}
       </div>
       ${this.selectedIndex===t?a`<record-detail .record=${e}></record-detail>`:""}
     `}render(){return this.records.length===0?this.loading?a`<div class="loading"><wisper-spinner></wisper-spinner></div>`:a`<div class="empty">${l("inspectorNoRecords")}</div>`:a`
@@ -264,36 +279,56 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
         ${this.records.map((e,t)=>this._renderRow(e,t))}
         <div class="sentinel"></div>
       </div>
-    `}};f.styles=u`
+    `}};_.styles=b`
     :host { display: block; }
     .list { display: flex; flex-direction: column; gap: 4px; }
     .row {
       background: var(--border-subtle); border-radius: var(--radius-sm);
-      padding: 10px 12px; cursor: pointer; display: flex; align-items: center;
-      gap: 10px; font-size: var(--font-sm); transition: background 0.1s;
+      padding: 8px 12px; cursor: pointer; display: flex; flex-direction: column;
+      gap: 2px; transition: background 0.1s;
     }
     .row:hover { background: #30363d; }
     .row.selected { border-left: 2px solid var(--accent); }
+    .line { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--font-sm); }
+    .host {
+      font-weight: 500; flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .uri {
+      font-family: var(--font-mono, 'SF Mono', monospace); color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    }
+    .muted { color: var(--text-muted); flex-shrink: 0; }
+    .time {
+      margin-left: auto; font-family: var(--font-mono, 'SF Mono', monospace);
+      color: var(--text-muted); white-space: nowrap; flex-shrink: 0;
+    }
+    .status { font-weight: 700; flex-shrink: 0; min-width: 28px; }
+    .status-green { color: var(--green); }
+    .status-yellow { color: #d2991d; }
+    .status-red { color: var(--red); }
+    .status-muted { color: var(--text-muted); }
     .method-badge {
-      padding: 2px 6px; border-radius: 4px; font-weight: 600;
-      font-size: var(--font-sm); font-family: var(--font-mono, 'SF Mono', monospace);
-      min-width: 38px; text-align: center;
+      padding: 1px 6px; border-radius: 4px; font-weight: 600;
+      font-family: var(--font-mono, 'SF Mono', monospace); flex-shrink: 0;
     }
     .method-green { background: rgba(63,185,80,0.2); color: var(--green); }
     .method-blue { background: rgba(88,166,255,0.2); color: var(--accent); }
     .method-yellow { background: rgba(210,153,29,0.2); color: #d2991d; }
     .method-red { background: rgba(248,81,73,0.2); color: var(--red); }
     .method-default { background: rgba(139,148,158,0.15); color: var(--text-muted); }
-    .details { flex: 1; min-width: 0; }
-    .host { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .meta { font-size: var(--font-sm); color: var(--text-muted); margin-top: 1px; display: flex; gap: 8px; min-width: 0; }
-    .uri { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .proto { flex-shrink: 0; }
-    .right { text-align: right; font-size: var(--font-sm); color: var(--text-muted); }
+    .dir { font-weight: 700; flex-shrink: 0; }
+    .dir-in { color: var(--green); }
+    .dir-out { color: #d2991d; }
+    .opcode { padding: 1px 6px; border-radius: 4px; flex-shrink: 0; }
+    .op-text { background: rgba(63,185,80,0.2); color: var(--green); }
+    .op-binary { background: rgba(188,140,255,0.2); color: #bc8cff; }
+    .op-close { background: rgba(210,153,29,0.2); color: #d2991d; }
+    .op-default { background: rgba(139,148,158,0.15); color: var(--text-muted); }
     .sentinel { height: 1px; }
     .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: var(--font-sm); }
     .loading { display: flex; justify-content: center; padding: 24px; }
-  `;g([d({attribute:!1})],f.prototype,"records",2);g([d()],f.prototype,"protocol",2);g([d({type:Number})],f.prototype,"selectedIndex",2);g([d({type:Boolean})],f.prototype,"hasMore",2);g([d({type:Boolean})],f.prototype,"loading",2);f=g([b("record-list")],f);var ae=Object.defineProperty,le=Object.getOwnPropertyDescriptor,k=(e,t,r,i)=>{for(var s=i>1?void 0:i?le(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&ae(t,r,s),s};let _=class extends v{constructor(){super(...arguments),this.connected=!1,this.recordCount=0,this.stopped=!1}render(){return a`
+  `;$([d({attribute:!1})],_.prototype,"records",2);$([d()],_.prototype,"protocol",2);$([d({type:Number})],_.prototype,"selectedIndex",2);$([d({type:Boolean})],_.prototype,"hasMore",2);$([d({type:Boolean})],_.prototype,"loading",2);_=$([m("record-list")],_);var he=Object.defineProperty,ue=Object.getOwnPropertyDescriptor,I=(e,t,r,o)=>{for(var s=o>1?void 0:o?ue(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&he(t,r,s),s};let y=class extends f{constructor(){super(...arguments),this.connected=!1,this.recordCount=0,this.stopped=!1}render(){return a`
       <div class="bar">
         <span class="status">
           <span class="dot ${this.connected?"connected":"disconnected"}"></span>
@@ -305,7 +340,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
           <button @click=${()=>this.dispatchEvent(new CustomEvent("live-clear",{bubbles:!0,composed:!0}))}>${l("inspectorBtnClear")}</button>
         </span>
       </div>
-    `}};_.styles=u`
+    `}};y.styles=b`
     :host { display: block; }
     .bar {
       display: flex; align-items: center; justify-content: space-between;
@@ -330,11 +365,11 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
       font-family: inherit;
     }
     .actions button:hover { color: var(--text); border-color: var(--text-muted); }
-  `;k([d({type:Boolean})],_.prototype,"connected",2);k([d({type:Number})],_.prototype,"recordCount",2);k([d({type:Boolean})],_.prototype,"stopped",2);_=k([b("live-indicator")],_);var ce=Object.defineProperty,de=Object.getOwnPropertyDescriptor,p=(e,t,r,i)=>{for(var s=i>1?void 0:i?de(t,r):t,o=e.length-1,n;o>=0;o--)(n=e[o])&&(s=(i?n(t,r,s):n(s))||s);return i&&s&&ce(t,r,s),s};let c=class extends v{constructor(){super(...arguments),this.parentKind="tunnel",this.parentType="",this.parentId="",this._mode="query",this._protocol="http",this._records=[],this._selectedIndex=-1,this._sid="",this._range="all",this._cursor=null,this._hasMore=!0,this._loading=!1,this._liveConnected=!1,this._liveStopped=!1,this._error="",this._client=null,this._clientUrl="",this._unsub=null,this._ws=null,this._reconnectDelay=1e3,this._reconnectTimer=null}connectedCallback(){super.connectedCallback(),this._initClient(),this._fetchRecords(),this._unsub=B(()=>this._onSettings())}disconnectedCallback(){super.disconnectedCallback(),this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer),this._unsub?.(),this._unsub=null}_initClient(){const e=L().inspector_url||"";return e&&e!==this._clientUrl?(this._client=new W(e),this._clientUrl=e,!0):!1}_onSettings(){const e=!this._client;this._initClient()&&e&&(this._mode==="query"?(this._hasMore=!0,this._cursor=null,this._fetchRecords()):this._openWs())}_getClientId(){return this.parentKind==="tunnel"?this.parentId:D().find(r=>r.id===this.parentId)?.options?.tunnel_id||this.parentId}_getParentName(){return this.parentKind==="tunnel"?U().find(r=>r.id===this.parentId)?.name||this.parentId:D().find(t=>t.id===this.parentId)?.name||this.parentId}async _fetchRecords(e){if(!(!this._client||this._loading)){this._loading=!0,this._error="";try{const t=await this._client.query({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0,start:this._range!=="all"?Math.floor(Date.now()/1e3)-this._range*60:void 0,before:e,limit:50});if(t.code===0&&t.data){const r=t.data.list||[];e?this._records=[...this._records,...r]:this._records=r,this._cursor=t.data.before||null,this._hasMore=r.length>=50}else this._error=t.msg||t.error||`query failed (code ${t.code})`}catch(t){this._error=t instanceof Error?t.message:String(t),console.error("[inspector] query failed:",t)}this._loading=!1}}_onLoadMore(){this._mode==="query"&&this._hasMore&&this._cursor&&this._fetchRecords(this._cursor)}_openWs(){if(this._client){this._closeWs(),this._liveStopped=!1,this._reconnectDelay=1e3;try{this._ws=this._client.connectTail({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0}),this._ws.onopen=()=>{this._liveConnected=!0},this._ws.onmessage=e=>{try{const t=JSON.parse(e.data);this._records=[t,...this._records].slice(0,200)}catch{}},this._ws.onclose=()=>{this._liveConnected=!1,this._liveStopped||this._scheduleReconnect()},this._ws.onerror=()=>{this._ws?.close()}}catch{}}}_scheduleReconnect(){this._reconnectTimer&&clearTimeout(this._reconnectTimer),this._reconnectTimer=setTimeout(()=>{this._openWs(),this._reconnectDelay=Math.min(this._reconnectDelay*2,3e4)},this._reconnectDelay)}_closeWs(){this._ws&&(this._ws.onclose=null,this._ws.onmessage=null,this._ws.close(),this._ws=null),this._liveConnected=!1}_onModeChange(e){const t=e.detail;this._mode=t,this._selectedIndex=-1,t==="live"?(this._records=[],this._openWs()):(this._closeWs(),this._records=[],this._fetchRecords())}_onProtocolChange(e){this._protocol=e.detail,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onFilterChange(e){const{sid:t}=e.detail;this._sid=t,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onRangeChange(e){this._range=e.detail,this._selectedIndex=-1,this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords()}_onRecordSelect(e){const t=e.detail;this._selectedIndex=this._selectedIndex===t?-1:t}_onLiveStop(){this._liveStopped=!0,this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer)}_onLiveReconnect(){this._liveStopped=!1,this._openWs()}_onLiveClear(){this._records=[],this._selectedIndex=-1}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){const e=this._getParentName(),t=this.parentKind==="tunnel"?`/tunnel/${this.parentType}/${this.parentId}`:`/entrypoint/${this.parentType}/${this.parentId}`,r=this._getClientId().slice(0,8);return this._client?a`
+  `;I([d({type:Boolean})],y.prototype,"connected",2);I([d({type:Number})],y.prototype,"recordCount",2);I([d({type:Boolean})],y.prototype,"stopped",2);y=I([m("live-indicator")],y);var ve=Object.defineProperty,be=Object.getOwnPropertyDescriptor,p=(e,t,r,o)=>{for(var s=o>1?void 0:o?be(t,r):t,i=e.length-1,n;i>=0;i--)(n=e[i])&&(s=(o?n(t,r,s):n(s))||s);return o&&s&&ve(t,r,s),s};let c=class extends f{constructor(){super(...arguments),this.parentKind="tunnel",this.parentType="",this.parentId="",this._mode="query",this._protocol="http",this._records=[],this._selectedIndex=-1,this._sid="",this._range="all",this._cursor=null,this._hasMore=!0,this._loading=!1,this._liveConnected=!1,this._liveStopped=!1,this._error="",this._client=null,this._clientUrl="",this._unsub=null,this._ws=null,this._reconnectDelay=1e3,this._reconnectTimer=null}connectedCallback(){super.connectedCallback(),this._initClient(),this._fetchRecords(),this._unsub=N(()=>this._onSettings())}disconnectedCallback(){super.disconnectedCallback(),this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer),this._unsub?.(),this._unsub=null}_initClient(){const e=U().inspector_url||"";return e&&e!==this._clientUrl?(this._client=new A(e),this._clientUrl=e,!0):!1}_onSettings(){const e=!this._client;this._initClient()&&e&&(this._mode==="query"?(this._hasMore=!0,this._cursor=null,this._fetchRecords()):this._openWs())}_getClientId(){return this.parentKind==="tunnel"?this.parentId:M().find(r=>r.id===this.parentId)?.options?.tunnel_id||this.parentId}_getParentName(){return this.parentKind==="tunnel"?W().find(r=>r.id===this.parentId)?.name||this.parentId:M().find(t=>t.id===this.parentId)?.name||this.parentId}async _fetchRecords(e){if(!(!this._client||this._loading)){this._loading=!0,this._error="";try{const t=await this._client.query({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0,start:this._range!=="all"?Math.floor(Date.now()/1e3)-this._range*60:void 0,before:e,limit:50});if(t.code===0&&t.data){const r=t.data.list||[];e?this._records=[...this._records,...r]:this._records=r,this._cursor=t.data.before||null,this._hasMore=r.length>=50}else this._error=t.msg||t.error||`query failed (code ${t.code})`}catch(t){this._error=t instanceof Error?t.message:String(t),console.error("[inspector] query failed:",t)}this._loading=!1}}_onLoadMore(){this._mode==="query"&&this._hasMore&&this._cursor&&this._fetchRecords(this._cursor)}_openWs(){if(this._client){this._closeWs(),this._liveStopped=!1,this._reconnectDelay=1e3;try{this._ws=this._client.connectTail({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0}),this._ws.onopen=()=>{this._liveConnected=!0},this._ws.onmessage=e=>{try{const t=JSON.parse(e.data);this._records=[t,...this._records].slice(0,200)}catch{}},this._ws.onclose=()=>{this._liveConnected=!1,this._liveStopped||this._scheduleReconnect()},this._ws.onerror=()=>{this._ws?.close()}}catch{}}}_scheduleReconnect(){this._reconnectTimer&&clearTimeout(this._reconnectTimer),this._reconnectTimer=setTimeout(()=>{this._openWs(),this._reconnectDelay=Math.min(this._reconnectDelay*2,3e4)},this._reconnectDelay)}_closeWs(){this._ws&&(this._ws.onclose=null,this._ws.onmessage=null,this._ws.close(),this._ws=null),this._liveConnected=!1}_onModeChange(e){const t=e.detail;this._mode=t,this._selectedIndex=-1,t==="live"?(this._records=[],this._openWs()):(this._closeWs(),this._records=[],this._fetchRecords())}_onProtocolChange(e){this._protocol=e.detail,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onFilterChange(e){const{sid:t}=e.detail;this._sid=t,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onRangeChange(e){this._range=e.detail,this._selectedIndex=-1,this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords()}_onRecordSelect(e){const t=e.detail;this._selectedIndex=this._selectedIndex===t?-1:t}_onLiveStop(){this._liveStopped=!0,this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer)}_onLiveReconnect(){this._liveStopped=!1,this._openWs()}_onLiveClear(){this._records=[],this._selectedIndex=-1}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){const e=this._getParentName(),t=this.parentKind==="tunnel"?`/tunnel/${this.parentType}/${this.parentId}`:`/entrypoint/${this.parentType}/${this.parentId}`,r=this._getClientId().slice(0,8);return this._client?a`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate(t)}>
-            ${R("chevron-left")}
+            ${j("chevron-left")}
           </button>
           <span class="page-title">
             &larr; ${e||this.parentId} &middot; ${l("inspectorTitle")}
@@ -392,7 +427,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
         <app-scaffold>
           <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
             <button class="back-btn" @click=${()=>this._navigate(t)}>
-              ${R("chevron-left")}
+              ${j("chevron-left")}
             </button>
             <span class="page-title">${l("inspectorTitle")}</span>
           </div>
@@ -403,7 +438,7 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
             <a href="/settings" style="color:var(--accent);font-size:var(--font-sm);text-decoration:none;margin-top:8px;">&rarr; ${l("settingsTitle")}</a>
           </div>
         </app-scaffold>
-      `}};c.styles=u`
+      `}};c.styles=b`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -417,4 +452,4 @@ import{i as u,a as v,j as l,b as a,t as b,h as B,w as L,c as D,g as U}from"./ind
       font-family: var(--font-mono, 'SF Mono', monospace);
     }
     .spacer { height: 8px; }
-  `;p([d()],c.prototype,"parentKind",2);p([d()],c.prototype,"parentType",2);p([d()],c.prototype,"parentId",2);p([h()],c.prototype,"_mode",2);p([h()],c.prototype,"_protocol",2);p([h()],c.prototype,"_records",2);p([h()],c.prototype,"_selectedIndex",2);p([h()],c.prototype,"_sid",2);p([h()],c.prototype,"_range",2);p([h()],c.prototype,"_cursor",2);p([h()],c.prototype,"_hasMore",2);p([h()],c.prototype,"_loading",2);p([h()],c.prototype,"_liveConnected",2);p([h()],c.prototype,"_liveStopped",2);p([h()],c.prototype,"_error",2);c=p([b("inspector-page")],c);export{c as InspectorPage};
+  `;p([d()],c.prototype,"parentKind",2);p([d()],c.prototype,"parentType",2);p([d()],c.prototype,"parentId",2);p([h()],c.prototype,"_mode",2);p([h()],c.prototype,"_protocol",2);p([h()],c.prototype,"_records",2);p([h()],c.prototype,"_selectedIndex",2);p([h()],c.prototype,"_sid",2);p([h()],c.prototype,"_range",2);p([h()],c.prototype,"_cursor",2);p([h()],c.prototype,"_hasMore",2);p([h()],c.prototype,"_loading",2);p([h()],c.prototype,"_liveConnected",2);p([h()],c.prototype,"_liveStopped",2);p([h()],c.prototype,"_error",2);c=p([m("inspector-page")],c);export{c as InspectorPage};

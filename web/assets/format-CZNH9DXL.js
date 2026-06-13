@@ -1,2 +1,0 @@
-function i(r){if(r===0)return"0 B";if(r<0)return"—";const n=["B","KB","MB","GB","TB"],t=Math.floor(Math.log(r)/Math.log(1024)),o=r/Math.pow(1024,t);return t===0?`${o} B`:`${o.toFixed(1)} ${n[t]}`}function f(r){return r===0?"0 B/s":r<0?"—":i(r)+"/s"}function u(r){return r.toLocaleString()}function a(r){return r?typeof r=="string"?r:Object.entries(r).map(([n,t])=>`${n}: ${Array.isArray(t)?t.join(", "):String(t)}`).join(`
-`):""}export{f as a,u as b,a as c,i as f};
