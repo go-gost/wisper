@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { InspectorRecord } from '../../api/types';
 import { t } from '../../i18n/i18n';
+import { formatHeaders } from '../../utils/format';
 import './body-viewer';
 
 @customElement('record-detail')
@@ -60,11 +61,11 @@ export class RecordDetail extends LitElement {
         ${r.http ? html`
           <div class="section">
             <div class="section-title">${t('inspectorDetailHeaders')} — Request</div>
-            <pre>${r.http.request.header}</pre>
+            <pre>${formatHeaders(r.http.request.header)}</pre>
           </div>
           <div class="section">
             <div class="section-title">${t('inspectorDetailHeaders')} — Response</div>
-            <pre>${r.http.response.header}</pre>
+            <pre>${formatHeaders(r.http.response.header)}</pre>
           </div>
           ${r.http.request.body ? html`
             <div class="section">

@@ -1,13 +1,13 @@
-import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f-8Us.js";import{n as l,r as h}from"./state-DQeFf1Ap.js";import{i as S}from"./app-scaffold-O_dUiI2j.js";class M{constructor(e){this.baseUrl=e.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(e){const o=new URLSearchParams;o.set("client_id",e.client_id),e.type&&o.set("type",e.type),e.service&&o.set("service",e.service),e.sid&&o.set("sid",e.sid),e.start!==void 0&&o.set("start",String(e.start)),e.end!==void 0&&o.set("end",String(e.end)),e.before&&o.set("before",e.before),e.after&&o.set("after",e.after),e.limit!==void 0&&o.set("limit",String(e.limit));const r=await fetch(`${this.baseUrl}/api/records/query?${o.toString()}`);if(!r.ok)throw new Error(`Inspector query failed: ${r.status}`);return r.json()}connectTail(e){const o=new URLSearchParams;o.set("client_id",e.client_id),e.type&&o.set("type",e.type),e.service&&o.set("service",e.service),e.sid&&o.set("sid",e.sid);const r=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${r}/api/records/tail?${o.toString()}`)}}function z(t){const e=atob(t),o=new Uint8Array(e.length);for(let r=0;r<e.length;r++)o[r]=e.charCodeAt(r);return o}var B=Object.defineProperty,L=Object.getOwnPropertyDescriptor,O=(t,e,o,r)=>{for(var s=r>1?void 0:r?L(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&B(e,o,s),s};const q=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let g=class extends u{constructor(){super(...arguments),this.active="http"}render(){return a`
+import{i as v,a as u,j as c,b as a,t as b,w as E,c as S,g as M}from"./index-Dgeo2YKt.js";import{n as l,r as h}from"./state-CoEzwZPc.js";import{i as O}from"./app-scaffold-BbDEDkeD.js";import{c as k}from"./format-CZNH9DXL.js";class z{constructor(e){this.baseUrl=e.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(e){const o=new URLSearchParams;o.set("client_id",e.client_id),e.type&&o.set("type",e.type),e.service&&o.set("service",e.service),e.sid&&o.set("sid",e.sid),e.start!==void 0&&o.set("start",String(e.start)),e.end!==void 0&&o.set("end",String(e.end)),e.before&&o.set("before",e.before),e.after&&o.set("after",e.after),e.limit!==void 0&&o.set("limit",String(e.limit));const r=await fetch(`${this.baseUrl}/api/records/query?${o.toString()}`);if(!r.ok)throw new Error(`Inspector query failed: ${r.status}`);return r.json()}connectTail(e){const o=new URLSearchParams;o.set("client_id",e.client_id),e.type&&o.set("type",e.type),e.service&&o.set("service",e.service),e.sid&&o.set("sid",e.sid);const r=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${r}/api/records/tail?${o.toString()}`)}}function B(t){const e=atob(t),o=new Uint8Array(e.length);for(let r=0;r<e.length;r++)o[r]=e.charCodeAt(r);return o}var L=Object.defineProperty,q=Object.getOwnPropertyDescriptor,I=(t,e,o,r)=>{for(var s=r>1?void 0:r?q(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&L(e,o,s),s};const W=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let x=class extends u{constructor(){super(...arguments),this.active="http"}render(){return a`
       <div class="tabs">
-        ${q.map(t=>a`
+        ${W.map(t=>a`
           <button class="tab ${this.active===t.type?"active":""}"
             @click=${()=>this.dispatchEvent(new CustomEvent("protocol-change",{detail:t.type,bubbles:!0,composed:!0}))}>
             ${c(t.labelKey)}
           </button>
         `)}
       </div>
-    `}};g.styles=v`
+    `}};x.styles=v`
     :host { display: block; }
     .tabs {
       display: flex; gap: 2px;
@@ -24,14 +24,14 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
     }
     .tab.active { background: var(--accent); color: var(--accent-fg, #fff); }
     .tab:hover:not(.active) { color: var(--text); }
-  `;O([l()],g.prototype,"active",2);g=O([b("protocol-tabs")],g);var W=Object.defineProperty,F=Object.getOwnPropertyDescriptor,k=(t,e,o,r)=>{for(var s=r>1?void 0:r?F(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&W(e,o,s),s};let x=class extends u{constructor(){super(...arguments),this.mode="query"}render(){return a`
+  `;I([l()],x.prototype,"active",2);x=I([b("protocol-tabs")],x);var F=Object.defineProperty,N=Object.getOwnPropertyDescriptor,D=(t,e,o,r)=>{for(var s=r>1?void 0:r?N(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&F(e,o,s),s};let y=class extends u{constructor(){super(...arguments),this.mode="query"}render(){return a`
       <div class="toggle">
         <button class="btn ${this.mode==="query"?"active":""}"
           @click=${()=>this._setMode("query")}>${c("inspectorQuery")}</button>
         <button class="btn ${this.mode==="live"?"active":""}"
           @click=${()=>this._setMode("live")}>${c("inspectorLive")}</button>
       </div>
-    `}_setMode(t){this.mode=t,this.dispatchEvent(new CustomEvent("mode-change",{detail:t,bubbles:!0,composed:!0}))}};x.styles=v`
+    `}_setMode(t){this.mode=t,this.dispatchEvent(new CustomEvent("mode-change",{detail:t,bubbles:!0,composed:!0}))}};y.styles=v`
     :host { display: block; }
     .toggle {
       display: flex; background: var(--bg);
@@ -44,12 +44,12 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
       color: var(--text-muted); transition: all 0.15s;
     }
     .btn.active { background: var(--border-subtle); color: var(--text); font-weight: 500; }
-  `;k([l()],x.prototype,"mode",2);x=k([b("mode-toggle")],x);var N=Object.defineProperty,U=Object.getOwnPropertyDescriptor,I=(t,e,o,r)=>{for(var s=r>1?void 0:r?U(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&N(e,o,s),s};let y=class extends u{constructor(){super(...arguments),this.sid="",this._debounceTimer=null}_fireChange(){this._debounceTimer&&clearTimeout(this._debounceTimer),this._debounceTimer=setTimeout(()=>{this.dispatchEvent(new CustomEvent("filter-change",{detail:{sid:this.sid},bubbles:!0,composed:!0}))},400)}disconnectedCallback(){super.disconnectedCallback(),this._debounceTimer&&clearTimeout(this._debounceTimer)}render(){return a`
+  `;D([l()],y.prototype,"mode",2);y=D([b("mode-toggle")],y);var U=Object.defineProperty,K=Object.getOwnPropertyDescriptor,R=(t,e,o,r)=>{for(var s=r>1?void 0:r?K(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&U(e,o,s),s};let $=class extends u{constructor(){super(...arguments),this.sid="",this._debounceTimer=null}_fireChange(){this._debounceTimer&&clearTimeout(this._debounceTimer),this._debounceTimer=setTimeout(()=>{this.dispatchEvent(new CustomEvent("filter-change",{detail:{sid:this.sid},bubbles:!0,composed:!0}))},400)}disconnectedCallback(){super.disconnectedCallback(),this._debounceTimer&&clearTimeout(this._debounceTimer)}render(){return a`
       <div class="filter-row">
         <input .value=${this.sid} placeholder=${c("inspectorFilterSid")}
           @input=${t=>{this.sid=t.target.value,this._fireChange()}}>
       </div>
-    `}};y.styles=v`
+    `}};$.styles=v`
     :host { display: block; }
     .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
     input {
@@ -60,7 +60,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
       outline: none; box-sizing: border-box;
     }
     input:focus { border-color: var(--accent); }
-  `;I([l()],y.prototype,"sid",2);y=I([b("inspector-filter-bar")],y);var K=Object.defineProperty,H=Object.getOwnPropertyDescriptor,D=(t,e,o,r)=>{for(var s=r>1?void 0:r?H(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&K(e,o,s),s};let $=class extends u{constructor(){super(...arguments),this.body="",this._tab="text"}_decode(){if(!this.body)return new Uint8Array(0);try{return z(this.body)}catch{return new TextEncoder().encode(this.body)}}_renderContent(){const t=this._decode();switch(this._tab){case"hex":return Array.from(t.slice(0,4096)).map(e=>e.toString(16).padStart(2,"0")).join(" ");case"json":try{const e=new TextDecoder().decode(t);return JSON.stringify(JSON.parse(e),null,2)}catch{return new TextDecoder().decode(t)}default:return new TextDecoder().decode(t)}}_copyContent(){navigator.clipboard.writeText(this._renderContent())}render(){return a`
+  `;R([l()],$.prototype,"sid",2);$=R([b("inspector-filter-bar")],$);var H=Object.defineProperty,A=Object.getOwnPropertyDescriptor,T=(t,e,o,r)=>{for(var s=r>1?void 0:r?A(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&H(e,o,s),s};let g=class extends u{constructor(){super(...arguments),this.body="",this._tab="text"}_decode(){if(!this.body)return new Uint8Array(0);try{return B(this.body)}catch{return new TextEncoder().encode(this.body)}}_renderContent(){const t=this._decode();switch(this._tab){case"hex":return Array.from(t.slice(0,4096)).map(e=>e.toString(16).padStart(2,"0")).join(" ");case"json":try{const e=new TextDecoder().decode(t);return JSON.stringify(JSON.parse(e),null,2)}catch{return new TextDecoder().decode(t)}default:return new TextDecoder().decode(t)}}_copyContent(){navigator.clipboard.writeText(this._renderContent())}render(){return a`
       <div class="toolbar">
         <div class="tabs">
           <button class="tab ${this._tab==="text"?"active":""}" @click=${()=>{this._tab="text"}}>${c("inspectorTabText")}</button>
@@ -70,7 +70,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
         <button class="copy-btn" @click=${()=>this._copyContent()}>${c("inspectorBtnCopy")}</button>
       </div>
       <pre>${this._renderContent()}</pre>
-    `}};$.styles=v`
+    `}};g.styles=v`
     :host { display: block; }
     .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
     .tab {
@@ -92,7 +92,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
       background: var(--border-subtle); border: none; border-radius: 4px;
       color: var(--text-muted); font-family: inherit; margin-left: auto;
     }
-  `;D([l()],$.prototype,"body",2);$=D([b("body-viewer")],$);var A=Object.defineProperty,J=Object.getOwnPropertyDescriptor,R=(t,e,o,r)=>{for(var s=r>1?void 0:r?J(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&A(e,o,s),s};let w=class extends u{constructor(){super(...arguments),this.record=null}render(){const t=this.record;return t?a`
+  `;T([l()],g.prototype,"body",2);T([h()],g.prototype,"_tab",2);g=T([b("body-viewer")],g);var J=Object.defineProperty,G=Object.getOwnPropertyDescriptor,j=(t,e,o,r)=>{for(var s=r>1?void 0:r?G(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&J(e,o,s),s};let w=class extends u{constructor(){super(...arguments),this.record=null}render(){const t=this.record;return t?a`
       <div class="panel">
         <div class="section">
           <div class="section-title">Overview</div>
@@ -113,11 +113,11 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
         ${t.http?a`
           <div class="section">
             <div class="section-title">${c("inspectorDetailHeaders")} — Request</div>
-            <pre>${t.http.request.header}</pre>
+            <pre>${k(t.http.request.header)}</pre>
           </div>
           <div class="section">
             <div class="section-title">${c("inspectorDetailHeaders")} — Response</div>
-            <pre>${t.http.response.header}</pre>
+            <pre>${k(t.http.response.header)}</pre>
           </div>
           ${t.http.request.body?a`
             <div class="section">
@@ -173,7 +173,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
       white-space: pre-wrap; word-break: break-all; max-height: 200px;
       overflow-y: auto; margin: 0;
     }
-  `;R([l({attribute:!1})],w.prototype,"record",2);w=R([b("record-detail")],w);var G=Object.getOwnPropertyDescriptor,Q=(t,e,o,r)=>{for(var s=r>1?void 0:r?G(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=n(s)||s);return s};let P=class extends u{render(){return a`<div class="spinner"></div>`}};P.styles=v`
+  `;j([l({attribute:!1})],w.prototype,"record",2);w=j([b("record-detail")],w);var Q=Object.getOwnPropertyDescriptor,V=(t,e,o,r)=>{for(var s=r>1?void 0:r?Q(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=n(s)||s);return s};let P=class extends u{render(){return a`<div class="spinner"></div>`}};P.styles=v`
     :host {
       display: inline-block;
       width: 32px;
@@ -192,11 +192,11 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-  `;P=Q([b("wisper-spinner")],P);var V=Object.defineProperty,X=Object.getOwnPropertyDescriptor,m=(t,e,o,r)=>{for(var s=r>1?void 0:r?X(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&V(e,o,s),s};function Y(t){const e=t.toUpperCase();return e==="GET"?"method-green":e==="POST"||e==="PUT"||e==="PATCH"?"method-blue":e==="CONNECT"?"method-yellow":e==="DELETE"?"method-red":"method-default"}function Z(t){return t>=200&&t<300?"var(--green)":t>=400?"var(--red)":"var(--text-muted)"}let f=class extends u{constructor(){super(...arguments),this.records=[],this.protocol="http",this.selectedIndex=-1,this.hasMore=!1,this.loading=!1,this._observer=null}updated(){this._observer&&this._observer.disconnect(),this._observer=new IntersectionObserver(e=>{e[0]?.isIntersecting&&this.hasMore&&this.dispatchEvent(new CustomEvent("load-more",{bubbles:!0,composed:!0}))});const t=this.shadowRoot?.querySelector(".sentinel");t&&this._observer.observe(t)}disconnectedCallback(){super.disconnectedCallback(),this._observer?.disconnect()}_renderRow(t,e){const o=t.http?.host||t.host,r=t.http?.method||"",s=t.http?.uri||"",i=t.http?.statusCode||0,n=t.websocket?.opcode;return a`
+  `;P=V([b("wisper-spinner")],P);var X=Object.defineProperty,Y=Object.getOwnPropertyDescriptor,_=(t,e,o,r)=>{for(var s=r>1?void 0:r?Y(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&X(e,o,s),s};function Z(t){const e=t.toUpperCase();return e==="GET"?"method-green":e==="POST"||e==="PUT"||e==="PATCH"?"method-blue":e==="CONNECT"?"method-yellow":e==="DELETE"?"method-red":"method-default"}function ee(t){return t>=200&&t<300?"var(--green)":t>=400?"var(--red)":"var(--text-muted)"}let f=class extends u{constructor(){super(...arguments),this.records=[],this.protocol="http",this.selectedIndex=-1,this.hasMore=!1,this.loading=!1,this._observer=null}updated(){this._observer&&this._observer.disconnect(),this._observer=new IntersectionObserver(e=>{e[0]?.isIntersecting&&this.hasMore&&this.dispatchEvent(new CustomEvent("load-more",{bubbles:!0,composed:!0}))});const t=this.shadowRoot?.querySelector(".sentinel");t&&this._observer.observe(t)}disconnectedCallback(){super.disconnectedCallback(),this._observer?.disconnect()}_renderRow(t,e){const o=t.http?.host||t.host,r=t.http?.method||"",s=t.http?.uri||"",i=t.http?.statusCode||0,n=t.websocket?.opcode;return a`
       <div class="row ${this.selectedIndex===e?"selected":""}"
         @click=${()=>this.dispatchEvent(new CustomEvent("record-select",{detail:e,bubbles:!0,composed:!0}))}>
         ${r?a`
-          <span class="method-badge ${Y(r)}">${r}</span>
+          <span class="method-badge ${Z(r)}">${r}</span>
         `:n!==void 0?a`
           <span class="method-badge method-default">WS</span>
         `:a`
@@ -210,7 +210,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
           </div>
         </div>
         ${i?a`
-          <span style="color:${Z(i)};font-weight:600;font-size:var(--font-xs)">${i}</span>
+          <span style="color:${ee(i)};font-weight:600;font-size:var(--font-xs)">${i}</span>
         `:""}
         <div class="right">
           <div>↓${(t.inputBytes/1024).toFixed(1)}K</div>
@@ -250,7 +250,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
     .sentinel { height: 1px; }
     .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: var(--font-sm); }
     .loading { display: flex; justify-content: center; padding: 24px; }
-  `;m([l({attribute:!1})],f.prototype,"records",2);m([l()],f.prototype,"protocol",2);m([l({type:Number})],f.prototype,"selectedIndex",2);m([l({type:Boolean})],f.prototype,"hasMore",2);m([l({type:Boolean})],f.prototype,"loading",2);f=m([b("record-list")],f);var ee=Object.defineProperty,te=Object.getOwnPropertyDescriptor,C=(t,e,o,r)=>{for(var s=r>1?void 0:r?te(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&ee(e,o,s),s};let _=class extends u{constructor(){super(...arguments),this.connected=!1,this.recordCount=0,this.stopped=!1}render(){return a`
+  `;_([l({attribute:!1})],f.prototype,"records",2);_([l()],f.prototype,"protocol",2);_([l({type:Number})],f.prototype,"selectedIndex",2);_([l({type:Boolean})],f.prototype,"hasMore",2);_([l({type:Boolean})],f.prototype,"loading",2);f=_([b("record-list")],f);var te=Object.defineProperty,se=Object.getOwnPropertyDescriptor,C=(t,e,o,r)=>{for(var s=r>1?void 0:r?se(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&te(e,o,s),s};let m=class extends u{constructor(){super(...arguments),this.connected=!1,this.recordCount=0,this.stopped=!1}render(){return a`
       <div class="bar">
         <span class="status">
           <span class="dot ${this.connected?"connected":"disconnected"}"></span>
@@ -262,7 +262,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
           <button @click=${()=>this.dispatchEvent(new CustomEvent("live-clear",{bubbles:!0,composed:!0}))}>${c("inspectorBtnClear")}</button>
         </span>
       </div>
-    `}};_.styles=v`
+    `}};m.styles=v`
     :host { display: block; }
     .bar {
       display: flex; align-items: center; justify-content: space-between;
@@ -287,11 +287,11 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
       font-family: inherit;
     }
     .actions button:hover { color: var(--text); border-color: var(--text-muted); }
-  `;C([l({type:Boolean})],_.prototype,"connected",2);C([l({type:Number})],_.prototype,"recordCount",2);C([l({type:Boolean})],_.prototype,"stopped",2);_=C([b("live-indicator")],_);var se=Object.defineProperty,oe=Object.getOwnPropertyDescriptor,p=(t,e,o,r)=>{for(var s=r>1?void 0:r?oe(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&se(e,o,s),s};let d=class extends u{constructor(){super(...arguments),this.parentKind="tunnel",this.parentType="",this.parentId="",this._mode="query",this._protocol="http",this._records=[],this._selectedIndex=-1,this._sid="",this._cursor=null,this._hasMore=!0,this._loading=!1,this._liveConnected=!1,this._liveStopped=!1,this._client=null,this._ws=null,this._reconnectDelay=1e3,this._reconnectTimer=null}connectedCallback(){super.connectedCallback();const t=j();t.inspector_url&&(this._client=new M(t.inspector_url)),this._fetchRecords()}disconnectedCallback(){super.disconnectedCallback(),this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer)}_getClientId(){return this.parentKind==="tunnel"?this.parentId:T().find(o=>o.id===this.parentId)?.options?.tunnel_id||this.parentId}_getParentName(){return this.parentKind==="tunnel"?E().find(o=>o.id===this.parentId)?.name||this.parentId:T().find(e=>e.id===this.parentId)?.name||this.parentId}async _fetchRecords(t){if(!(!this._client||this._loading)){this._loading=!0;try{const e=await this._client.query({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0,after:t,limit:100});if(e.code===0&&e.data){const o=e.data.list||[];t?this._records=[...this._records,...o]:this._records=o,this._cursor=e.data.before||null,this._hasMore=o.length>=100}}catch{}this._loading=!1}}_onLoadMore(){this._mode==="query"&&this._hasMore&&this._cursor&&this._fetchRecords(this._cursor)}_openWs(){if(this._client){this._closeWs(),this._liveStopped=!1,this._reconnectDelay=1e3;try{this._ws=this._client.connectTail({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0}),this._ws.onopen=()=>{this._liveConnected=!0},this._ws.onmessage=t=>{try{const e=JSON.parse(t.data);this._records=[e,...this._records].slice(0,200)}catch{}},this._ws.onclose=()=>{this._liveConnected=!1,this._liveStopped||this._scheduleReconnect()},this._ws.onerror=()=>{this._ws?.close()}}catch{}}}_scheduleReconnect(){this._reconnectTimer&&clearTimeout(this._reconnectTimer),this._reconnectTimer=setTimeout(()=>{this._openWs(),this._reconnectDelay=Math.min(this._reconnectDelay*2,3e4)},this._reconnectDelay)}_closeWs(){this._ws&&(this._ws.onclose=null,this._ws.onmessage=null,this._ws.close(),this._ws=null),this._liveConnected=!1}_onModeChange(t){const e=t.detail;this._mode=e,this._selectedIndex=-1,e==="live"?(this._records=[],this._openWs()):(this._closeWs(),this._records=[],this._fetchRecords())}_onProtocolChange(t){this._protocol=t.detail,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onFilterChange(t){const{sid:e}=t.detail;this._sid=e,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onRecordSelect(t){const e=t.detail;this._selectedIndex=this._selectedIndex===e?-1:e}_onLiveStop(){this._liveStopped=!0,this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer)}_onLiveReconnect(){this._liveStopped=!1,this._openWs()}_onLiveClear(){this._records=[],this._selectedIndex=-1}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){const t=this._getParentName(),e=this.parentKind==="tunnel"?`/tunnel/${this.parentType}/${this.parentId}`:`/entrypoint/${this.parentType}/${this.parentId}`,o=this._getClientId().slice(0,8);return this._client?a`
+  `;C([l({type:Boolean})],m.prototype,"connected",2);C([l({type:Number})],m.prototype,"recordCount",2);C([l({type:Boolean})],m.prototype,"stopped",2);m=C([b("live-indicator")],m);var oe=Object.defineProperty,re=Object.getOwnPropertyDescriptor,p=(t,e,o,r)=>{for(var s=r>1?void 0:r?re(e,o):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(r?n(e,o,s):n(s))||s);return r&&s&&oe(e,o,s),s};let d=class extends u{constructor(){super(...arguments),this.parentKind="tunnel",this.parentType="",this.parentId="",this._mode="query",this._protocol="http",this._records=[],this._selectedIndex=-1,this._sid="",this._cursor=null,this._hasMore=!0,this._loading=!1,this._liveConnected=!1,this._liveStopped=!1,this._client=null,this._ws=null,this._reconnectDelay=1e3,this._reconnectTimer=null}connectedCallback(){super.connectedCallback();const t=E();t.inspector_url&&(this._client=new z(t.inspector_url)),this._fetchRecords()}disconnectedCallback(){super.disconnectedCallback(),this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer)}_getClientId(){return this.parentKind==="tunnel"?this.parentId:S().find(o=>o.id===this.parentId)?.options?.tunnel_id||this.parentId}_getParentName(){return this.parentKind==="tunnel"?M().find(o=>o.id===this.parentId)?.name||this.parentId:S().find(e=>e.id===this.parentId)?.name||this.parentId}async _fetchRecords(t){if(!(!this._client||this._loading)){this._loading=!0;try{const e=await this._client.query({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0,after:t,limit:100});if(e.code===0&&e.data){const o=e.data.list||[];t?this._records=[...this._records,...o]:this._records=o,this._cursor=e.data.before||null,this._hasMore=o.length>=100}}catch{}this._loading=!1}}_onLoadMore(){this._mode==="query"&&this._hasMore&&this._cursor&&this._fetchRecords(this._cursor)}_openWs(){if(this._client){this._closeWs(),this._liveStopped=!1,this._reconnectDelay=1e3;try{this._ws=this._client.connectTail({client_id:this._getClientId(),type:this._protocol,sid:this._sid||void 0}),this._ws.onopen=()=>{this._liveConnected=!0},this._ws.onmessage=t=>{try{const e=JSON.parse(t.data);this._records=[e,...this._records].slice(0,200)}catch{}},this._ws.onclose=()=>{this._liveConnected=!1,this._liveStopped||this._scheduleReconnect()},this._ws.onerror=()=>{this._ws?.close()}}catch{}}}_scheduleReconnect(){this._reconnectTimer&&clearTimeout(this._reconnectTimer),this._reconnectTimer=setTimeout(()=>{this._openWs(),this._reconnectDelay=Math.min(this._reconnectDelay*2,3e4)},this._reconnectDelay)}_closeWs(){this._ws&&(this._ws.onclose=null,this._ws.onmessage=null,this._ws.close(),this._ws=null),this._liveConnected=!1}_onModeChange(t){const e=t.detail;this._mode=e,this._selectedIndex=-1,e==="live"?(this._records=[],this._openWs()):(this._closeWs(),this._records=[],this._fetchRecords())}_onProtocolChange(t){this._protocol=t.detail,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onFilterChange(t){const{sid:e}=t.detail;this._sid=e,this._selectedIndex=-1,this._mode==="live"?(this._records=[],this._openWs()):(this._records=[],this._hasMore=!0,this._cursor=null,this._fetchRecords())}_onRecordSelect(t){const e=t.detail;this._selectedIndex=this._selectedIndex===e?-1:e}_onLiveStop(){this._liveStopped=!0,this._closeWs(),this._reconnectTimer&&clearTimeout(this._reconnectTimer)}_onLiveReconnect(){this._liveStopped=!1,this._openWs()}_onLiveClear(){this._records=[],this._selectedIndex=-1}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){const t=this._getParentName(),e=this.parentKind==="tunnel"?`/tunnel/${this.parentType}/${this.parentId}`:`/entrypoint/${this.parentType}/${this.parentId}`,o=this._getClientId().slice(0,8);return this._client?a`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate(e)}>
-            ${S("chevron-left")}
+            ${O("chevron-left")}
           </button>
           <span class="page-title">
             &larr; ${t||this.parentId} &middot; ${c("inspectorTitle")}
@@ -345,7 +345,7 @@ import{i as v,a as u,j as c,b as a,t as b,w as j,c as T,g as E}from"./index-Hz3f
         <app-scaffold>
           <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
             <button class="back-btn" @click=${()=>this._navigate(e)}>
-              ${S("chevron-left")}
+              ${O("chevron-left")}
             </button>
             <span class="page-title">${c("inspectorTitle")}</span>
           </div>

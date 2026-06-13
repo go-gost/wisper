@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { decodeBase64 } from '../../api/inspector';
 import { t } from '../../i18n/i18n';
 
@@ -33,7 +33,7 @@ export class BodyViewer extends LitElement {
     }
   `;
 
-  private _tab: BodyTab = 'text';
+  @state() private _tab: BodyTab = 'text';
 
   private _decode(): Uint8Array {
     if (!this.body) return new Uint8Array(0);

@@ -143,6 +143,9 @@ export interface AppSettingsUpdate {
 
 // ─── Inspector ───────────────────────────────────────────────────────────
 
+/** HTTP header map, as serialized from Go's `http.Header` (`map[string][]string`). */
+export type HttpHeaders = Record<string, string[]>;
+
 export interface HttpRecord {
   host: string;
   method: string;
@@ -150,8 +153,8 @@ export interface HttpRecord {
   scheme: string;
   uri: string;
   statusCode: number;
-  request: { header: string; body: string };   // body = base64
-  response: { header: string; body: string };  // body = base64
+  request: { header: HttpHeaders; body: string };   // body = base64
+  response: { header: HttpHeaders; body: string };  // body = base64
 }
 
 export interface WsRecord {
