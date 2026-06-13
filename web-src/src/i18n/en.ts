@@ -114,7 +114,7 @@ const en: Record<string, string> = {
 
   // Inspector
   inspectorEntryTitle: 'Traffic Inspection',
-  inspectorEntryDesc: 'View HTTP / WebSocket / TLS / DNS records',
+  inspectorEntryDesc: 'View HTTP / WebSocket records',
   inspectorTitle: 'Traffic',
   inspectorNotConfigured: 'Inspector not configured',
   inspectorNotConfiguredDesc: 'Set the inspector API URL in Settings to enable traffic inspection.',

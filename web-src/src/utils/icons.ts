@@ -10,7 +10,7 @@ import { html, svg, type TemplateResult } from 'lit';
  *   star, star-filled, settings, trash, copy,
  *   chevron-left, chevron-right, chevron-up, chevron-down,
  *   folder, globe, link, broadcast, plus, edit, back-arrow,
- *   check, close
+ *   check, close, search
  */
 export function icon(name: string): TemplateResult {
   const inner = ICON_PATHS[name];
@@ -54,6 +54,7 @@ const ICON_PATHS: Record<string, SVGInner> = {
   check: svg`<polyline points="20 6 9 17 4 12" />`,
   close: svg`<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />`,
   'rotate-cw': svg`<polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />`,
+  search: svg`<circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />`,
 
   /* ── Type indicators ── */
   folder: svg`<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />`,

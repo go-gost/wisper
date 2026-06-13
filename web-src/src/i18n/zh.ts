@@ -114,7 +114,7 @@ const zh: Record<string, string> = {
 
   // Inspector
   inspectorEntryTitle: '流量检查',
-  inspectorEntryDesc: '查看 HTTP / WebSocket / TLS / DNS 记录',
+  inspectorEntryDesc: '查看 HTTP / WebSocket 记录',
   inspectorTitle: '流量',
   inspectorNotConfigured: '流量检查未配置',
   inspectorNotConfiguredDesc: '在设置中配置 Inspector API URL 以启用流量检查。',

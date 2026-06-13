@@ -4,7 +4,6 @@ import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { setItemStats } from '../store/stats-store';
-import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber } from '../utils/format';
 import type { Entrypoint, EntrypointType } from '../api/types';
@@ -548,27 +547,6 @@ export class EntrypointDetailPage extends LitElement {
                 `
                 : ''}
             </div>
-
-            <!-- Inspector entry (only when inspector URL is configured) -->
-            ${this.mode === 'view' && ep && getSettings().inspector_url
-              ? html`
-                <div class="section">
-                  <div class="card" style="padding:0;">
-                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
-                      background:linear-gradient(135deg,var(--accent-bg-subtle, rgba(88,166,255,0.06)),rgba(163,113,247,0.04));
-                      border-radius:var(--radius-lg);cursor:pointer;"
-                      @click=${() => this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/inspector`)}>
-                      <span style="font-size:20px;">&#128269;</span>
-                      <div style="flex:1;">
-                        <div style="font-size:var(--font-sm);font-weight:600;">${t('inspectorEntryTitle')}</div>
-                        <div style="font-size:var(--font-xs);color:var(--text-muted);">${t('inspectorEntryDesc')}</div>
-                      </div>
-                      <span style="color:var(--text-muted);">&rarr;</span>
-                    </div>
-                  </div>
-                </div>
-              `
-              : ''}
 
             <div class="section">
               <button class="btn-edit-bottom" @click=${() => this._enterEdit()}>

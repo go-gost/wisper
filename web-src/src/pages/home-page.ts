@@ -646,12 +646,6 @@ export class HomePage extends LitElement {
           <div class="app-icon">W</div>
           <span class="appbar-title">${t('appName')}</span>
           <span class="header-spacer"></span>
-          <button
-            class="icon-btn ${this.showFavorites ? 'active' : ''}"
-            @click=${this._toggleFavorites}
-          >
-            ${icon(this.showFavorites ? 'star-filled' : 'star')}
-          </button>
           <button class="icon-btn" @click=${() => this._navigate('/settings')}>
             ${icon('settings')}
           </button>

@@ -800,8 +800,9 @@ export class TunnelDetailPage extends LitElement {
                 : ''}
             </div>
 
-            <!-- Inspector entry (only when inspector URL is configured) -->
-            ${this.mode === 'view' && t2 && getSettings().inspector_url
+            <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
+                 inspecting, and only when an inspector URL is configured. -->
+            ${this.mode === 'view' && t2 && (this.tunnelType === 'http' || this.tunnelType === 'file') && getSettings().inspector_url
               ? html`
                 <div class="section">
                   <div class="card" style="padding:0;">
@@ -809,7 +810,7 @@ export class TunnelDetailPage extends LitElement {
                       background:linear-gradient(135deg,var(--accent-bg-subtle, rgba(88,166,255,0.06)),rgba(163,113,247,0.04));
                       border-radius:var(--radius-lg);cursor:pointer;"
                       @click=${() => this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/inspector`)}>
-                      <span style="font-size:20px;">&#128269;</span>
+                      <span style="color:var(--accent);">${icon('search')}</span>
                       <div style="flex:1;">
                         <div style="font-size:var(--font-sm);font-weight:600;">${t('inspectorEntryTitle')}</div>
                         <div style="font-size:var(--font-xs);color:var(--text-muted);">${t('inspectorEntryDesc')}</div>

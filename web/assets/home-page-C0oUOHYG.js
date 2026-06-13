@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CNQdID4l.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
-import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h as I,j as e,k as S,l as z,m as L,n as j,_ as E,o as R,p as D}from"./index-CNQdID4l.js";import{n as p,r as v}from"./state-D-pgx_bz.js";import{i as h}from"./app-scaffold-BBO6Vp7v.js";import{c as B}from"./clipboard-C3x8_sid.js";import{f as C,a as T,b as N}from"./format-CZNH9DXL.js";var O=Object.defineProperty,q=Object.getOwnPropertyDescriptor,m=(t,n,r,a)=>{for(var s=a>1?void 0:a?q(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&O(n,r,s),s};let f=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-Gls27JYn.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
+import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h as F,j as e,k as S,l as z,m as L,n as j,_ as E,o as R,p as D}from"./index-Gls27JYn.js";import{n as p,r as h}from"./state-B4o8PH5o.js";import{i as v}from"./app-scaffold-Bkj5lTfJ.js";import{c as B}from"./clipboard-C3x8_sid.js";import{f as C,a as T,b as N}from"./format-CZNH9DXL.js";var O=Object.defineProperty,q=Object.getOwnPropertyDescriptor,m=(t,n,r,a)=>{for(var o=a>1?void 0:a?q(n,r):n,c=t.length-1,s;c>=0;c--)(s=t[c])&&(o=(a?s(n,r,o):s(o))||o);return a&&o&&O(n,r,o),o};let f=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
       <div class="pill-group">
         ${this.tabs.map((t,n)=>i`
             <button class=${n===this.activeIndex?"active":""} @click=${()=>this._handleClick(n)}>
@@ -44,7 +44,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       font-weight: 600;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
-  `;m([p({type:Array})],f.prototype,"tabs",2);m([p({type:Number})],f.prototype,"activeIndex",2);f=m([y("nav-tabs")],f);var A=Object.defineProperty,H=Object.getOwnPropertyDescriptor,l=(t,n,r,a)=>{for(var s=a>1?void 0:a?H(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&A(n,r,s),s};let d=class extends x{constructor(){super(...arguments),this.name="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.expanded=!1,this.compact=!0,this.error=""}_onRowClick(t){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return i`
+  `;m([p({type:Array})],f.prototype,"tabs",2);m([p({type:Number})],f.prototype,"activeIndex",2);f=m([y("nav-tabs")],f);var A=Object.defineProperty,H=Object.getOwnPropertyDescriptor,l=(t,n,r,a)=>{for(var o=a>1?void 0:a?H(n,r):n,c=t.length-1,s;c>=0;c--)(s=t[c])&&(o=(a?s(n,r,o):s(o))||o);return a&&o&&A(n,r,o),o};let d=class extends x{constructor(){super(...arguments),this.name="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.expanded=!1,this.compact=!0,this.error=""}_onRowClick(t){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return i`
       <div class="row ${t?"stopped":""}" @click=${this._onRowClick}>
         <span class="dot ${this.status}"></span>
 
@@ -67,7 +67,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
         `:""}
 
         <span class="chevron ${this.expanded?"open":""}" @click=${this._onChevronClick}>
-          ${h("chevron-right")}
+          ${v("chevron-right")}
         </span>
       </div>
 
@@ -183,9 +183,9 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
       font-size: var(--font-xs);
       color: var(--red-text);
     }
-  `;l([p()],d.prototype,"name",2);l([p()],d.prototype,"meta",2);l([p()],d.prototype,"status",2);l([p()],d.prototype,"endpoint",2);l([p({type:Number})],d.prototype,"currentConns",2);l([p({type:Number})],d.prototype,"totalConns",2);l([p({type:Number})],d.prototype,"requestRate",2);l([p({type:Number})],d.prototype,"inputBytes",2);l([p({type:Number})],d.prototype,"outputBytes",2);l([p({type:Number})],d.prototype,"inputRate",2);l([p({type:Number})],d.prototype,"outputRate",2);l([p({type:Boolean})],d.prototype,"expanded",2);l([p({type:Boolean})],d.prototype,"compact",2);l([p()],d.prototype,"error",2);d=l([y("tunnel-card")],d);var U=Object.defineProperty,M=Object.getOwnPropertyDescriptor,b=(t,n,r,a)=>{for(var s=a>1?void 0:a?M(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&U(n,r,s),s};let u=class extends x{constructor(){super(...arguments),this.tabIndex=0,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null}connectedCallback(){super.connectedCallback(),this._tunnels=_(),this._entrypoints=$(),this._tunnelsLoading=w(),this._entrypointsLoading=k(),this._unsubs.push(F(()=>{this._tunnels=_(),this._tunnelsLoading=w(),this.requestUpdate()}),P(()=>{this._entrypoints=$(),this._entrypointsLoading=k(),this.requestUpdate()}),I(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return this.showFavorites?this._tunnels.filter(t=>t.favorite):this._tunnels}get _filteredEntrypoints(){return this.showFavorites?this._entrypoints.filter(t=>t.favorite):this._entrypoints}get _items(){return this.tabIndex===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this.tabIndex===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){const n=t.data.type.toUpperCase(),r=this._statusLabel(t.data.status);return t.data.status==="running"?`${n} · ${N(t.data.stats.current_conns)} conns`:`${n} · ${r}`}_renderEmptyState(){const t=this.tabIndex===0,n=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return i`
+  `;l([p()],d.prototype,"name",2);l([p()],d.prototype,"meta",2);l([p()],d.prototype,"status",2);l([p()],d.prototype,"endpoint",2);l([p({type:Number})],d.prototype,"currentConns",2);l([p({type:Number})],d.prototype,"totalConns",2);l([p({type:Number})],d.prototype,"requestRate",2);l([p({type:Number})],d.prototype,"inputBytes",2);l([p({type:Number})],d.prototype,"outputBytes",2);l([p({type:Number})],d.prototype,"inputRate",2);l([p({type:Number})],d.prototype,"outputRate",2);l([p({type:Boolean})],d.prototype,"expanded",2);l([p({type:Boolean})],d.prototype,"compact",2);l([p()],d.prototype,"error",2);d=l([y("tunnel-card")],d);var U=Object.defineProperty,M=Object.getOwnPropertyDescriptor,b=(t,n,r,a)=>{for(var o=a>1?void 0:a?M(n,r):n,c=t.length-1,s;c>=0;c--)(s=t[c])&&(o=(a?s(n,r,o):s(o))||o);return a&&o&&U(n,r,o),o};let u=class extends x{constructor(){super(...arguments),this.tabIndex=0,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null}connectedCallback(){super.connectedCallback(),this._tunnels=_(),this._entrypoints=w(),this._tunnelsLoading=$(),this._entrypointsLoading=k(),this._unsubs.push(P(()=>{this._tunnels=_(),this._tunnelsLoading=$(),this.requestUpdate()}),I(()=>{this._entrypoints=w(),this._entrypointsLoading=k(),this.requestUpdate()}),F(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return this.showFavorites?this._tunnels.filter(t=>t.favorite):this._tunnels}get _filteredEntrypoints(){return this.showFavorites?this._entrypoints.filter(t=>t.favorite):this._entrypoints}get _items(){return this.tabIndex===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this.tabIndex===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){const n=t.data.type.toUpperCase(),r=this._statusLabel(t.data.status);return t.data.status==="running"?`${n} · ${N(t.data.stats.current_conns)} conns`:`${n} · ${r}`}_renderEmptyState(){const t=this.tabIndex===0,n=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return i`
         <div class="empty">
-          <div class="empty-icon-wrap">${h("star")}</div>
+          <div class="empty-icon-wrap">${v("star")}</div>
           <div class="empty-title">${e("homeNoFavorites")}</div>
           <div class="empty-desc">${t?e("homeNoFavTunnelHint"):e("homeNoFavEntryHint")}</div>
           <button class="empty-sub-link" @click=${this._toggleFavorites}>
@@ -194,28 +194,22 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
         </div>
       `;if(n){const r=t?"/tunnel/new":"/entrypoint/new";return i`
         <div class="empty">
-          <div class="empty-icon-wrap">${h(t?"link":"broadcast")}</div>
+          <div class="empty-icon-wrap">${v(t?"link":"broadcast")}</div>
           <div class="empty-title">${t?e("homeEmptyTunnels"):e("homeEmptyEntrypoints")}</div>
           <div class="empty-desc">${t?e("homeEmptyTunnelDesc"):e("homeEmptyEntryDesc")}</div>
           <button class="empty-action" @click=${()=>this._navigate(r)}>
             ${t?e("tunnelNewTitle"):e("entrypointNewTitle")}
           </button>
         </div>
-      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await S(t.data.id):await z(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await L(t.data.id):await j(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-CNQdID4l.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await E(()=>import("./index-CNQdID4l.js").then(r=>r.G),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}async _handleFavorite(t){t.kind==="tunnel"?await R(t.data.id):await D(t.data.id)}render(){const t=this._items,n=this._isLoading();this.tabIndex===0?e("homeEmptyTunnels"):e("homeEmptyEntrypoints");const r=this.tabIndex===0?"/tunnel/new":"/entrypoint/new";return i`
+      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await S(t.data.id):await z(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await L(t.data.id):await j(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-Gls27JYn.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await E(()=>import("./index-Gls27JYn.js").then(r=>r.G),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}async _handleFavorite(t){t.kind==="tunnel"?await R(t.data.id):await D(t.data.id)}render(){const t=this._items,n=this._isLoading();this.tabIndex===0?e("homeEmptyTunnels"):e("homeEmptyEntrypoints");const r=this.tabIndex===0?"/tunnel/new":"/entrypoint/new";return i`
       <app-scaffold>
         <!-- Appbar -->
         <div slot="appBar" class="home-header">
           <div class="app-icon">W</div>
           <span class="appbar-title">${e("appName")}</span>
           <span class="header-spacer"></span>
-          <button
-            class="icon-btn ${this.showFavorites?"active":""}"
-            @click=${this._toggleFavorites}
-          >
-            ${h(this.showFavorites?"star-filled":"star")}
-          </button>
           <button class="icon-btn" @click=${()=>this._navigate("/settings")}>
-            ${h("settings")}
+            ${v("settings")}
           </button>
         </div>
 
@@ -229,7 +223,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
         <!-- Body -->
         ${n?i`<div class="loading"><wisper-spinner></wisper-spinner></div>`:t.length===0?this._renderEmptyState():i`
               <div class="list">
-                ${t.map(a=>{const s=a.kind==="tunnel"?`/tunnel/${a.data.type}/${a.data.id}`:`/entrypoint/${a.data.type}/${a.data.id}`,c=this._expandedId===a.data.id;return i`
+                ${t.map(a=>{const o=a.kind==="tunnel"?`/tunnel/${a.data.type}/${a.data.id}`:`/entrypoint/${a.data.type}/${a.data.id}`,c=this._expandedId===a.data.id;return i`
                     <div>
                       <tunnel-card
                         .name=${a.data.name}
@@ -246,7 +240,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
                         .outputRate=${a.data.stats.output_rate_bytes}
                         .expanded=${c}
                         .compact=${!0}
-                        @card-click=${()=>this._navigate(s)}
+                        @card-click=${()=>this._navigate(o)}
                         @chevron-click=${()=>this._toggleExpand(a.data.id)}
                       ></tunnel-card>
 
@@ -256,8 +250,8 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
                               <div class="detail-row">
                                 <span class="dlabel">${a.kind==="tunnel"?"Entrypoint":"Endpoint"}</span>
                                 <span class="dval">${a.data.entrypoint}
-                                  <button class="copy-btn-mini" @click=${async o=>{o.stopPropagation(),await B(a.data.entrypoint),this._showSnackbar(e("copiedToClipboard"))}}>
-                                    ${h("copy")}
+                                  <button class="copy-btn-mini" @click=${async s=>{s.stopPropagation(),await B(a.data.entrypoint),this._showSnackbar(e("copiedToClipboard"))}}>
+                                    ${v("copy")}
                                   </button>
                                 </span>
                               </div>
@@ -273,12 +267,12 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
                             </div>
                             <div class="expand-actions">
                               ${a.data.status==="running"?i`
-                                  <button class="action-btn stop" @click=${o=>{o.stopPropagation(),this._handleStop(a)}}>■ ${e("btnStop")}</button>
+                                  <button class="action-btn stop" @click=${s=>{s.stopPropagation(),this._handleStop(a)}}>■ ${e("btnStop")}</button>
                                 `:i`
-                                  <button class="action-btn start" @click=${o=>{o.stopPropagation(),this._handleStart(a)}}>▶ ${e("btnStart")}</button>
+                                  <button class="action-btn start" @click=${s=>{s.stopPropagation(),this._handleStart(a)}}>▶ ${e("btnStart")}</button>
                                 `}
-                              <button class="action-btn" @click=${o=>{o.stopPropagation(),this._navigate(s+"?edit")}}>${h("edit")} ${e("btnEdit")}</button>
-                              <button class="action-btn danger" @click=${o=>{o.stopPropagation(),this._confirmDelete(a.kind,a.data.id,a.data.name)}}>${h("trash")} ${e("btnDelete")}</button>
+                              <button class="action-btn" @click=${s=>{s.stopPropagation(),this._navigate(o+"?edit")}}>${v("edit")} ${e("btnEdit")}</button>
+                              <button class="action-btn danger" @click=${s=>{s.stopPropagation(),this._confirmDelete(a.kind,a.data.id,a.data.name)}}>${v("trash")} ${e("btnDelete")}</button>
                             </div>
                           </div>
                         `:""}
@@ -290,7 +284,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
         <!-- FAB -->
         <div slot="fab">
           <button class="fab" @click=${()=>this._navigate(r)}>
-            ${h("plus")}
+            ${v("plus")}
           </button>
         </div>
       </app-scaffold>
@@ -704,4 +698,4 @@ import{i as g,a as x,b as i,t as y,g as _,c as $,d as w,e as k,s as F,f as P,h a
     .dialog-btn:hover {
       opacity: 0.85;
     }
-  `;b([v()],u.prototype,"tabIndex",2);b([v()],u.prototype,"showFavorites",2);b([v()],u.prototype,"_tunnels",2);b([v()],u.prototype,"_entrypoints",2);b([v()],u.prototype,"_tunnelsLoading",2);b([v()],u.prototype,"_entrypointsLoading",2);b([v()],u.prototype,"_expandedId",2);b([v()],u.prototype,"_snackbar",2);b([v()],u.prototype,"_deleteTarget",2);u=b([y("home-page")],u);export{u as HomePage};
+  `;b([h()],u.prototype,"tabIndex",2);b([h()],u.prototype,"showFavorites",2);b([h()],u.prototype,"_tunnels",2);b([h()],u.prototype,"_entrypoints",2);b([h()],u.prototype,"_tunnelsLoading",2);b([h()],u.prototype,"_entrypointsLoading",2);b([h()],u.prototype,"_expandedId",2);b([h()],u.prototype,"_snackbar",2);b([h()],u.prototype,"_deleteTarget",2);u=b([y("home-page")],u);export{u as HomePage};
