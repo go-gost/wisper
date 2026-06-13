@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-Belib3UG.js","assets/index-DIq3FqVg.css"])))=>i.map(i=>d[i]);
-import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h as F,j as e,k as S,l as z,m as L,n as j,_ as E,o as R,p as D}from"./index-Belib3UG.js";import{n as p,r as h}from"./state-og4zxob-.js";import{i as v}from"./app-scaffold-D1qj9PTy.js";import{c as B}from"./clipboard-C3x8_sid.js";import{f as C,a as T,b as N}from"./format-CZNH9DXL.js";var O=Object.defineProperty,q=Object.getOwnPropertyDescriptor,m=(t,n,r,a)=>{for(var o=a>1?void 0:a?q(n,r):n,c=t.length-1,s;c>=0;c--)(s=t[c])&&(o=(a?s(n,r,o):s(o))||o);return a&&o&&O(n,r,o),o};let f=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DvQYVtD8.js","assets/index-A1_tgL98.css"])))=>i.map(i=>d[i]);
+import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h as F,j as e,k as S,l as z,m as L,n as j,_ as E,o as R,p as D}from"./index-DvQYVtD8.js";import{n as p,r as h}from"./state-C1UvBj5T.js";import{i as v}from"./app-scaffold-CU6KxGiW.js";import{c as B}from"./clipboard-C3x8_sid.js";import{f as C,a as T,b as N}from"./format-CZNH9DXL.js";var O=Object.defineProperty,q=Object.getOwnPropertyDescriptor,m=(t,n,r,a)=>{for(var o=a>1?void 0:a?q(n,r):n,c=t.length-1,s;c>=0;c--)(s=t[c])&&(o=(a?s(n,r,o):s(o))||o);return a&&o&&O(n,r,o),o};let f=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
       <div class="pill-group">
         ${this.tabs.map((t,n)=>i`
             <button class=${n===this.activeIndex?"active":""} @click=${()=>this._handleClick(n)}>
@@ -29,7 +29,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
       border: none;
       background: transparent;
       color: var(--text-secondary);
-      font-size: var(--font-lg);
+      font-size: var(--font-md);
       font-weight: 500;
       cursor: pointer;
       letter-spacing: 0.3px;
@@ -180,7 +180,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
       background: var(--red-bg);
       border: 1px solid var(--red-border);
       border-radius: var(--radius-sm);
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       color: var(--red-text);
     }
   `;l([p()],d.prototype,"name",2);l([p()],d.prototype,"meta",2);l([p()],d.prototype,"status",2);l([p()],d.prototype,"endpoint",2);l([p({type:Number})],d.prototype,"currentConns",2);l([p({type:Number})],d.prototype,"totalConns",2);l([p({type:Number})],d.prototype,"requestRate",2);l([p({type:Number})],d.prototype,"inputBytes",2);l([p({type:Number})],d.prototype,"outputBytes",2);l([p({type:Number})],d.prototype,"inputRate",2);l([p({type:Number})],d.prototype,"outputRate",2);l([p({type:Boolean})],d.prototype,"expanded",2);l([p({type:Boolean})],d.prototype,"compact",2);l([p()],d.prototype,"error",2);d=l([y("tunnel-card")],d);var U=Object.defineProperty,M=Object.getOwnPropertyDescriptor,b=(t,n,r,a)=>{for(var o=a>1?void 0:a?M(n,r):n,c=t.length-1,s;c>=0;c--)(s=t[c])&&(o=(a?s(n,r,o):s(o))||o);return a&&o&&U(n,r,o),o};let u=class extends x{constructor(){super(...arguments),this.tabIndex=0,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null}connectedCallback(){super.connectedCallback(),this._tunnels=_(),this._entrypoints=w(),this._tunnelsLoading=$(),this._entrypointsLoading=k(),this._unsubs.push(P(()=>{this._tunnels=_(),this._tunnelsLoading=$(),this.requestUpdate()}),I(()=>{this._entrypoints=w(),this._entrypointsLoading=k(),this.requestUpdate()}),F(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return this.showFavorites?this._tunnels.filter(t=>t.favorite):this._tunnels}get _filteredEntrypoints(){return this.showFavorites?this._entrypoints.filter(t=>t.favorite):this._entrypoints}get _items(){return this.tabIndex===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this.tabIndex===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){const n=t.data.type.toUpperCase(),r=this._statusLabel(t.data.status);return t.data.status==="running"?`${n} · ${N(t.data.stats.current_conns)} conns`:`${n} · ${r}`}_renderEmptyState(){const t=this.tabIndex===0,n=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return i`
@@ -201,7 +201,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
             ${t?e("tunnelNewTitle"):e("entrypointNewTitle")}
           </button>
         </div>
-      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await S(t.data.id):await z(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await L(t.data.id):await j(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-Belib3UG.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await E(()=>import("./index-Belib3UG.js").then(r=>r.G),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}async _handleFavorite(t){t.kind==="tunnel"?await R(t.data.id):await D(t.data.id)}render(){const t=this._items,n=this._isLoading();this.tabIndex===0?e("homeEmptyTunnels"):e("homeEmptyEntrypoints");const r=this.tabIndex===0?"/tunnel/new":"/entrypoint/new";return i`
+      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await S(t.data.id):await z(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await L(t.data.id):await j(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-DvQYVtD8.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await E(()=>import("./index-DvQYVtD8.js").then(r=>r.G),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}async _handleFavorite(t){t.kind==="tunnel"?await R(t.data.id):await D(t.data.id)}render(){const t=this._items,n=this._isLoading();this.tabIndex===0?e("homeEmptyTunnels"):e("homeEmptyEntrypoints");const r=this.tabIndex===0?"/tunnel/new":"/entrypoint/new";return i`
       <app-scaffold>
         <!-- Appbar -->
         <div slot="appBar" class="home-header">
@@ -384,7 +384,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       color: var(--text-secondary);
       word-break: break-all;
@@ -407,7 +407,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       cursor: pointer;
       font-family: inherit;
       transition: background var(--transition-fast);
@@ -438,7 +438,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
     }
 
     .expand-error {
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       color: var(--red-text);
       padding: 4px 8px;
       background: var(--red-bg);
@@ -523,7 +523,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
 
     .empty-title {
       font-weight: 600;
-      font-size: var(--font-lg);
+      font-size: var(--font-md);
       color: var(--text);
     }
 

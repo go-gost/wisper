@@ -37,13 +37,13 @@ export class RecordList extends LitElement {
     .row {
       background: var(--border-subtle); border-radius: var(--radius-sm);
       padding: 10px 12px; cursor: pointer; display: flex; align-items: center;
-      gap: 10px; font-size: var(--font-xs); transition: background 0.1s;
+      gap: 10px; font-size: var(--font-sm); transition: background 0.1s;
     }
     .row:hover { background: #30363d; }
     .row.selected { border-left: 2px solid var(--accent); }
     .method-badge {
       padding: 2px 6px; border-radius: 4px; font-weight: 600;
-      font-size: 10px; font-family: var(--font-mono, 'SF Mono', monospace);
+      font-size: var(--font-sm); font-family: var(--font-mono, 'SF Mono', monospace);
       min-width: 38px; text-align: center;
     }
     .method-green { background: rgba(63,185,80,0.2); color: var(--green); }
@@ -53,8 +53,8 @@ export class RecordList extends LitElement {
     .method-default { background: rgba(139,148,158,0.15); color: var(--text-muted); }
     .details { flex: 1; min-width: 0; }
     .host { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .meta { font-size: 10px; color: var(--text-muted); margin-top: 1px; display: flex; gap: 8px; }
-    .right { text-align: right; font-size: 10px; color: var(--text-muted); }
+    .meta { font-size: var(--font-sm); color: var(--text-muted); margin-top: 1px; display: flex; gap: 8px; }
+    .right { text-align: right; font-size: var(--font-sm); color: var(--text-muted); }
     .sentinel { height: 1px; }
     .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: var(--font-sm); }
     .loading { display: flex; justify-content: center; padding: 24px; }
@@ -101,7 +101,7 @@ export class RecordList extends LitElement {
           </div>
         </div>
         ${httpStatus ? html`
-          <span style="color:${statusColor(httpStatus)};font-weight:600;font-size:var(--font-xs)">${httpStatus}</span>
+          <span style="color:${statusColor(httpStatus)};font-weight:600;font-size:var(--font-sm)">${httpStatus}</span>
         ` : ''}
         <div class="right">
           <div>↓${formatBytes(r.inputBytes)}</div>

@@ -16,7 +16,7 @@ export class ModeToggle extends LitElement {
     }
     .btn {
       flex: 1; text-align: center; padding: 6px;
-      font-size: var(--font-xs); cursor: pointer; border-radius: 6px;
+      font-size: var(--font-sm); cursor: pointer; border-radius: 6px;
       border: none; background: none; font-family: inherit;
       color: var(--text-muted); transition: all 0.15s;
     }

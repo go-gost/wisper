@@ -13,7 +13,7 @@ export class LiveIndicator extends LitElement {
     .bar {
       display: flex; align-items: center; justify-content: space-between;
       padding: 8px 12px; background: var(--border-subtle);
-      border-radius: var(--radius-sm); font-size: var(--font-xs); gap: 8px;
+      border-radius: var(--radius-sm); font-size: var(--font-sm); gap: 8px;
     }
     .status { display: flex; align-items: center; gap: 6px; }
     .dot {
@@ -27,7 +27,7 @@ export class LiveIndicator extends LitElement {
     }
     .actions { display: flex; gap: 6px; }
     .actions button {
-      font-size: var(--font-xs); padding: 2px 10px; cursor: pointer;
+      font-size: var(--font-sm); padding: 2px 10px; cursor: pointer;
       background: none; border: 1px solid var(--border);
       border-radius: var(--radius-pill); color: var(--text-muted);
       font-family: inherit;

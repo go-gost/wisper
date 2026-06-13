@@ -193,10 +193,10 @@ export class SettingsPage extends LitElement {
       margin: 0 auto 12px;
       display: flex; align-items: center; justify-content: center;
       color: var(--accent-fg);
-      font-weight: 700; font-size: var(--font-2xl);
+      font-weight: 700; font-size: var(--font-lg);
     }
     .app-name {
-      font-size: var(--font-lg); font-weight: 600;
+      font-size: var(--font-md); font-weight: 600;
       color: var(--text); margin-bottom: 2px;
     }
     .app-version {
@@ -225,7 +225,7 @@ export class SettingsPage extends LitElement {
     .form-group:last-child { margin-bottom: 0; }
     .form-label {
       display: block;
-      font-size: var(--font-xs); font-weight: 500;
+      font-size: var(--font-sm); font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
       text-transform: uppercase;
@@ -242,7 +242,7 @@ export class SettingsPage extends LitElement {
     }
     .form-input:focus { border-color: var(--accent); }
     .hint {
-      font-size: var(--font-xs); color: var(--text-muted); margin-top: 2px;
+      font-size: var(--font-sm); color: var(--text-muted); margin-top: 2px;
     }
 
     /* ── Switch ── */
@@ -252,7 +252,7 @@ export class SettingsPage extends LitElement {
     }
     .switch-row:last-child { border-bottom: none; }
     .switch-label { font-size: var(--font-sm); color: var(--text); }
-    .switch-desc { font-size: var(--font-xs); color: var(--text-muted); }
+    .switch-desc { font-size: var(--font-sm); color: var(--text-muted); }
     .switch {
       width: 40px; height: 22px; border-radius: 11px;
       background: var(--border); position: relative;
@@ -279,7 +279,7 @@ export class SettingsPage extends LitElement {
     .selector-label { font-size: var(--font-sm); color: var(--text); }
     .selector-value {
       display: flex; align-items: center; gap: 4px;
-      color: var(--text-muted); font-size: var(--font-xs);
+      color: var(--text-muted); font-size: var(--font-sm);
     }
 
     /* ── Save button ── */
@@ -368,7 +368,7 @@ export class SettingsPage extends LitElement {
           <div class="section-title">🔍 Inspector</div>
           <div class="card">
             <div class="card-padded">
-              <p style="font-size:var(--font-xs);color:var(--text-muted);margin-bottom:12px;">
+              <p style="font-size:var(--font-sm);color:var(--text-muted);margin-bottom:12px;">
                 ${t('inspectorSettingsDesc')}
               </p>
               <div class="form-group">

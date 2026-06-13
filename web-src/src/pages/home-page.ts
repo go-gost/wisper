@@ -247,7 +247,7 @@ export class HomePage extends LitElement {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       color: var(--text-secondary);
       word-break: break-all;
@@ -270,7 +270,7 @@ export class HomePage extends LitElement {
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       cursor: pointer;
       font-family: inherit;
       transition: background var(--transition-fast);
@@ -301,7 +301,7 @@ export class HomePage extends LitElement {
     }
 
     .expand-error {
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       color: var(--red-text);
       padding: 4px 8px;
       background: var(--red-bg);
@@ -386,7 +386,7 @@ export class HomePage extends LitElement {
 
     .empty-title {
       font-weight: 600;
-      font-size: var(--font-lg);
+      font-size: var(--font-md);
       color: var(--text);
     }
 

@@ -16,14 +16,14 @@ export class BodyViewer extends LitElement {
     :host { display: block; }
     .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
     .tab {
-      font-size: var(--font-xs); padding: 3px 8px; border-radius: 4px;
+      font-size: var(--font-sm); padding: 3px 8px; border-radius: 4px;
       cursor: pointer; color: var(--text-muted);
       background: var(--border-subtle); border: none; font-family: inherit;
     }
     .tab.active { color: var(--text); background: var(--accent); }
     pre {
       font-family: var(--font-mono, 'SF Mono', monospace);
-      font-size: var(--font-xs); background: var(--bg);
+      font-size: var(--font-sm); background: var(--bg);
       border-radius: var(--radius-sm); padding: 8px; overflow-x: auto;
       white-space: pre-wrap; word-break: break-all; max-height: 300px;
       overflow-y: auto; margin: 0;
@@ -32,7 +32,7 @@ export class BodyViewer extends LitElement {
     pre.hex { white-space: pre; word-break: normal; }
     .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
     .copy-btn {
-      font-size: var(--font-xs); padding: 2px 8px; cursor: pointer;
+      font-size: var(--font-sm); padding: 2px 8px; cursor: pointer;
       background: var(--border-subtle); border: none; border-radius: 4px;
       color: var(--text-muted); font-family: inherit; margin-left: auto;
     }

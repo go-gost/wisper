@@ -36,7 +36,7 @@ export class NavTabs extends LitElement {
       border: none;
       background: transparent;
       color: var(--text-secondary);
-      font-size: var(--font-lg);
+      font-size: var(--font-md);
       font-weight: 500;
       cursor: pointer;
       letter-spacing: 0.3px;

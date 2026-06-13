@@ -22,7 +22,7 @@ export class ProtocolTabs extends LitElement {
     }
     .tab {
       flex: 1; text-align: center; padding: 6px 4px;
-      font-size: var(--font-xs); font-weight: 500;
+      font-size: var(--font-sm); font-weight: 500;
       color: var(--text-muted);
       border-radius: 6px; cursor: pointer; border: none; background: none;
       font-family: inherit; transition: all 0.15s;

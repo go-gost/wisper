@@ -17,19 +17,19 @@ export class RecordDetail extends LitElement {
     }
     .section { margin-bottom: 10px; }
     .section-title {
-      font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+      font-size: var(--font-sm); text-transform: uppercase; letter-spacing: 0.5px;
       color: var(--text-muted); margin-bottom: 4px; font-weight: 600;
     }
     .meta-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
     }
     .meta-item { display: flex; justify-content: space-between; padding: 2px 0; }
     .meta-label { color: var(--text-muted); }
     .meta-value { font-family: var(--font-mono, 'SF Mono', monospace); }
     pre {
       font-family: var(--font-mono, 'SF Mono', monospace);
-      font-size: var(--font-xs); background: #0d1117;
+      font-size: var(--font-sm); background: #0d1117;
       border-radius: var(--radius-sm); padding: 8px; overflow-x: auto;
       white-space: pre-wrap; word-break: break-all; max-height: 200px;
       overflow-y: auto; margin: 0;

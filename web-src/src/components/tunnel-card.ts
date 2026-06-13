@@ -147,7 +147,7 @@ export class TunnelCard extends LitElement {
       background: var(--red-bg);
       border: 1px solid var(--red-border);
       border-radius: var(--radius-sm);
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       color: var(--red-text);
     }
   `;

@@ -1,4 +1,4 @@
-import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./index-Belib3UG.js";import{n as l,r as h}from"./state-og4zxob-.js";import{i as D}from"./app-scaffold-D1qj9PTy.js";import{c as E,f as R}from"./format-CZNH9DXL.js";class U{constructor(e){this.baseUrl=e.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(e){const r=new URLSearchParams;r.set("client_id",e.client_id),e.type&&r.set("type",e.type),e.service&&r.set("service",e.service),e.sid&&r.set("sid",e.sid),e.start!==void 0&&r.set("start",String(e.start)),e.end!==void 0&&r.set("end",String(e.end)),e.before&&r.set("before",e.before),e.after&&r.set("after",e.after),e.limit!==void 0&&r.set("limit",String(e.limit));const o=await fetch(`${this.baseUrl}/api/records/query?${r.toString()}`);if(!o.ok)throw new Error(`Inspector query failed: ${o.status}`);return o.json()}connectTail(e){const r=new URLSearchParams;r.set("client_id",e.client_id),e.type&&r.set("type",e.type),e.service&&r.set("service",e.service),e.sid&&r.set("sid",e.sid);const o=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${o}/api/records/tail?${r.toString()}`)}}function N(t){const e=atob(t),r=new Uint8Array(e.length);for(let o=0;o<e.length;o++)r[o]=e.charCodeAt(o);return r}var F=Object.defineProperty,H=Object.getOwnPropertyDescriptor,M=(t,e,r,o)=>{for(var s=o>1?void 0:o?H(e,r):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(o?n(e,r,s):n(s))||s);return o&&s&&F(e,r,s),s};const K=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let $=class extends v{constructor(){super(...arguments),this.active="http"}render(){return a`
+import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./index-DvQYVtD8.js";import{n as l,r as h}from"./state-C1UvBj5T.js";import{i as D}from"./app-scaffold-CU6KxGiW.js";import{c as E,f as R}from"./format-CZNH9DXL.js";class U{constructor(e){this.baseUrl=e.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(e){const r=new URLSearchParams;r.set("client_id",e.client_id),e.type&&r.set("type",e.type),e.service&&r.set("service",e.service),e.sid&&r.set("sid",e.sid),e.start!==void 0&&r.set("start",String(e.start)),e.end!==void 0&&r.set("end",String(e.end)),e.before&&r.set("before",e.before),e.after&&r.set("after",e.after),e.limit!==void 0&&r.set("limit",String(e.limit));const o=await fetch(`${this.baseUrl}/api/records/query?${r.toString()}`);if(!o.ok)throw new Error(`Inspector query failed: ${o.status}`);return o.json()}connectTail(e){const r=new URLSearchParams;r.set("client_id",e.client_id),e.type&&r.set("type",e.type),e.service&&r.set("service",e.service),e.sid&&r.set("sid",e.sid);const o=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${o}/api/records/tail?${r.toString()}`)}}function N(t){const e=atob(t),r=new Uint8Array(e.length);for(let o=0;o<e.length;o++)r[o]=e.charCodeAt(o);return r}var F=Object.defineProperty,H=Object.getOwnPropertyDescriptor,M=(t,e,r,o)=>{for(var s=o>1?void 0:o?H(e,r):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(o?n(e,r,s):n(s))||s);return o&&s&&F(e,r,s),s};const K=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let $=class extends v{constructor(){super(...arguments),this.active="http"}render(){return a`
       <div class="tabs">
         ${K.map(t=>a`
           <button class="tab ${this.active===t.type?"active":""}"
@@ -17,7 +17,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     }
     .tab {
       flex: 1; text-align: center; padding: 6px 4px;
-      font-size: var(--font-xs); font-weight: 500;
+      font-size: var(--font-sm); font-weight: 500;
       color: var(--text-muted);
       border-radius: 6px; cursor: pointer; border: none; background: none;
       font-family: inherit; transition: all 0.15s;
@@ -39,7 +39,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     }
     .btn {
       flex: 1; text-align: center; padding: 6px;
-      font-size: var(--font-xs); cursor: pointer; border-radius: 6px;
+      font-size: var(--font-sm); cursor: pointer; border-radius: 6px;
       border: none; background: none; font-family: inherit;
       color: var(--text-muted); transition: all 0.15s;
     }
@@ -56,11 +56,11 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
       flex: 1; min-width: 80px; padding: 8px 10px;
       background: var(--bg); border: 1px solid var(--border);
       border-radius: var(--radius-sm); color: var(--text);
-      font-size: var(--font-xs); font-family: var(--font-mono, 'SF Mono', monospace);
+      font-size: var(--font-sm); font-family: var(--font-mono, 'SF Mono', monospace);
       outline: none; box-sizing: border-box;
     }
     input:focus { border-color: var(--accent); }
-  `;z([l()],C.prototype,"sid",2);C=z([b("inspector-filter-bar")],C);var V=Object.defineProperty,X=Object.getOwnPropertyDescriptor,O=(t,e,r,o)=>{for(var s=o>1?void 0:o?X(e,r):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(o?n(e,r,s):n(s))||s);return o&&s&&V(e,r,s),s};const y=4096;let g=class extends v{constructor(){super(...arguments),this.body="",this._tab="text"}_decode(){if(!this.body)return new Uint8Array(0);try{return N(this.body)}catch{return new TextEncoder().encode(this.body)}}_renderContent(){const t=this._decode();switch(this._tab){case"hex":return this._renderHexdump(t);case"json":try{const e=new TextDecoder().decode(t);return JSON.stringify(JSON.parse(e),null,2)}catch{return new TextDecoder().decode(t)}default:return new TextDecoder().decode(t)}}_renderHexdump(t){const e=t.length>y?t.slice(0,y):t,r=[];for(let o=0;o<e.length;o+=16){let s="",i="";for(let n=0;n<16;n++){n===8&&(s+=" ");const k=o+n;if(k>=e.length)s+="   ";else{const x=e[k];s+=x.toString(16).padStart(2,"0")+" ",i+=x>=32&&x<=126?String.fromCharCode(x):"."}}r.push(`${o.toString(16).padStart(8,"0")}  ${s} |${i}|`)}return t.length>y&&r.push(`... (${(t.length-y).toLocaleString()} more bytes not shown)`),r.join(`
+  `;z([l()],C.prototype,"sid",2);C=z([b("inspector-filter-bar")],C);var V=Object.defineProperty,X=Object.getOwnPropertyDescriptor,O=(t,e,r,o)=>{for(var s=o>1?void 0:o?X(e,r):e,i=t.length-1,n;i>=0;i--)(n=t[i])&&(s=(o?n(e,r,s):n(s))||s);return o&&s&&V(e,r,s),s};const x=4096;let g=class extends v{constructor(){super(...arguments),this.body="",this._tab="text"}_decode(){if(!this.body)return new Uint8Array(0);try{return N(this.body)}catch{return new TextEncoder().encode(this.body)}}_renderContent(){const t=this._decode();switch(this._tab){case"hex":return this._renderHexdump(t);case"json":try{const e=new TextDecoder().decode(t);return JSON.stringify(JSON.parse(e),null,2)}catch{return new TextDecoder().decode(t)}default:return new TextDecoder().decode(t)}}_renderHexdump(t){const e=t.length>x?t.slice(0,x):t,r=[];for(let o=0;o<e.length;o+=16){let s="",i="";for(let n=0;n<16;n++){n===8&&(s+=" ");const k=o+n;if(k>=e.length)s+="   ";else{const y=e[k];s+=y.toString(16).padStart(2,"0")+" ",i+=y>=32&&y<=126?String.fromCharCode(y):"."}}r.push(`${o.toString(16).padStart(8,"0")}  ${s} |${i}|`)}return t.length>x&&r.push(`... (${(t.length-x).toLocaleString()} more bytes not shown)`),r.join(`
 `)}_copyContent(){navigator.clipboard.writeText(this._renderContent())}render(){return a`
       <div class="toolbar">
         <div class="tabs">
@@ -75,14 +75,14 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     :host { display: block; }
     .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
     .tab {
-      font-size: var(--font-xs); padding: 3px 8px; border-radius: 4px;
+      font-size: var(--font-sm); padding: 3px 8px; border-radius: 4px;
       cursor: pointer; color: var(--text-muted);
       background: var(--border-subtle); border: none; font-family: inherit;
     }
     .tab.active { color: var(--text); background: var(--accent); }
     pre {
       font-family: var(--font-mono, 'SF Mono', monospace);
-      font-size: var(--font-xs); background: var(--bg);
+      font-size: var(--font-sm); background: var(--bg);
       border-radius: var(--radius-sm); padding: 8px; overflow-x: auto;
       white-space: pre-wrap; word-break: break-all; max-height: 300px;
       overflow-y: auto; margin: 0;
@@ -91,7 +91,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     pre.hex { white-space: pre; word-break: normal; }
     .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
     .copy-btn {
-      font-size: var(--font-xs); padding: 2px 8px; cursor: pointer;
+      font-size: var(--font-sm); padding: 2px 8px; cursor: pointer;
       background: var(--border-subtle); border: none; border-radius: 4px;
       color: var(--text-muted); font-family: inherit; margin-left: auto;
     }
@@ -159,19 +159,19 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     }
     .section { margin-bottom: 10px; }
     .section-title {
-      font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+      font-size: var(--font-sm); text-transform: uppercase; letter-spacing: 0.5px;
       color: var(--text-muted); margin-bottom: 4px; font-weight: 600;
     }
     .meta-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
     }
     .meta-item { display: flex; justify-content: space-between; padding: 2px 0; }
     .meta-label { color: var(--text-muted); }
     .meta-value { font-family: var(--font-mono, 'SF Mono', monospace); }
     pre {
       font-family: var(--font-mono, 'SF Mono', monospace);
-      font-size: var(--font-xs); background: #0d1117;
+      font-size: var(--font-sm); background: #0d1117;
       border-radius: var(--radius-sm); padding: 8px; overflow-x: auto;
       white-space: pre-wrap; word-break: break-all; max-height: 200px;
       overflow-y: auto; margin: 0;
@@ -213,7 +213,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
           </div>
         </div>
         ${i?a`
-          <span style="color:${ie(i)};font-weight:600;font-size:var(--font-xs)">${i}</span>
+          <span style="color:${ie(i)};font-weight:600;font-size:var(--font-sm)">${i}</span>
         `:""}
         <div class="right">
           <div>↓${R(t.inputBytes)}</div>
@@ -232,13 +232,13 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     .row {
       background: var(--border-subtle); border-radius: var(--radius-sm);
       padding: 10px 12px; cursor: pointer; display: flex; align-items: center;
-      gap: 10px; font-size: var(--font-xs); transition: background 0.1s;
+      gap: 10px; font-size: var(--font-sm); transition: background 0.1s;
     }
     .row:hover { background: #30363d; }
     .row.selected { border-left: 2px solid var(--accent); }
     .method-badge {
       padding: 2px 6px; border-radius: 4px; font-weight: 600;
-      font-size: 10px; font-family: var(--font-mono, 'SF Mono', monospace);
+      font-size: var(--font-sm); font-family: var(--font-mono, 'SF Mono', monospace);
       min-width: 38px; text-align: center;
     }
     .method-green { background: rgba(63,185,80,0.2); color: var(--green); }
@@ -248,8 +248,8 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     .method-default { background: rgba(139,148,158,0.15); color: var(--text-muted); }
     .details { flex: 1; min-width: 0; }
     .host { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .meta { font-size: 10px; color: var(--text-muted); margin-top: 1px; display: flex; gap: 8px; }
-    .right { text-align: right; font-size: 10px; color: var(--text-muted); }
+    .meta { font-size: var(--font-sm); color: var(--text-muted); margin-top: 1px; display: flex; gap: 8px; }
+    .right { text-align: right; font-size: var(--font-sm); color: var(--text-muted); }
     .sentinel { height: 1px; }
     .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: var(--font-sm); }
     .loading { display: flex; justify-content: center; padding: 24px; }
@@ -270,7 +270,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     .bar {
       display: flex; align-items: center; justify-content: space-between;
       padding: 8px 12px; background: var(--border-subtle);
-      border-radius: var(--radius-sm); font-size: var(--font-xs); gap: 8px;
+      border-radius: var(--radius-sm); font-size: var(--font-sm); gap: 8px;
     }
     .status { display: flex; align-items: center; gap: 6px; }
     .dot {
@@ -284,7 +284,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     }
     .actions { display: flex; gap: 6px; }
     .actions button {
-      font-size: var(--font-xs); padding: 2px 10px; cursor: pointer;
+      font-size: var(--font-sm); padding: 2px 10px; cursor: pointer;
       background: none; border: 1px solid var(--border);
       border-radius: var(--radius-pill); color: var(--text-muted);
       font-family: inherit;
@@ -333,7 +333,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
         <div class="spacer"></div>
 
         <div style="padding:0 16px;">
-          ${this._error?a`<div style="color:var(--red);font-size:var(--font-xs);padding:6px 0;">⚠ ${this._error}</div>`:""}
+          ${this._error?a`<div style="color:var(--red);font-size:var(--font-sm);padding:6px 0;">⚠ ${this._error}</div>`:""}
           <record-list
             .records=${this._records}
             .protocol=${this._protocol}
@@ -369,7 +369,7 @@ import{i as u,a as v,j as c,b as a,t as b,h as q,w as L,c as I,g as W}from"./ind
     .back-btn:hover { background: var(--border-subtle); }
     .page-title { font-size: var(--font-md); font-weight: 600; flex: 1; }
     .id-chip {
-      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-sm); padding: 2px 8px; border-radius: 10px;
       background: var(--border-subtle); color: var(--text-muted);
       font-family: var(--font-mono, 'SF Mono', monospace);
     }

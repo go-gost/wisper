@@ -284,12 +284,12 @@ export class EntrypointDetailPage extends LitElement {
       width: 80px; flex-shrink: 0;
     }
     .info-value {
-      font-size: var(--font-lg); color: var(--text);
+      font-size: var(--font-md); color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       flex: 1; word-break: break-all;
     }
     .info-value.text {
-      font-family: inherit; font-size: var(--font-lg);
+      font-family: inherit; font-size: var(--font-md);
     }
     .info-value.uuid {
       font-size: var(--font-sm);
@@ -318,7 +318,7 @@ export class EntrypointDetailPage extends LitElement {
     }
 
     .stat-value {
-      font-size: var(--font-xl);
+      font-size: var(--font-lg);
       font-weight: 700;
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -354,7 +354,7 @@ export class EntrypointDetailPage extends LitElement {
     .form-group { margin-bottom: 14px; }
     .form-label {
       display: block;
-      font-size: var(--font-xs); font-weight: 500; color: var(--text-muted);
+      font-size: var(--font-sm); font-weight: 500; color: var(--text-muted);
       margin-bottom: 4px;
       text-transform: uppercase; letter-spacing: 0.5px;
     }
@@ -378,7 +378,7 @@ export class EntrypointDetailPage extends LitElement {
       border-radius: var(--radius-md);
     }
     .danger-zone-label {
-      font-size: var(--font-xs); font-weight: 600; color: var(--red-text);
+      font-size: var(--font-sm); font-weight: 600; color: var(--red-text);
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
     }
 

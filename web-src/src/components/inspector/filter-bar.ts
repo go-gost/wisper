@@ -15,7 +15,7 @@ export class InspectorFilterBar extends LitElement {
       flex: 1; min-width: 80px; padding: 8px 10px;
       background: var(--bg); border: 1px solid var(--border);
       border-radius: var(--radius-sm); color: var(--text);
-      font-size: var(--font-xs); font-family: var(--font-mono, 'SF Mono', monospace);
+      font-size: var(--font-sm); font-family: var(--font-mono, 'SF Mono', monospace);
       outline: none; box-sizing: border-box;
     }
     input:focus { border-color: var(--accent); }

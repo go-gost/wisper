@@ -280,7 +280,7 @@ export class InspectorPage extends LitElement {
     .back-btn:hover { background: var(--border-subtle); }
     .page-title { font-size: var(--font-md); font-weight: 600; flex: 1; }
     .id-chip {
-      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-sm); padding: 2px 8px; border-radius: 10px;
       background: var(--border-subtle); color: var(--text-muted);
       font-family: var(--font-mono, 'SF Mono', monospace);
     }
@@ -357,7 +357,7 @@ export class InspectorPage extends LitElement {
         <div class="spacer"></div>
 
         <div style="padding:0 16px;">
-          ${this._error ? html`<div style="color:var(--red);font-size:var(--font-xs);padding:6px 0;">⚠ ${this._error}</div>` : ''}
+          ${this._error ? html`<div style="color:var(--red);font-size:var(--font-sm);padding:6px 0;">⚠ ${this._error}</div>` : ''}
           <record-list
             .records=${this._records}
             .protocol=${this._protocol}

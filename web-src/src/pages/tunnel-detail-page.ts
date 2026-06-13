@@ -385,7 +385,7 @@ export class TunnelDetailPage extends LitElement {
     }
 
     .info-value {
-      font-size: var(--font-lg);
+      font-size: var(--font-md);
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       flex: 1;
@@ -394,7 +394,7 @@ export class TunnelDetailPage extends LitElement {
 
     .info-value.text {
       font-family: inherit;
-      font-size: var(--font-lg);
+      font-size: var(--font-md);
     }
 
     .info-value.uuid {
@@ -448,7 +448,7 @@ export class TunnelDetailPage extends LitElement {
     .stat-reset-mini:hover { color: var(--accent); }
 
     .stat-value {
-      font-size: var(--font-xl);
+      font-size: var(--font-lg);
       font-weight: 700;
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -475,7 +475,7 @@ export class TunnelDetailPage extends LitElement {
     }
     .form-label {
       display: block;
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 4px;
@@ -551,7 +551,7 @@ export class TunnelDetailPage extends LitElement {
       border-radius: var(--radius-md);
     }
     .danger-zone-label {
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
       font-weight: 600;
       color: var(--red-text);
       text-transform: uppercase;
@@ -813,7 +813,7 @@ export class TunnelDetailPage extends LitElement {
                       <span style="color:var(--accent);">${icon('search')}</span>
                       <div style="flex:1;">
                         <div style="font-size:var(--font-sm);font-weight:600;">${t('inspectorEntryTitle')}</div>
-                        <div style="font-size:var(--font-xs);color:var(--text-muted);">${t('inspectorEntryDesc')}</div>
+                        <div style="font-size:var(--font-sm);color:var(--text-muted);">${t('inspectorEntryDesc')}</div>
                       </div>
                       <span style="color:var(--text-muted);">&rarr;</span>
                     </div>
