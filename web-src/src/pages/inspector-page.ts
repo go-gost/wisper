@@ -14,7 +14,6 @@ import '../components/inspector/mode-toggle';
 import '../components/inspector/filter-bar';
 import '../components/inspector/record-list';
 import '../components/inspector/live-indicator';
-import '../components/inspector/record-detail';
 
 type InspectorMode = 'query' | 'live';
 
@@ -28,7 +27,6 @@ export class InspectorPage extends LitElement {
   @state() private _protocol: ProtocolType = 'http';
   @state() private _records: InspectorRecord[] = [];
   @state() private _selectedIndex = -1;
-  @state() private _service = '';
   @state() private _sid = '';
   @state() private _cursor: string | null = null;
   @state() private _hasMore = true;
@@ -82,7 +80,6 @@ export class InspectorPage extends LitElement {
       const resp = await this._client.query({
         client_id: this._getClientId(),
         type: this._protocol,
-        service: this._service || undefined,
         sid: this._sid || undefined,
         after,
         limit: 100,
@@ -121,7 +118,6 @@ export class InspectorPage extends LitElement {
       this._ws = this._client.connectTail({
         client_id: this._getClientId(),
         type: this._protocol,
-        service: this._service || undefined,
         sid: this._sid || undefined,
       });
 
@@ -196,8 +192,7 @@ export class InspectorPage extends LitElement {
   }
 
   private _onFilterChange(e: CustomEvent) {
-    const { service, sid } = e.detail;
-    this._service = service;
+    const { sid } = e.detail;
     this._sid = sid;
     this._selectedIndex = -1;
     if (this._mode === 'live') {
@@ -212,7 +207,9 @@ export class InspectorPage extends LitElement {
   }
 
   private _onRecordSelect(e: CustomEvent) {
-    this._selectedIndex = e.detail as number;
+    const idx = e.detail as number;
+    // Clicking the already-selected row collapses it; otherwise switch.
+    this._selectedIndex = this._selectedIndex === idx ? -1 : idx;
   }
 
   private _onLiveStop() {
@@ -301,8 +298,6 @@ export class InspectorPage extends LitElement {
 
         <div style="padding:8px 16px 0;">
           <inspector-filter-bar
-            .clientId=${this._getClientId()}
-            .service=${this._service}
             .sid=${this._sid}
             @filter-change=${this._onFilterChange}>
           </inspector-filter-bar>
@@ -328,17 +323,12 @@ export class InspectorPage extends LitElement {
             .records=${this._records}
             .protocol=${this._protocol}
             .selectedIndex=${this._selectedIndex}
+            .loading=${this._mode === 'query' && this._loading}
             .hasMore=${this._mode === 'query' && this._hasMore}
             @record-select=${this._onRecordSelect}
             @load-more=${() => this._onLoadMore()}>
           </record-list>
         </div>
-
-        ${this._selectedIndex >= 0 && this._records[this._selectedIndex] ? html`
-          <div style="padding:0 16px 16px;">
-            <record-detail .record=${this._records[this._selectedIndex]}></record-detail>
-          </div>
-        ` : ''}
       </app-scaffold>
     `;
   }

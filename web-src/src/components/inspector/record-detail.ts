@@ -80,18 +80,6 @@ export class RecordDetail extends LitElement {
           ` : ''}
         ` : ''}
 
-        ${r.tls ? html`
-          <div class="section">
-            <div class="section-title">TLS</div>
-            <div class="meta-grid">
-              <div class="meta-item"><span class="meta-label">SNI</span><span class="meta-value">${r.tls.serverName}</span></div>
-              <div class="meta-item"><span class="meta-label">ALPN</span><span class="meta-value">${r.tls.proto}</span></div>
-              <div class="meta-item"><span class="meta-label">Version</span><span class="meta-value">${r.tls.version}</span></div>
-              <div class="meta-item"><span class="meta-label">Cipher</span><span class="meta-value">${r.tls.cipherSuite}</span></div>
-            </div>
-          </div>
-        ` : ''}
-
         ${r.websocket ? html`
           <div class="section">
             <div class="section-title">WebSocket</div>
@@ -104,18 +92,6 @@ export class RecordDetail extends LitElement {
               <div class="section-title" style="margin-top:8px;">Payload</div>
               <body-viewer .body=${r.websocket.payload}></body-viewer>
             ` : ''}
-          </div>
-        ` : ''}
-
-        ${r.dns ? html`
-          <div class="section">
-            <div class="section-title">DNS</div>
-            <div class="meta-grid">
-              <div class="meta-item"><span class="meta-label">Name</span><span class="meta-value">${r.dns.name}</span></div>
-              <div class="meta-item"><span class="meta-label">Type</span><span class="meta-value">${r.dns.type}</span></div>
-              <div class="meta-item"><span class="meta-label">Class</span><span class="meta-value">${r.dns.class}</span></div>
-              <div class="meta-item"><span class="meta-label">Cached</span><span class="meta-value">${r.dns.cached ? 'Yes' : 'No'}</span></div>
-            </div>
           </div>
         ` : ''}
       </div>

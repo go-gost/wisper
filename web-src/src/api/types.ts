@@ -167,26 +167,6 @@ export interface WsRecord {
   payload: string;  // base64
 }
 
-export interface TlsRecord {
-  serverName: string;
-  cipherSuite: number;
-  compressionMethod: number;
-  proto: string;
-  version: number;
-  clientHello: string;  // hex
-  serverHello: string;  // hex
-}
-
-export interface DnsRecord {
-  id: number;
-  name: string;
-  class: number;
-  type: number;
-  question: string;
-  answer: string;
-  cached: boolean;
-}
-
 export interface InspectorRecord {
   node?: string;
   service: string;
@@ -200,8 +180,6 @@ export interface InspectorRecord {
   clientID?: string;
   http?: HttpRecord;
   websocket?: WsRecord;
-  tls?: TlsRecord;
-  dns?: DnsRecord;
   route?: string;
   inputBytes: number;
   outputBytes: number;
@@ -223,4 +201,4 @@ export interface InspectorQueryResponse {
   error?: string;
 }
 
-export type ProtocolType = 'http' | 'websocket' | 'tls' | 'dns';
+export type ProtocolType = 'http' | 'websocket';

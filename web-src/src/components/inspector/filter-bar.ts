@@ -4,8 +4,6 @@ import { t } from '../../i18n/i18n';
 
 @customElement('inspector-filter-bar')
 export class InspectorFilterBar extends LitElement {
-  @property() clientId = '';
-  @property() service = '';
   @property() sid = '';
 
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -21,14 +19,13 @@ export class InspectorFilterBar extends LitElement {
       outline: none; box-sizing: border-box;
     }
     input:focus { border-color: var(--accent); }
-    input[readonly] { opacity: 0.6; }
   `;
 
   private _fireChange() {
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => {
       this.dispatchEvent(new CustomEvent('filter-change', {
-        detail: { service: this.service, sid: this.sid },
+        detail: { sid: this.sid },
         bubbles: true, composed: true,
       }));
     }, 400);
@@ -42,9 +39,6 @@ export class InspectorFilterBar extends LitElement {
   render() {
     return html`
       <div class="filter-row">
-        <input .value=${this.clientId} readonly title=${t('inspectorFieldTunnelId')}>
-        <input .value=${this.service} placeholder=${t('inspectorFilterService')}
-          @input=${(e: Event) => { this.service = (e.target as HTMLInputElement).value; this._fireChange(); }}>
         <input .value=${this.sid} placeholder=${t('inspectorFilterSid')}
           @input=${(e: Event) => { this.sid = (e.target as HTMLInputElement).value; this._fireChange(); }}>
       </div>

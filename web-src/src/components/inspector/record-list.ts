@@ -3,6 +3,7 @@ import { customElement, property } from 'lit/decorators.js';
 import type { InspectorRecord, ProtocolType } from '../../api/types';
 import { t } from '../../i18n/i18n';
 import './record-detail';
+import '../spinner';
 
 function methodClass(method: string): string {
   const m = method.toUpperCase();
@@ -25,6 +26,7 @@ export class RecordList extends LitElement {
   @property() protocol: ProtocolType = 'http';
   @property({ type: Number }) selectedIndex = -1;
   @property({ type: Boolean }) hasMore = false;
+  @property({ type: Boolean }) loading = false;
 
   private _observer: IntersectionObserver | null = null;
 
@@ -54,6 +56,7 @@ export class RecordList extends LitElement {
     .right { text-align: right; font-size: 10px; color: var(--text-muted); }
     .sentinel { height: 1px; }
     .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: var(--font-sm); }
+    .loading { display: flex; justify-content: center; padding: 24px; }
   `;
 
   updated() {
@@ -104,11 +107,15 @@ export class RecordList extends LitElement {
           <div>↑${(r.outputBytes / 1024).toFixed(1)}K</div>
         </div>
       </div>
+      ${this.selectedIndex === i ? html`<record-detail .record=${r}></record-detail>` : ''}
     `;
   }
 
   render() {
     if (this.records.length === 0) {
+      if (this.loading) {
+        return html`<div class="loading"><wisper-spinner></wisper-spinner></div>`;
+      }
       return html`<div class="empty">${t('inspectorNoRecords')}</div>`;
     }
     return html`

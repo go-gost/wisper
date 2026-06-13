@@ -6,8 +6,6 @@ import { t } from '../../i18n/i18n';
 const PROTOCOLS: { type: ProtocolType; labelKey: string }[] = [
   { type: 'http', labelKey: 'inspectorProtocolHttp' },
   { type: 'websocket', labelKey: 'inspectorProtocolWs' },
-  { type: 'tls', labelKey: 'inspectorProtocolTls' },
-  { type: 'dns', labelKey: 'inspectorProtocolDns' },
 ];
 
 @customElement('protocol-tabs')
