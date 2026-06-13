@@ -131,6 +131,8 @@ const zh: Record<string, string> = {
   inspectorProtocolHttp: 'HTTP',
   inspectorProtocolWs: 'WebSocket',
   inspectorFilterSid: '会话 ID',
+  inspectorTime: '时间',
+  inspectorRangeAll: '全部',
   inspectorDetailHeaders: '头信息',
   inspectorDetailBody: '内容',
   inspectorTabText: '文本',

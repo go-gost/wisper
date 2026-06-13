@@ -7,6 +7,7 @@ import { getTunnels } from '../store/tunnel-store';
 import { getEntrypoints } from '../store/entrypoint-store';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
+import type { RangeValue } from '../components/inspector/filter-bar';
 
 import '../components/app-scaffold';
 import '../components/inspector/protocol-tabs';
@@ -28,6 +29,7 @@ export class InspectorPage extends LitElement {
   @state() private _records: InspectorRecord[] = [];
   @state() private _selectedIndex = -1;
   @state() private _sid = '';
+  @state() private _range: RangeValue = 'all';
   @state() private _cursor: string | null = null;
   @state() private _hasMore = true;
   @state() private _loading = false;
@@ -113,8 +115,9 @@ export class InspectorPage extends LitElement {
         client_id: this._getClientId(),
         type: this._protocol,
         sid: this._sid || undefined,
+        start: this._range !== 'all' ? Math.floor(Date.now() / 1000) - (this._range as number) * 60 : undefined,
         before,
-        limit: 100,
+        limit: 50,
       });
 
       if (resp.code === 0 && resp.data) {
@@ -125,7 +128,7 @@ export class InspectorPage extends LitElement {
           this._records = list;
         }
         this._cursor = resp.data.before || null;
-        this._hasMore = list.length >= 100;
+        this._hasMore = list.length >= 50;
       } else {
         this._error = resp.msg || resp.error || `query failed (code ${resp.code})`;
       }
@@ -244,6 +247,18 @@ export class InspectorPage extends LitElement {
     }
   }
 
+  private _onRangeChange(e: CustomEvent) {
+    this._range = e.detail as RangeValue;
+    this._selectedIndex = -1;
+    // Mirror the protocol/sid handlers: reset cursor + refetch.
+    // range-change only fires in query mode (the time row is query-only),
+    // so no live-mode branch is needed.
+    this._records = [];
+    this._hasMore = true;
+    this._cursor = null;
+    this._fetchRecords();
+  }
+
   private _onRecordSelect(e: CustomEvent) {
     const idx = e.detail as number;
     // Clicking the already-selected row collapses it; otherwise switch.
@@ -337,7 +352,10 @@ export class InspectorPage extends LitElement {
         <div style="padding:8px 16px 0;">
           <inspector-filter-bar
             .sid=${this._sid}
-            @filter-change=${this._onFilterChange}>
+            .mode=${this._mode}
+            .range=${this._range}
+            @filter-change=${this._onFilterChange}
+            @range-change=${this._onRangeChange}>
           </inspector-filter-bar>
         </div>
 

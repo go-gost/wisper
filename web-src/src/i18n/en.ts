@@ -131,6 +131,8 @@ const en: Record<string, string> = {
   inspectorProtocolHttp: 'HTTP',
   inspectorProtocolWs: 'WebSocket',
   inspectorFilterSid: 'Session ID',
+  inspectorTime: 'Time',
+  inspectorRangeAll: 'All',
   inspectorDetailHeaders: 'Headers',
   inspectorDetailBody: 'Body',
   inspectorTabText: 'Text',
