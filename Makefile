@@ -6,6 +6,7 @@
 #   make darwin       — build macOS arm64 + amd64
 #   make windows      — build Windows amd64
 #   make web          — build Lit web UI (Vite + TypeScript)
+#   make typecheck    — type-check web UI (tsc --noEmit); Vite/esbuild skips this
 #   make clean        — remove build artifacts
 
 BINARY  := wisper
@@ -15,7 +16,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Output directories
 DIST_DIR   := dist
 
-.PHONY: all linux darwin windows web web-force clean
+.PHONY: all linux darwin windows web web-force typecheck clean
 
 all: linux darwin windows
 
@@ -43,6 +44,15 @@ web:
 web-force:
 	rm -f web/.build_stamp
 	$(MAKE) web
+
+# ----- Type-check (tsc) -----
+# Vite/esbuild strips types without checking them, so type errors (e.g. an
+# undefined-variable reference after a rename) build green and fail at runtime.
+# Run this to catch them. NOTE: not wired into `web` because home-page.ts still
+# has unused-symbol errors from the in-progress favorites cleanup.
+.PHONY: typecheck
+typecheck:
+	cd web-src && npx tsc --noEmit
 
 # ----- Linux -----
 linux: $(DIST_DIR)/linux-amd64/$(BINARY)

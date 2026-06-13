@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { createRouter } from './router/routes';
 import { loadSettings, subscribe, getSettings } from './store/settings-store';

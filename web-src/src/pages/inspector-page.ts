@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ProtocolType, InspectorRecord } from '../api/types';
 import { InspectorApiClient } from '../api/inspector';
-import { getSettings } from '../store/settings-store';
+import { getSettings, subscribe } from '../store/settings-store';
 import { getTunnels } from '../store/tunnel-store';
 import { getEntrypoints } from '../store/entrypoint-store';
 import { t } from '../i18n/i18n';
@@ -33,25 +33,56 @@ export class InspectorPage extends LitElement {
   @state() private _loading = false;
   @state() private _liveConnected = false;
   @state() private _liveStopped = false;
+  @state() private _error = '';
 
   private _client: InspectorApiClient | null = null;
+  private _clientUrl = '';
+  private _unsub: (() => void) | null = null;
   private _ws: WebSocket | null = null;
   private _reconnectDelay = 1000;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   connectedCallback() {
     super.connectedCallback();
-    const s = getSettings();
-    if (s.inspector_url) {
-      this._client = new InspectorApiClient(s.inspector_url);
-    }
+    this._initClient();
     this._fetchRecords();
+    // Settings load asynchronously (app.ts firstUpdated). If inspector_url
+    // wasn't available yet, re-init and run the first query once it arrives.
+    this._unsub = subscribe(() => this._onSettings());
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._closeWs();
     if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+    this._unsub?.();
+    this._unsub = null;
+  }
+
+  /** (Re)build the API client when inspector_url is available or changed. */
+  private _initClient(): boolean {
+    const url = getSettings().inspector_url || '';
+    if (url && url !== this._clientUrl) {
+      this._client = new InspectorApiClient(url);
+      this._clientUrl = url;
+      return true;
+    }
+    return false;
+  }
+
+  private _onSettings() {
+    const wasUnconfigured = !this._client;
+    if (this._initClient() && wasUnconfigured) {
+      // First time we have a working URL — run the query/openWs that
+      // connectedCallback had to skip because settings hadn't loaded yet.
+      if (this._mode === 'query') {
+        this._hasMore = true;
+        this._cursor = null;
+        this._fetchRecords();
+      } else {
+        this._openWs();
+      }
+    }
   }
 
   private _getClientId(): string {
@@ -72,31 +103,38 @@ export class InspectorPage extends LitElement {
     return eps.find(e => e.id === this.parentId)?.name || this.parentId;
   }
 
-  private async _fetchRecords(after?: string) {
+  private async _fetchRecords(before?: string) {
     if (!this._client || this._loading) return;
     this._loading = true;
+    this._error = '';
 
     try {
       const resp = await this._client.query({
         client_id: this._getClientId(),
         type: this._protocol,
         sid: this._sid || undefined,
-        after,
+        before,
         limit: 100,
       });
 
       if (resp.code === 0 && resp.data) {
         const list = resp.data.list || [];
-        if (after) {
+        if (before) {
           this._records = [...this._records, ...list];
         } else {
           this._records = list;
         }
         this._cursor = resp.data.before || null;
         this._hasMore = list.length >= 100;
+      } else {
+        this._error = resp.msg || resp.error || `query failed (code ${resp.code})`;
       }
-    } catch {
-      // Inspector unreachable — silently handle
+    } catch (e) {
+      // Surface instead of swallowing — a blank list with no clue is worse
+      // than a visible error. (This is how the previous `if (after)`
+      // ReferenceError hid itself: the catch ate it and the list went blank.)
+      this._error = e instanceof Error ? e.message : String(e);
+      console.error('[inspector] query failed:', e);
     }
 
     this._loading = false;
@@ -319,6 +357,7 @@ export class InspectorPage extends LitElement {
         <div class="spacer"></div>
 
         <div style="padding:0 16px;">
+          ${this._error ? html`<div style="color:var(--red);font-size:var(--font-xs);padding:6px 0;">⚠ ${this._error}</div>` : ''}
           <record-list
             .records=${this._records}
             .protocol=${this._protocol}

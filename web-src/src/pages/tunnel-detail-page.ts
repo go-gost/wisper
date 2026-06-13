@@ -7,7 +7,7 @@ import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber } from '../utils/format';
-import type { Tunnel, TunnelType } from '../api/types';
+import type { Tunnel, TunnelType, TunnelCreateRequest } from '../api/types';
 import '../components/app-scaffold';
 
 type PageMode = 'view' | 'edit' | 'create';
@@ -152,7 +152,7 @@ export class TunnelDetailPage extends LitElement {
 
     this._saving = true;
     try {
-      const body: Record<string, unknown> = {
+      const body: TunnelCreateRequest = {
         name: this._name.trim(),
         type: this.tunnelType,
         endpoint: this._endpoint.trim(),

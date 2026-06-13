@@ -18,7 +18,7 @@ const inspectorPage = () => import('../pages/inspector-page');
  *
  * @param host - The Lit element that hosts the router (must be a ReactiveControllerHost).
  */
-export function createRouter(host: ReactiveControllerHost) {
+export function createRouter(host: ReactiveControllerHost & HTMLElement) {
   return new Router(
     host,
     [

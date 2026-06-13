@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { formatBytes, formatRate, formatNumber } from '../utils/format';
+import { formatBytes, formatRate } from '../utils/format';
 import { icon } from '../utils/icons';
 import type { ServiceStatus } from '../api/types';
 
@@ -152,7 +152,7 @@ export class TunnelCard extends LitElement {
     }
   `;
 
-  private _onRowClick(e: Event) {
+  private _onRowClick() {
     this.dispatchEvent(new CustomEvent('card-click', { bubbles: true, composed: true }));
   }
 
