@@ -186,13 +186,27 @@ pub fn run() {
             .min_inner_size(600.0, 400.0)
             .build()?;
 
-            // Close button → hide to tray instead of quitting
+            // Close button → hide to tray instead of quitting.
             let w = window.clone();
-            window.on_window_event(move |event| {
-                if let WindowEvent::CloseRequested { api, .. } = event {
+            window.on_window_event(move |event| match event {
+                WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
                     let _ = w.hide();
                 }
+                // Workaround for tauri#11856: on Linux/Wayland the native
+                // title-bar buttons (min/max/close) stop responding after the
+                // window is hidden then shown again — including our close→
+                // hide-to-tray→show flow. Toggling resizable off→on when the
+                // window regains focus forces the compositor to recompute the
+                // input region, restoring the buttons. set_focus() in
+                // show_main_window fires Focused(true), so this runs on each
+                // re-show.
+                #[cfg(target_os = "linux")]
+                WindowEvent::Focused(true) => {
+                    let _ = w.set_resizable(false);
+                    let _ = w.set_resizable(true);
+                }
+                _ => {}
             });
 
             // 3. System tray — always present so tunnels keep running in background
