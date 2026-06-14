@@ -128,8 +128,8 @@ pub fn run() {
 
             let (rx, child) = app
                 .shell()
-                .sidecar("wisper-backend")
-                .expect("wisper-backend not found in externalBin — run `make sidecar` first")
+                .sidecar("wisper-api")
+                .expect("wisper-api not found in externalBin — run `make sidecar` first")
                 .args(["-addr", &addr])
                 .spawn()
                 .expect("failed to spawn wisper sidecar");

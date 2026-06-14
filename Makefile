@@ -23,7 +23,7 @@ SIDECAR_DIR   := src-tauri/binaries
 # otherwise Tauri 2 refuses to build: "Cannot define a sidecar with the same
 # name as the Cargo package name". This must match externalBin in
 # tauri.conf.json and the sidecar() call in src-tauri/src/lib.rs.
-SIDECAR_NAME  := wisper-backend
+SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
 .PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps

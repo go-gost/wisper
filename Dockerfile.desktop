@@ -109,7 +109,7 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
 # Relocate the bundled binaries from /usr/bin to /usr/local/bin.
 # Tauri 2 hardcodes the deb install path to /usr/bin/<mainBinaryName> and exposes
 # no config to override it, so we repack the .deb and move BOTH the app binary
-# and its `wisper-backend` sidecar together — the sidecar is resolved relative
+# and its `wisper-api` sidecar together — the sidecar is resolved relative
 # to the main binary at runtime, so the two must stay in the same directory.
 # The .desktop launcher uses a bare `Exec=wisper`, which PATH resolves to
 # /usr/local/bin, so relocation is transparent to it. We rewrite the two binary
@@ -121,9 +121,9 @@ RUN set -eux; \
     TMP="$(mktemp -d)"; \
     dpkg-deb -R "$DEB" "$TMP"; \
     mkdir -p "$TMP/usr/local/bin"; \
-    mv "$TMP/usr/bin/wisper" "$TMP/usr/bin/wisper-backend" "$TMP/usr/local/bin/"; \
+    mv "$TMP/usr/bin/wisper" "$TMP/usr/bin/wisper-api" "$TMP/usr/local/bin/"; \
     rmdir "$TMP/usr/bin"; \
-    sed -i 's#  usr/bin/wisper#  usr/local/bin/wisper#g' "$TMP/DEBIAN/md5sums"; \
+    sed -i 's#  usr/bin/#  usr/local/bin/#g' "$TMP/DEBIAN/md5sums"; \
     dpkg-deb --root-owner-group -b "$TMP" "$DEB"; \
     rm -rf "$TMP"
 
