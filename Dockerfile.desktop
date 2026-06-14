@@ -106,6 +106,27 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
     --mount=type=cache,target=/root/.cargo/git \
     npx --yes @tauri-apps/cli@latest build --bundles deb,appimage
 
+# Relocate the bundled binaries from /usr/bin to /usr/local/bin.
+# Tauri 2 hardcodes the deb install path to /usr/bin/<mainBinaryName> and exposes
+# no config to override it, so we repack the .deb and move BOTH the app binary
+# and its `wisper-backend` sidecar together — the sidecar is resolved relative
+# to the main binary at runtime, so the two must stay in the same directory.
+# The .desktop launcher uses a bare `Exec=wisper`, which PATH resolves to
+# /usr/local/bin, so relocation is transparent to it. We rewrite the two binary
+# paths in DEBIAN/md5sums (file contents are unchanged by mv, so the existing
+# checksums stay valid — only the path strings move).
+RUN set -eux; \
+    DEB="$(find /work/src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' | head -n1)"; \
+    test -n "$DEB"; \
+    TMP="$(mktemp -d)"; \
+    dpkg-deb -R "$DEB" "$TMP"; \
+    mkdir -p "$TMP/usr/local/bin"; \
+    mv "$TMP/usr/bin/wisper" "$TMP/usr/bin/wisper-backend" "$TMP/usr/local/bin/"; \
+    rmdir "$TMP/usr/bin"; \
+    sed -i 's#  usr/bin/wisper#  usr/local/bin/wisper#g' "$TMP/DEBIAN/md5sums"; \
+    dpkg-deb --root-owner-group -b "$TMP" "$DEB"; \
+    rm -rf "$TMP"
+
 # Copy the built installers to a known location in the image for easy extraction.
 RUN mkdir -p /out && \
     cp -r /work/src-tauri/target/release/bundle/* /out/ 2>/dev/null || true

@@ -1,5 +1,6 @@
-use std::net::TcpListener;
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
@@ -12,7 +13,6 @@ use tauri_plugin_shell::ShellExt;
 // Sidecar lifecycle — keeps the Go process alive for the app's lifetime.
 // ---------------------------------------------------------------------------
 
-#[allow(dead_code)]
 struct SidecarChild(Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
 
 // ---------------------------------------------------------------------------
@@ -30,12 +30,77 @@ fn pick_free_port() -> u16 {
         .port()
 }
 
+/// Block until the Go sidecar accepts TCP connections on `addr`, or until the
+/// timeout elapses. We wait so the webview never paints a "connection refused"
+/// page on startup. Best-effort: if the sidecar is slow we still proceed and
+/// let the webview retry its own navigation.
+fn wait_for_sidecar(addr: &str) {
+    let Ok(socket_addr) = addr.parse::<SocketAddr>() else {
+        eprintln!("[wisper:desktop] invalid sidecar addr: {addr}");
+        return;
+    };
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        if TcpStream::connect_timeout(&socket_addr, Duration::from_millis(200)).is_ok() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    eprintln!("[wisper:desktop] sidecar not ready within 5s, showing window anyway");
+}
+
 /// Bring the main window to the foreground (show + unminimize + focus).
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+    }
+}
+
+/// Stop the Go sidecar before the desktop app exits.
+///
+/// On Unix we send SIGTERM (the Go sidecar catches it to persist tunnel/
+/// entrypoint config and shut its HTTP server down cleanly), wait briefly for
+/// it to exit, then escalate to SIGKILL. `tauri_plugin_shell`'s `CommandChild`
+/// only exposes a SIGKILL-style `kill()`, so we signal via `libc` to get the
+/// graceful path. On other platforms we fall back to that hard kill.
+fn shutdown_sidecar(app: &tauri::AppHandle) {
+    let Some(state) = app.try_state::<SidecarChild>() else {
+        return;
+    };
+
+    #[cfg(unix)]
+    {
+        let pid = match state.inner().0.lock().unwrap().as_ref() {
+            Some(child) => child.pid() as i32,
+            None => return,
+        };
+        // 1. Graceful: SIGTERM lets the Go sidecar save config on the way out.
+        unsafe {
+            libc::kill(pid, libc::SIGTERM);
+        }
+        // 2. Wait up to 1.5s for it to exit (kill(pid, 0) == 0 means still alive).
+        let deadline = Instant::now() + Duration::from_millis(1500);
+        while Instant::now() < deadline {
+            if unsafe { libc::kill(pid, 0) } != 0 {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        // 3. Force.
+        unsafe {
+            libc::kill(pid, libc::SIGKILL);
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        if let Ok(mut guard) = state.inner().0.lock() {
+            if let Some(child) = guard.take() {
+                let _ = child.kill();
+            }
+        }
     }
 }
 
@@ -102,7 +167,14 @@ pub fn run() {
                 }
             });
 
-            // 2. Create the main window — starts hidden, shown via tray click
+            // 2. Create the main window. We wait for the sidecar's HTTP server
+            //    first (no "connection refused" flash), then build the window
+            //    visible-from-birth. Creating it visible rather than
+            //    hidden-then-shown keeps the native title-bar controls
+            //    (minimize / maximize / close) responsive on WebKitGTK/Linux —
+            //    a hidden→show transition leaves them unclickable until a
+            //    resize/maximize.
+            wait_for_sidecar(&addr);
             let url_str = format!("http://{}", addr);
             let window = WebviewWindowBuilder::new(
                 app,
@@ -112,7 +184,6 @@ pub fn run() {
             .title("Wisper")
             .inner_size(900.0, 700.0)
             .min_inner_size(600.0, 400.0)
-            .visible(false)
             .build()?;
 
             // Close button → hide to tray instead of quitting
@@ -137,8 +208,9 @@ pub fn run() {
                 .on_menu_event(|app_handle, event| match event.id().as_ref() {
                     "show" => show_main_window(app_handle),
                     "quit" => {
-                        // TODO: send graceful shutdown signal to sidecar before exit
-                        // (SIGTERM on Unix; the Go sidecar saves config on SIGTERM)
+                        // Tear down the Go sidecar (SIGTERM → save config, then
+                        // SIGKILL fallback) before exiting, so it doesn't linger.
+                        shutdown_sidecar(app_handle);
                         app_handle.exit(0);
                     }
                     _ => {}
