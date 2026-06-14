@@ -1,0 +1,2 @@
+{"type":"server-started","port":50526,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:50526","screen_dir":"/config/workspace/go-gost/wisper/.superpowers/brainstorm/3930215-1781253320/content","state_dir":"/config/workspace/go-gost/wisper/.superpowers/brainstorm/3930215-1781253320/state"}
+{"type":"server-stopped","reason":"idle timeout"}

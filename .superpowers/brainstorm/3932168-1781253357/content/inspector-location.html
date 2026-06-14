@@ -1,0 +1,33 @@
+<h2>Inspector data — where should it live?</h2>
+<p class="subtitle">How should users access traffic inspection from a tunnel/entrypoint detail page?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Inline Section</h3>
+      <p>A collapsible "Traffic Inspection" panel below the stats grid on the existing detail page. Toggle to expand/collapse inspector data within the same page — no navigation away.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Separate Tab</h3>
+      <p>A "Traffic" tab button at the top of the detail page that reveals a full inspector interface. The info card + stats grid remain above, with a tab bar to switch between "Overview" and "Traffic" views.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Dedicated Route</h3>
+      <p>A "View Traffic" button on the detail page navigates to a separate full-page route like /tunnel/:type/:id/traffic. Inspector gets its own deep page with protocol tabs, query history, and live streaming — full-screen, no tunnel context clutter.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Slide-out Drawer</h3>
+      <p>A button opens a slide-out panel from the right edge, overlaying the detail page. Shows inspector data while keeping the tunnel info visible behind a semi-transparent backdrop.</p>
+    </div>
+  </div>
+</div>

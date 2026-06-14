@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wisper Inspector Prototype</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-card: #161b22;
+    --bg-hover: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d2991d;
+    --purple: #a371f7;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    padding: 24px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* === Section === */
+  .section { margin-bottom: 48px; }
+  .section-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tag-route { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .tag-component { background: rgba(163,113,247,0.15); color: var(--purple); }
+  .tag-setting { background: rgba(210,153,29,0.15); color: var(--yellow); }
+
+  /* === Mockup container === */
+  .mockup {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  .mockup-header {
+    background: #21262d;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mockup-dot.r { background: #f85149; }
+  .mockup-dot.y { background: #d2991d; }
+  .mockup-dot.g { background: #3fb950; }
+  .mockup-body { padding: 0; }
+
+  /* === Phone frame === */
+  .phone-frame {
+    width: 390px;
+    margin: 0 auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 760px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  }
+  .phone-statusbar {
+    padding: 8px 20px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: #0d1117;
+  }
+  .phone-appbar {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    min-height: 48px;
+  }
+  .phone-appbar .back { color: var(--accent); font-size: 13px; cursor: pointer; }
+  .phone-appbar .title { font-weight: 600; font-size: 14px; flex: 1; }
+  .phone-appbar .action { color: var(--accent); font-size: 13px; }
+  .phone-body { flex: 1; overflow-y: auto; padding: 16px; }
+  .phone-body::-webkit-scrollbar { width: 3px; }
+  .phone-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* === Tunnel detail card === */
+  .info-card {
+    background: var(--bg-hover);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(48,54,61,0.4);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: var(--text-dim); font-size: 12px; }
+  .info-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .status-badge.running { background: rgba(63,185,80,0.15); color: var(--green); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  /* === Button === */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg-hover);
+    color: var(--text);
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #30363d; }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-block { width: 100%; }
+  .btn-ghost {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* === Stats grid === */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-box {
+    background: var(--bg-hover);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-value { font-size: 18px; font-weight: 700; font-family: var(--font-mono); }
+  .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .stat-rate { font-size: 11px; color: var(--accent); }
+
+  /* === Inspector button on detail page === */
+  .inspector-entry {
+    margin-top: 12px;
+    background: linear-gradient(135deg, rgba(88,166,255,0.08), rgba(163,113,247,0.08));
+    border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .inspector-entry:hover {
+    border-color: rgba(88,166,255,0.4);
+    background: linear-gradient(135deg, rgba(88,166,255,0.12), rgba(163,113,247,0.12));
+  }
+  .inspector-entry-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: rgba(88,166,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .inspector-entry-text { flex: 1; }
+  .inspector-entry-title { font-size: 13px; font-weight: 600; }
+  .inspector-entry-desc { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+  .inspector-entry-arrow { color: var(--text-dim); font-size: 16px; }
+
+  /* === Inspector Page === */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 12px;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .filter-input {
+    flex: 1;
+    min-width: 80px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+  .filter-input::placeholder { color: #484f58; }
+  .filter-input:focus { outline: none; border-color: var(--accent); }
+
+  .mode-toggle {
+    display: flex;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 12px;
+  }
+  .mode-btn {
+    flex: 1;
+    text-align: center;
+    padding: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+    color: var(--text-dim);
+  }
+  .mode-btn.active { background: var(--bg-hover); color: var(--text); font-weight: 500; }
+
+  /* === Record row === */
+  .record-list { display: flex; flex-direction: column; gap: 4px; }
+  .record-row {
+    background: var(--bg-hover);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    transition: background 0.1s;
+  }
+  .record-row:hover { background: #30363d; }
+  .record-method {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    min-width: 38px;
+    text-align: center;
+  }
+  .method-GET { background: rgba(63,185,80,0.2); color: var(--green); }
+  .method-POST { background: rgba(88,166,255,0.2); color: var(--accent); }
+  .method-CONNECT { background: rgba(210,153,29,0.2); color: var(--yellow); }
+  .record-details { flex: 1; min-width: 0; }
+  .record-host { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .record-meta { font-size: 10px; color: var(--text-dim); margin-top: 1px; display: flex; gap: 8px; }
+  .record-status {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .status-200 { color: var(--green); }
+  .status-4xx { color: var(--yellow); }
+  .record-bytes { font-size: 10px; color: var(--text-dim); text-align: right; }
+
+  /* === Live indicator === */
+  .live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    animation: pulse 1.5s ease-in-out infinite;
+    margin-right: 6px;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .live-counter { font-size: 11px; color: var(--text-dim); }
+
+  /* === Record detail panel === */
+  .detail-panel {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+  .detail-section { margin-bottom: 8px; }
+  .detail-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .detail-code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: #0d1117;
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text-dim);
+  }
+
+  /* === Settings page inspector section === */
+  .settings-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .settings-section h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .settings-section .desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+  .form-group { margin-bottom: 14px; }
+  .form-group:last-child { margin-bottom: 0; }
+  .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .form-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-mono);
+  }
+  .form-input:focus { outline: none; border-color: var(--accent); }
+
+  /* === Side by side for desktop === */
+  .prototype-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+  @media (max-width: 860px) {
+    .prototype-grid { grid-template-columns: 1fr; }
+  }
+
+  /* === Flow arrows === */
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--text-dim);
+    padding: 8px 0;
+  }
+
+  /* === Icon SVG inline === */
+  .icon-svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+  /* Body viewer tabs */
+  .body-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .body-tab {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-dim);
+    background: var(--bg-hover);
+    border: none;
+  }
+  .body-tab.active { color: var(--text); background: var(--accent); }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+  }
+  .empty-state-icon { font-size: 32px; margin-bottom: 8px; }
+  .empty-state-text { font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ============================== -->
+<!-- SECTION 1: ENTRY POINT         -->
+<!-- ============================== -->
+<div class="section">
+  <div class="section-title">
+    <span class="tag tag-route">Route</span>
+    Tunnel Detail → Inspector Entry
+  </div>
+  <p class="section-subtitle">
+    A "Traffic Inspection" button appears on the tunnel/entrypoint detail page (when inspector URL is configured in settings). Clicking it navigates to a dedicated inspector page pre-filtered by tunnel ID.
+  </p>
+
+  <div class="prototype-grid">
+    <!-- Tunnel Detail Page -->
+    <div>
+      <p style="font-size:11px;color:var(--text-dim);margin-bottom:8px;text-align:center">Tunnel Detail Page</p>
+      <div class="phone-frame">
+        <div class="phone-statusbar">
+          <span>9:41</span>
+          <span>●●● WiFi</span>
+        </div>
+        <div class="phone-appbar">
+          <span class="back">← Back</span>
+          <span class="title">HTTP Tunnel</span>
+          <span class="action">Stop</span>
+        </div>
+        <div class="phone-body">
+          <!-- Status banner -->
+          <div class="info-card" style="margin-bottom:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span class="status-badge running"><span class="status-dot"></span> Running</span>
+            <span style="font-size:12px;color:var(--text-dim);">3 active connections</span>
+          </div>
+
+          <!-- Info -->
+          <div class="info-card">
+            <div class="info-row"><span class="info-label">Type</span><span class="info-value">HTTP Tunnel</span></div>
+            <div class="info-row"><span class="info-label">Target</span><span class="info-value">192.168.1.100:8080</span></div>
+            <div class="info-row"><span class="info-label">Entrypoint</span><span class="info-value">https://abc123.gost.run</span></div>
+            <div class="info-row"><span class="info-label">TLS</span><span class="info-value">Enabled</span></div>
+            <div class="info-row"><span class="info-label">ID</span><span class="info-value">a1b2c3d4...</span></div>
+          </div>
+
+          <!-- Stats -->
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-value">3 / 142</div>
+              <div class="stat-label">Total Conns</div>
+              <div class="stat-rate">↗ 2.3 conns/s</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Total Errors</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">1.2 GB</div>
+              <div class="stat-label">Download</div>
+              <div class="stat-rate">↓ 4.8 MB/s</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">340 MB</div>
+              <div class="stat-label">Upload</div>
+              <div class="stat-rate">↑ 1.2 MB/s</div>
+            </div>
+          </div>
+
+          <!-- ★ Inspector entry button -->
+          <div class="inspector-entry" onclick="alert('Navigate to /tunnel/http/a1b2c3d4/inspector')">
+            <div class="inspector-entry-icon">🔍</div>
+            <div class="inspector-entry-text">
+              <div class="inspector-entry-title">Traffic Inspection</div>
+              <div class="inspector-entry-desc">View HTTP / WebSocket / TLS / DNS records</div>
+            </div>
+            <div class="inspector-entry-arrow">→</div>
+          </div>
+
+          <button class="btn btn-block" style="margin-top:12px;">✏️ Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inspector Page (pre-filtered) -->
+    <div>
+      <p style="font-size:11px;color:var(--text-dim);margin-bottom:8px;text-align:center">Inspector Page (navigated from tunnel)</p>
+      <div class="phone-frame">
+        <div class="phone-statusbar">
+          <span>9:41</span>
+          <span>●●● WiFi</span>
+        </div>
+        <div class="phone-appbar">
+          <span class="back">← Tunnel</span>
+          <span class="title">Traffic</span>
+          <span class="action" style="font-size:11px;color:var(--text-dim);">id: a1b2c3d4</span>
+        </div>
+        <div class="phone-body">
+          <!-- Mode toggle -->
+          <div class="mode-toggle">
+            <div class="mode-btn active">Query</div>
+            <div class="mode-btn">Live</div>
+          </div>
+
+          <!-- Protocol tabs -->
+          <div class="tabs">
+            <div class="tab active">HTTP</div>
+            <div class="tab">WS</div>
+            <div class="tab">TLS</div>
+            <div class="tab">DNS</div>
+          </div>
+
+          <!-- Filters (tunnel_id pre-filled) -->
+          <div class="filter-row">
+            <input class="filter-input" value="a1b2c3d4" placeholder="Tunnel ID" style="max-width:100px;" readonly>
+            <input class="filter-input" placeholder="Service" style="max-width:90px;">
+            <button class="btn" style="padding:8px 14px;font-size:12px;">🔍</button>
+          </div>
+
+          <!-- Record list -->
+          <div class="record-list">
+            <div class="record-row">
+              <span class="record-method method-GET">GET</span>
+              <div class="record-details">
+                <div class="record-host">api.example.com</div>
+                <div class="record-meta"><span>/v1/users</span><span>HTTP/1.1</span></div>
+              </div>
+              <span class="record-status status-200">200</span>
+              <div class="record-bytes"><div>↓ 1.2K</div><div>↑ 256B</div><div style="color:var(--text-dim)">45ms</div></div>
+            </div>
+            <div class="record-row">
+              <span class="record-method method-POST">POST</span>
+              <div class="record-details">
+                <div class="record-host">api.example.com</div>
+                <div class="record-meta"><span>/v1/auth</span><span>HTTP/2</span></div>
+              </div>
+              <span class="record-status status-200">200</span>
+              <div class="record-bytes"><div>↓ 890B</div><div>↑ 420B</div><div style="color:var(--text-dim)">32ms</div></div>
+            </div>
+            <div class="record-row">
+              <span class="record-method method-CONNECT">CONNECT</span>
+              <div class="record-details">
+                <div class="record-host">db.internal:5432</div>
+                <div class="record-meta"><span>tunnel</span><span>HTTP/1.1</span></div>
+              </div>
+              <span class="record-status status-200">200</span>
+              <div class="record-bytes"><div>↓ 4.7K</div><div>↑ 3.1K</div><div style="color:var(--text-dim)">120ms</div></div>
+            </div>
+          </div>
+
+          <!-- Expanded record detail -->
+          <div class="detail-panel" style="margin-top:8px;">
+            <div class="detail-section">
+              <div class="detail-section-title">Request Headers</div>
+              <div class="detail-code">GET /v1/users HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJ***
+Accept: application/json</div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title">Response Headers</div>
+              <div class="detail-code">HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: 1247</div>
+            </div>
+            <div class="body-tabs">
+              <button class="body-tab active">Text</button>
+              <button class="body-tab">Hex</button>
+              <button class="body-tab">JSON</button>
+            </div>
+            <div class="detail-code">{"users":[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- SECTION 2: LIVE MODE            -->
+<!-- ============================== -->
+<div class="section">
+  <div class="section-title">
+    <span class="tag tag-component">Live Mode</span>
+    Real-time WebSocket Streaming
+  </div>
+  <p class="section-subtitle">
+    Toggle to "Live" mode opens a WebSocket connection to <code>{inspector_url}/api/records/tail?client_id={tunnel_id}</code>.
+    Records stream in real-time with auto-reconnect (exponential backoff up to 30s).
+  </p>
+
+  <div class="prototype-grid">
+    <div class="phone-frame">
+      <div class="phone-statusbar"><span>9:41</span><span>●●● WiFi</span></div>
+      <div class="phone-appbar">
+        <span class="back">← Tunnel</span>
+        <span class="title">Traffic</span>
+        <span class="action" style="font-size:11px;color:var(--text-dim);">id: a1b2c3d4</span>
+      </div>
+      <div class="phone-body">
+        <div class="mode-toggle">
+          <div class="mode-btn">Query</div>
+          <div class="mode-btn active">Live</div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active">HTTP</div>
+          <div class="tab">WS</div>
+          <div class="tab">TLS</div>
+          <div class="tab">DNS</div>
+        </div>
+
+        <!-- Connection status -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:8px 12px;background:var(--bg-hover);border-radius:8px;font-size:12px;">
+          <span><span class="live-dot"></span>Connected</span>
+          <span class="live-counter">47 records</span>
+          <span style="color:var(--text-dim);">⏸ Stop</span>
+        </div>
+
+        <div class="record-list">
+          <div class="record-row" style="border-left:2px solid var(--accent);">
+            <span class="record-method method-POST">POST</span>
+            <div class="record-details">
+              <div class="record-host">api.example.com</div>
+              <div class="record-meta"><span>/v1/data</span><span>HTTP/2</span><span>just now</span></div>
+            </div>
+            <span class="record-status status-200">201</span>
+          </div>
+          <div class="record-row" style="border-left:2px solid var(--accent);">
+            <span class="record-method method-GET">GET</span>
+            <div class="record-details">
+              <div class="record-host">cdn.example.com</div>
+              <div class="record-meta"><span>/assets/bundle.js</span><span>HTTP/1.1</span><span>0.5s ago</span></div>
+            </div>
+            <span class="record-status status-200">200</span>
+          </div>
+          <div class="record-row" style="border-left:2px solid var(--green);">
+            <span class="record-method method-GET">GET</span>
+            <div class="record-details">
+              <div class="record-host">static.example.com</div>
+              <div class="record-meta"><span>/img/logo.png</span><span>HTTP/2</span><span>1.2s ago</span></div>
+            </div>
+            <span class="record-status status-4xx" style="color:#f85149;">404</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;justify-content:center;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">
+        <h4 style="font-size:13px;margin-bottom:8px;">WebSocket Lifecycle</h4>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.8;">
+          1. Open <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">ws://{inspector}/api/records/tail?client_id=xxx&type=http</code><br>
+          2. Each message = one <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">HandlerRecorderObject</code><br>
+          3. Prepend to list, cap at 200 records<br>
+          4. On disconnect → auto-reconnect (1s→2s→4s→…→30s max)<br>
+          5. On tab/protocol/type switch → close old WS, open new
+        </div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">
+        <h4 style="font-size:13px;margin-bottom:8px;">Keys</h4>
+        <div style="font-size:12px;color:var(--text-dim);">
+          <span style="color:var(--accent);">▎</span> New record (blue border)<br>
+          <span style="color:var(--green);">▎</span> Record with error (red status)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- SECTION 3: SETTINGS             -->
+<!-- ============================== -->
+<div class="section">
+  <div class="section-title">
+    <span class="tag tag-setting">Settings</span>
+    Inspector API Configuration
+  </div>
+  <p class="section-subtitle">
+    A new "Inspector" section in the Settings page where users configure the inspector API URL. When this URL is set, the "Traffic Inspection" button appears on tunnel/entrypoint detail pages. When empty, the button is hidden.
+  </p>
+
+  <div class="phone-frame" style="margin:0 auto;">
+    <div class="phone-statusbar"><span>9:41</span><span>●●● WiFi</span></div>
+    <div class="phone-appbar">
+      <span class="back">← Back</span>
+      <span class="title">Settings</span>
+      <span></span>
+    </div>
+    <div class="phone-body">
+      <!-- Tunnel Server -->
+      <div class="settings-section">
+        <h3>Tunnel Server</h3>
+        <p class="desc">GOST tunnel server address for reverse proxy connections.</p>
+        <div class="form-group">
+          <label class="form-label">Server Address</label>
+          <input class="form-input" value="tunnel.gost.run:443" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Entrypoint Domain</label>
+          <input class="form-input" value="gost.run" readonly>
+        </div>
+      </div>
+
+      <!-- ★ Inspector (NEW) -->
+      <div class="settings-section" style="border-color:rgba(88,166,255,0.3);">
+        <h3>🔍 Inspector</h3>
+        <p class="desc">Traffic inspection service URL. When configured, a "Traffic Inspection" button appears on tunnel detail pages to browse HTTP, WebSocket, TLS, and DNS records.</p>
+        <div class="form-group">
+          <label class="form-label">Inspector API URL</label>
+          <input class="form-input" value="http://192.168.1.50:8000" placeholder="e.g. http://inspector.local:8000">
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Leave empty to disable traffic inspection.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Connection Status</label>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:8px 0;">
+            <span class="live-dot" style="animation:none;"></span>
+            <span style="color:var(--green);">Connected</span>
+            <button class="btn-ghost" style="margin-left:auto;">Test</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="settings-section">
+        <h3>Statistics</h3>
+        <p class="desc">Control stats polling behavior.</p>
+        <div class="form-group">
+          <label class="form-label">Polling Interval</label>
+          <input class="form-input" value="1s" readonly>
+        </div>
+      </div>
+
+      <!-- Theme & Language -->
+      <div class="settings-section">
+        <h3>Appearance</h3>
+        <div class="form-group">
+          <label class="form-label">Theme</label>
+          <input class="form-input" value="Terminal / Industrial" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Language</label>
+          <input class="form-input" value="English" readonly>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- SECTION 4: NAVIGATION FLOW      -->
+<!-- ============================== -->
+<div class="section">
+  <div class="section-title">
+    <span class="tag tag-route">Navigation Flow</span>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:center;gap:24px;padding:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow-x:auto;">
+    <div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:8px;min-width:100px;">
+      <div style="font-size:20px;margin-bottom:4px;">🏠</div>
+      <div style="font-size:11px;">Home</div>
+      <div style="font-size:10px;color:var(--text-dim);">/</div>
+    </div>
+    <div style="color:var(--accent);font-size:20px;">→</div>
+    <div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:8px;min-width:120px;">
+      <div style="font-size:20px;margin-bottom:4px;">📋</div>
+      <div style="font-size:11px;">Tunnel Detail</div>
+      <div style="font-size:10px;color:var(--text-dim);">/tunnel/:type/:id</div>
+    </div>
+    <div style="color:var(--accent);font-size:20px;">→</div>
+    <div style="text-align:center;padding:16px;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:8px;min-width:140px;">
+      <div style="font-size:20px;margin-bottom:4px;">🔍</div>
+      <div style="font-size:11px;font-weight:600;">Inspector</div>
+      <div style="font-size:10px;color:var(--text-dim);">/tunnel/:type/:id/inspector</div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <h4 style="font-size:13px;margin-bottom:6px;">URL Construction</h4>
+      <div class="detail-code" style="font-size:11px;">// Frontend constructs inspector API calls:
+const base = settings.inspectorUrl  // e.g. "http://inspector:8000"
+
+// Query:
+GET {base}/api/records/query?client_id={tunnel.id}&type={protocol}&limit=100
+
+// Live:
+WS {base}/api/records/tail?client_id={tunnel.id}&type={protocol}
+
+// Health check:
+GET {base}/liveness</div>
+    </div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <h4 style="font-size:13px;margin-bottom:6px;">Conditional Display</h4>
+      <div class="detail-code" style="font-size:11px;">// Traffic Inspection button visible when:
+settings.inspectorUrl !== ""
+
+// Route registered conditionally:
+if (settings.inspectorUrl) {
+  // /tunnel/:type/:id/inspector
+  // /entrypoint/:type/:id/inspector
+}
+
+// If inspector URL is empty → button hidden, route 404</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- SECTION 5: COMPONENT TREE       -->
+<!-- ============================== -->
+<div class="section">
+  <div class="section-title">
+    <span class="tag tag-component">Component Tree</span>
+    New & Modified Files
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <h4 style="font-size:13px;margin-bottom:8px;color:var(--green);">New Files</h4>
+      <div style="font-size:12px;font-family:var(--font-mono);line-height:2;color:var(--text-dim);">
+        web-src/src/pages/<span style="color:var(--text);">inspector-page.ts</span><br>
+        web-src/src/components/<span style="color:var(--text);">inspector/</span><br>
+        <span style="padding-left:16px;">├─ record-list.ts</span><br>
+        <span style="padding-left:16px;">├─ record-detail.ts</span><br>
+        <span style="padding-left:16px;">├─ filter-bar.ts</span><br>
+        <span style="padding-left:16px;">├─ protocol-tabs.ts</span><br>
+        <span style="padding-left:16px;">├─ mode-toggle.ts</span><br>
+        <span style="padding-left:16px;">├─ body-viewer.ts</span><br>
+        <span style="padding-left:16px;">└─ live-indicator.ts</span><br>
+        web-src/src/api/<span style="color:var(--text);">inspector.ts</span><br>
+      </div>
+    </div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <h4 style="font-size:13px;margin-bottom:8px;color:var(--yellow);">Modified Files</h4>
+      <div style="font-size:12px;font-family:var(--font-mono);line-height:2;color:var(--text-dim);">
+        web-src/src/router/<span style="color:var(--text);">routes.ts</span><br>
+        <span style="padding-left:16px;">+ inspector route</span><br>
+        web-src/src/pages/<span style="color:var(--text);">tunnel-detail-page.ts</span><br>
+        <span style="padding-left:16px;">+ inspector entry button</span><br>
+        web-src/src/pages/<span style="color:var(--text);">entrypoint-detail-page.ts</span><br>
+        <span style="padding-left:16px;">+ inspector entry button</span><br>
+        web-src/src/pages/<span style="color:var(--text);">settings-page.ts</span><br>
+        <span style="padding-left:16px;">+ inspector URL field</span><br>
+        web-src/src/store/<span style="color:var(--text);">settings-store.ts</span><br>
+        <span style="padding-left:16px;">+ inspectorUrl state</span><br>
+        web-src/src/api/<span style="color:var(--text);">types.ts</span><br>
+        <span style="padding-left:16px;">+ inspector types</span><br>
+        web-src/src/i18n/<span style="color:var(--text);">en.ts, zh.ts</span><br>
+        <span style="padding-left:16px;">+ inspector strings</span><br>
+        config/<span style="color:var(--text);">config.go</span><br>
+        <span style="padding-left:16px;">+ InspectorURL field</span><br>
+        api/<span style="color:var(--text);">config_handler.go</span><br>
+        <span style="padding-left:16px;">+ inspector url in response</span><br>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

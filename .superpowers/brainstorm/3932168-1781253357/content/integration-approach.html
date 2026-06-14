@@ -1,0 +1,38 @@
+<h2>Inspector Backend Integration — How?</h2>
+<p class="subtitle">How should wisper's Go backend provide inspector data to the frontend?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Import inspector/pkg into wisper</h3>
+      <p>Add <code>github.com/go-gost/inspector</code> to wisper's <code>go.mod</code>. Reuse inspector's <code>pkg/model</code> (MongoDB queries, Redis hub) and <code>pkg/api</code> (handlers) directly. Wire into wisper's existing HTTP mux.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Zero logic duplication</li><li>Bug fixes in inspector propagate automatically</li><li>Same data structures as the React SPA</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Adds MongoDB + Redis deps to wisper</li><li>Inspector uses Gin, wisper uses net/http — needs adapter</li><li>Inspector code is singleton-heavy (global config, global DB clients)</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Reverse proxy to inspector backend</h3>
+      <p>Run inspector as a sidecar or separate service. Wisper acts as a reverse proxy: <code>/api/tunnels/{id}/records</code> → <code>inspector:8000/api/records/query?client_id={id}</code>. Wisper stays thin, inspector runs independently.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Wisper stays dependency-free</li><li>Inspector runs independently, can be shared across wisper nodes</li><li>Simplest implementation — a few lines of proxy code</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Requires deploying two services</li><li>Extra network hop on every query</li><li>Authentication/authorization across services</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Extract & embed — copy model logic into wisper</h3>
+      <p>Copy the essential inspector model types + query logic (~3 files) into a new <code>wisper/inspector/</code> Go package. Strip the Gin dependency, adapt to wisper's net/http patterns. Keep MongoDB + Redis connections scoped to wisper's config.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Clean integration — matches wisper's existing patterns</li><li>No Gin dependency, no singleton globals</li><li>Full control over API surface and auth</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Forks inspector logic (drift over time)</li><li>Still adds MongoDB + Redis deps</li><li>Duplicates ~500 lines of model code</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
