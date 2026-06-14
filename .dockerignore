@@ -1,0 +1,21 @@
+# Keep the docker build context small — only web/ and src-tauri/ are COPY'd.
+.git
+.gitignore
+**/node_modules
+dist/
+web-src/
+flutter/
+docs/
+.remember/
+.superpowers/
+.codegraph/
+.claude/
+# Don't copy the host's partial Rust build into the image (mounted as volume instead)
+src-tauri/target
+Dockerfile
+Dockerfile.desktop
+build.sh
+Makefile
+*.md
+.go
+go.work

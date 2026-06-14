@@ -48,7 +48,10 @@ pub fn run() {
     tauri::Builder::default()
         // ---- plugins ----
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        // Auto-update is a future feature (see docs/.../desktop-packaging-design.md).
+        // tauri-plugin-updater requires a `plugins.updater` config block (pubkey +
+        // endpoints) and is not wired up yet, so it is intentionally omitted —
+        // re-add it together with that config when implementing updates.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
@@ -60,8 +63,8 @@ pub fn run() {
 
             let (rx, child) = app
                 .shell()
-                .sidecar("wisper")
-                .expect("wisper not found in externalBin — run `make sidecar` first")
+                .sidecar("wisper-backend")
+                .expect("wisper-backend not found in externalBin — run `make sidecar` first")
                 .args(["-addr", &addr])
                 .spawn()
                 .expect("failed to spawn wisper sidecar");

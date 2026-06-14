@@ -19,7 +19,12 @@ DIST_DIR   := dist
 # Tauri desktop app
 TARGET_TRIPLE := $(shell rustc -vV 2>/dev/null | grep host | awk '{print $$2}')
 SIDECAR_DIR   := src-tauri/binaries
-SIDECAR       := $(SIDECAR_DIR)/$(BINARY)-$(TARGET_TRIPLE)
+# The sidecar binary name MUST differ from the Cargo package name (`wisper`),
+# otherwise Tauri 2 refuses to build: "Cannot define a sidecar with the same
+# name as the Cargo package name". This must match externalBin in
+# tauri.conf.json and the sidecar() call in src-tauri/src/lib.rs.
+SIDECAR_NAME  := wisper-backend
+SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
 .PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps
 

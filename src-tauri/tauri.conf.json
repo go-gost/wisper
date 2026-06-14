@@ -23,7 +23,7 @@
       "icons/128x128@2x.png"
     ],
     "externalBin": [
-      "binaries/wisper"
+      "binaries/wisper-backend"
     ]
   }
 }
