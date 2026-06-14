@@ -16,7 +16,12 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Output directories
 DIST_DIR   := dist
 
-.PHONY: all linux darwin windows web web-force typecheck clean
+# Tauri desktop app
+TARGET_TRIPLE := $(shell rustc -vV 2>/dev/null | grep host | awk '{print $$2}')
+SIDECAR_DIR   := src-tauri/binaries
+SIDECAR       := $(SIDECAR_DIR)/$(BINARY)-$(TARGET_TRIPLE)
+
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps
 
 all: linux darwin windows
 
@@ -79,6 +84,55 @@ $(DIST_DIR)/windows-amd64/$(BINARY).exe:
 	@mkdir -p $(dir $@)
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $@ .
 
+# ----- Tauri Desktop App -----
+# Run on each target platform to produce native installers (.deb, .dmg, .msi).
+
+# Build the Go sidecar for the host platform and place it where Tauri expects it.
+# Tauri appends -<target-triple> automatically to the name in externalBin.
+.PHONY: sidecar
+sidecar:
+	@echo "Building wisper sidecar for $(TARGET_TRIPLE)..."
+	@mkdir -p $(SIDECAR_DIR)
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(SIDECAR) .
+	@echo "Sidecar ready: $(SIDECAR)"
+
+# Development mode — hot-reload frontend + sidecar.
+# Requires Tauri CLI: cargo install tauri-cli --version "^2"
+.PHONY: tauri-dev
+tauri-dev: web sidecar
+	cargo tauri dev
+
+# Production desktop build for the host platform.
+.PHONY: tauri-build
+tauri-build: web sidecar
+	cargo tauri build
+
+# Print OS-specific instructions for installing Tauri 2 system dependencies.
+# Linux requires webkit2gtk + gtk dev packages.  macOS and Windows only need
+# the standard build toolchain (Xcode CLT / Visual Studio Build Tools).
+.PHONY: tauri-deps
+tauri-deps:
+	@echo "Tauri 2 system dependencies:"
+	@echo ""
+	@echo "  Ubuntu / Debian:"
+	@echo "    sudo apt-get install -y \\"
+	@echo "      libwebkit2gtk-4.1-dev libgtk-3-dev \\"
+	@echo "      libayatana-appindicator3-dev librsvg2-dev \\"
+	@echo "      libsoup-3.0-dev libjavascriptcoregtk-4.1-dev"
+	@echo ""
+	@echo "  Fedora:"
+	@echo "    sudo dnf install webkit2gtk4.1-devel gtk3-devel \\"
+	@echo "      libappindicator-gtk3-devel librsvg2-devel"
+	@echo ""
+	@echo "  macOS:  no extra deps (Xcode CLT is enough)"
+	@echo "  Windows: WebView2 is pre-installed on Win10 21H2+ / Win11"
+	@echo ""
+	@echo "  Tauri CLI: cargo install tauri-cli --version \"^2\""
+
+# ----- Cross-platform Go binaries (no Tauri shell) -----
+
 # ----- Clean -----
 clean:
 	rm -rf $(DIST_DIR)
+	rm -rf $(SIDECAR_DIR)
+	rm -rf src-tauri/target

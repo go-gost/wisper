@@ -25,3 +25,9 @@ flutter/build/
 
 # Web build stamp (local, never commit)
 web/.build_stamp
+
+# Desktop (Tauri) build artifacts
+/wisper
+src-tauri/binaries/*
+src-tauri/target/
+src-tauri/gen/

@@ -1,0 +1,29 @@
+{
+  "productName": "Wisper",
+  "version": "0.1.0",
+  "identifier": "run.gost.wisper",
+  "build": {
+    "frontendDist": "../web",
+    "devUrl": "http://127.0.0.1:8900",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ],
+    "externalBin": [
+      "binaries/wisper"
+    ]
+  }
+}
