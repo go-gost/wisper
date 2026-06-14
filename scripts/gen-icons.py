@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Generate every Wisper branding asset from appicon.png.
+
+Single source of truth: appicon.png (512x512 RGBA, white ghost on solid
+black square) at the repo root. Run this whenever appicon.png changes.
+
+Outputs (all created/overwritten, idempotent):
+  src-tauri/icons/32x32.png         desktop icon set (RGBA PNGs — Tauri on
+  src-tauri/icons/128x128.png        Linux requires RGBA, not RGB)
+  src-tauri/icons/128x128@2x.png    (256x256)
+  src-tauri/icons/icon.png          (1024x1024, upscaled)
+  src-tauri/icons/icon.ico          Windows multi-resolution icon
+  web-src/public/logo.png           in-app logo (displayed at 28px & 64px)
+  web-src/public/favicon.ico        browser tab icon
+
+.icns (macOS) is intentionally not produced — no icns tool is available on
+the host and the current build targets Linux deb/appimage only.
+"""
+import os
+import sys
+
+from PIL import Image, ImageDraw
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "appicon.png")
+
+ICONS_DIR = os.path.join(ROOT, "src-tauri", "icons")
+PUBLIC_DIR = os.path.join(ROOT, "web-src", "public")
+
+# (px, path)
+PNG_SET = [
+    (32, "32x32.png"),
+    (128, "128x128.png"),
+    (256, "128x128@2x.png"),
+    (1024, "icon.png"),
+]
+
+# Multi-resolution .ico sizes (Pillow writes all into one file).
+ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
+FAVICON_SIZES = [16, 32, 48]
+LOGO_PX = 256
+TRAY_PX = 128
+
+
+def resized(img: Image.Image, px: int) -> Image.Image:
+    """Return an RGBA copy of `img` resized to px x px with high-quality resampling."""
+    out = img.convert("RGBA")
+    return out.resize((px, px), Image.Resampling.LANCZOS)
+
+
+def make_tray_icon(src: Image.Image, dest: str, px: int) -> None:
+    """Isolate the ghost on a transparent background for use as a tray icon.
+
+    The source is a white ghost on a solid black square; at tray size the black
+    border makes the ghost look tiny. We want only the ghost, cropped tight.
+
+    Two stages (flood-fill alone is fragile — anti-aliased dark fringe pixels
+    stay opaque and inflate the bounding box):
+      1. Bounding box from *bright* (ghost-body) pixels — dark fringe and stray
+         pixels are ignored, so the box is the true ghost extent.
+      2. Crop to that box, then flood-fill the residual black background
+         (corners + gaps between the ghost's wavy tendrils) to transparent.
+         The eyes are interior black, disconnected from the border, so they
+         survive.
+
+    Then a final tight crop, pad to a square with a small transparent margin,
+    and resize.
+    """
+    img = src.convert("RGBA")
+    W, H = img.size
+
+    # Stage 1 — bbox of the bright ghost body (immune to dark fringe/strays).
+    bright = img.convert("L").point(lambda v: 255 if v > 100 else 0)
+    bbox = bright.getbbox() or (0, 0, W, H)
+    l, t, r, b = bbox
+    pad = max(4, int(max(W, H) * 0.02))  # don't clip the body's outer edge
+    img = img.crop((max(0, l - pad), max(0, t - pad), min(W, r + pad), min(H, b + pad)))
+
+    # Stage 2 — remove the residual black background by flood-filling from
+    # each corner to transparent.
+    cw, ch = img.size
+    for corner in [(0, 0), (cw - 1, 0), (0, ch - 1), (cw - 1, ch - 1)]:
+        ImageDraw.floodfill(img, corner, value=(0, 0, 0, 0), thresh=50)
+
+    # Final tight crop to the ghost, pad to a square with a ~6% transparent
+    # margin so the ghost isn't edge-to-edge in the tray, and resize.
+    bb = img.getbbox()
+    if bb:
+        img = img.crop(bb)
+    side = max(img.width, img.height)
+    margin = int(side * 0.06)
+    canvas = side + 2 * margin
+    out = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    out.paste(img, ((canvas - img.width) // 2, (canvas - img.height) // 2), img)
+    out.resize((px, px), Image.Resampling.LANCZOS).save(dest, format="PNG")
+
+
+def main() -> int:
+    if not os.path.isfile(SRC):
+        print(f"error: source logo not found at {SRC}", file=sys.stderr)
+        return 1
+
+    src = Image.open(SRC)
+    if src.mode != "RGBA":
+        src = src.convert("RGBA")
+    print(f"source: {SRC}  {src.size[0]}x{src.size[1]} {src.mode}")
+
+    os.makedirs(ICONS_DIR, exist_ok=True)
+    os.makedirs(PUBLIC_DIR, exist_ok=True)
+
+    # --- desktop PNG set ---
+    for px, name in PNG_SET:
+        dest = os.path.join(ICONS_DIR, name)
+        resized(src, px).save(dest, format="PNG")
+        print(f"  wrote {os.path.relpath(dest, ROOT)} ({px}x{px})")
+
+    # --- Windows .ico (multi-resolution) ---
+    ico_path = os.path.join(ICONS_DIR, "icon.ico")
+    resized(src, max(ICO_SIZES)).save(
+        ico_path, format="ICO", sizes=[(s, s) for s in ICO_SIZES]
+    )
+    print(f"  wrote {os.path.relpath(ico_path, ROOT)} ({len(ICO_SIZES)} sizes)")
+
+    # --- in-app logo ---
+    logo_path = os.path.join(PUBLIC_DIR, "logo.png")
+    resized(src, LOGO_PX).save(logo_path, format="PNG")
+    print(f"  wrote {os.path.relpath(logo_path, ROOT)} ({LOGO_PX}x{LOGO_PX})")
+
+    # --- favicon ---
+    favicon_path = os.path.join(PUBLIC_DIR, "favicon.ico")
+    resized(src, max(FAVICON_SIZES)).save(
+        favicon_path, format="ICO", sizes=[(s, s) for s in FAVICON_SIZES]
+    )
+    print(f"  wrote {os.path.relpath(favicon_path, ROOT)} ({len(FAVICON_SIZES)} sizes)")
+
+    # --- tray icon (ghost isolated on a transparent background) ---
+    tray_path = os.path.join(ICONS_DIR, "tray.png")
+    make_tray_icon(src, tray_path, TRAY_PX)
+    print(f"  wrote {os.path.relpath(tray_path, ROOT)} ({TRAY_PX}x{TRAY_PX}, transparent bg)")
+
+    print("done.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

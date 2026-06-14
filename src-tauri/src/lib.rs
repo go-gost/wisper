@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder},
+    menu::MenuBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
@@ -210,13 +210,28 @@ pub fn run() {
             });
 
             // 3. System tray — always present so tunnels keep running in background
-            let show_item = MenuItemBuilder::with_id("show", "Show").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "Quit Wisper").build(app)?;
+            // Each item carries the app icon so the menu is never entirely blank:
+            // the icon is a separate dbusmenu property from the text label and
+            // tends to survive the AppIndicator D-Bus export race that blanks
+            // labels on the first open of a cold-launched tray.
+            let menu_icon = app
+                .default_window_icon()
+                .cloned()
+                .expect("default window icon missing");
             let tray_menu = MenuBuilder::new(app)
-                .items(&[&show_item, &quit_item])
+                .icon("show", "Show", menu_icon.clone())
+                .icon("quit", "Quit Wisper", menu_icon)
                 .build()?;
 
             let _tray = TrayIconBuilder::new()
+                // Dedicated tray icon: just the ghost on a transparent
+                // background. The full app icon wastes the canvas on a black
+                // border, making the ghost tiny at tray size. Loaded from an
+                // embedded PNG (needs the `image-png` Cargo feature).
+                .icon(
+                    tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
+                        .expect("failed to decode tray icon"),
+                )
                 .menu(&tray_menu)
                 .tooltip("Wisper")
                 .on_menu_event(|app_handle, event| match event.id().as_ref() {

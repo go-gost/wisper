@@ -188,12 +188,9 @@ export class SettingsPage extends LitElement {
     }
     .app-logo {
       width: 64px; height: 64px;
-      background: var(--accent);
       border-radius: var(--radius-lg);
       margin: 0 auto 12px;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--accent-fg);
-      font-weight: 700; font-size: var(--font-lg);
+      object-fit: contain;
     }
     .app-name {
       font-size: var(--font-md); font-weight: 600;
@@ -324,7 +321,7 @@ export class SettingsPage extends LitElement {
 
         <!-- App Info -->
         <div class="app-info">
-          <div class="app-logo">W</div>
+          <img class="app-logo" src="/logo.png" alt="Wisper" />
           <div class="app-name">${t('appName')}</div>
           <div class="app-version">v1.0.0 · GOST Tunnel Manager</div>
         </div>

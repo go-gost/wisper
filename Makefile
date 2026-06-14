@@ -26,7 +26,7 @@ SIDECAR_DIR   := src-tauri/binaries
 SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
-.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons
 
 all: linux darwin windows
 
@@ -54,6 +54,14 @@ web:
 web-force:
 	rm -f web/.build_stamp
 	$(MAKE) web
+
+# ----- Branding icons -----
+# Regenerate the desktop icon set (src-tauri/icons/) and the web assets
+# (web-src/public/) from appicon.png. Re-run whenever appicon.png changes.
+# Requires Python 3 + Pillow.
+.PHONY: icons
+icons:
+	python3 scripts/gen-icons.py
 
 # ----- Type-check (tsc) -----
 # Vite/esbuild strips types without checking them, so type errors (e.g. an
