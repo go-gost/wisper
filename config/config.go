@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	configFile = "config.yml"
+	configFile = "wisper.yaml"
 	logFile    = "wisper.log"
 )
 
@@ -108,7 +108,7 @@ type Settings struct {
 	// Public entrypoint address (default: gost.run).
 	Entrypoint string
 	// Skip TLS certificate verification for the tunnel server.
-	Insecure bool
+	Insecure      bool
 	Lang          string
 	Theme         string
 	StatsInterval int `yaml:"stats_interval,omitempty" json:"stats_interval,omitempty"`

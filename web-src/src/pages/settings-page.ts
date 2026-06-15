@@ -188,7 +188,9 @@ export class SettingsPage extends LitElement {
     }
     .app-logo {
       width: 64px; height: 64px;
-      border-radius: var(--radius-lg);
+      padding: 6px;
+      border-radius: 50%;
+      background: #000;
       margin: 0 auto 12px;
       object-fit: contain;
     }

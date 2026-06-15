@@ -182,7 +182,9 @@ export class HomePage extends LitElement {
     .app-icon {
       width: 28px;
       height: 28px;
-      border-radius: var(--radius-sm);
+      padding: 4px;
+      border-radius: 50%;
+      background: #000;
       object-fit: contain;
       flex-shrink: 0;
     }

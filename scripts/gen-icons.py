@@ -4,12 +4,17 @@
 Single source of truth: appicon.png (512x512 RGBA, white ghost on solid
 black square) at the repo root. Run this whenever appicon.png changes.
 
+All output icons use the same ghost-isolation pipeline: crop to the ghost
+body, flood-fill residual black to transparent, tight crop, pad to square
+with transparent margin, resize.
+
 Outputs (all created/overwritten, idempotent):
   src-tauri/icons/32x32.png         desktop icon set (RGBA PNGs — Tauri on
   src-tauri/icons/128x128.png        Linux requires RGBA, not RGB)
   src-tauri/icons/128x128@2x.png    (256x256)
   src-tauri/icons/icon.png          (1024x1024, upscaled)
   src-tauri/icons/icon.ico          Windows multi-resolution icon
+  src-tauri/icons/tray.png          system tray icon
   web-src/public/logo.png           in-app logo (displayed at 28px & 64px)
   web-src/public/favicon.ico        browser tab icon
 
@@ -42,17 +47,11 @@ LOGO_PX = 256
 TRAY_PX = 128
 
 
-def resized(img: Image.Image, px: int) -> Image.Image:
-    """Return an RGBA copy of `img` resized to px x px with high-quality resampling."""
-    out = img.convert("RGBA")
-    return out.resize((px, px), Image.Resampling.LANCZOS)
+def make_ghost_icon(src: Image.Image, dest: str, px: int) -> None:
+    """Isolate the ghost on a transparent background.
 
-
-def make_tray_icon(src: Image.Image, dest: str, px: int) -> None:
-    """Isolate the ghost on a transparent background for use as a tray icon.
-
-    The source is a white ghost on a solid black square; at tray size the black
-    border makes the ghost look tiny. We want only the ghost, cropped tight.
+    The source is a white ghost on a solid black square; we want only the
+    ghost, cropped tight against its body, on a fully transparent background.
 
     Two stages (flood-fill alone is fragile — anti-aliased dark fringe pixels
     stay opaque and inflate the bounding box):
@@ -83,7 +82,7 @@ def make_tray_icon(src: Image.Image, dest: str, px: int) -> None:
         ImageDraw.floodfill(img, corner, value=(0, 0, 0, 0), thresh=50)
 
     # Final tight crop to the ghost, pad to a square with a ~6% transparent
-    # margin so the ghost isn't edge-to-edge in the tray, and resize.
+    # margin so the ghost isn't edge-to-edge, and resize.
     bb = img.getbbox()
     if bb:
         img = img.crop(bb)
@@ -93,6 +92,15 @@ def make_tray_icon(src: Image.Image, dest: str, px: int) -> None:
     out = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
     out.paste(img, ((canvas - img.width) // 2, (canvas - img.height) // 2), img)
     out.resize((px, px), Image.Resampling.LANCZOS).save(dest, format="PNG")
+
+
+def pack_ico(src: Image.Image, dest: str, sizes: list[int]) -> None:
+    """Pack `src` (RGBA, ghost-on-transparent) into a multi-resolution .ico."""
+    tmp = os.path.join(ICONS_DIR, "_ico_tmp.png")
+    make_ghost_icon(src, tmp, max(sizes))
+    ico_src = Image.open(tmp).convert("RGBA")
+    ico_src.save(dest, format="ICO", sizes=[(s, s) for s in sizes])
+    os.remove(tmp)
 
 
 def main() -> int:
@@ -111,31 +119,27 @@ def main() -> int:
     # --- desktop PNG set ---
     for px, name in PNG_SET:
         dest = os.path.join(ICONS_DIR, name)
-        resized(src, px).save(dest, format="PNG")
-        print(f"  wrote {os.path.relpath(dest, ROOT)} ({px}x{px})")
+        make_ghost_icon(src, dest, px)
+        print(f"  wrote {os.path.relpath(dest, ROOT)} ({px}x{px}, transparent bg)")
 
-    # --- Windows .ico (multi-resolution) ---
+    # --- Windows .ico ---
     ico_path = os.path.join(ICONS_DIR, "icon.ico")
-    resized(src, max(ICO_SIZES)).save(
-        ico_path, format="ICO", sizes=[(s, s) for s in ICO_SIZES]
-    )
-    print(f"  wrote {os.path.relpath(ico_path, ROOT)} ({len(ICO_SIZES)} sizes)")
+    pack_ico(src, ico_path, ICO_SIZES)
+    print(f"  wrote {os.path.relpath(ico_path, ROOT)} ({len(ICO_SIZES)} sizes, transparent bg)")
 
     # --- in-app logo ---
     logo_path = os.path.join(PUBLIC_DIR, "logo.png")
-    resized(src, LOGO_PX).save(logo_path, format="PNG")
-    print(f"  wrote {os.path.relpath(logo_path, ROOT)} ({LOGO_PX}x{LOGO_PX})")
+    make_ghost_icon(src, logo_path, LOGO_PX)
+    print(f"  wrote {os.path.relpath(logo_path, ROOT)} ({LOGO_PX}x{LOGO_PX}, transparent bg)")
 
     # --- favicon ---
     favicon_path = os.path.join(PUBLIC_DIR, "favicon.ico")
-    resized(src, max(FAVICON_SIZES)).save(
-        favicon_path, format="ICO", sizes=[(s, s) for s in FAVICON_SIZES]
-    )
-    print(f"  wrote {os.path.relpath(favicon_path, ROOT)} ({len(FAVICON_SIZES)} sizes)")
+    pack_ico(src, favicon_path, FAVICON_SIZES)
+    print(f"  wrote {os.path.relpath(favicon_path, ROOT)} ({len(FAVICON_SIZES)} sizes, transparent bg)")
 
-    # --- tray icon (ghost isolated on a transparent background) ---
+    # --- tray icon ---
     tray_path = os.path.join(ICONS_DIR, "tray.png")
-    make_tray_icon(src, tray_path, TRAY_PX)
+    make_ghost_icon(src, tray_path, TRAY_PX)
     print(f"  wrote {os.path.relpath(tray_path, ROOT)} ({TRAY_PX}x{TRAY_PX}, transparent bg)")
 
     print("done.")
