@@ -264,14 +264,16 @@ android: web
 		export CGO_ENABLED=1; \
 		export GOOS=android; \
 		export GOARCH=arm64; \
+		echo "--- Copying JNI bridge into package root ---"; \
+		cp android/lib_jni.c .; \
 		echo "--- Cross-compiling libwisper.so (arm64-v8a) ---"; \
 		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
 			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
+		rm -f lib_jni.c; \
 		echo "--- libwisper.so: $$(wc -c < android/app/src/main/jniLibs/arm64-v8a/libwisper.so) bytes ---"; \
 		echo "--- Assembling APK with Gradle ---"; \
 		cd android; \
-		gradle wrapper --gradle-version 8.5 --no-daemon 2>/dev/null || true; \
-		./gradlew assembleDebug --no-daemon; \
+		gradle assembleDebug --no-daemon; \
 		'
 	@echo "==> APK ready:"
 	@ls -lh android/app/build/outputs/apk/debug/*.apk 2>/dev/null || echo "  (no .apk found — check container logs)"
