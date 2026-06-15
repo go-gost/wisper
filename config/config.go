@@ -32,18 +32,42 @@ func init() {
 	config.Store(&Config{})
 }
 
+// Option configures the Init behavior.
+type Option func(*options)
+
+type options struct {
+	configDir string
+}
+
+// WithConfigDir sets an explicit config directory for Init().
+// When empty (the default), Init() uses os.UserConfigDir() + "/wisper".
+func WithConfigDir(dir string) Option {
+	return func(o *options) {
+		o.configDir = dir
+	}
+}
+
 // Init initializes the configuration directory and loads config.
-func Init() {
+func Init(opts ...Option) {
+	o := &options{}
+	for _, opt := range opts {
+		opt(o)
+	}
+
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true})))
 
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		slog.Error(fmt.Sprintf("configDir: %v", err))
+	if o.configDir != "" {
+		configDir = o.configDir
+	} else {
+		dir, err := os.UserConfigDir()
+		if err != nil {
+			slog.Error(fmt.Sprintf("configDir: %v", err))
+		}
+		if dir == "" {
+			dir, _ = os.Getwd()
+		}
+		configDir = filepath.Join(dir, "wisper")
 	}
-	if dir == "" {
-		dir, _ = os.Getwd()
-	}
-	configDir = filepath.Join(dir, "wisper")
 	os.MkdirAll(configDir, 0755)
 
 	slog.Info(fmt.Sprintf("configDir: %s", configDir))
