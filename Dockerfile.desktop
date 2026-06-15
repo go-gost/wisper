@@ -1,44 +1,39 @@
-# Dockerfile.desktop — Reproducible, sudo-free build of the Wisper Linux
-# desktop app (Tauri 2).
+# Dockerfile.desktop — Docker image that provides the Tauri 2 Linux build
+# environment (webkit2gtk, gtk, appindicator dev headers, Node.js) for building
+# the Wisper desktop app from a Linux host.
 #
-# Why this exists: `cargo tauri build` links the Rust webview shell against
-# webkit2gtk-4.1, which needs the *-dev headers. On hosts without root (or
-# without the dev packages), the build dies at the pkg-config step. This image
-# ships those headers so the build runs unprivileged.
+# Rust is NOT installed in this image — the host's Rust toolchain (~/.rustup,
+# ~/.cargo) is volume-mounted at runtime. This bypasses the flaky / blocked
+# static.rust-lang.org CDN and keeps the Docker image lean.
 #
-# Division of labor (no webkit needed on the host):
-#   host    → make web (Lit UI)  +  make sidecar (Go binary, embedded UI)
-#   image   → npx tauri build (Rust shell + bundles the sidecar + web → .deb/AppImage)
+# Division of labor:
+#   host    → Rust toolchain (pre-installed)
+#   host    → make web (Lit UI) + make sidecar (Go binary)
+#   image   → provides webkit2gtk + node → npx tauri build
 #
 # Usage:
-#   # 1. on the host (once):
-#   make web && make sidecar
-#   # 2. build this image:
-#   docker build -t wisper-desktop -f Dockerfile.desktop .
-#   # 3. run it, mounting target/ so the installers land back on the host:
-#   mkdir -p src-tauri/target
-#   docker run --rm -v "$PWD/src-tauri/target:/work/src-tauri/target" wisper-desktop
-#   # 4. artifacts:
-#   ls src-tauri/target/release/bundle/{deb,appimage}/
+#   make linux-installer
+#   # (which runs:)
+#   #   make web && make sidecar
+#   #   docker build -t wisper-desktop -f Dockerfile.desktop .
+#   #   docker run --rm \
+#   #     -v $(pwd):/work -v ~/.rustup:/root/.rustup:ro -v ~/.cargo:/root/.cargo \
+#   #     wisper-desktop
+#   #   ls src-tauri/target/release/bundle/{deb,appimage}/
 
 # syntax=docker/dockerfile:1.7
-# BuildKit cache mounts make the crate download/compile resumable: the China
-# network to crates.io-index occasionally stalls mid-bulk-download, so retries
-# must resume from cached crates rather than restarting from zero.
+# BuildKit cache mounts for apt packages (Tuna mirror retries are resumable).
 
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
-# ---- Switch apt to a China mirror (archive.ubuntu.com is ~3-5s/pkg here) ----
-# Use http:// (not https://) for the mirror: the base image ships no
-# ca-certificates yet, so HTTPS would fail cert verification. apt installs
-# ca-certificates itself, after which HTTPS works for everything else.
+# ---- Tuna apt mirror (archive.ubuntu.com is slow from China) ----
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null \
     || sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list
 
-# ---- Tauri 2 Linux system dependencies -------------------------------------
+# ---- Tauri 2 Linux system dependencies ----
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
@@ -58,76 +53,56 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- Node 22 (for the prebuilt tauri CLI; avoids compiling tauri-cli) ------
+# ---- Node 22 (for the prebuilt tauri CLI) ----
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- Rust toolchain --------------------------------------------------------
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --default-toolchain stable --profile minimal
+# npm China mirror (npmmirror).
+RUN npm config set registry https://registry.npmmirror.com
+
+# Rust toolchain path — the host's ~/.rustup and ~/.cargo are volume-mounted at
+# /root/.rustup and /root/.cargo at container runtime. The entrypoint script
+# creates a minimal cargo config pointing to the Tuna mirror if none exists,
+# then runs the tauri build.
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# ---- China mirrors (crates.io is HTTP 403 on the build network) ------------
-# Also tune cargo's HTTP client: the Tuna mirror has flaky throughput on large
-# crates (gtk/glib bindings), causing spurious "transferred <10 bytes in 30s"
-# aborts. A 5-min timeout + 8 retries lets slow-but-working transfers finish
-# instead of thrashing on 30s timeouts.
-RUN printf '%s\n' \
-      '[source.crates-io]' \
-      'replace-with = "tuna"' \
-      '[source.tuna]' \
-      'registry = "sparse+https://mirrors.tuna.tsinghua.edu.cn/crates.io-index/"' \
-      '[http]' \
-      'timeout = 300' \
-      'multiplexing = false' \
-      '[net]' \
-      'retry = 8' \
-      'git-fetch-with-cli = true' \
-      > /root/.cargo/config.toml \
-    && npm config set registry https://registry.npmmirror.com
+# Stub directories so the mount points exist (harmless if overmounted).
+RUN mkdir -p /root/.rustup /root/.cargo
 
-WORKDIR /work
-
-# Pre-built artifacts from the host: web assets + Tauri shell + sidecar binary.
-COPY web/ ./web/
-COPY src-tauri/ ./src-tauri/
-
+# The host repo is bind-mounted at /work, so /work/src-tauri is the host's
+# src-tauri/ directory (with binaries, icons, Cargo.toml, etc. already in place)
+# and /work/web/ is the host's web/ directory.
 WORKDIR /work/src-tauri
 
-# Build the Rust shell and bundle native installers. Artifacts land in
-# /work/src-tauri/target/release/bundle/{deb,appimage}/.
-#
-# Cache mounts: cargo registry + git are mounted so a stalled download resumes
-# on retry (NOT the target/ dir — we want the artifacts baked into the layer so
-# `docker cp` can extract them). Bundles are restricted to deb + appimage; the
-# default "all" also tries .rpm, which needs rpmbuild (not installed).
-RUN --mount=type=cache,target=/root/.cargo/registry \
-    --mount=type=cache,target=/root/.cargo/git \
-    npx --yes @tauri-apps/cli@latest build --bundles deb,appimage
-
-# Relocate the bundled binaries from /usr/bin to /usr/local/bin.
-# Tauri 2 hardcodes the deb install path to /usr/bin/<mainBinaryName> and exposes
-# no config to override it, so we repack the .deb and move BOTH the app binary
-# and its `wisper-api` sidecar together — the sidecar is resolved relative
-# to the main binary at runtime, so the two must stay in the same directory.
-# The .desktop launcher uses a bare `Exec=wisper`, which PATH resolves to
-# /usr/local/bin, so relocation is transparent to it. We rewrite the two binary
-# paths in DEBIAN/md5sums (file contents are unchanged by mv, so the existing
-# checksums stay valid — only the path strings move).
-RUN set -eux; \
-    DEB="$(find /work/src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' | head -n1)"; \
-    test -n "$DEB"; \
-    TMP="$(mktemp -d)"; \
-    dpkg-deb -R "$DEB" "$TMP"; \
-    mkdir -p "$TMP/usr/local/bin"; \
-    mv "$TMP/usr/bin/wisper" "$TMP/usr/bin/wisper-api" "$TMP/usr/local/bin/"; \
-    rmdir "$TMP/usr/bin"; \
-    sed -i 's#  usr/bin/#  usr/local/bin/#g' "$TMP/DEBIAN/md5sums"; \
-    dpkg-deb --root-owner-group -b "$TMP" "$DEB"; \
-    rm -rf "$TMP"
-
-# Copy the built installers to a known location in the image for easy extraction.
-RUN mkdir -p /out && \
-    cp -r /work/src-tauri/target/release/bundle/* /out/ 2>/dev/null || true
-
+# Entrypoint: configure Tuna cargo mirror (no-op if host config.toml already has
+# it), then build the Linux .deb + .AppImage installers. The final chown ensures
+# artifacts are owned by the host user.
+ENTRYPOINT ["/bin/bash", "-c", "\
+  set -e; \
+  echo '==> Verifying host Rust toolchain...'; \
+  rustc --version; \
+  cargo --version; \
+  echo '==> Ensuring Tuna cargo mirror...'; \
+  mkdir -p /root/.cargo; \
+  if [ ! -f /root/.cargo/config.toml ] || ! grep -q 'tuna' /root/.cargo/config.toml 2>/dev/null; then \
+    printf '%s\\n' \
+      '[source.crates-io]' \
+      'replace-with = \"tuna\"' \
+      '[source.tuna]' \
+      'registry = \"sparse+https://mirrors.tuna.tsinghua.edu.cn/crates.io-index/\"' \
+      '[net]' \
+      'git-fetch-with-cli = true' \
+      > /root/.cargo/config.toml; \
+    echo '  (created /root/.cargo/config.toml with Tuna mirror)'; \
+  else \
+    echo '  (host config.toml already has Tuna mirror)'; \
+  fi; \
+  echo '==> Building Linux installers (.deb + .AppImage)...'; \
+  npx --yes @tauri-apps/cli@latest build --bundles deb,appimage; \
+  echo \"==> Fixing artifact ownership for host...\"; \
+  chown -R ${HOST_UID:-0}:${HOST_GID:-0} /work/src-tauri/target/release/bundle/ 2>/dev/null || true; \
+  echo '==> Installers built:'; \
+  ls -lh /work/src-tauri/target/release/bundle/deb/; \
+  ls -lh /work/src-tauri/target/release/bundle/appimage/ 2>/dev/null || true" \
+]

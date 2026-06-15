@@ -26,7 +26,7 @@ SIDECAR_DIR   := src-tauri/binaries
 SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
-.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer
 
 all: linux darwin windows
 
@@ -193,6 +193,39 @@ windows-installer: web windows-sidecar
 	  $(WIN_IMAGE)
 	@echo "==> Windows installer ready:"
 	@ls -lh $(WIN_DIST)/*.exe 2>/dev/null || echo "  (no .exe found — check container logs)"
+
+# ----- Linux desktop installer (Docker build) -----
+# Builds .deb + .AppImage WITHOUT sudo or webkit2gtk on the host. Rust is NOT
+# in the Docker image — the host's Rust toolchain (~/.rustup + ~/.cargo) is
+# volume-mounted in, same as the Windows build.
+#
+# Division of labor:
+#   host  → make web  +  make sidecar
+#   image → npx tauri build --bundles deb,appimage
+#
+# Artifacts land in:
+#   src-tauri/target/release/bundle/deb/
+#   src-tauri/target/release/bundle/appimage/
+
+LINUX_IMAGE         := wisper-desktop
+LINUX_DEB_DIST      := src-tauri/target/release/bundle/deb
+LINUX_APPIMAGE_DIST := src-tauri/target/release/bundle/appimage
+
+.PHONY: linux-installer
+linux-installer: web sidecar
+	@echo "==> Building Docker image $(LINUX_IMAGE)..."
+	DOCKER_BUILDKIT=1 docker build -t $(LINUX_IMAGE) -f Dockerfile.desktop .
+	@echo "==> Running container to build Linux installers..."
+	docker run --rm \
+	  -e HOST_UID=$$(id -u) -e HOST_GID=$$(id -g) \
+	  -v "$$PWD:/work" \
+	  -v "$$HOME/.rustup:/root/.rustup:ro" \
+	  -v "$$HOME/.cargo:/root/.cargo" \
+	  $(LINUX_IMAGE)
+	@echo "  (bins in /usr/bin — FHS-compliant, managed by dpkg)"
+	@echo "==> Linux installers ready:"
+	@ls -lh $(LINUX_DEB_DIST)/*.deb 2>/dev/null || echo "  (no .deb found — check container logs)"
+	@ls -lh $(LINUX_APPIMAGE_DIST)/*.AppImage 2>/dev/null || echo "  (no .AppImage found — check container logs)"
 
 # ----- Cross-platform Go binaries (no Tauri shell) -----
 
