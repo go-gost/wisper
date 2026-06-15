@@ -5,6 +5,7 @@
 
     <application
         android:label="Wisper"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
 
