@@ -1,0 +1,56 @@
+# Docker image with Go 1.26, Android SDK 34, NDK 27, and Gradle 8.5.
+# Build:  docker build -t wisper-android -f android/Dockerfile.android android/
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl unzip wget ca-certificates git make \
+    openjdk-17-jdk-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# Go 1.26.4
+RUN curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -C /usr/local -xz
+ENV PATH="/usr/local/go/bin:$PATH"
+
+# Gradle 8.5
+RUN curl -fsSL https://services.gradle.org/distributions/gradle-8.5-bin.zip -o /tmp/gradle.zip \
+    && unzip -q /tmp/gradle.zip -d /opt \
+    && rm /tmp/gradle.zip
+ENV PATH="/opt/gradle-8.5/bin:$PATH"
+
+# Android SDK command-line tools
+RUN mkdir -p $ANDROID_SDK_ROOT/cmdline-tools \
+    && curl -fsSL -o /tmp/cmdline-tools.zip \
+        https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+    && unzip -q /tmp/cmdline-tools.zip -d /tmp \
+    && mv /tmp/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip
+
+# Accept licenses
+RUN yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses > /dev/null 2>&1 || true
+
+# SDK packages (small — sdkmanager handles these fine)
+RUN $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+    "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+# NDK r27b (~450 MB) — direct download is more reliable than sdkmanager which
+# struggles with large zip files in Docker.
+ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/android-ndk-r27b
+ENV PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+RUN mkdir -p $ANDROID_SDK_ROOT/ndk \
+    && cd $ANDROID_SDK_ROOT/ndk \
+    && curl -fsSL -o ndk.zip \
+        https://dl.google.com/android/repository/android-ndk-r27b-linux.zip \
+    && unzip -q ndk.zip \
+    && rm ndk.zip
+
+# Verify NDK clang
+RUN ls $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android*-clang \
+    && $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang --version
+
+WORKDIR /go-gost

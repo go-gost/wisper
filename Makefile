@@ -229,6 +229,53 @@ linux-installer: web sidecar
 
 # ----- Cross-platform Go binaries (no Tauri shell) -----
 
+# ----- Android APK (Docker build) -----
+# Builds libwisper.so via NDK cross-compile + APK via Gradle, all inside a
+# Docker container (host needs no Android toolchain).
+#
+# Prerequisites: Docker, Go 1.26+ on host (for `make web`).
+#
+# The entire go workspace (/home/gerry/code/go-gost) is volume-mounted into
+# the container so go.work module resolution (wisper → x) works unchanged.
+# The x module was already patched in-place (commit 81dc933) so no patch cycle
+# is needed at build time.
+#
+# Artifacts: android/app/build/outputs/apk/debug/app-debug.apk
+
+ANDROID_IMAGE := wisper-android
+
+.PHONY: android
+android: web
+	@echo "==> Building Docker image $(ANDROID_IMAGE)..."
+	DOCKER_BUILDKIT=1 docker build -t $(ANDROID_IMAGE) -f android/Dockerfile.android android/
+	@echo "==> Cross-compiling libwisper.so + assembling APK..."
+	@mkdir -p android/app/src/main/jniLibs/arm64-v8a
+	docker run --rm \
+		-v "$(PWD)/..:/go-gost" \
+		-v "$$(go env GOMODCACHE):/root/go/pkg/mod" \
+		-v "$$(go env GOCACHE):/root/.cache/go-build" \
+		-w /go-gost/wisper \
+		-e GOWORK=/go-gost/go.work \
+		$(ANDROID_IMAGE) sh -c '\
+		set -e; \
+		CC="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"; \
+		CXX="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++"; \
+		export CC CXX; \
+		export CGO_ENABLED=1; \
+		export GOOS=android; \
+		export GOARCH=arm64; \
+		echo "--- Cross-compiling libwisper.so (arm64-v8a) ---"; \
+		go build -buildmode=c-shared -ldflags="-s -w" \
+			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
+		echo "--- libwisper.so: $$(ls -lh android/app/src/main/jniLibs/arm64-v8a/libwisper.so | awk \"{print \\$$5}\") ---"; \
+		echo "--- Assembling APK with Gradle ---"; \
+		cd android; \
+		gradle wrapper --gradle-version 8.5 --no-daemon 2>/dev/null || true; \
+		./gradlew assembleDebug --no-daemon; \
+		'
+	@echo "==> APK ready:"
+	@ls -lh android/app/build/outputs/apk/debug/*.apk 2>/dev/null || echo "  (no .apk found — check container logs)"
+
 # ----- Clean -----
 clean:
 	rm -rf $(DIST_DIR)

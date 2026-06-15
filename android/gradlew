@@ -1,0 +1,3 @@
+#!/bin/sh
+# Gradle wrapper — falls back to wrapper jar if system gradle is not installed.
+exec gradle "$@" 2>/dev/null || exec java -cp "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
