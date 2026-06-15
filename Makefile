@@ -265,9 +265,9 @@ android: web
 		export GOOS=android; \
 		export GOARCH=arm64; \
 		echo "--- Cross-compiling libwisper.so (arm64-v8a) ---"; \
-		go build -buildmode=c-shared -ldflags="-s -w" \
+		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
 			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
-		echo "--- libwisper.so: $$(ls -lh android/app/src/main/jniLibs/arm64-v8a/libwisper.so | awk \"{print \\$$5}\") ---"; \
+		echo "--- libwisper.so: $$(wc -c < android/app/src/main/jniLibs/arm64-v8a/libwisper.so) bytes ---"; \
 		echo "--- Assembling APK with Gradle ---"; \
 		cd android; \
 		gradle wrapper --gradle-version 8.5 --no-daemon 2>/dev/null || true; \
