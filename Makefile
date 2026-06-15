@@ -11,7 +11,7 @@
 
 BINARY  := wisper
 VERSION := 0.1.0
-LDFLAGS := -s -w -X main.version=$(VERSION)
+LDFLAGS := -s -w -X github.com/go-gost/wisper/version.Version=$(VERSION)
 
 # Output directories
 DIST_DIR   := dist
@@ -26,7 +26,7 @@ SIDECAR_DIR   := src-tauri/binaries
 SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
-.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer
 
 all: linux darwin windows
 
@@ -141,6 +141,58 @@ tauri-deps:
 	@echo "  Windows: WebView2 is pre-installed on Win10 21H2+ / Win11"
 	@echo ""
 	@echo "  Tauri CLI: cargo install tauri-cli --version \"^2\""
+
+# ----- Windows NSIS installer (Docker cross-compile on Linux) -----
+# Builds the Windows installer WITHOUT a Windows host or sudo. Rust is NOT in
+# the Docker image — the host's Rust toolchain (~/.rustup + ~/.cargo) is
+# volume-mounted in, so the build uses the host's already-installed rustc,
+# cargo-xwin, and Windows MSVC target. Only makensis + lld + Node live in the
+# image. Artifacts land on the host via a bind-mount of the repo root.
+#
+# Prerequisites on the host (one-time):
+#   rustc + cargo (already installed)
+#   cargo-xwin:  cargo install cargo-xwin --locked
+#   Windows target:  rustup target add x86_64-pc-windows-msvc
+#
+# Division of labor:
+#   host  → make web  +  make windows-sidecar
+#   image → npx tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+#
+# Artifacts land in:
+#   src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/
+
+WIN_TRIPLE    := x86_64-pc-windows-msvc
+WIN_SIDECAR   := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(WIN_TRIPLE).exe
+WIN_IMAGE     := wisper-windows
+WIN_DIST      := src-tauri/target/$(WIN_TRIPLE)/release/bundle/nsis
+
+# Cross-compile the Go sidecar for Windows amd64.
+# Pure Go (CGO_ENABLED=0), so no Windows toolchain needed on the host.
+.PHONY: windows-sidecar
+windows-sidecar:
+	@echo "Building wisper sidecar for $(WIN_TRIPLE)..."
+	@mkdir -p $(SIDECAR_DIR)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(WIN_SIDECAR) .
+	@echo "Sidecar ready: $(WIN_SIDECAR)"
+
+# Full pipeline: web → windows-sidecar → docker build image → docker run builds .exe.
+# The repo root is bind-mounted into the container so the tauri build output
+# lands directly back on the host. Host Rust toolchain is volume-mounted to
+# bypass the flaky static.rust-lang.org CDN.
+.PHONY: windows-installer
+windows-installer: web windows-sidecar
+	@echo "==> Building Docker image $(WIN_IMAGE)..."
+	DOCKER_BUILDKIT=1 docker build -t $(WIN_IMAGE) -f Dockerfile.windows .
+	@echo "==> Running container to build NSIS installer..."
+	@mkdir -p $(WIN_DIST)
+	docker run --rm \
+	  -v "$$PWD:/work" \
+	  -v "$$HOME/.rustup:/root/.rustup:ro" \
+	  -v "$$HOME/.cargo:/root/.cargo" \
+	  -v "$$HOME/.cache:/root/.cache" \
+	  $(WIN_IMAGE)
+	@echo "==> Windows installer ready:"
+	@ls -lh $(WIN_DIST)/*.exe 2>/dev/null || echo "  (no .exe found — check container logs)"
 
 # ----- Cross-platform Go binaries (no Tauri shell) -----
 

@@ -1,0 +1,99 @@
+# Dockerfile.windows — Docker image that provides the Windows NSIS toolchain
+# (makensis, lld, CMake, Node.js) for cross-compiling the Wisper Tauri 2 app
+# from a Linux host.
+#
+# Rust is NOT installed in this image — the host's Rust toolchain (~/.rustup,
+# ~/.cargo) is volume-mounted at runtime. This bypasses the flaky / blocked
+# static.rust-lang.org CDN and keeps the Docker image lean (~1 GB vs ~5 GB).
+#
+# Division of labor:
+#   host    → Rust 1.96.0 + cargo-xwin + Windows MSVC target (pre-built)
+#   host    → make web (Lit UI) + make windows-sidecar (Go .exe)
+#   image   → provides makensis + lld + node → npx tauri build
+#
+# Usage:
+#   make windows-installer
+#   # (which runs:)
+#   #   make web && make windows-sidecar
+#   #   docker build -t wisper-windows -f Dockerfile.windows .
+#   #   docker run --rm --user $(id -u):$(id -g) \
+#   #     -v $(pwd):/work -v ~/.rustup:/root/.rustup -v ~/.cargo:/root/.cargo \
+#   #     wisper-windows
+#   #   ls src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/
+
+# syntax=docker/dockerfile:1.7
+# BuildKit cache mounts for apt packages (Tuna mirror retries are resumable).
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+# ---- Tuna apt mirror (same as desktop) ----
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null \
+    || sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list
+
+# ---- Windows cross-build toolchain ----
+# NO webkit2gtk / gtk / soup / javascriptcore headers — a Windows MSVC target
+# doesn't link the Linux webview. The image stays ~hundreds of MB leaner.
+#   nsis        → makensis (Tauri invokes it to assemble the .exe installer)
+#   clang/lld   → cargo-xwin links Windows binaries via lld
+#   cmake       → build-scripts of some native crates linked against MSVC
+#   ayatana-appindicator3-dev → bundler panics (Can't detect any appindicator
+#                               library) without it, even on a Windows build,
+#                               because tray-icon is a Cargo feature.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get update && apt-get install -y --no-install-recommends \
+      nsis \
+      clang \
+      lld \
+      llvm \
+      cmake \
+      build-essential \
+      curl \
+      wget \
+      file \
+      pkg-config \
+      ca-certificates \
+      p7zip-full \
+      libayatana-appindicator3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- Node 22 (for the prebuilt tauri CLI) ----
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# npm China mirror (npmmirror).
+RUN npm config set registry https://registry.npmmirror.com
+
+# Rust toolchain path — the host's ~/.rustup and ~/.cargo are volume-mounted at
+# /root/.rustup and /root/.cargo at container runtime. The entrypoint script
+# creates a minimal cargo config pointing to the Tuna mirror if none exists,
+# then runs the tauri build.
+ENV PATH="/root/.cargo/bin:${PATH}" \
+    XWIN_ARCH=x86_64
+
+# Stub directories so the mount points exist (harmless if overmounted).
+RUN mkdir -p /root/.rustup /root/.cargo
+
+WORKDIR /work/src-tauri
+
+# Entrypoint: configure Tuna cargo mirror (if not already set by the host's
+# config.toml), then build the Windows NSIS installer.
+ENTRYPOINT ["/bin/bash", "-c", "\
+  set -e; \
+  echo '==> Verifying host Rust toolchain...'; \
+  rustc --version; \
+  cargo --version; \
+  echo 'cargo-xwin:' && cargo xwin --version 2>&1 || true; \
+  echo '==> Building Windows NSIS installer...'; \
+  npx --yes @tauri-apps/cli@latest build \
+    --runner cargo-xwin \
+    --target x86_64-pc-windows-msvc \
+    --bundles nsis; \
+  echo '==> Installer built:' && \
+  ls -lh /work/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/" \
+]

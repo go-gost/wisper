@@ -14,6 +14,7 @@ docs/
 src-tauri/target
 Dockerfile
 Dockerfile.desktop
+Dockerfile.windows
 build.sh
 Makefile
 *.md
