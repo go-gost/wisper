@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wisper</string>
+    <string name="notification_channel_name">Wisper Service</string>
+    <string name="notification_channel_description">Shows that Wisper is running tunnels in the background</string>
+    <string name="notification_running">Wisper running</string>
+    <string name="notification_stop">Stop</string>
+</resources>
