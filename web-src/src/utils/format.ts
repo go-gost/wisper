@@ -31,18 +31,17 @@ export function formatNumber(n: number): string {
 }
 
 /**
- * Format an ISO 8601 timestamp as "2026-01-02 15:04:05.000" in local time
- * with fixed 3-digit milliseconds — matches go-gost/inspector's fmtTime().
+ * Format an ISO 8601 timestamp as "2026-01-02 15:04:05" in local time.
  */
 export function formatTimestamp(iso: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   const pad = (n: number, w = 2) => String(n).padStart(w, '0');
-  const base =
+  return (
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  return `${base}.${pad(d.getMilliseconds(), 3)}`;
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
 }
 
 /**

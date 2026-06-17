@@ -235,10 +235,8 @@ linux-installer: web sidecar
 #
 # Prerequisites: Docker, Go 1.26+ on host (for `make web`).
 #
-# The entire go workspace (/home/gerry/code/go-gost) is volume-mounted into
-# the container so go.work module resolution (wisper → x) works unchanged.
-# The x module was already patched in-place (commit 81dc933) so no patch cycle
-# is needed at build time.
+# Wisper is mounted as /wisper; module resolution uses go.mod alone (no go.work).
+# The x module comes from the module cache as a versioned dependency (v0.11.0).
 #
 # Artifacts: android/app/build/outputs/apk/debug/app-debug.apk
 
@@ -252,11 +250,10 @@ android: web
 	@mkdir -p android/app/src/main/jniLibs/arm64-v8a
 	@mkdir -p android/app/src/main/jniLibs/x86_64
 	docker run --rm \
-		-v "$(PWD)/..:/go-gost" \
+		-v "$(PWD):/wisper" \
 		-v "$$(go env GOMODCACHE):/root/go/pkg/mod" \
 		-v "$$(go env GOCACHE):/root/.cache/go-build" \
-		-w /go-gost/wisper \
-		-e GOWORK=/go-gost/go.work \
+		-w /wisper \
 		$(ANDROID_IMAGE) sh -c '\
 		set -e; \
 		NDK_BIN="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"; \
@@ -314,16 +311,16 @@ android-test-smoke: android-test-image android
 		--security-opt seccomp=unconfined \
 		--security-opt apparmor=unconfined \
 		-d --name $(TEST_CONTAINER) \
-		-v "$(PWD):/go-gost/wisper" \
+		-v "$(PWD):/wisper" \
 		-v "$$HOME/.gradle:/root/.gradle" \
 		$(TEST_IMAGE) \
 		bash -c '\
 			set -e; \
 			/opt/start-emulator.sh; \
 			echo "=== Installing APK ==="; \
-			adb -s emulator-5554 install -r /go-gost/wisper/android/app/build/outputs/apk/debug/app-debug.apk; \
+			adb -s emulator-5554 install -r /wisper/android/app/build/outputs/apk/debug/app-debug.apk; \
 			echo "=== Running smoke tests ==="; \
-			cd /go-gost/wisper/android; \
+			cd /wisper/android; \
 			gradle connectedDebugAndroidTest \
 				-Pandroid.testInstrumentationRunnerArguments.class=run.gost.wisper.smoke.SmokeTestSuite \
 				--no-daemon; \
@@ -341,16 +338,16 @@ android-test-full: android-test-image android
 		--security-opt seccomp=unconfined \
 		--security-opt apparmor=unconfined \
 		-d --name $(TEST_CONTAINER) \
-		-v "$(PWD):/go-gost/wisper" \
+		-v "$(PWD):/wisper" \
 		-v "$$HOME/.gradle:/root/.gradle" \
 		$(TEST_IMAGE) \
 		bash -c '\
 			set -e; \
 			/opt/start-emulator.sh; \
 			echo "=== Installing APK ==="; \
-			adb -s emulator-5554 install -r /go-gost/wisper/android/app/build/outputs/apk/debug/app-debug.apk; \
+			adb -s emulator-5554 install -r /wisper/android/app/build/outputs/apk/debug/app-debug.apk; \
 			echo "=== Running full tests ==="; \
-			cd /go-gost/wisper/android; \
+			cd /wisper/android; \
 			gradle connectedDebugAndroidTest \
 				-Pandroid.testInstrumentationRunnerArguments.class=run.gost.wisper.full.FullTestSuite \
 				--no-daemon; \

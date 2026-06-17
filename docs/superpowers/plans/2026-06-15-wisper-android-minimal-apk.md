@@ -855,7 +855,6 @@ android: web
 		export CGO_ENABLED=1; \
 		export GOOS=android; \
 		export GOARCH=arm64; \
-		export GOWORK=/go-gost/go.work; \
 		go build -buildmode=c-shared -ldflags="-s -w" \
 			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
 		echo "--- Reverting x-module patch ---"; \

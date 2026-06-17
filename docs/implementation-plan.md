@@ -49,7 +49,7 @@ cd /config/workspace/go-gost/wisper
 go mod init github.com/go-gost/wisper
 ```
 
-依赖：`github.com/go-gost/x`, `github.com/go-gost/core`（从 go workspace 共享）
+依赖：`github.com/go-gost/x`, `github.com/go-gost/core`（版本化模块依赖）
 
 ## Phase 2：Flutter 项目骨架（1 周）
 

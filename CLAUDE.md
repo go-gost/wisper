@@ -94,7 +94,7 @@ Every tunnel type follows the same pattern:
 
 ### Key dependency: `github.com/go-gost/x`
 
-The `x` module (in the parent `go.work` workspace) provides concrete GOST implementations. Wisper uses:
+The `x` module (declared as a versioned module in `go.mod`) provides concrete GOST implementations. Wisper uses:
 - Listeners: `tcp`, `rtcp` (reverse-tcp), `rudp` (reverse-udp), `udp`
 - Handlers: `file`, `rtcp`, `tcp`, `udp`, `remote` (reverse-tunnel forwarder), `local` (entrypoint forwarder)
 - Chain/router/hop from `x/chain/`, `x/hop/`
