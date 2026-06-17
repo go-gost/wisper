@@ -24,9 +24,9 @@ export class RecordDetail extends LitElement {
       display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
       font-size: var(--font-sm);
     }
-    .meta-item { display: flex; justify-content: space-between; padding: 2px 0; }
-    .meta-label { color: var(--text-muted); }
-    .meta-value { font-family: var(--font-mono, 'SF Mono', monospace); }
+    .meta-item { display: flex; justify-content: space-between; padding: 2px 0; min-width: 0; }
+    .meta-label { color: var(--text-muted); flex-shrink: 0; margin-right: 8px; }
+    .meta-value { font-family: var(--font-mono, 'SF Mono', monospace); min-width: 0; word-break: break-word; text-align: right; }
     .uri-item { grid-column: 1 / -1; justify-content: flex-start; gap: 8px; }
     .uri-item .meta-label { flex-shrink: 0; }
     .uri-text { word-break: break-all; min-width: 0; flex: 1; }

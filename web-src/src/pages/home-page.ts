@@ -270,12 +270,17 @@ export class HomePage extends LitElement {
       background: var(--surface);
       color: var(--text);
       font-size: var(--font-sm);
+      line-height: 1;
       cursor: pointer;
       font-family: inherit;
       transition: background var(--transition-fast);
       display: inline-flex;
       align-items: center;
       gap: 4px;
+    }
+    .action-btn svg {
+      width: 14px;
+      height: 14px;
     }
 
     .action-btn:hover {
@@ -318,6 +323,7 @@ export class HomePage extends LitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 16px;
       padding: 8px 12px;
       border-bottom: 1px solid var(--border-subtle);
     }
@@ -328,6 +334,7 @@ export class HomePage extends LitElement {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 600;
+      flex-shrink: 0;
     }
     .detail-row .dval {
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -336,6 +343,12 @@ export class HomePage extends LitElement {
       display: flex;
       align-items: center;
       gap: 4px;
+      min-width: 0;
+    }
+    .dval-mono {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .detail-row.error {
       background: var(--red-bg);
@@ -682,6 +695,7 @@ export class HomePage extends LitElement {
                         .status=${item.data.status}
                         .endpoint=${item.data.endpoint}
                         .error=${item.data.error}
+                        .createdAt=${item.data.created_at}
                         .currentConns=${item.data.stats.current_conns}
                         .totalConns=${item.data.stats.total_conns}
                         .requestRate=${item.data.stats.request_rate}
@@ -701,7 +715,8 @@ export class HomePage extends LitElement {
                             <div class="detail-card">
                               <div class="detail-row">
                                 <span class="dlabel">${item.kind === 'tunnel' ? 'Entrypoint' : 'Endpoint'}</span>
-                                <span class="dval">${item.data.entrypoint}
+                                <span class="dval">
+                                  <span class="dval-mono">${item.data.entrypoint}</span>
                                   <button class="copy-btn-mini" @click=${async (e: Event) => { e.stopPropagation(); await copyToClipboard(item.data.entrypoint); this._showSnackbar(t('copiedToClipboard')); }}>
                                     ${icon('copy')}
                                   </button>
@@ -709,16 +724,16 @@ export class HomePage extends LitElement {
                               </div>
                               <div class="detail-row">
                                 <span class="dlabel">${item.kind === 'tunnel' ? 'Target' : 'Bind'}</span>
-                                <span class="dval">${item.data.endpoint}</span>
+                                <span class="dval"><span class="dval-mono">${item.data.endpoint}</span></span>
                               </div>
                               ${item.kind === 'tunnel' && (item.data as import('../api/types').Tunnel).options?.hostname
                                 ? html`<div class="detail-row">
                                   <span class="dlabel">Host Rewrite</span>
-                                  <span class="dval">${(item.data as import('../api/types').Tunnel).options.hostname}</span>
+                                  <span class="dval"><span class="dval-mono">${(item.data as import('../api/types').Tunnel).options.hostname}</span></span>
                                 </div>`
                                 : ''}
                               ${item.data.error
-                                ? html`<div class="detail-row error"><span class="dlabel">Error</span><span class="dval error-text">${item.data.error}</span></div>`
+                                ? html`<div class="detail-row error"><span class="dlabel">Error</span><span class="dval error-text"><span class="dval-mono">${item.data.error}</span></span></div>`
                                 : ''}
                             </div>
                             <div class="expand-actions">

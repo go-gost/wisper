@@ -57,6 +57,30 @@ export function formatDuration(ns: number): string {
 }
 
 /**
+ * Format an ISO timestamp as a compact relative time string (e.g. "3m", "2h", "5d", "1w").
+ * Returns empty string if the input is falsy or unparseable.
+ */
+export function formatRelativeTime(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const diffMs = Date.now() - d.getTime();
+  // Clamp negative diff (e.g. clock skew between server and browser) to 0.
+  if (diffMs < 0) return '0m';
+
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return '0m';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d`;
+  const week = Math.floor(day / 7);
+  return `${week}w`;
+}
+
+/**
  * Format HTTP headers (a map of name → values) into readable "Name: value" lines.
  * Accepts the `map[string][]string` shape serialized from Go's `http.Header`;
  * passes strings through unchanged so a raw header block also renders correctly.

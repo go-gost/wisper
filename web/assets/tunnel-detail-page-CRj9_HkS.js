@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CxHJT6AI.js","assets/index-B3f8Rhiy.css"])))=>i.map(i=>d[i]);
-import{a as g,s as _,g as w,j as e,_ as b,r as x,q as y,k as $,m as k,u as T,v as S,b as a,w as D,i as z,t as E}from"./index-CxHJT6AI.js";import{n as m,r}from"./state-CyDrhp3q.js";import{i as d}from"./app-scaffold-CeS-TNbp.js";import{c as C}from"./clipboard-C3x8_sid.js";import{b as c,f as v,a as f}from"./format-CsvuTgp2.js";var R=Object.defineProperty,F=Object.getOwnPropertyDescriptor,o=(t,s,l,i)=>{for(var p=i>1?void 0:i?F(s,l):s,h=t.length-1,u;h>=0;h--)(u=t[h])&&(p=(i?u(s,l,p):u(p))||p);return i&&p&&R(s,l,p),p};let n=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=s=>{this._endpoint=s,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=w().find(i=>i.id===t);l&&(this._tunnel=l,s?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this._showAuth&&(t.username=this._username.trim()||void 0,t.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-CxHJT6AI.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-CxHJT6AI.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.update(this.tunnelId,t)),this._showSnackbar(e("saved")),this.mode="view",await x())}catch(t){const s=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await C(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await T(this.tunnelId,this._resetKind),this._tunnel&&S(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,s=t?t.stats:null,l=this._typeLabel();return a`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BjP7QG1i.js","assets/index-B3f8Rhiy.css"])))=>i.map(i=>d[i]);
+import{a as g,s as _,g as w,j as e,_ as b,r as x,q as y,k as $,m as k,u as T,v as S,b as a,w as D,i as z,t as E}from"./index-BjP7QG1i.js";import{n as m,r}from"./state-DdAkAoFM.js";import{i as d}from"./app-scaffold-B1WBSxNu.js";import{c as C}from"./clipboard-C3x8_sid.js";import{c,d as R,a as v,b as f}from"./format-RWi2jW-K.js";var F=Object.defineProperty,L=Object.getOwnPropertyDescriptor,o=(t,s,l,i)=>{for(var p=i>1?void 0:i?L(s,l):s,h=t.length-1,u;h>=0;h--)(u=t[h])&&(p=(i?u(s,l,p):u(p))||p);return i&&p&&F(s,l,p),p};let n=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=s=>{this._endpoint=s,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=w().find(i=>i.id===t);l&&(this._tunnel=l,s?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this._showAuth&&(t.username=this._username.trim()||void 0,t.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-BjP7QG1i.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-BjP7QG1i.js").then(s=>s.F),__vite__mapDeps([0,1])).then(s=>s.update(this.tunnelId,t)),this._showSnackbar(e("saved")),this.mode="view",await x())}catch(t){const s=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await C(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await T(this.tunnelId,this._resetKind),this._tunnel&&S(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,s=t?t.stats:null,l=this._typeLabel();return a`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -39,6 +39,10 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,q as y,k as $,m as k,u as T,v a
                 <div class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value text">${l} Tunnel</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Created</span>
+                  <span class="info-value text">${R(t.created_at)}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Target</span>
@@ -164,15 +168,15 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,q as y,k as $,m as k,u as T,v a
                   </label>
                   <div class="dir-input-row">
                     <input class="form-input dir-input" .value=${this._endpoint}
-                      placeholder=${this.tunnelType==="http"?"http://localhost:3000":this.tunnelType==="file"?"/path/to/dir":"host:port"}
+                      placeholder=${this.tunnelType==="http"?"host:port":this.tunnelType==="file"?"/path/to/dir":"host:port"}
                       @input=${i=>{this._endpoint=i.target.value}}>
                     ${this.tunnelType==="file"&&this._isNativeDirPicker?a`<button type="button" class="browse-btn"
                           @click=${this._browseDir}>📁 ${e("browseDirectory")}</button>`:""}
                   </div>
                 </div>
 
-                <!-- Hostname (HTTP/File) -->
-                ${this.tunnelType==="http"||this.tunnelType==="file"?a`
+                <!-- Hostname (HTTP only) -->
+                ${this.tunnelType==="http"?a`
                     <div class="form-group">
                       <label class="form-label">${e("fieldHostname")}</label>
                       <input class="form-input" .value=${this._hostname} placeholder="example.com"
@@ -335,6 +339,10 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,q as y,k as $,m as k,u as T,v a
       background: var(--red);
       color: #fff;
     }
+    .pill-btn svg {
+      width: 14px;
+      height: 14px;
+    }
     .pill-btn:hover {
       opacity: 0.85;
     }
@@ -397,7 +405,7 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,q as y,k as $,m as k,u as T,v a
       align-items: center;
       padding: 10px 14px;
       border-bottom: 1px solid var(--border-subtle);
-      gap: 8px;
+      gap: 16px;
     }
     .info-row:last-child {
       border-bottom: none;
@@ -712,6 +720,11 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,q as y,k as $,m as k,u as T,v a
       align-items: center;
       justify-content: center;
       gap: 6px;
+      line-height: 1;
+    }
+    .btn-edit-bottom svg {
+      width: 14px;
+      height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
   `;o([m()],n.prototype,"tunnelType",2);o([m()],n.prototype,"tunnelId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_tunnel",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_hostname",2);o([r()],n.prototype,"_username",2);o([r()],n.prototype,"_password",2);o([r()],n.prototype,"_enableTLS",2);o([r()],n.prototype,"_rewriteHost",2);o([r()],n.prototype,"_fileUpload",2);o([r()],n.prototype,"_showAuth",2);n=o([E("tunnel-detail-page")],n);export{n as TunnelDetailPage};

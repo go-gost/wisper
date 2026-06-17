@@ -30,7 +30,7 @@ export class BodyViewer extends LitElement {
     }
     /* Hex columns are fixed-width; never wrap (scroll horizontally instead). */
     pre.hex { white-space: pre; word-break: normal; }
-    .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
     .copy-btn {
       font-size: var(--font-sm); padding: 2px 8px; cursor: pointer;
       background: var(--border-subtle); border: none; border-radius: 4px;

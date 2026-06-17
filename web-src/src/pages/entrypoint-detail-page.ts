@@ -5,7 +5,7 @@ import { icon } from '../utils/icons';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber } from '../utils/format';
+import { formatBytes, formatRate, formatNumber, formatTimestamp } from '../utils/format';
 import type { Entrypoint, EntrypointType } from '../api/types';
 import '../components/app-scaffold';
 
@@ -236,6 +236,7 @@ export class EntrypointDetailPage extends LitElement {
     }
     .pill-btn.primary { background: var(--accent); color: var(--accent-fg); }
     .pill-btn.danger { background: var(--red); color: #fff; }
+    .pill-btn svg { width: 14px; height: 14px; }
     .pill-btn:hover { opacity: 0.85; }
     .pill-btn.appbar-action { margin-left: auto; }
 
@@ -274,7 +275,7 @@ export class EntrypointDetailPage extends LitElement {
       display: flex; align-items: center;
       padding: 10px 14px;
       border-bottom: 1px solid var(--border-subtle);
-      gap: 8px;
+      gap: 16px;
     }
     .info-row:last-child { border-bottom: none; }
 
@@ -441,6 +442,11 @@ export class EntrypointDetailPage extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 6px;
+      line-height: 1;
+    }
+    .btn-edit-bottom svg {
+      width: 14px;
+      height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
   `;
@@ -500,6 +506,10 @@ export class EntrypointDetailPage extends LitElement {
                 <div class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value text">${typeLabel} Entrypoint</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Created</span>
+                  <span class="info-value text">${formatTimestamp(ep.created_at)}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>

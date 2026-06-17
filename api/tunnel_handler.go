@@ -84,7 +84,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		Entrypoint: t.Entrypoint(),
 		Status:     status,
 		Favorite:   t.IsFavorite(),
-		CreatedAt:  opts.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:  opts.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 		Error:      errMsg,
 		Options: tunnelOptionsResp{
 			Hostname:    opts.Hostname,

@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { formatBytes, formatRate } from '../utils/format';
+import { formatBytes, formatRate, formatRelativeTime } from '../utils/format';
 import { icon } from '../utils/icons';
 import type { ServiceStatus } from '../api/types';
 
@@ -33,6 +33,7 @@ export class TunnelCard extends LitElement {
   @property({ type: Number }) inputRate = 0;
   @property({ type: Number }) outputRate = 0;
 
+  @property() createdAt = '';
   @property({ type: Boolean }) expanded = false;
   @property({ type: Boolean }) compact = true;
 
@@ -46,7 +47,7 @@ export class TunnelCard extends LitElement {
 
     .row {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       padding: 8px 12px;
       background: var(--border-subtle);
       border-radius: var(--radius-sm);
@@ -70,6 +71,7 @@ export class TunnelCard extends LitElement {
       border-radius: 50%;
       flex-shrink: 0;
       background: var(--text-muted);
+      align-self: center;
     }
 
     .dot.running {
@@ -86,6 +88,10 @@ export class TunnelCard extends LitElement {
     .info {
       flex: 1;
       min-width: 0;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
 
     .name {
@@ -100,12 +106,27 @@ export class TunnelCard extends LitElement {
     .meta {
       font-size: var(--font-sm);
       color: var(--text-muted);
-      margin-top: 1px;
     }
 
-    /* ── Traffic column ── */
-    .traffic {
+    /* ── Right column: created-at + traffic ── */
+    .right-col {
       flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      min-width: 60px;
+    }
+
+    .created-at {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    /* ── Traffic stats ── */
+    .traffic {
       text-align: right;
       font-size: var(--font-sm);
       color: var(--text);
@@ -113,7 +134,6 @@ export class TunnelCard extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      min-width: 60px;
     }
 
     .traffic-row {
@@ -135,6 +155,11 @@ export class TunnelCard extends LitElement {
       transition: transform var(--transition-fast);
       display: flex;
       align-items: center;
+      justify-content: center;
+      align-self: stretch;
+      padding: 0 8px;
+      margin: -8px -12px;
+      margin-left: 0;
     }
 
     .chevron.open {
@@ -173,18 +198,21 @@ export class TunnelCard extends LitElement {
           <div class="meta">${this.meta}</div>
         </div>
 
-        ${this.status === 'running' ? html`
-          <div class="traffic">
-            <div class="traffic-row">
-              <span class="traffic-total">${formatBytes(this.inputBytes)}</span>
-              <span>↑ ${formatRate(this.inputRate)}</span>
+        <div class="right-col">
+          ${this.createdAt ? html`<span class="created-at">${formatRelativeTime(this.createdAt)}</span>` : ''}
+          ${this.status === 'running' ? html`
+            <div class="traffic">
+              <div class="traffic-row">
+                <span class="traffic-total">${formatBytes(this.inputBytes)}</span>
+                <span>↑ ${formatRate(this.inputRate)}</span>
+              </div>
+              <div class="traffic-row">
+                <span class="traffic-total">${formatBytes(this.outputBytes)}</span>
+                <span>↓ ${formatRate(this.outputRate)}</span>
+              </div>
             </div>
-            <div class="traffic-row">
-              <span class="traffic-total">${formatBytes(this.outputBytes)}</span>
-              <span>↓ ${formatRate(this.outputRate)}</span>
-            </div>
-          </div>
-        ` : ''}
+          ` : ''}
+        </div>
 
         <span class="chevron ${this.expanded ? 'open' : ''}" @click=${this._onChevronClick}>
           ${icon('chevron-right')}
