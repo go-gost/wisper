@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
                 "Could not resolve directory path — using URI",
                 Toast.LENGTH_SHORT
             ).show()
-            return uri.toString() ?: "/"
+            return uri.toString()
         }
     }
 
