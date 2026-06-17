@@ -141,6 +141,8 @@ class MainActivity : AppCompatActivity() {
             )
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
 
             // Dark content algorithmic darkening (API 33+) — helps
             // with pages that don't natively support dark mode.

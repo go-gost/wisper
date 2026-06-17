@@ -15,11 +15,11 @@ import { html, svg, type TemplateResult } from 'lit';
 export function icon(name: string): TemplateResult {
   const inner = ICON_PATHS[name];
   if (!inner) {
-    return html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none"></svg>`;
+    return html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none"></svg>`;
   }
   return html`<svg
-    width="16"
-    height="16"
+    width="20"
+    height="20"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
