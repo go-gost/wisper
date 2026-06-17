@@ -47,6 +47,7 @@ const zh: Record<string, string> = {
   fieldUsername: '用户名',
   fieldPassword: '密码',
   fieldDirectory: '目录',
+  browseDirectory: '浏览',
   fieldTTL: 'TTL',
   fieldTTLHint: '例如 30s',
 

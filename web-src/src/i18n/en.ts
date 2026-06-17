@@ -47,6 +47,7 @@ const en: Record<string, string> = {
   fieldUsername: 'Username',
   fieldPassword: 'Password',
   fieldDirectory: 'Directory',
+  browseDirectory: 'Browse',
   fieldTTL: 'TTL',
   fieldTTLHint: 'e.g. 30s',
 
