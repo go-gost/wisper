@@ -281,9 +281,9 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !t.IsClosed() {
-		// A tunnel that failed to start (Run returned error) is not closed,
-		// but also not running — it's stuck. Close it to allow restart.
-		if t.Err() != nil {
+		// A tunnel that failed (Run() error or service.StateFailed) is not
+		// closed, but also not running — it's stuck. Close it to allow restart.
+		if t.Err() != nil || tunnel.IsServiceFailed(t) {
 			t.Close()
 		} else {
 			writeError(w, http.StatusConflict, "tunnel already running")
