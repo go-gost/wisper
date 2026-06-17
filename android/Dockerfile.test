@@ -1,0 +1,96 @@
+# Docker image for Android automated testing.
+# Extends wisper-android with x86_64 emulator for headless testing.
+#
+# Build:  docker build -t wisper-android-test -f android/Dockerfile.test android/
+#
+# Pre-requisite: download test assets first with:
+#   ./scripts/download-test-assets.sh   (or place zips in test-assets/ manually)
+#
+# The wisper-android base image already provides:
+#   - Go 1.26, Gradle 8.5, Android SDK 34, NDK r27b
+#   - $ANDROID_SDK_ROOT at /opt/android-sdk
+
+FROM wisper-android
+
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+
+# ── Emulator runtime dependencies ────────────────────────────────────────
+# The emulator links against libpulse, libX11, and friends for GL/audio even
+# in headless mode.  The base ubuntu:24.04 doesn't include these.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpulse0 libx11-6 libxcb1 libxau6 libxdmcp6 \
+    libegl1 libgl1 libgl1-mesa-dri \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Emulator binary (~258 MB) ────────────────────────────────────────────
+# Zip layout: emulator/* → goes to ${ANDROID_SDK_ROOT}/
+COPY test-assets/emulator-linux_x64.zip /tmp/
+RUN unzip -q /tmp/emulator-linux_x64.zip -d ${ANDROID_SDK_ROOT} \
+    && rm /tmp/emulator-linux_x64.zip \
+    && chmod +x ${ANDROID_SDK_ROOT}/emulator/emulator \
+    && ls -la ${ANDROID_SDK_ROOT}/emulator/emulator \
+    && echo "=== Emulator binary installed ==="
+
+# ── System image (~1.5 GB) ───────────────────────────────────────────────
+# Zip layout: x86_64/* → goes to system-images/android-34/google_apis/
+COPY test-assets/x86_64-34.zip /tmp/
+RUN mkdir -p ${ANDROID_SDK_ROOT}/system-images/android-34/google_apis \
+    && unzip -q /tmp/x86_64-34.zip -d ${ANDROID_SDK_ROOT}/system-images/android-34/google_apis \
+    && rm /tmp/x86_64-34.zip
+
+# ── Validate system image ─────────────────────────────────────────────────
+RUN ls ${ANDROID_SDK_ROOT}/system-images/android-34/google_apis/x86_64/system.img \
+    && echo "=== System image OK ($(du -h ${ANDROID_SDK_ROOT}/system-images/android-34/google_apis/x86_64/system.img | cut -f1)) ==="
+
+# ── Create AVD manually (avoids avdmanager package.xml parsing) ──────────
+# avdmanager is extremely picky about package.xml format and we installed
+# packages via zip.  An AVD is just a directory with config files + symlinks.
+RUN mkdir -p /root/.android/avd/test_avd.avd \
+    && echo "avd.ini.encoding=UTF-8" > /root/.android/avd/test_avd.ini \
+    && echo "path=/root/.android/avd/test_avd.avd" >> /root/.android/avd/test_avd.ini \
+    && echo "path.rel=avd/test_avd.avd" >> /root/.android/avd/test_avd.ini \
+    && echo "target=android-34" >> /root/.android/avd/test_avd.ini \
+    && cd /root/.android/avd/test_avd.avd \
+    && echo 'PlayStore.enabled=false' > config.ini \
+    && echo 'abi.type=x86_64' >> config.ini \
+    && echo 'avd.ini.encoding=UTF-8' >> config.ini \
+    && echo 'hw.accelerometer=yes' >> config.ini \
+    && echo 'hw.audioInput=yes' >> config.ini \
+    && echo 'hw.audioOutput=yes' >> config.ini \
+    && echo 'hw.battery=yes' >> config.ini \
+    && echo 'hw.cpu.arch=x86_64' >> config.ini \
+    && echo 'hw.cpu.ncore=4' >> config.ini \
+    && echo 'hw.dPad=no' >> config.ini \
+    && echo 'hw.device.hash2=MD5:524882cfa641b4cd6b85e1a8b28bfc7f' >> config.ini \
+    && echo 'hw.device.manufacturer=Google' >> config.ini \
+    && echo 'hw.device.name=pixel_6' >> config.ini \
+    && echo 'hw.gps=yes' >> config.ini \
+    && echo 'hw.gpu.enabled=yes' >> config.ini \
+    && echo 'hw.gpu.mode=host' >> config.ini \
+    && echo 'hw.initialOrientation=portrait' >> config.ini \
+    && echo 'hw.keyboard=yes' >> config.ini \
+    && echo 'hw.lcd.density=420' >> config.ini \
+    && echo 'hw.lcd.height=2400' >> config.ini \
+    && echo 'hw.lcd.width=1080' >> config.ini \
+    && echo 'hw.mainKeys=no' >> config.ini \
+    && echo 'hw.ramSize=2048' >> config.ini \
+    && echo 'hw.sdCard=yes' >> config.ini \
+    && echo 'hw.sensors.orientation=yes' >> config.ini \
+    && echo 'hw.sensors.proximity=yes' >> config.ini \
+    && echo 'hw.trackBall=no' >> config.ini \
+    && echo 'image.sysdir.1=system-images/android-34/google_apis/x86_64/' >> config.ini \
+    && echo 'tag.display=Google APIs' >> config.ini \
+    && echo 'tag.id=google_apis' >> config.ini \
+    && echo 'vm.heapSize=256' >> config.ini \
+    && echo "System image files will be symlinked at runtime" \
+    && ls ${ANDROID_SDK_ROOT}/system-images/android-34/google_apis/x86_64/system.img \
+    && echo "=== AVD created manually ==="
+
+# ── Override AVD config with test-specific settings ──────────────────────
+COPY scripts/avd_config.ini /root/.android/avd/test_avd.avd/config.ini
+
+# ── Startup script ───────────────────────────────────────────────────────
+COPY scripts/start-emulator.sh /opt/start-emulator.sh
+RUN chmod +x /opt/start-emulator.sh
+
+WORKDIR /go-gost

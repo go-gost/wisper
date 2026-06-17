@@ -13,13 +13,21 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
         }
+        debug {
+            // Ensure debug APK is used for connectedCheck
+            isDebuggable = true
+        }
     }
+
+    testBuildType = "debug"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -40,4 +48,10 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
+
+    // ── Instrumentation tests ──────────────────────────────────────────
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.2.0")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
 }

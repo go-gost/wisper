@@ -277,8 +277,12 @@ Go 交叉编译到 `android/amd64` 只需改 `GOARCH=amd64` + 换 x86_64 NDK 编
 ## 7. Known Limitations
 
 1. **KVM 必须可用** — `/dev/kvm` 透传到容器。没有 KVM 模拟器会极慢（>10min boot），不适合自动化。
-2. **WebView 版本差异** — 模拟器的 WebView 与 Pixel 9 可能不同。P0 层的 crash 检查覆盖性不受影响，但 UI 渲染差异不在本 scope 内。
-3. **Full suite 依赖 Lit SPA 的语义化 DOM** — UIAutomator 通过 text/label 定位元素，需要 WebView contentDescription 或 DOM label 正确映射到 Accessibility Tree。
+2. **Kernel Compatibility** — Android emulator QEMU (build 15507667, emulator 36.6.11) crashes on Linux 7.0+ kernels due to memory mapping incompatibility (`cannnot unmap ptr` in protected range). The emulator requires Linux 6.x kernel. When a compatible kernel is available, boot takes ~30s with KVM.
+3. **Docker security opts required** — Container must run with `--security-opt seccomp=unconfined --security-opt apparmor=unconfined` or KVM ioctls are blocked by the default seccomp profile.
+4. **Hang detection must be disabled** — Set `ANDROID_EMU_DISABLE_HANG_DETECTION=1` or the emulator watchdog kills QEMU prematurely (a known issue with some CPU models).
+5. **WebView 版本差异** — 模拟器的 WebView 与 Pixel 9 可能不同。P0 层的 crash 检查覆盖性不受影响，但 UI 渲染差异不在本 scope 内。
+6. **Full suite 依赖 Lit SPA 的语义化 DOM** — UIAutomator 通过 text/label 定位元素，需要 WebView contentDescription 或 DOM label 正确映射到 Accessibility Tree。
+7. **Single-core emulator** — Multi-core KVM (4 cores) causes thread hangs. Current workaround: `-cores 1`.
 
 ## 7. Build Impact
 
@@ -287,7 +291,27 @@ Go 交叉编译到 `android/amd64` 只需改 `GOARCH=amd64` + 换 x86_64 NDK 编
 - 签名：debug APK 即可，不引入 release signing
 - 产物大小：`wisper-android-test` 镜像约 8GB
 
-## 8. CI Integration (Future)
+## 8. Docker Run Configuration
+
+The working `docker run` configuration for kernel 6.x hosts:
+
+```bash
+docker run --rm --privileged \
+    --security-opt seccomp=unconfined \
+    --security-opt apparmor=unconfined \
+    -v "$(pwd):/go-gost/wisper" \
+    -v "${HOME}/.gradle:/root/.gradle" \
+    wisper-android-test bash -c '
+        /opt/start-emulator.sh
+        adb -s emulator-5554 install -r /go-gost/wisper/android/app/build/outputs/apk/debug/app-debug.apk
+        cd /go-gost/wisper/android
+        gradle connectedDebugAndroidTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=run.gost.wisper.smoke.SmokeTestSuite \
+            --no-daemon
+    '
+```
+
+## 9. CI Integration (Future)
 
 当前先手动 `make android-test-smoke`。后续 CI 集成（GitHub Actions runner 上启用 KVM）：
 
@@ -296,7 +320,7 @@ Go 交叉编译到 `android/amd64` 只需改 `GOARCH=amd64` + 换 x86_64 NDK 编
   run: make android-test-smoke
 ```
 
-runner 需要 `ubuntu-latest` + KVM enabled group。
+runner 需要 `ubuntu-latest` + KVM enabled group + Linux 6.x kernel.
 
 ---
 
@@ -305,3 +329,4 @@ runner 需要 `ubuntu-latest` + KVM enabled group。
 | Date | Change |
 |------|--------|
 | 2026-06-16 | Initial spec approved |
+| 2026-06-17 | Implemented: dual-arch APK, Dockerfile.test, smoke/full test suites, Makefile targets. Discovered kernel 7.0 incompatibility with emulator QEMU |

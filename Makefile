@@ -26,7 +26,7 @@ SIDECAR_DIR   := src-tauri/binaries
 SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
-.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer android-test-image android-test-smoke android-test-full android-test-stop
 
 all: linux darwin windows
 
@@ -248,8 +248,9 @@ ANDROID_IMAGE := wisper-android
 android: web
 	@echo "==> Building Docker image $(ANDROID_IMAGE)..."
 	DOCKER_BUILDKIT=1 docker build -t $(ANDROID_IMAGE) -f android/Dockerfile.android android/
-	@echo "==> Cross-compiling libwisper.so + assembling APK..."
+	@echo "==> Cross-compiling libwisper.so (arm64 + x86_64) + assembling APK..."
 	@mkdir -p android/app/src/main/jniLibs/arm64-v8a
+	@mkdir -p android/app/src/main/jniLibs/x86_64
 	docker run --rm \
 		-v "$(PWD)/..:/go-gost" \
 		-v "$$(go env GOMODCACHE):/root/go/pkg/mod" \
@@ -258,25 +259,112 @@ android: web
 		-e GOWORK=/go-gost/go.work \
 		$(ANDROID_IMAGE) sh -c '\
 		set -e; \
-		CC="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"; \
-		CXX="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++"; \
-		export CC CXX; \
-		export CGO_ENABLED=1; \
-		export GOOS=android; \
-		export GOARCH=arm64; \
+		NDK_BIN="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"; \
 		echo "--- Copying JNI bridge into package root ---"; \
 		cp android/lib_jni.c .; \
 		echo "--- Cross-compiling libwisper.so (arm64-v8a) ---"; \
+		export CC="$$NDK_BIN/aarch64-linux-android24-clang"; \
+		export CXX="$$NDK_BIN/aarch64-linux-android24-clang++"; \
+		export CGO_ENABLED=1; \
+		export GOOS=android; \
+		export GOARCH=arm64; \
 		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
 			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
+		echo "--- libwisper.so (arm64): $$(wc -c < android/app/src/main/jniLibs/arm64-v8a/libwisper.so) bytes ---"; \
+		echo "--- Cross-compiling libwisper.so (x86_64) ---"; \
+		export CC="$$NDK_BIN/x86_64-linux-android24-clang"; \
+		export CXX="$$NDK_BIN/x86_64-linux-android24-clang++"; \
+		export GOARCH=amd64; \
+		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+			-o android/app/src/main/jniLibs/x86_64/libwisper.so .; \
+		echo "--- libwisper.so (x86_64): $$(wc -c < android/app/src/main/jniLibs/x86_64/libwisper.so) bytes ---"; \
 		rm -f lib_jni.c; \
-		echo "--- libwisper.so: $$(wc -c < android/app/src/main/jniLibs/arm64-v8a/libwisper.so) bytes ---"; \
 		echo "--- Assembling APK with Gradle ---"; \
 		cd android; \
 		gradle assembleDebug --no-daemon; \
 		'
 	@echo "==> APK ready:"
 	@ls -lh android/app/build/outputs/apk/debug/*.apk 2>/dev/null || echo "  (no .apk found — check container logs)"
+
+# ----- Android Automated Tests (Docker + Emulator) -----
+# Prerequisites: Docker, /dev/kvm available on host.
+#
+#   make android-test-smoke  — smoke suite (< 90s target)
+#   make android-test-full   — full suite (< 5 min target)
+#   make android-test-stop   — stop & remove test container
+#
+# The test pipeline:
+#   1. Build wisper-android-test image (FROM wisper-android + emulator + AVD)
+#   2. Launch container with --privileged (needs KVM)
+#   3. Boot headless emulator → wait for boot
+#   4. Install APK → run connectedCheck → output report
+
+TEST_CONTAINER := wisper-android-test-container
+TEST_IMAGE     := wisper-android-test
+
+.PHONY: android-test-image
+android-test-image:
+	@echo "==> Building Docker image $(TEST_IMAGE)..."
+	DOCKER_BUILDKIT=1 docker build -t $(TEST_IMAGE) -f android/Dockerfile.test android/
+
+.PHONY: android-test-smoke
+android-test-smoke: android-test-image android
+	@echo "==> Starting test container for SMOKE suite..."
+	docker run --rm --privileged \
+		--security-opt seccomp=unconfined \
+		--security-opt apparmor=unconfined \
+		-d --name $(TEST_CONTAINER) \
+		-v "$(PWD):/go-gost/wisper" \
+		-v "$$HOME/.gradle:/root/.gradle" \
+		$(TEST_IMAGE) \
+		bash -c '\
+			set -e; \
+			/opt/start-emulator.sh; \
+			echo "=== Installing APK ==="; \
+			adb -s emulator-5554 install -r /go-gost/wisper/android/app/build/outputs/apk/debug/app-debug.apk; \
+			echo "=== Running smoke tests ==="; \
+			cd /go-gost/wisper/android; \
+			gradle connectedDebugAndroidTest \
+				-Pandroid.testInstrumentationRunnerArguments.class=run.gost.wisper.smoke.SmokeTestSuite \
+				--no-daemon; \
+			echo "=== Tests complete ==="; \
+		'
+	@echo "==> Waiting for tests (docker logs -f $(TEST_CONTAINER))..."
+	docker logs -f $(TEST_CONTAINER)
+	@echo ""
+	@echo "==> Test report: android/app/build/reports/androidTests/connected/"
+
+.PHONY: android-test-full
+android-test-full: android-test-image android
+	@echo "==> Starting test container for FULL suite..."
+	docker run --rm --privileged \
+		--security-opt seccomp=unconfined \
+		--security-opt apparmor=unconfined \
+		-d --name $(TEST_CONTAINER) \
+		-v "$(PWD):/go-gost/wisper" \
+		-v "$$HOME/.gradle:/root/.gradle" \
+		$(TEST_IMAGE) \
+		bash -c '\
+			set -e; \
+			/opt/start-emulator.sh; \
+			echo "=== Installing APK ==="; \
+			adb -s emulator-5554 install -r /go-gost/wisper/android/app/build/outputs/apk/debug/app-debug.apk; \
+			echo "=== Running full tests ==="; \
+			cd /go-gost/wisper/android; \
+			gradle connectedDebugAndroidTest \
+				-Pandroid.testInstrumentationRunnerArguments.class=run.gost.wisper.full.FullTestSuite \
+				--no-daemon; \
+			echo "=== Tests complete ==="; \
+		'
+	@echo "==> Waiting for tests (docker logs -f $(TEST_CONTAINER))..."
+	docker logs -f $(TEST_CONTAINER)
+	@echo ""
+	@echo "==> Test report: android/app/build/reports/androidTests/connected/"
+
+.PHONY: android-test-stop
+android-test-stop:
+	docker stop $(TEST_CONTAINER) 2>/dev/null || true
+	docker rm $(TEST_CONTAINER) 2>/dev/null || true
 
 # ----- Clean -----
 clean:
