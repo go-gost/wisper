@@ -59,16 +59,21 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	s := t.Stats()
 	bl := t.StatsBaseline()
 	status := "stopped"
-	errMsg := errStr(t.Err())
+	errMsg := ""
 	if !t.IsClosed() {
-		if t.Err() != nil || tunnel.IsServiceFailed(t) {
+		if tunnel.IsServiceFailed(t) {
 			status = "error"
+			errMsg = tunnel.ServiceErrorMessage(t)
+			// Fall back to Err() if the service-level error is empty.
 			if errMsg == "" {
-				errMsg = tunnel.ServiceErrorMessage(t)
+				errMsg = errStr(t.Err())
 			}
 		} else {
 			status = "running"
 		}
+	} else if t.Err() != nil {
+		// Closed tunnel with a recorded failure — preserve the error for display.
+		errMsg = errStr(t.Err())
 	}
 
 	return tunnelResponse{

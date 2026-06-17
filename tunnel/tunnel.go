@@ -408,8 +408,8 @@ func LoadConfig() {
 
 		if cfg.Closed {
 			tun.Close()
-		} else {
-			tun.Run()
+		} else if err := tun.Run(); err != nil {
+			tun.Close()
 		}
 
 		tun.Favorite(cfg.Favorite)

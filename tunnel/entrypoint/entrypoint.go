@@ -196,8 +196,8 @@ func LoadConfig() {
 
 		if cfg.Closed {
 			ep.Close()
-		} else {
-			ep.Run()
+		} else if err := ep.Run(); err != nil {
+			ep.Close()
 		}
 
 		ep.Favorite(cfg.Favorite)
