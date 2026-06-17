@@ -38,6 +38,7 @@ import android.app.Activity
 import android.provider.DocumentsContract
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -72,8 +73,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             val path = resolveDocumentTreeUri(uri)
-            val escaped = path.replace("\\", "\\\\").replace("'", "\\'")
-            webView.evaluateJavascript("$callback('$escaped')", null)
+            val escaped = JSONObject.quote(path)
+            webView.evaluateJavascript("$callback($escaped)", null)
         }
 
     private fun resolveDocumentTreeUri(uri: android.net.Uri): String {
