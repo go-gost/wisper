@@ -142,11 +142,9 @@ export class TunnelCard extends LitElement {
 
     /* ── Error ── */
     .error-banner {
-      margin: 0 16px 8px 34px;
-      padding: 6px 10px;
+      padding: 5px 14px 5px 34px;
       background: var(--red-bg);
-      border: 1px solid var(--red-border);
-      border-radius: var(--radius-sm);
+      border-bottom: 1px solid var(--border-subtle);
       font-size: var(--font-sm);
       color: var(--red-text);
     }
