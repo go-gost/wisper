@@ -34,6 +34,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import android.app.Activity
+import android.provider.DocumentsContract
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : AppCompatActivity() {
 
@@ -41,6 +45,59 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_NOTIFICATIONS = 1
         private const val REQUEST_STORAGE = 2
         private const val BACKEND_URL = "http://127.0.0.1:8900"
+    }
+
+    // ── Directory picker ─────────────────────────────────────────────────
+    private var pendingDirCallback: String? = null
+
+    private val dirPickerLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val callback = pendingDirCallback ?: return@registerForActivityResult
+            pendingDirCallback = null
+
+            if (result.resultCode != Activity.RESULT_OK || result.data == null) {
+                return@registerForActivityResult
+            }
+
+            val uri = result.data?.data ?: return@registerForActivityResult
+
+            // Take persistable read permission
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {
+                // Some providers don't support persistable permissions
+            }
+
+            val path = resolveDocumentTreeUri(uri)
+            val escaped = path.replace("\\", "\\\\").replace("'", "\\'")
+            webView.evaluateJavascript("$callback('$escaped')", null)
+        }
+
+    private fun resolveDocumentTreeUri(uri: android.net.Uri): String {
+        try {
+            val docId = DocumentsContract.getTreeDocumentId(uri)
+            val parts = docId.split(":", limit = 2)
+            val volume = parts[0]
+            val relativePath = if (parts.size > 1) parts[1] else ""
+
+            val root = if (volume.equals("primary", ignoreCase = true)) {
+                android.os.Environment.getExternalStorageDirectory().absolutePath
+            } else {
+                "/storage/$volume"
+            }
+
+            return if (relativePath.isEmpty()) root else "$root/$relativePath"
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "Could not resolve directory path — using URI",
+                Toast.LENGTH_SHORT
+            ).show()
+            return uri.toString() ?: "/"
+        }
     }
 
     // ── Views ──────────────────────────────────────────────────────────
@@ -92,6 +149,9 @@ class MainActivity : AppCompatActivity() {
 
             webViewClient = WisperWebViewClient()
         }
+
+        // Register native bridge for directory picker
+        webView.addJavascriptInterface(JsBridge(), "WisperNative")
 
         progressBar = ProgressBar(this).apply {
             isIndeterminate = true
@@ -340,6 +400,31 @@ class MainActivity : AppCompatActivity() {
                 errorCode == WebViewClient.ERROR_HOST_LOOKUP
             ) {
                 showError("Connection refused — wait for backend or tap Retry")
+            }
+        }
+    }
+
+    // ── JavaScript Bridge ──────────────────────────────────────────────
+    private inner class JsBridge {
+        @android.webkit.JavascriptInterface
+        fun pickDir(callbackId: String) {
+            runOnUiThread {
+                pendingDirCallback = callbackId
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                    addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    )
+                }
+                try {
+                    dirPickerLauncher.launch(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Could not open directory picker",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
