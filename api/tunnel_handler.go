@@ -281,8 +281,14 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !t.IsClosed() {
-		writeError(w, http.StatusConflict, "tunnel already running")
-		return
+		// A tunnel that failed to start (Run returned error) is not closed,
+		// but also not running — it's stuck. Close it to allow restart.
+		if t.Err() != nil {
+			t.Close()
+		} else {
+			writeError(w, http.StatusConflict, "tunnel already running")
+			return
+		}
 	}
 
 	// Recreate and start

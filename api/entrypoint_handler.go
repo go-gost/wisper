@@ -164,8 +164,14 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !ep.IsClosed() {
-		writeError(w, http.StatusConflict, "entrypoint already running")
-		return
+		// An entrypoint that failed to start (Run returned error) is not closed,
+		// but also not running — it's stuck. Close it to allow restart.
+		if ep.Err() != nil {
+			ep.Close()
+		} else {
+			writeError(w, http.StatusConflict, "entrypoint already running")
+			return
+		}
 	}
 
 	// Recreate and start

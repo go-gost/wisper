@@ -107,7 +107,9 @@ export async function toggleFavorite(id: string): Promise<void> {
 /** Apply stats snapshot to tunnel list (called by stats store every 1s). */
 export function applyStats(statsList: Tunnel[]): void {
   for (const s of statsList) {
-    tunnels = tunnels.map(t => (t.id === s.id ? { ...t, stats: s.stats, status: s.status } : t));
+    tunnels = tunnels.map(t =>
+      t.id === s.id ? { ...t, stats: s.stats, status: s.status, error: s.error } : t,
+    );
   }
   notify();
 }
