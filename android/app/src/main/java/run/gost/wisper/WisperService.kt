@@ -5,16 +5,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
-import androidx.core.content.ContextCompat
 
 class WisperService : Service() {
 
@@ -22,7 +18,6 @@ class WisperService : Service() {
         private const val TAG = "WisperService"
         private const val CHANNEL_ID = "wisper_foreground"
         private const val NOTIFICATION_ID = 1
-        private const val ACTION_STOP = "run.gost.wisper.action.STOP"
     }
 
     // ---------------------------------------------------------------
@@ -43,16 +38,6 @@ class WisperService : Service() {
         private set
 
     // ---------------------------------------------------------------
-    // Stop-action broadcast receiver
-    // ---------------------------------------------------------------
-    private val stopReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            Log.i(TAG, "Stop action received; shutting down")
-            stopSelf()
-        }
-    }
-
-    // ---------------------------------------------------------------
     // Lifecycle
     // ---------------------------------------------------------------
     override fun onCreate() {
@@ -60,12 +45,6 @@ class WisperService : Service() {
         Log.i(TAG, "onCreate")
 
         createNotificationChannel()
-
-        // Register stop receiver. ContextCompat handles the API 33+ flag.
-        ContextCompat.registerReceiver(
-            this, stopReceiver, IntentFilter(ACTION_STOP),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
 
         // Start Go backend. The listen() call happens synchronously inside
         // wisperStartGo, so by the time it returns the port is open.
@@ -103,11 +82,6 @@ class WisperService : Service() {
 
     override fun onDestroy() {
         Log.i(TAG, "onDestroy")
-        try {
-            unregisterReceiver(stopReceiver)
-        } catch (e: Exception) {
-            Log.w(TAG, "unregisterReceiver failed", e)
-        }
         releaseWakeLock()
         WisperJNI.stop()
         super.onDestroy()
@@ -145,14 +119,7 @@ class WisperService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Stop action → broadcast to internal receiver
-        val stopIntent = Intent(ACTION_STOP)
-        val stopPendingIntent = PendingIntent.getBroadcast(
-            this, 0, stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val builder = Notification.Builder(this, CHANNEL_ID)
+        return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_running))
             .setContentText(getString(R.string.app_name))
             .setSmallIcon(R.drawable.ic_notification)
@@ -160,16 +127,7 @@ class WisperService : Service() {
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setColor(getColor(android.R.color.holo_blue_dark))
-
-        // Add stop action
-        val stopAction = Notification.Action.Builder(
-                android.R.drawable.ic_media_pause,
-                getString(R.string.notification_stop),
-                stopPendingIntent
-            ).build()
-        builder.addAction(stopAction)
-
-        return builder.build()
+            .build()
     }
 
     // ---------------------------------------------------------------

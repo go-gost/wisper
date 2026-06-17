@@ -8,9 +8,12 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.IBinder
+import android.provider.Settings
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
@@ -36,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_NOTIFICATIONS = 1
+        private const val REQUEST_STORAGE = 2
         private const val BACKEND_URL = "http://127.0.0.1:8900"
     }
 
@@ -134,11 +138,11 @@ class MainActivity : AppCompatActivity() {
                     arrayOf(Manifest.permission.POST_NOTIFICATIONS),
                     REQUEST_NOTIFICATIONS
                 )
-                return // onRequestPermissionsResult will start the service
+                return // onRequestPermissionsResult will proceed
             }
         }
 
-        startWisperService()
+        checkStorageThenStart()
     }
 
     override fun onDestroy() {
@@ -153,8 +157,15 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_NOTIFICATIONS) {
-            startWisperService()
+        when (requestCode) {
+            REQUEST_NOTIFICATIONS -> {
+                checkStorageThenStart()
+            }
+            REQUEST_STORAGE -> {
+                // Start service regardless of grant result —
+                // the File tunnel simply won't work for external paths.
+                startWisperService()
+            }
         }
     }
 
@@ -196,6 +207,41 @@ class MainActivity : AppCompatActivity() {
             startService(intent)
         }
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    // ── Storage permission ──────────────────────────────────────────────
+    private fun checkStorageThenStart() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+: MANAGE_EXTERNAL_STORAGE is required for broad
+            // file access. Direct the user to system settings.
+            if (!Environment.isExternalStorageManager()) {
+                Toast.makeText(
+                    this,
+                    "File tunnel needs storage access. Enable \"All files access\" in Settings.",
+                    Toast.LENGTH_LONG
+                ).show()
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            }
+        } else {
+            // Android 10 and below: request READ/WRITE_EXTERNAL_STORAGE.
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ),
+                    REQUEST_STORAGE
+                )
+                return // onRequestPermissionsResult will start the service
+            }
+        }
+        startWisperService()
     }
 
     // ── Error UI ───────────────────────────────────────────────────────
