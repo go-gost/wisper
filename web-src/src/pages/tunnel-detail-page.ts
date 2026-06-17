@@ -38,6 +38,21 @@ export class TunnelDetailPage extends LitElement {
   @state() private _fileUpload = false;
   @state() private _showAuth = false;
 
+  // Native bridge detection
+  private get _isNativeDirPicker(): boolean {
+    return !!(window as any).WisperNative?.pickDir;
+  }
+
+  private _browseDir() {
+    const cbName = '__wisper_dir_callback__';
+    (window as any)[cbName] = (path: string) => {
+      this._endpoint = path;
+      this.requestUpdate();
+      delete (window as any)[cbName];
+    };
+    (window as any).WisperNative.pickDir(cbName);
+  }
+
   private _unsubs: (() => void)[] = [];
 
   // ── Lifecycle ────────────────────────────────────────────────────────
@@ -503,6 +518,32 @@ export class TunnelDetailPage extends LitElement {
       color: var(--text-muted);
     }
 
+    /* ── Directory picker ── */
+    .dir-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .dir-input {
+      flex: 1;
+    }
+    .browse-btn {
+      white-space: nowrap;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      color: var(--text);
+      font-size: var(--font-sm);
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+    .browse-btn:hover {
+      background: var(--border-subtle);
+      border-color: var(--accent);
+    }
+
     /* ── Switch ── */
     .switch-row {
       display: flex;
@@ -858,9 +899,15 @@ export class TunnelDetailPage extends LitElement {
                   <label class="form-label">
                     ${this.tunnelType === 'file' ? t('fieldDirectory') : t('fieldEndpoint')}
                   </label>
-                  <input class="form-input" .value=${this._endpoint}
-                    placeholder=${this.tunnelType === 'http' ? 'http://localhost:3000' : this.tunnelType === 'file' ? '/path/to/dir' : 'host:port'}
-                    @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
+                  <div class="dir-input-row">
+                    <input class="form-input dir-input" .value=${this._endpoint}
+                      placeholder=${this.tunnelType === 'http' ? 'http://localhost:3000' : this.tunnelType === 'file' ? '/path/to/dir' : 'host:port'}
+                      @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
+                    ${this.tunnelType === 'file' && this._isNativeDirPicker
+                      ? html`<button type="button" class="browse-btn"
+                          @click=${this._browseDir}>📁 ${t('browseDirectory')}</button>`
+                      : ''}
+                  </div>
                 </div>
 
                 <!-- Hostname (HTTP/File) -->
