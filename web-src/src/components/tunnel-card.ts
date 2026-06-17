@@ -47,15 +47,16 @@ export class TunnelCard extends LitElement {
     .row {
       display: flex;
       align-items: center;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border-subtle);
+      padding: 8px 12px;
+      background: var(--border-subtle);
+      border-radius: var(--radius-sm);
       cursor: pointer;
       transition: background var(--transition-fast);
       gap: 10px;
     }
 
     .row:hover {
-      background: var(--border-subtle);
+      background: var(--border);
     }
 
     .row.stopped {
@@ -144,7 +145,8 @@ export class TunnelCard extends LitElement {
     .error-banner {
       padding: 5px 14px 5px 34px;
       background: var(--red-bg);
-      border-bottom: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      margin-top: 2px;
       font-size: var(--font-sm);
       color: var(--red-text);
     }

@@ -31,3 +31,15 @@ web/.build_stamp
 src-tauri/binaries/*
 src-tauri/target/
 src-tauri/gen/
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/app/src/main/jniLibs/
+android/test-assets/
+
+# Playwright MCP browser state
+.playwright-mcp/
+
+# Generated API spec / config dump
+api/wisper.yaml

@@ -226,7 +226,10 @@ export class HomePage extends LitElement {
     /* ── List ── */
     .list {
       flex: 1;
-      padding-bottom: 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 16px 80px 16px;
     }
 
     /* ── Expand panel ── */
