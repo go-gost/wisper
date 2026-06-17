@@ -437,7 +437,7 @@ export class HomePage extends LitElement {
     .fab {
       width: 48px;
       height: 48px;
-      border-radius: var(--radius-lg);
+      border-radius: 50%;
       border: none;
       background: var(--accent);
       color: var(--accent-fg);
