@@ -50,6 +50,7 @@ jobs:
           DELIM="EOF_${RANDOM}_$(date +%s)"
           echo "changelog<<${DELIM}" >> $GITHUB_OUTPUT
           git log --pretty='format:- %s (%h)' $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD >> $GITHUB_OUTPUT
+          echo >> $GITHUB_OUTPUT
           echo "${DELIM}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
