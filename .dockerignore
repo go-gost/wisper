@@ -3,9 +3,9 @@
 .gitignore
 .gitattributes
 
-# Web UI (built fresh in Docker)
-web-src/
+# Web UI (keep sources, drop local install artifacts)
 web-src/node_modules/
+web/
 
 # Desktop shell (not needed for Go binary image)
 src-tauri/
