@@ -26,7 +26,7 @@ SIDECAR_DIR   := src-tauri/binaries
 SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
-.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer android-test-image android-test-smoke android-test-full android-test-stop
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer android android-release android-test-image android-test-smoke android-test-full android-test-stop
 
 all: linux darwin windows
 
@@ -282,6 +282,61 @@ android: web
 		'
 	@echo "==> APK ready:"
 	@ls -lh android/app/build/outputs/apk/debug/*.apk 2>/dev/null || echo "  (no .apk found — check container logs)"
+
+# Same as `android` but builds a signed release APK. Needs a keystore:
+#   keytool -genkeypair -keystore android/release.keystore \
+#     -alias wisper -keyalg RSA -keysize 2048 -validity 10000 \
+#     -storepass android -keypass android \
+#     -dname "CN=Wisper, OU=Dev, O=go-gost"
+.PHONY: android-release
+android-release: web
+	@echo "==> Building Docker image $(ANDROID_IMAGE)..."
+	DOCKER_BUILDKIT=1 docker build -t $(ANDROID_IMAGE) -f android/Dockerfile.android android/
+	@echo "==> Cross-compiling libwisper.so + assembling release APK..."
+	@mkdir -p android/app/src/main/jniLibs/arm64-v8a
+	@mkdir -p android/app/src/main/jniLibs/x86_64
+	@if [ ! -f android/release.keystore ]; then \
+		echo "==> Generating release keystore (first time)..."; \
+		keytool -genkeypair -v \
+			-keystore android/release.keystore \
+			-alias wisper \
+			-keyalg RSA -keysize 2048 -validity 10000 \
+			-storepass android -keypass android \
+			-dname "CN=Wisper, OU=Dev, O=go-gost"; \
+	fi
+	docker run --rm \
+		-v "$(PWD):/wisper" \
+		-v "$$(go env GOMODCACHE):/root/go/pkg/mod" \
+		-v "$$(go env GOCACHE):/root/.cache/go-build" \
+		-w /wisper \
+		$(ANDROID_IMAGE) sh -c '\
+		set -e; \
+		NDK_BIN="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"; \
+		echo "--- Copying JNI bridge into package root ---"; \
+		cp android/lib_jni.c .; \
+		echo "--- Cross-compiling libwisper.so (arm64-v8a) ---"; \
+		export CC="$$NDK_BIN/aarch64-linux-android24-clang"; \
+		export CXX="$$NDK_BIN/aarch64-linux-android24-clang++"; \
+		export CGO_ENABLED=1; \
+		export GOOS=android; \
+		export GOARCH=arm64; \
+		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
+		echo "--- libwisper.so (arm64): $$(wc -c < android/app/src/main/jniLibs/arm64-v8a/libwisper.so) bytes ---"; \
+		echo "--- Cross-compiling libwisper.so (x86_64) ---"; \
+		export CC="$$NDK_BIN/x86_64-linux-android24-clang"; \
+		export CXX="$$NDK_BIN/x86_64-linux-android24-clang++"; \
+		export GOARCH=amd64; \
+		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+			-o android/app/src/main/jniLibs/x86_64/libwisper.so .; \
+		echo "--- libwisper.so (x86_64): $$(wc -c < android/app/src/main/jniLibs/x86_64/libwisper.so) bytes ---"; \
+		rm -f lib_jni.c; \
+		echo "--- Assembling release APK with Gradle ---"; \
+		cd android; \
+		gradle assembleRelease --no-daemon; \
+		'
+	@echo "==> Release APK ready:"
+	@ls -lh android/app/build/outputs/apk/release/*.apk 2>/dev/null || echo "  (no .apk found — check container logs)"
 
 # ----- Android Automated Tests (Docker + Emulator) -----
 # Prerequisites: Docker, /dev/kvm available on host.

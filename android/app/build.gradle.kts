@@ -17,8 +17,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // CI-generated keystore for GitHub Releases.
+        // When the keystore file is absent, fall back to debug signing so local
+        // `assembleDebug` still works; `assembleRelease` will fail with a clear
+        // "keystore not found" error — generate one with:
+        //   keytool -genkeypair -keystore android/release.keystore \
+        //     -alias wisper -keyalg RSA -keysize 2048 -validity 10000 \
+        //     -storepass android -keypass android \
+        //     -dname "CN=Wisper, OU=Dev, O=go-gost"
+        create("release") {
+            storeFile = rootProject.file("release.keystore")
+            storePassword = "android"
+            keyAlias = "wisper"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
         }
         debug {

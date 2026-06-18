@@ -224,3 +224,105 @@ jobs:
           files: src-tauri/target/release/bundle/nsis/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android:
+    name: Android (APK)
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web-src/package-lock.json
+
+      - name: Build web UI
+        run: cd web-src && npm ci && npx vite build
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Build Android Docker image
+        run: DOCKER_BUILDKIT=1 docker build -t wisper-android -f android/Dockerfile.android android/
+
+      - name: Build APK (cross-compile + Gradle)
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          echo "Building Wisper APK version=${VERSION} (tag=${TAG})"
+
+          docker run --rm \
+            -e "WISPER_VERSION=${VERSION}" \
+            -v "$PWD:/wisper" \
+            -v "$(go env GOMODCACHE):/root/go/pkg/mod" \
+            -v "$(go env GOCACHE):/root/.cache/go-build" \
+            -w /wisper \
+            wisper-android sh -c '
+              set -e
+              NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+              echo "--- Generating release keystore ---"
+              keytool -genkeypair -v \
+                -keystore /wisper/android/release.keystore \
+                -alias wisper \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass android -keypass android \
+                -dname "CN=Wisper, OU=Dev, O=go-gost, L=Unknown, S=Unknown, C=US"
+
+              echo "--- Injecting version ${WISPER_VERSION} ---"
+              sed -i "s/versionName = \"[^\"]*\"/versionName = \"${WISPER_VERSION}\"/" /wisper/android/app/build.gradle.kts
+
+              echo "--- Copying JNI bridge ---"
+              cp /wisper/android/lib_jni.c /wisper/
+
+              echo "--- Cross-compiling libwisper.so (arm64-v8a) ---"
+              export CC="$NDK_BIN/aarch64-linux-android24-clang"
+              export CXX="$NDK_BIN/aarch64-linux-android24-clang++"
+              export CGO_ENABLED=1 GOOS=android GOARCH=arm64
+              cd /wisper
+              go build -buildmode=c-shared -buildvcs=false \
+                -ldflags="-s -w -X github.com/go-gost/wisper/version.Version=${WISPER_VERSION}" \
+                -o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .
+
+              echo "--- Cross-compiling libwisper.so (x86_64) ---"
+              export CC="$NDK_BIN/x86_64-linux-android24-clang"
+              export CXX="$NDK_BIN/x86_64-linux-android24-clang++"
+              export GOARCH=amd64
+              go build -buildmode=c-shared -buildvcs=false \
+                -ldflags="-s -w -X github.com/go-gost/wisper/version.Version=${WISPER_VERSION}" \
+                -o android/app/src/main/jniLibs/x86_64/libwisper.so .
+
+              rm -f /wisper/lib_jni.c
+
+              echo "--- Building release APK ---"
+              cd /wisper/android
+              gradle assembleRelease --no-daemon
+
+              echo "--- APK info ---"
+              APK="app/build/outputs/apk/release/app-release.apk"
+              if [ -f "$APK" ]; then
+                ls -lh "$APK"
+                cp "$APK" "/wisper/Wisper_${WISPER_VERSION}_android.apk"
+                echo "Copied to Wisper_${WISPER_VERSION}_android.apk"
+              else
+                echo "ERROR: APK not found at $APK"
+                exit 1
+              fi
+            '
+
+      - name: Upload APK to release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: Wisper_*_android.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
