@@ -47,7 +47,7 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64 | tr -d '\n+/')
           echo "changelog<<$EOF" >> $GITHUB_OUTPUT
           git log --pretty='format:- %s (%h)' $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
