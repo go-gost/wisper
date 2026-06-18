@@ -6,7 +6,7 @@ version: 2
 # ---- Web UI must exist before go build (embedded via //go:embed) ----
 before:
   hooks:
-    - cmd: cd web-src && npm ci && npx vite build
+    - cd web-src && npm ci && npx vite build
 
 # ---- Cross-compile Go binaries ----
 builds:
@@ -30,10 +30,10 @@ builds:
 
 # ---- Archives (.tar.gz / .zip) ----
 archives:
-  - format: tar.gz
+  - formats: ['tar.gz']
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ['zip']
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     files:
@@ -56,10 +56,6 @@ changelog:
       - Merge pull request
       - Merge branch
 
-# ---- GitHub Release ----
-release:
-  github:
-    owner: go-gost
-    name: wisper
-  draft: false
-  prerelease: auto
+# GitHub Release is created by the create-release job in
+# .github/workflows/release.yml and populated by goreleaser + desktop jobs
+# via softprops/action-gh-release. The release section is intentionally absent.
