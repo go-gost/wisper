@@ -134,7 +134,7 @@ func decodeBody(t *testing.T, r io.ReadCloser) map[string]any {
 	t.Helper()
 	defer r.Close()
 	var m map[string]any
-	json.NewDecoder(r).Decode(&m)
+	_ = json.NewDecoder(r).Decode(&m)
 	return m
 }
 
@@ -146,7 +146,7 @@ func getJSONArray(t *testing.T, url string) (*http.Response, []map[string]any) {
 	}
 	defer resp.Body.Close()
 	var arr []map[string]any
-	json.NewDecoder(resp.Body).Decode(&arr)
+	_ = json.NewDecoder(resp.Body).Decode(&arr)
 	return resp, arr
 }
 
@@ -474,7 +474,7 @@ func TestGetStatsEmpty(t *testing.T) {
 	}
 
 	var body map[string]any
-	json.NewDecoder(resp.Body).Decode(&body)
+	_ = json.NewDecoder(resp.Body).Decode(&body)
 
 	tunnels := body["tunnels"].([]any)
 	entrypoints := body["entrypoints"].([]any)
@@ -500,7 +500,7 @@ func TestGetStatsWithData(t *testing.T) {
 	defer resp.Body.Close()
 
 	var body map[string]any
-	json.NewDecoder(resp.Body).Decode(&body)
+	_ = json.NewDecoder(resp.Body).Decode(&body)
 
 	tunnels := body["tunnels"].([]any)
 	entrypoints := body["entrypoints"].([]any)

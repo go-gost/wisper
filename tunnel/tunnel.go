@@ -343,7 +343,9 @@ func RestartRunning() {
 		Set(newT)
 	}
 
-	SaveConfig()
+	if err := SaveConfig(); err != nil {
+		logger.Default().Error(fmt.Sprintf("save config: %v", err))
+	}
 }
 
 // ChainConfig builds a GOST chain configuration that connects to the tunnel server.

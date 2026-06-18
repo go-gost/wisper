@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-gost/wisper/config"
@@ -71,7 +72,9 @@ func handleCreateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entrypoint.Add(ep)
-	entrypoint.SaveConfig()
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusCreated, toTunnelResponse(ep))
 }
@@ -136,7 +139,9 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	entrypoint.Delete(id)
 
 	entrypoint.Add(ep)
-	entrypoint.SaveConfig()
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(ep))
 }
@@ -150,7 +155,9 @@ func handleDeleteEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entrypoint.Delete(id)
-	entrypoint.SaveConfig()
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
@@ -207,7 +214,9 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entrypoint.Set(newEP)
-	entrypoint.SaveConfig()
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(newEP))
 }
@@ -226,7 +235,9 @@ func handleStopEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ep.Close()
-	entrypoint.SaveConfig()
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(ep))
 }
@@ -261,7 +272,9 @@ func handleResetEntrypointStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ep.SetStatsBaseline(bl)
-	entrypoint.SaveConfig()
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(ep))
 }

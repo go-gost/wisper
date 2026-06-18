@@ -35,11 +35,13 @@ func Start(configDir, addr string) error {
 	if s := config.Get().Settings; s != nil && s.StatsInterval > 0 {
 		statsInterval = s.StatsInterval
 	}
-	runner.Exec(context.Background(), task.UpdateStats(),
+	if err := runner.Exec(context.Background(), task.UpdateStats(),
 		runner.WithAsync(true),
 		runner.WithInterval(time.Duration(statsInterval)*time.Second),
 		runner.WithCancel(true),
-	)
+	); err != nil {
+		slog.Error("start stats runner", "err", err)
+	}
 
 	handler := api.NewHandler(webFileServer())
 	srv := &http.Server{Handler: handler}
@@ -66,13 +68,19 @@ func Start(configDir, addr string) error {
 func Stop() {
 	stopOnce.Do(func() {
 		slog.Info("shutting down...")
-		tunnel.SaveConfig()
-		entrypoint.SaveConfig()
+		if err := tunnel.SaveConfig(); err != nil {
+				slog.Error("save tunnel config", "err", err)
+			}
+			if err := entrypoint.SaveConfig(); err != nil {
+				slog.Error("save entrypoint config", "err", err)
+			}
 
 		if srv := httpServer.Load(); srv != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			srv.Shutdown(ctx)
+			if err := srv.Shutdown(ctx); err != nil {
+				slog.Error("shutdown server", "err", err)
+			}
 		}
 		slog.Info("wisper stopped")
 	})

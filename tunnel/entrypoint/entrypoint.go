@@ -166,7 +166,9 @@ func RestartRunning() {
 		Set(newEP)
 	}
 
-	SaveConfig()
+	if err := SaveConfig(); err != nil {
+		logger.Default().Error(fmt.Sprintf("save config: %v", err))
+	}
 }
 
 // LoadConfig loads entrypoints from the persisted configuration.

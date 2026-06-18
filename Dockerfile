@@ -1,5 +1,5 @@
 # ---- Stage 1: Web UI ------------------------------------------------
-FROM node:22-alpine AS web-builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web-builder
 
 WORKDIR /src/web-src
 COPY web-src/package.json web-src/package-lock.json ./

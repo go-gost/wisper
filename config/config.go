@@ -68,7 +68,9 @@ func Init(opts ...Option) {
 		}
 		configDir = filepath.Join(dir, "wisper")
 	}
-	os.MkdirAll(configDir, 0755)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		slog.Error(fmt.Sprintf("mkdir config dir: %v", err))
+	}
 
 	slog.Info(fmt.Sprintf("configDir: %s", configDir))
 
@@ -76,7 +78,9 @@ func Init(opts ...Option) {
 	if err := cfg.load(); err != nil {
 		slog.Error(fmt.Sprintf("load config: %v", err))
 		if _, ok := err.(*os.PathError); ok {
-			cfg.Write()
+			if err := cfg.Write(); err != nil {
+				slog.Error(fmt.Sprintf("write config: %v", err))
+			}
 		}
 	}
 	Set(cfg)
@@ -88,7 +92,9 @@ func initLog() {
 	cfg := Get().Log
 	if cfg == nil {
 		logDir := filepath.Join(configDir, "logs")
-		os.MkdirAll(logDir, 0755)
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			slog.Error(fmt.Sprintf("mkdir log dir: %v", err))
+		}
 		slog.Info(fmt.Sprintf("log dir: %s", logDir))
 
 		cfg = &xconfig.LogConfig{

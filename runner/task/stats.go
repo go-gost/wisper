@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	stats_pkg "github.com/go-gost/core/observer/stats"
@@ -23,8 +24,12 @@ func (t *updateStatsTask) ID() runner.TaskID {
 }
 
 func (t *updateStatsTask) Run(context.Context) error {
-	t.updateTunnel()
-	t.updateEntrypoint()
+	if err := t.updateTunnel(); err != nil {
+		slog.Error("stats", "err", err)
+	}
+	if err := t.updateEntrypoint(); err != nil {
+		slog.Error("stats", "err", err)
+	}
 	return nil
 }
 

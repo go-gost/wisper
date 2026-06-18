@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-gost/wisper/config"
@@ -189,7 +190,9 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tunnel.Add(t)
-	tunnel.SaveConfig()
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusCreated, toTunnelResponse(t))
 }
@@ -258,7 +261,9 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	tunnel.Delete(id)
 
 	tunnel.Add(t)
-	tunnel.SaveConfig()
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(t))
 }
@@ -272,7 +277,9 @@ func handleDeleteTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tunnel.Delete(id)
-	tunnel.SaveConfig()
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
@@ -336,7 +343,9 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tunnel.Set(newT)
-	tunnel.SaveConfig()
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(newT))
 }
@@ -355,7 +364,9 @@ func handleStopTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t.Close()
-	tunnel.SaveConfig()
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(t))
 }
@@ -390,7 +401,9 @@ func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	t.SetStatsBaseline(bl)
-	tunnel.SaveConfig()
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(t))
 }

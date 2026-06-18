@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -96,7 +97,9 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	config.Set(cfg)
-	cfg.Write()
+	if err := cfg.Write(); err != nil {
+		slog.Error("write config", "err", err)
+	}
 
 	// Restart all running tunnels/entrypoints so they reconnect with the
 	// new server, entrypoint domain, or TLS settings.
@@ -108,11 +111,13 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Restart stats runner with the new interval.
 	if intervalChanged {
 		interval := time.Duration(cfg.Settings.StatsInterval) * time.Second
-		runner.Exec(context.Background(), task.UpdateStats(),
+		if err := runner.Exec(context.Background(), task.UpdateStats(),
 			runner.WithAsync(true),
 			runner.WithInterval(interval),
 			runner.WithCancel(true),
-		)
+		); err != nil {
+			slog.Error("restart stats runner", "err", err)
+		}
 	}
 
 	handleGetConfig(w, r)

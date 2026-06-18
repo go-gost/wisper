@@ -234,7 +234,14 @@ func (s *fileTunnel) Run() (err error) {
 		log.Infof("service listen on %s", s.file.Addr())
 	}
 
-	go s.file.Serve()
+	go func() {
+		serveErr := s.file.Serve()
+		if serveErr != nil {
+			log.Error("file server stopped with error", "err", serveErr)
+		} else {
+			log.Info("file server stopped")
+		}
+	}()
 	go func() {
 		serveErr := s.forward.Serve()
 		if serveErr != nil {
