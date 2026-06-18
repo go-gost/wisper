@@ -100,6 +100,7 @@ const zh: Record<string, string> = {
   settingsStatsInterval: '统计更新频率',
   settingsInterval1s: '1 秒',
   settingsInterval2s: '2 秒',
+  settingsInterval3s: '3 秒',
   settingsInterval5s: '5 秒',
   settingsInterval10s: '10 秒',
   settingsInterval30s: '30 秒',

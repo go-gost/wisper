@@ -1,0 +1,16 @@
+# Release Dockerfile — assumes the Go binary is already cross-compiled by
+# GoReleaser and placed in the build context. GoReleaser sets up the context
+# with dist/<os>_<arch>/wisper copied to ./wisper.
+#
+# This is used only by GoReleaser's dockers section; the standalone Dockerfile
+# at the repo root is the multi-stage build for development / manual use.
+
+FROM alpine:3.23
+
+COPY wisper /usr/local/bin/wisper
+
+EXPOSE 8900
+
+VOLUME ["/root/.config/wisper"]
+
+ENTRYPOINT ["wisper"]

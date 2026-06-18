@@ -3,11 +3,10 @@ import { customElement, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatRate, formatNumber } from '../utils/format';
+import { formatNumber } from '../utils/format';
 import {
   getTunnels,
   isLoading as tunnelsLoading,
-  toggleFavorite,
   start as startTunnel,
   stop as stopTunnel,
   subscribe as subTunnel,
@@ -15,7 +14,6 @@ import {
 import {
   getEntrypoints,
   isLoading as entrypointsLoading,
-  toggleFavorite as toggleEntrypointFavorite,
   start as startEntrypoint,
   stop as stopEntrypoint,
   subscribe as subEntrypoint,
@@ -32,7 +30,7 @@ type Item =
 
 @customElement('home-page')
 export class HomePage extends LitElement {
-  @state() private tabIndex = 0; // 0 = tunnels, 1 = entrypoints
+  @state() private _activeTab = 0; // 0 = tunnels, 1 = entrypoints
   @state() private showFavorites = false;
   @state() private _tunnels: Tunnel[] = [];
   @state() private _entrypoints: Entrypoint[] = [];
@@ -101,14 +99,14 @@ export class HomePage extends LitElement {
   }
 
   private get _items(): Item[] {
-    if (this.tabIndex === 0) {
+    if (this._activeTab === 0) {
       return this._filteredTunnels.map(t => ({ kind: 'tunnel' as const, data: t }));
     }
     return this._filteredEntrypoints.map(e => ({ kind: 'entrypoint' as const, data: e }));
   }
 
   private _isLoading(): boolean {
-    return this.tabIndex === 0 ? this._tunnelsLoading : this._entrypointsLoading;
+    return this._activeTab === 0 ? this._tunnelsLoading : this._entrypointsLoading;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────
@@ -133,7 +131,7 @@ export class HomePage extends LitElement {
   // ── Empty state ───────────────────────────────────────────────────────
 
   private _renderEmptyState() {
-    const isTunnel = this.tabIndex === 0;
+    const isTunnel = this._activeTab === 0;
     const allEmpty = isTunnel
       ? this._tunnels.length === 0
       : this._entrypoints.length === 0;
@@ -635,21 +633,12 @@ export class HomePage extends LitElement {
     }
   }
 
-  private async _handleFavorite(item: Item) {
-    if (item.kind === 'tunnel') {
-      await toggleFavorite(item.data.id);
-    } else {
-      await toggleEntrypointFavorite(item.data.id);
-    }
-  }
-
   // ── Render ───────────────────────────────────────────────────────────
 
   render() {
     const items = this._items;
     const isLoading = this._isLoading();
-    const emptyLabel = this.tabIndex === 0 ? t('homeEmptyTunnels') : t('homeEmptyEntrypoints');
-    const fabPath = this.tabIndex === 0 ? '/tunnel/new' : '/entrypoint/new';
+    const fabPath = this._activeTab === 0 ? '/tunnel/new' : '/entrypoint/new';
 
     return html`
       <app-scaffold>
@@ -666,9 +655,9 @@ export class HomePage extends LitElement {
         <!-- Tabs -->
         <nav-tabs
           .tabs=${[t('homeTabTunnel'), t('homeTabEntrypoint')]}
-          .activeIndex=${this.tabIndex}
+          .activeIndex=${this._activeTab}
           @tab-change=${(e: CustomEvent) => {
-            this.tabIndex = e.detail.index;
+            this._activeTab = e.detail.index;
             this._expandedId = null;
           }}
         ></nav-tabs>

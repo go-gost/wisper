@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DLk9o5Py.js","assets/index-B3f8Rhiy.css"])))=>i.map(i=>d[i]);
-import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h as F,j as e,k as S,l as z,m as L,n as j,_ as E,o as R,p as D}from"./index-DLk9o5Py.js";import{n as p,r as v}from"./state-BiBkWjRE.js";import{i as b}from"./app-scaffold-CVH8aBOa.js";import{c as B}from"./clipboard-C3x8_sid.js";import{f as N,a as C,b as T,c as O}from"./format-BcWb47bn.js";var A=Object.defineProperty,q=Object.getOwnPropertyDescriptor,m=(t,n,r,a)=>{for(var s=a>1?void 0:a?q(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&A(n,r,s),s};let f=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DZjnTtcD.js","assets/index-B3f8Rhiy.css"])))=>i.map(i=>d[i]);
+import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as S,h as z,j as e,k as L,l as F,m as j,n as R,_ as T}from"./index-DZjnTtcD.js";import{n as p,r as v}from"./state-BREd1G6S.js";import{i as b}from"./app-scaffold-BNcPpRSc.js";import{c as D}from"./clipboard-C3x8_sid.js";import{f as I,a as E,b as C,c as B}from"./format-BcWb47bn.js";var N=Object.defineProperty,O=Object.getOwnPropertyDescriptor,m=(t,n,r,a)=>{for(var s=a>1?void 0:a?O(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&N(n,r,s),s};let f=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return i`
       <div class="pill-group">
         ${this.tabs.map((t,n)=>i`
             <button class=${n===this.activeIndex?"active":""} @click=${()=>this._handleClick(n)}>
@@ -12,7 +12,6 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
       display: flex;
       justify-content: center;
       padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
     }
 
     .pill-group {
@@ -44,7 +43,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
       font-weight: 600;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
-  `;m([p({type:Array})],f.prototype,"tabs",2);m([p({type:Number})],f.prototype,"activeIndex",2);f=m([y("nav-tabs")],f);var H=Object.defineProperty,U=Object.getOwnPropertyDescriptor,l=(t,n,r,a)=>{for(var s=a>1?void 0:a?U(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&H(n,r,s),s};let d=class extends x{constructor(){super(...arguments),this.name="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.createdAt="",this.expanded=!1,this.compact=!0,this.error=""}_onRowClick(){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return i`
+  `;m([p({type:Array})],f.prototype,"tabs",2);m([p({type:Number})],f.prototype,"activeIndex",2);f=m([y("nav-tabs")],f);var A=Object.defineProperty,q=Object.getOwnPropertyDescriptor,l=(t,n,r,a)=>{for(var s=a>1?void 0:a?q(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&A(n,r,s),s};let d=class extends x{constructor(){super(...arguments),this.name="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.createdAt="",this.expanded=!1,this.compact=!0,this.error=""}_onRowClick(){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return i`
       <div class="row ${t?"stopped":""}" @click=${this._onRowClick}>
         <span class="dot ${this.status}"></span>
 
@@ -54,16 +53,16 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
         </div>
 
         <div class="right-col">
-          ${this.createdAt?i`<span class="created-at">${N(this.createdAt)}</span>`:""}
+          ${this.createdAt?i`<span class="created-at">${I(this.createdAt)}</span>`:""}
           ${this.status==="running"?i`
             <div class="traffic">
               <div class="traffic-row">
-                <span class="traffic-total">${C(this.inputBytes)}</span>
-                <span>↑ ${T(this.inputRate)}</span>
+                <span class="traffic-total">${E(this.inputBytes)}</span>
+                <span>↑ ${C(this.inputRate)}</span>
               </div>
               <div class="traffic-row">
-                <span class="traffic-total">${C(this.outputBytes)}</span>
-                <span>↓ ${T(this.outputRate)}</span>
+                <span class="traffic-total">${E(this.outputBytes)}</span>
+                <span>↓ ${C(this.outputRate)}</span>
               </div>
             </div>
           `:""}
@@ -210,7 +209,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
       font-size: var(--font-sm);
       color: var(--red-text);
     }
-  `;l([p()],d.prototype,"name",2);l([p()],d.prototype,"meta",2);l([p()],d.prototype,"status",2);l([p()],d.prototype,"endpoint",2);l([p({type:Number})],d.prototype,"currentConns",2);l([p({type:Number})],d.prototype,"totalConns",2);l([p({type:Number})],d.prototype,"requestRate",2);l([p({type:Number})],d.prototype,"inputBytes",2);l([p({type:Number})],d.prototype,"outputBytes",2);l([p({type:Number})],d.prototype,"inputRate",2);l([p({type:Number})],d.prototype,"outputRate",2);l([p()],d.prototype,"createdAt",2);l([p({type:Boolean})],d.prototype,"expanded",2);l([p({type:Boolean})],d.prototype,"compact",2);l([p()],d.prototype,"error",2);d=l([y("tunnel-card")],d);var M=Object.defineProperty,X=Object.getOwnPropertyDescriptor,h=(t,n,r,a)=>{for(var s=a>1?void 0:a?X(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&M(n,r,s),s};let u=class extends x{constructor(){super(...arguments),this.tabIndex=0,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null}connectedCallback(){super.connectedCallback(),this._tunnels=_(),this._entrypoints=w(),this._tunnelsLoading=$(),this._entrypointsLoading=k(),this._unsubs.push(P(()=>{this._tunnels=_(),this._tunnelsLoading=$(),this.requestUpdate()}),I(()=>{this._entrypoints=w(),this._entrypointsLoading=k(),this.requestUpdate()}),F(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return this.showFavorites?this._tunnels.filter(t=>t.favorite):this._tunnels}get _filteredEntrypoints(){return this.showFavorites?this._entrypoints.filter(t=>t.favorite):this._entrypoints}get _items(){return this.tabIndex===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this.tabIndex===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){const n=t.data.type.toUpperCase(),r=this._statusLabel(t.data.status);return t.data.status==="running"?`${n} · ${O(t.data.stats.current_conns)} conns`:`${n} · ${r}`}_renderEmptyState(){const t=this.tabIndex===0,n=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return i`
+  `;l([p()],d.prototype,"name",2);l([p()],d.prototype,"meta",2);l([p()],d.prototype,"status",2);l([p()],d.prototype,"endpoint",2);l([p({type:Number})],d.prototype,"currentConns",2);l([p({type:Number})],d.prototype,"totalConns",2);l([p({type:Number})],d.prototype,"requestRate",2);l([p({type:Number})],d.prototype,"inputBytes",2);l([p({type:Number})],d.prototype,"outputBytes",2);l([p({type:Number})],d.prototype,"inputRate",2);l([p({type:Number})],d.prototype,"outputRate",2);l([p()],d.prototype,"createdAt",2);l([p({type:Boolean})],d.prototype,"expanded",2);l([p({type:Boolean})],d.prototype,"compact",2);l([p()],d.prototype,"error",2);d=l([y("tunnel-card")],d);var H=Object.defineProperty,U=Object.getOwnPropertyDescriptor,h=(t,n,r,a)=>{for(var s=a>1?void 0:a?U(n,r):n,c=t.length-1,o;c>=0;c--)(o=t[c])&&(s=(a?o(n,r,s):o(s))||s);return a&&s&&H(n,r,s),s};let u=class extends x{constructor(){super(...arguments),this._activeTab=0,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null}connectedCallback(){super.connectedCallback(),this._tunnels=_(),this._entrypoints=w(),this._tunnelsLoading=$(),this._entrypointsLoading=k(),this._unsubs.push(P(()=>{this._tunnels=_(),this._tunnelsLoading=$(),this.requestUpdate()}),S(()=>{this._entrypoints=w(),this._entrypointsLoading=k(),this.requestUpdate()}),z(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return this.showFavorites?this._tunnels.filter(t=>t.favorite):this._tunnels}get _filteredEntrypoints(){return this.showFavorites?this._entrypoints.filter(t=>t.favorite):this._entrypoints}get _items(){return this._activeTab===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this._activeTab===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){const n=t.data.type.toUpperCase(),r=this._statusLabel(t.data.status);return t.data.status==="running"?`${n} · ${B(t.data.stats.current_conns)} conns`:`${n} · ${r}`}_renderEmptyState(){const t=this._activeTab===0,n=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return i`
         <div class="empty">
           <div class="empty-icon-wrap">${b("star")}</div>
           <div class="empty-title">${e("homeNoFavorites")}</div>
@@ -228,7 +227,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
             ${t?e("tunnelNewTitle"):e("entrypointNewTitle")}
           </button>
         </div>
-      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await S(t.data.id):await z(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await L(t.data.id):await j(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-DLk9o5Py.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await E(()=>import("./index-DLk9o5Py.js").then(r=>r.G),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}async _handleFavorite(t){t.kind==="tunnel"?await R(t.data.id):await D(t.data.id)}render(){const t=this._items,n=this._isLoading();this.tabIndex===0?e("homeEmptyTunnels"):e("homeEmptyEntrypoints");const r=this.tabIndex===0?"/tunnel/new":"/entrypoint/new";return i`
+      `}return i``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await L(t.data.id):await F(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await j(t.data.id):await R(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,n,r){this._deleteTarget={kind:t,id:n,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:n}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await T(()=>import("./index-DZjnTtcD.js").then(r=>r.D),__vite__mapDeps([0,1])).then(r=>r.remove(n)):await T(()=>import("./index-DZjnTtcD.js").then(r=>r.E),__vite__mapDeps([0,1])).then(r=>r.remove(n)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}render(){const t=this._items,n=this._isLoading(),r=this._activeTab===0?"/tunnel/new":"/entrypoint/new";return i`
       <app-scaffold>
         <!-- Appbar -->
         <div slot="appBar" class="home-header">
@@ -243,8 +242,8 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
         <!-- Tabs -->
         <nav-tabs
           .tabs=${[e("homeTabTunnel"),e("homeTabEntrypoint")]}
-          .activeIndex=${this.tabIndex}
-          @tab-change=${a=>{this.tabIndex=a.detail.index,this._expandedId=null}}
+          .activeIndex=${this._activeTab}
+          @tab-change=${a=>{this._activeTab=a.detail.index,this._expandedId=null}}
         ></nav-tabs>
 
         <!-- Body -->
@@ -279,7 +278,7 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
                                 <span class="dlabel">${a.kind==="tunnel"?"Entrypoint":"Endpoint"}</span>
                                 <span class="dval">
                                   <span class="dval-mono">${a.data.entrypoint}</span>
-                                  <button class="copy-btn-mini" @click=${async o=>{o.stopPropagation(),await B(a.data.entrypoint),this._showSnackbar(e("copiedToClipboard"))}}>
+                                  <button class="copy-btn-mini" @click=${async o=>{o.stopPropagation(),await D(a.data.entrypoint),this._showSnackbar(e("copiedToClipboard"))}}>
                                     ${b("copy")}
                                   </button>
                                 </span>
@@ -739,4 +738,4 @@ import{i as g,a as x,b as i,t as y,g as _,c as w,d as $,e as k,s as P,f as I,h a
     .dialog-btn:hover {
       opacity: 0.85;
     }
-  `;h([v()],u.prototype,"tabIndex",2);h([v()],u.prototype,"showFavorites",2);h([v()],u.prototype,"_tunnels",2);h([v()],u.prototype,"_entrypoints",2);h([v()],u.prototype,"_tunnelsLoading",2);h([v()],u.prototype,"_entrypointsLoading",2);h([v()],u.prototype,"_expandedId",2);h([v()],u.prototype,"_snackbar",2);h([v()],u.prototype,"_deleteTarget",2);u=h([y("home-page")],u);export{u as HomePage};
+  `;h([v()],u.prototype,"_activeTab",2);h([v()],u.prototype,"showFavorites",2);h([v()],u.prototype,"_tunnels",2);h([v()],u.prototype,"_entrypoints",2);h([v()],u.prototype,"_tunnelsLoading",2);h([v()],u.prototype,"_entrypointsLoading",2);h([v()],u.prototype,"_expandedId",2);h([v()],u.prototype,"_snackbar",2);h([v()],u.prototype,"_deleteTarget",2);u=h([y("home-page")],u);export{u as HomePage};

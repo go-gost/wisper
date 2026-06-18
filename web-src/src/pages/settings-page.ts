@@ -20,6 +20,7 @@ const LANG_OPTIONS: { value: LanguagePreference; labelKey: string }[] = [
 const INTERVAL_OPTIONS: { value: number; labelKey: string }[] = [
   { value: 1, labelKey: 'settingsInterval1s' },
   { value: 2, labelKey: 'settingsInterval2s' },
+  { value: 3, labelKey: 'settingsInterval3s' },
   { value: 5, labelKey: 'settingsInterval5s' },
   { value: 10, labelKey: 'settingsInterval10s' },
   { value: 30, labelKey: 'settingsInterval30s' },
@@ -32,7 +33,7 @@ export class SettingsPage extends LitElement {
   @state() private _insecure = false;
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
-  @state() private _statsInterval = 1;
+  @state() private _statsInterval = 3;
   @state() private _inspectorUrl = '';
   @state() private _inspectorConnected = false;
   @state() private _snackbar = '';
@@ -291,6 +292,7 @@ export class SettingsPage extends LitElement {
       font-family: inherit;
       margin-top: 12px;
       transition: opacity var(--transition-fast);
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     }
     .save-btn:hover { opacity: 0.85; }
     .save-btn:disabled { opacity: 0.5; cursor: default; }

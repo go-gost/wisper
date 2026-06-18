@@ -1,4 +1,4 @@
-import{b as o,E as a,i as c,a as d,t as h}from"./index-DLk9o5Py.js";function g(l){const t=x[l];return t?o`<svg
+import{b as o,C as a,i as c,a as d,t as h}from"./index-DZjnTtcD.js";function g(l){const t=x[l];return t?o`<svg
     width="20"
     height="20"
     viewBox="0 0 24 24"
@@ -41,7 +41,6 @@ import{b as o,E as a,i as c,a as d,t as h}from"./index-DLk9o5Py.js";function g(l
       align-items: center;
       padding: 12px 16px;
       background: var(--bg);
-      border-bottom: 1px solid var(--border-subtle);
       position: sticky;
       top: 0;
       z-index: 10;

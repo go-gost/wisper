@@ -1,0 +1,65 @@
+# GoReleaser configuration for Wisper
+# https://goreleaser.com
+
+version: 2
+
+# ---- Web UI must exist before go build (embedded via //go:embed) ----
+before:
+  hooks:
+    - cmd: cd web-src && npm ci && npx vite build
+
+# ---- Cross-compile Go binaries ----
+builds:
+  - id: wisper
+    binary: wisper
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X github.com/go-gost/wisper/version.Version={{ .Version }}
+
+# ---- Archives (.tar.gz / .zip) ----
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+
+# ---- Checksum ----
+checksum:
+  name_template: checksums.txt
+
+# ---- Changelog ----
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "^style:"
+      - Merge pull request
+      - Merge branch
+
+# ---- GitHub Release ----
+release:
+  github:
+    owner: go-gost
+    name: wisper
+  draft: false
+  prerelease: auto

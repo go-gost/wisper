@@ -37,7 +37,7 @@ let settings: AppSettings = {
   insecure: false,
   lang: 'en',
   theme: 'system',
-  stats_interval: 1,
+  stats_interval: 3,
   inspector_url: '',
 };
 
@@ -71,7 +71,7 @@ export async function loadSettings(): Promise<void> {
       insecure: cfg.insecure || false,
       lang: cfg.lang || 'en',
       theme: cfg.theme || getStoredTheme(),
-      stats_interval: cfg.stats_interval || 1,
+      stats_interval: cfg.stats_interval || 3,
       inspector_url: cfg.inspector_url || '',
     };
   } catch {

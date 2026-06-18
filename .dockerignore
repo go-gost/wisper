@@ -1,22 +1,50 @@
-# Keep the docker build context small — only web/ and src-tauri/ are COPY'd.
-.git
+# ---- Keep context small: Dockerfile COPY's everything then excludes what it doesn't need ----
+.git/
 .gitignore
-**/node_modules
-dist/
+.gitattributes
+
+# Web UI (built fresh in Docker)
 web-src/
-flutter/
+web-src/node_modules/
+
+# Desktop shell (not needed for Go binary image)
+src-tauri/
+
+# Android
+android/
+
+# Build artifacts
+dist/
+
+# CI/CD
+.github/
+
+# Docs & config
 docs/
+.claude/
 .remember/
 .superpowers/
 .codegraph/
-.claude/
-# Don't copy the host's partial Rust build into the image (mounted as volume instead)
-src-tauri/target
-Dockerfile
-Dockerfile.desktop
-Dockerfile.windows
+CLAUDE.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Build scripts
 build.sh
 Makefile
+
+# All markdown
 *.md
+
+# Go workspace
 .go
 go.work

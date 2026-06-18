@@ -100,6 +100,7 @@ const en: Record<string, string> = {
   settingsStatsInterval: 'Stats update frequency',
   settingsInterval1s: '1 second',
   settingsInterval2s: '2 seconds',
+  settingsInterval3s: '3 seconds',
   settingsInterval5s: '5 seconds',
   settingsInterval10s: '10 seconds',
   settingsInterval30s: '30 seconds',

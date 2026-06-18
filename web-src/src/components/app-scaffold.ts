@@ -33,7 +33,6 @@ export class AppScaffold extends LitElement {
       align-items: center;
       padding: 12px 16px;
       background: var(--bg);
-      border-bottom: 1px solid var(--border-subtle);
       position: sticky;
       top: 0;
       z-index: 10;

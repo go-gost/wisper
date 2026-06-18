@@ -24,10 +24,10 @@ export function setItemStats(id: string, s: ItemStats): void {
   stats.set(id, { ...s });
 }
 
-/** Start polling stats with the configured interval (default 1s). */
+/** Start polling stats with the configured interval (default 3s). */
 export function startPolling(): void {
   if (pollTimer !== null) return;
-  const intervalSec = getSettings().stats_interval || 1;
+  const intervalSec = getSettings().stats_interval || 3;
   poll();
   pollTimer = setInterval(poll, intervalSec * 1000);
 }
@@ -43,7 +43,7 @@ export function stopPolling(): void {
 /** Restart polling timer with a new interval (in seconds). No-op if timer is not running. */
 export function updatePollingInterval(intervalSec: number): void {
   if (pollTimer === null) return;
-  const ms = (intervalSec > 0 ? intervalSec : 1) * 1000;
+  const ms = (intervalSec > 0 ? intervalSec : 3) * 1000;
   clearInterval(pollTimer);
   pollTimer = setInterval(poll, ms);
 }
