@@ -122,7 +122,7 @@ jobs:
         with:
           go-version: '1.26'
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           targets: wasm32-unknown-unknown
 
@@ -185,7 +185,7 @@ jobs:
         with:
           go-version: '1.26'
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - uses: actions/cache@v4
         with:
@@ -202,10 +202,12 @@ jobs:
 
       - name: Build Go sidecar (Windows)
         shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p src-tauri/binaries
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
-            go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${{ github.ref_name }}" \
+            go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${VERSION}" \
             -o src-tauri/binaries/wisper-api-x86_64-pc-windows-msvc.exe .
 
       - name: Build Windows installer
