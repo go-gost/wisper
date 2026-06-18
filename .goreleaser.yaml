@@ -6,7 +6,8 @@ version: 2
 # ---- Web UI must exist before go build (embedded via //go:embed) ----
 before:
   hooks:
-    - cd web-src && npm ci && npx vite build
+    - npm ci --prefix web-src
+    - npm run build --prefix web-src
 
 # ---- Cross-compile Go binaries ----
 builds:
