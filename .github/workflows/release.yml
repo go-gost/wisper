@@ -151,8 +151,14 @@ jobs:
       - name: Build web UI
         run: cd web-src && npm ci && npx vite build
 
+      - name: Inject version (tag → bare semver)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" src-tauri/tauri.conf.json
+
       - name: Build Go sidecar
-        run: make sidecar
+        run: make sidecar VERSION=${{ env.VERSION }}
 
       - name: Build Linux installers
         run: npx --yes @tauri-apps/cli@latest build --bundles deb,appimage
