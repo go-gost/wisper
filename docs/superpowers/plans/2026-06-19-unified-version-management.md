@@ -562,7 +562,7 @@ Run:
 python3 -c "import yaml; yaml.safe_load(open('.github/workflows/release.yml')); print('yaml ok')"
 echo "0.1.4" | awk -F. '{print $1*10000+$2*100+$3}'
 ```
-Expected: `yaml ok` then `10104`.
+Expected: `yaml ok` then `104`.
 
 - [ ] **Step 3: Commit**
 
@@ -670,10 +670,10 @@ done
 ```
 Expected:
 ```
-0.1.4 -> 10104
-0.2.0 -> 10200
+0.1.4 -> 104
+0.2.0 -> 200
 1.0.0 -> 10000
-0.10.5 -> 10005
+0.10.5 -> 1005
 ```
 Confirm the values are monotonically increasing with semver order.
 

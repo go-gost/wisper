@@ -81,7 +81,7 @@ These were settled during brainstorming:
 |--------|-----------|--------|
 | Go binary | `-ldflags -X github.com/go-gost/wisper/version.Version=<bare>` | goreleaser + Android already do this; **Windows must be fixed** to strip `v` |
 | Android `versionName` | `<bare>` via CI `sed` | already done |
-| Android `versionCode` | `major*10000 + minor*100 + patch` (`0.1.4` → `10104`) via CI | **new** — replaces hardcoded `1` |
+| Android `versionCode` | `major*10000 + minor*100 + patch` (`0.1.4` → `104`) via CI | **new** — replaces hardcoded `1` |
 | Tauri `tauri.conf.json` `version` | `<bare>` via CI `sed` before build | **new** — replaces hardcoded `0.1.0` |
 | Web UI | **not injected** — runtime fetch of `/api/version` | new mechanism |
 
@@ -90,7 +90,7 @@ These were settled during brainstorming:
 `versionCode = major*10000 + minor*100 + patch`.
 
 - Deterministic and monotonic from the semver.
-- `0.1.4` → `10104`; `0.2.0` → `10200`; `1.0.0` → `10000`.
+- `0.1.4` → `104`; `0.2.0` → `200`; `0.10.5` → `1005`; `1.0.0` → `10000`.
 - Constraint: this is only monotonic while patch < 100 and minor < 100, which holds
   for the foreseeable release cadence. If that is ever exceeded, the scheme must be
   revisited.
