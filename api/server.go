@@ -72,10 +72,11 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("POST /api/entrypoints/{id}/stop", handleStopEntrypoint)
 	mux.HandleFunc("POST /api/entrypoints/{id}/stats/reset", handleResetEntrypointStats)
 
-	// Stats and config
+	// Stats, config, and version
 	mux.HandleFunc("GET /api/stats", handleGetStats)
 	mux.HandleFunc("GET /api/config", handleGetConfig)
 	mux.HandleFunc("PUT /api/config", handleUpdateConfig)
+	mux.HandleFunc("GET /api/version", handleGetVersion)
 
 	// Serve embedded web UI for non-API requests.
 	if webHandler != nil {
