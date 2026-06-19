@@ -109,7 +109,7 @@ const zh: Record<string, string> = {
   // Settings
   settingsFavorites: '收藏',
   settingsServer: '隧道服务器',
-  settingsServerHint: 'tunnel.gost.run',
+  settingsServerHint: 'wisper.gost.run',
   settingsEntrypoint: '入口域名',
   settingsEntrypointHint: 'gost.run',
   settingsInsecure: '跳过 TLS 验证',

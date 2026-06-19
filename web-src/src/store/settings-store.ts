@@ -32,7 +32,7 @@ export function getStoredTheme(): ThemePreference {
 // ─── State ───────────────────────────────────────────────────────────────────
 
 let settings: AppSettings = {
-  server: 'tunnel.gost.run',
+  server: 'wisper.gost.run',
   entrypoint: 'gost.run',
   insecure: false,
   lang: 'en',
@@ -66,7 +66,7 @@ export async function loadSettings(): Promise<void> {
   try {
     const cfg = await backend.getConfig();
     settings = {
-      server: cfg.server || 'tunnel.gost.run',
+      server: cfg.server || 'wisper.gost.run',
       entrypoint: cfg.entrypoint || 'gost.run',
       insecure: cfg.insecure || false,
       lang: cfg.lang || 'en',

@@ -16,7 +16,7 @@ import (
 
 const (
 	defaultEndpointAddr = "gost.run"
-	defaultServerName   = "tunnel.gost.run"
+	defaultServerName   = "wisper.gost.run"
 )
 
 // GetEndpointAddr returns the public entrypoint domain, reading from config
@@ -29,7 +29,7 @@ func GetEndpointAddr() string {
 }
 
 // GetServerName returns the tunnel relay server hostname, reading from config
-// with fallback to the default (tunnel.gost.run).
+// with fallback to the default (wisper.gost.run).
 func GetServerName() string {
 	if s := config.Get().Settings; s != nil && s.Server != "" {
 		return s.Server

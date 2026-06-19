@@ -133,7 +133,7 @@ func Set(c *Config) {
 
 // Settings holds application settings.
 type Settings struct {
-	// Server address (default: tunnel.gost.run).
+	// Server address (default: wisper.gost.run).
 	Server string
 	// Public entrypoint address (default: gost.run).
 	Entrypoint string

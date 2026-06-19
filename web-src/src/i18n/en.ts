@@ -109,7 +109,7 @@ const en: Record<string, string> = {
   // Settings
   settingsFavorites: 'Favorites',
   settingsServer: 'Tunnel Server',
-  settingsServerHint: 'tunnel.gost.run',
+  settingsServerHint: 'wisper.gost.run',
   settingsEntrypoint: 'Entrypoint Domain',
   settingsEntrypointHint: 'gost.run',
   settingsInsecure: 'Skip TLS Verify',
