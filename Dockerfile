@@ -28,7 +28,9 @@ COPY . .
 # Inject pre-built web assets
 COPY --from=web-builder /src/web/ web/
 
-RUN xx-go build -ldflags "-s -w" && \
+ARG VERSION=0.0.0-dev
+
+RUN xx-go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${VERSION}" && \
     xx-verify wisper
 
 # ---- Stage 3: Runtime -----------------------------------------------
