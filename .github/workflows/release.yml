@@ -203,9 +203,8 @@ jobs:
 
       - name: Build Go sidecar (Windows)
         shell: bash
-        env:
-          VERSION: ${{ github.ref_name }}
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p src-tauri/binaries
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
             go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${VERSION}" \
