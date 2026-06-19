@@ -1,7 +1,7 @@
 const en: Record<string, string> = {
   // App / UI labels
   appName: 'Wisper',
-  appSubtitle: 'GOST Tunnel Manager',
+  appSubtitle: 'Silent in · Silent out',
   homeTabTunnel: 'Tunnels',
   homeTabEntrypoint: 'Entrypoints',
   homeEmptyTunnels: 'No tunnels yet',

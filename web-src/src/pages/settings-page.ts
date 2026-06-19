@@ -215,6 +215,10 @@ export class SettingsPage extends LitElement {
     }
     .app-version {
       font-size: var(--font-sm); color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .app-tagline {
+      font-size: var(--font-sm); color: var(--text-muted);
     }
 
     /* ── Section ── */
@@ -341,7 +345,8 @@ export class SettingsPage extends LitElement {
         <div class="app-info">
           <img class="app-logo" src="/logo.png" alt="Wisper" />
           <div class="app-name">${t('appName')}</div>
-          <div class="app-version">${this._version ? `v${this._version} · ` : ''}${t('appSubtitle')}</div>
+          <div class="app-tagline">${t('appSubtitle')}</div>
+          <div class="app-version">${this._version ? `v${this._version}` : ''}</div>
         </div>
 
         <!-- Server Configuration -->
