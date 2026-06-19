@@ -6,6 +6,7 @@ import type {
   StatsSnapshot,
   AppSettings,
   AppSettingsUpdate,
+  VersionInfo,
 } from './types';
 
 export class BackendError extends Error {
@@ -144,5 +145,11 @@ export class GoBackend {
 
   updateConfig(body: AppSettingsUpdate): Promise<void> {
     return this.request<void>('PUT', '/api/config', body);
+  }
+
+  // ─── Version ────────────────────────────────────────────────────────────
+
+  getVersion(): Promise<VersionInfo> {
+    return this.request<VersionInfo>('GET', '/api/version');
   }
 }

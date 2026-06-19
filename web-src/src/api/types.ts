@@ -205,3 +205,10 @@ export interface InspectorQueryResponse {
 }
 
 export type ProtocolType = 'http' | 'websocket';
+
+// ─── Version ───────────────────────────────────────────────────────────
+
+/** Response from GET /api/version. */
+export interface VersionInfo {
+  version: string;
+}
