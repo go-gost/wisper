@@ -2,6 +2,8 @@
 
 **GOST tunnel manager** — a self-hosted web UI and API for creating and managing reverse proxy tunnels through the [GOST](https://github.com/go-gost/gost) network.
 
+**Silent in · Silent out.** / 静入 · 静出
+
 Expose local services to the public internet without opening firewall ports. Wisper handles the tunnel lifecycle — create, start, stop, update, and monitor — through a browser-based UI.
 
 ## Features
@@ -87,6 +89,7 @@ All routes under `/api/`:
 | `POST` | `/api/entrypoints/{id}/start` | Start a stopped entrypoint |
 | `POST` | `/api/entrypoints/{id}/stop` | Stop a running entrypoint |
 | `GET` | `/api/stats` | Aggregated stats for all tunnels + entrypoints |
+| `GET` | `/api/version` | Version info |
 | `GET` | `/api/config` | Get app settings |
 | `PUT` | `/api/config` | Update app settings |
 
@@ -98,6 +101,13 @@ All routes under `/api/`:
 - Node.js 22+
 - Python 3 + Pillow (for icon generation)
 - Docker (for Android APK + desktop installers)
+
+### Docker
+
+```bash
+# Run from Docker Hub
+docker run -p 8900:8900 -v ~/.config/wisper:/root/.config/wisper gogost/wisper:latest
+```
 
 ### Build all platforms
 
@@ -132,8 +142,14 @@ make tauri-dev
 ### Android APK
 
 ```bash
-# Build APK (Docker NDK cross-compile + Gradle)
+# Build the Android Docker image first
+docker build -t wisper-android -f android/Dockerfile.android android/
+
+# Build debug APK
 make android
+
+# Build release APK (needs keystore secrets)
+make android-release
 ```
 
 ## Architecture
@@ -159,7 +175,7 @@ make android
         │ WSS / GOST relay
 ┌───────▼──────────┐
 │  GOST Network    │
-│ (tunnel.gost.run)│
+│(wisper.gost.run) │
 └──────────────────┘
 ```
 
