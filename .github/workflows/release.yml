@@ -291,7 +291,7 @@ jobs:
                 > /wisper/android/keystore.properties
 
               echo "--- Injecting version ${WISPER_VERSION} ---"
-              VCODE=$(echo "$WISPER_VERSION" | awk -F. '{print $1*10000+$2*100+$3}')
+              VCODE=$(echo "$WISPER_VERSION" | sed 's/-.*//' | awk -F. '{print $1*10000+$2*100+$3}')
               echo "--- Computed versionCode=${VCODE} ---"
               sed -i "s/versionCode = [0-9][0-9]*/versionCode = ${VCODE}/" /wisper/android/app/build.gradle.kts
               sed -i "s/versionName = \"[^\"]*\"/versionName = \"${WISPER_VERSION}\"/" /wisper/android/app/build.gradle.kts
