@@ -38,6 +38,10 @@ android/app/build/
 android/app/src/main/jniLibs/
 android/test-assets/
 
+# Android release signing (secrets — NEVER commit)
+android/release.keystore
+android/keystore.properties
+
 # Playwright MCP browser state
 .playwright-mcp/
 

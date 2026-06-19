@@ -256,12 +256,16 @@ jobs:
       - name: Build APK (cross-compile + Gradle)
         env:
           TAG: ${{ github.ref_name }}
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           VERSION="${TAG#v}"
           echo "Building Wisper APK version=${VERSION} (tag=${TAG})"
 
           docker run --rm \
             -e "WISPER_VERSION=${VERSION}" \
+            -e "ANDROID_KEYSTORE" \
+            -e "ANDROID_KEYSTORE_PASSWORD" \
             -v "$PWD:/wisper" \
             -v "$(go env GOMODCACHE):/root/go/pkg/mod" \
             -v "$(go env GOCACHE):/root/.cache/go-build" \
@@ -270,13 +274,16 @@ jobs:
               set -e
               NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
-              echo "--- Generating release keystore ---"
-              keytool -genkeypair -v \
-                -keystore /wisper/android/release.keystore \
-                -alias wisper \
-                -keyalg RSA -keysize 2048 -validity 10000 \
-                -storepass android -keypass android \
-                -dname "CN=Wisper, OU=Dev, O=go-gost, L=Unknown, S=Unknown, C=US"
+              echo "--- Materializing release keystore from GitHub Secret ---"
+              if [ -z "$ANDROID_KEYSTORE" ]; then
+                echo "ERROR: ANDROID_KEYSTORE secret is not set."
+                echo "Set it to the base64 of android/release.keystore before tagging a release."
+                exit 1
+              fi
+              echo "$ANDROID_KEYSTORE" | base64 -d > /wisper/android/release.keystore
+              printf 'storeFile=release.keystore\nstorePassword=%s\nkeyAlias=wisper\nkeyPassword=%s\n' \
+                "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEYSTORE_PASSWORD" \
+                > /wisper/android/keystore.properties
 
               echo "--- Injecting version ${WISPER_VERSION} ---"
               sed -i "s/versionName = \"[^\"]*\"/versionName = \"${WISPER_VERSION}\"/" /wisper/android/app/build.gradle.kts

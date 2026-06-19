@@ -1,6 +1,16 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+// Load release signing config from android/keystore.properties (gitignored).
+// Present in CI (decoded from GitHub Secrets) and after local setup; absent
+// for plain dev builds, which fall back to debug signing.
+val keystoreProperties = Properties().apply {
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.let { load(FileInputStream(it)) }
 }
 
 android {
@@ -18,25 +28,24 @@ android {
     }
 
     signingConfigs {
-        // CI-generated keystore for GitHub Releases.
-        // When the keystore file is absent, fall back to debug signing so local
-        // `assembleDebug` still works; `assembleRelease` will fail with a clear
-        // "keystore not found" error — generate one with:
-        //   keytool -genkeypair -keystore android/release.keystore \
-        //     -alias wisper -keyalg RSA -keysize 2048 -validity 10000 \
-        //     -storepass android -keypass android \
-        //     -dname "CN=Wisper, OU=Dev, O=go-gost"
         create("release") {
-            storeFile = rootProject.file("release.keystore")
-            storePassword = "android"
-            keyAlias = "wisper"
-            keyPassword = "android"
+            storeFile = (keystoreProperties["storeFile"] as String?)?.let { rootProject.file(it) }
+            storePassword = keystoreProperties.getProperty("storePassword", "")
+            keyAlias = keystoreProperties.getProperty("keyAlias", "")
+            keyPassword = keystoreProperties.getProperty("keyPassword", "")
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Sign with the release keystore when keystore.properties is
+            // configured; otherwise fall back to the debug key so a plain
+            // `assembleRelease` still yields an installable APK.
+            signingConfig = if (keystoreProperties.isEmpty) {
+                signingConfigs.getByName("debug")
+            } else {
+                signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
         }
         debug {

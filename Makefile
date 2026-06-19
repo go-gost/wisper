@@ -283,27 +283,31 @@ android: web
 	@echo "==> APK ready:"
 	@ls -lh android/app/build/outputs/apk/debug/*.apk 2>/dev/null || echo "  (no .apk found — check container logs)"
 
-# Same as `android` but builds a signed release APK. Needs a keystore:
-#   keytool -genkeypair -keystore android/release.keystore \
+# Same as `android` but builds a signed release APK. Requires a one-time
+# release keystore + keystore.properties (both gitignored):
+#   keytool -genkeypair -v -keystore android/release.keystore \
 #     -alias wisper -keyalg RSA -keysize 2048 -validity 10000 \
 #     -storepass android -keypass android \
 #     -dname "CN=Wisper, OU=Dev, O=go-gost"
+#   cat > android/keystore.properties <<'EOF'
+#   storeFile=release.keystore
+#   storePassword=android
+#   keyAlias=wisper
+#   keyPassword=android
+#   EOF
+# CI materializes the same two files from GitHub Secrets.
 .PHONY: android-release
 android-release: web
+	@if [ ! -f android/keystore.properties ] || [ ! -f android/release.keystore ]; then \
+		echo "ERROR: android/keystore.properties or android/release.keystore missing."; \
+		echo "Create a release keystore once (see comment above this target)."; \
+		exit 1; \
+	fi
 	@echo "==> Building Docker image $(ANDROID_IMAGE)..."
 	DOCKER_BUILDKIT=1 docker build -t $(ANDROID_IMAGE) -f android/Dockerfile.android android/
 	@echo "==> Cross-compiling libwisper.so + assembling release APK..."
 	@mkdir -p android/app/src/main/jniLibs/arm64-v8a
 	@mkdir -p android/app/src/main/jniLibs/x86_64
-	@if [ ! -f android/release.keystore ]; then \
-		echo "==> Generating release keystore (first time)..."; \
-		keytool -genkeypair -v \
-			-keystore android/release.keystore \
-			-alias wisper \
-			-keyalg RSA -keysize 2048 -validity 10000 \
-			-storepass android -keypass android \
-			-dname "CN=Wisper, OU=Dev, O=go-gost"; \
-	fi
 	docker run --rm \
 		-v "$(PWD):/wisper" \
 		-v "$$(go env GOMODCACHE):/root/go/pkg/mod" \
