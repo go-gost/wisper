@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { t, onLocaleChange } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getSettings, updateSettings, subscribe } from '../store/settings-store';
+import { GoBackend } from '../api/backend';
 import type { ThemePreference, LanguagePreference } from '../api/types';
 import '../components/app-scaffold';
 
@@ -38,8 +39,10 @@ export class SettingsPage extends LitElement {
   @state() private _inspectorConnected = false;
   @state() private _snackbar = '';
   @state() private _saving = false;
+  @state() private _version = '';
 
   private _unsubs: (() => void)[] = [];
+  private _backend = new GoBackend();
 
   connectedCallback() {
     super.connectedCallback();
@@ -66,6 +69,17 @@ export class SettingsPage extends LitElement {
       }),
       onLocaleChange(() => this.requestUpdate()),
     );
+
+    this._fetchVersion();
+  }
+
+  private async _fetchVersion(): Promise<void> {
+    try {
+      const v = await this._backend.getVersion();
+      this._version = v.version;
+    } catch {
+      this._version = '';
+    }
   }
 
   disconnectedCallback() {
@@ -327,7 +341,7 @@ export class SettingsPage extends LitElement {
         <div class="app-info">
           <img class="app-logo" src="/logo.png" alt="Wisper" />
           <div class="app-name">${t('appName')}</div>
-          <div class="app-version">v1.0.0 · GOST Tunnel Manager</div>
+          <div class="app-version">${this._version ? `v${this._version} · ` : ''}${t('appSubtitle')}</div>
         </div>
 
         <!-- Server Configuration -->

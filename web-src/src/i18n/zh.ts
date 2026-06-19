@@ -1,6 +1,7 @@
 const zh: Record<string, string> = {
   // App / UI labels
   appName: 'Wisper',
+  appSubtitle: 'GOST 隧道管理器',
   homeTabTunnel: '隧道',
   homeTabEntrypoint: '入口',
   homeEmptyTunnels: '暂无隧道',
