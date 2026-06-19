@@ -266,9 +266,16 @@ jobs:
         run: |
           VERSION="${TAG#v}"
           echo "Building Wisper APK version=${VERSION} (tag=${TAG})"
+          # Derive Android versionCode from semver (major*10000 + minor*100 + patch),
+          # dropping any prerelease suffix first. Computed HERE, outside the
+          # sh -c script below, so the single-quoted sed/awk programs are safe
+          # (single quotes must not appear inside the sh -c '...' blob).
+          VCODE=$(echo "${VERSION}" | sed 's/-.*//' | awk -F. '{print $1*10000+$2*100+$3}')
+          echo "Computed versionCode=${VCODE}"
 
           docker run --rm \
             -e "WISPER_VERSION=${VERSION}" \
+            -e "VCODE=${VCODE}" \
             -e "ANDROID_KEYSTORE" \
             -e "ANDROID_KEYSTORE_PASSWORD" \
             -v "$PWD:/wisper" \
@@ -286,13 +293,18 @@ jobs:
                 exit 1
               fi
               echo "$ANDROID_KEYSTORE" | base64 -d > /wisper/android/release.keystore
-              printf 'storeFile=release.keystore\nstorePassword=%s\nkeyAlias=wisper\nkeyPassword=%s\n' \
-                "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEYSTORE_PASSWORD" \
-                > /wisper/android/keystore.properties
+              # keystore.properties: one property per line, written with echo.
+              # This block runs inside sh -c, so do not use single-quoted
+              # literals or backslash-n escapes here; the outer shell would
+              # strip them. echo supplies the line breaks.
+              {
+                echo "storeFile=release.keystore"
+                echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+                echo "keyAlias=wisper"
+                echo "keyPassword=$ANDROID_KEYSTORE_PASSWORD"
+              } > /wisper/android/keystore.properties
 
-              echo "--- Injecting version ${WISPER_VERSION} ---"
-              VCODE=$(echo "$WISPER_VERSION" | sed 's/-.*//' | awk -F. '{print $1*10000+$2*100+$3}')
-              echo "--- Computed versionCode=${VCODE} ---"
+              echo "--- Injecting version ${WISPER_VERSION} (versionCode=${VCODE}) ---"
               sed -i "s/versionCode = [0-9][0-9]*/versionCode = ${VCODE}/" /wisper/android/app/build.gradle.kts
               sed -i "s/versionName = \"[^\"]*\"/versionName = \"${WISPER_VERSION}\"/" /wisper/android/app/build.gradle.kts
 
