@@ -156,6 +156,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" src-tauri/tauri.conf.json
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" src-tauri/Cargo.toml
 
       - name: Build Go sidecar
         run: make sidecar VERSION=${{ env.VERSION }}
@@ -207,10 +208,17 @@ jobs:
       - name: Build web UI
         run: cd web-src && npm ci && npx vite build
 
-      - name: Build Go sidecar (Windows)
+      - name: Inject version (tag → bare semver)
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" src-tauri/tauri.conf.json
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" src-tauri/Cargo.toml
+
+      - name: Build Go sidecar (Windows)
+        shell: bash
+        run: |
           mkdir -p src-tauri/binaries
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
             go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${VERSION}" \
