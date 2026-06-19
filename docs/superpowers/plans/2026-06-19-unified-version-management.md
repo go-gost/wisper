@@ -545,11 +545,11 @@ Find the Android version-injection block inside the docker `run` script:
               sed -i "s/versionName = \"[^\"]*\"/versionName = \"${WISPER_VERSION}\"/" /wisper/android/app/build.gradle.kts
 ```
 
-Replace with (compute `versionCode = major*10000 + minor*100 + patch`, inject it, then versionName):
+Replace with (compute `versionCode = major*10000 + minor*100 + patch` from the numeric core — stripping any prerelease suffix like `-rc1` so it doesn't corrupt the awk arithmetic — then inject it, then versionName which keeps the full version):
 
 ```bash
               echo "--- Injecting version ${WISPER_VERSION} ---"
-              VCODE=$(echo "$WISPER_VERSION" | awk -F. '{print $1*10000+$2*100+$3}')
+              VCODE=$(echo "$WISPER_VERSION" | sed 's/-.*//' | awk -F. '{print $1*10000+$2*100+$3}')
               echo "--- Computed versionCode=${VCODE} ---"
               sed -i "s/versionCode = [0-9][0-9]*/versionCode = ${VCODE}/" /wisper/android/app/build.gradle.kts
               sed -i "s/versionName = \"[^\"]*\"/versionName = \"${WISPER_VERSION}\"/" /wisper/android/app/build.gradle.kts
@@ -560,9 +560,9 @@ Replace with (compute `versionCode = major*10000 + minor*100 + patch`, inject it
 Run:
 ```bash
 python3 -c "import yaml; yaml.safe_load(open('.github/workflows/release.yml')); print('yaml ok')"
-echo "0.1.4" | awk -F. '{print $1*10000+$2*100+$3}'
+for v in 0.1.4 0.1.4-rc1; do echo "$v -> $(echo "$v" | sed 's/-.*//' | awk -F. '{print $1*10000+$2*100+$3}')"; done
 ```
-Expected: `yaml ok` then `104`.
+Expected: `yaml ok`, then `0.1.4 -> 104` and `0.1.4-rc1 -> 104` (prerelease suffix stripped before the arithmetic).
 
 - [ ] **Step 3: Commit**
 

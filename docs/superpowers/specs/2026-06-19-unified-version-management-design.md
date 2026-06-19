@@ -182,3 +182,13 @@ These become the acceptance checks for the implementation.
 - **`git describe` during a shallow checkout:** `actions/checkout` already uses
   `fetch-depth: 0` in the relevant jobs, so tags are present. Local shallow clones
   fall back to `0.0.0-dev`.
+- **Prerelease tags (`vX.Y.Z-rc1`, `-alpha`, `-beta`):** the workflow's `create-release`
+  job treats these as prereleases, so they are supported inputs. The Android
+  `versionCode` strips the prerelease suffix before the arithmetic
+  (`sed 's/-.*//'`), so `0.1.4-rc1` and the final `0.1.4` both map to `versionCode 104`
+  while `versionName` keeps the full `0.1.4-rc1`. Consequence: a prerelease and the
+  final of the same `X.Y.Z` share a `versionCode`, so they cannot coexist as
+  upgradable versions in the same Android channel. This is acceptable for
+  GitHub-release artifacts (the final supersedes the prerelease) but should be
+  revisited if prereleases are ever published to Play Store. No prerelease tag has
+  been cut on this project to date.
