@@ -10,7 +10,14 @@
 #   make clean        — remove build artifacts
 
 BINARY  := wisper
-VERSION := 0.1.0
+# VERSION is derived from the most recent git tag (the single source of truth),
+# with the leading "v" stripped. Falls back to 0.0.0-dev when there is no tag.
+# Override on the command line for CI: `make sidecar VERSION=0.1.4`.
+GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
+VERSION := $(patsubst v%,%,$(GIT_TAG))
+ifeq ($(strip $(VERSION)),)
+VERSION := 0.0.0-dev
+endif
 LDFLAGS := -s -w -X github.com/go-gost/wisper/version.Version=$(VERSION)
 
 # Output directories
