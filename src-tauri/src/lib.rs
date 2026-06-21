@@ -210,17 +210,9 @@ pub fn run() {
             });
 
             // 3. System tray — always present so tunnels keep running in background
-            // Each item carries the app icon so the menu is never entirely blank:
-            // the icon is a separate dbusmenu property from the text label and
-            // tends to survive the AppIndicator D-Bus export race that blanks
-            // labels on the first open of a cold-launched tray.
-            let menu_icon = app
-                .default_window_icon()
-                .cloned()
-                .expect("default window icon missing");
             let tray_menu = MenuBuilder::new(app)
-                .icon("show", "Show", menu_icon.clone())
-                .icon("quit", "Quit Wisper", menu_icon)
+                .text("show", "Show")
+                .text("quit", "Quit Wisper")
                 .build()?;
 
             let _tray = TrayIconBuilder::new()
