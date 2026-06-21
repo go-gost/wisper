@@ -238,6 +238,66 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  desktop-macos:
+    name: Desktop (macOS)
+    needs: [create-release]
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web-src/package-lock.json
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build web UI
+        run: cd web-src && npm ci && npx vite build
+
+      - name: Inject version (tag → bare semver)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" src-tauri/tauri.conf.json
+          sed -i '' "s/^version = \".*\"/version = \"${VERSION}\"/" src-tauri/Cargo.toml
+
+      - name: Build Go sidecar (macOS ARM)
+        run: |
+          mkdir -p src-tauri/binaries
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 \
+            go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${VERSION}" \
+            -o src-tauri/binaries/wisper-api-aarch64-apple-darwin .
+
+      - name: Build macOS DMG
+        run: npx --yes @tauri-apps/cli@latest build --bundles dmg
+        working-directory: src-tauri
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   android:
     name: Android (APK)
     needs: [create-release]

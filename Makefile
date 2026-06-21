@@ -33,7 +33,7 @@ SIDECAR_DIR   := src-tauri/binaries
 SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
-.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer android android-release android-test-image android-test-smoke android-test-full android-test-stop
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer macos-sidecar macos-installer android android-release android-test-image android-test-smoke android-test-full android-test-stop
 
 all: linux darwin windows
 
@@ -233,6 +233,39 @@ linux-installer: web sidecar
 	@echo "==> Linux installers ready:"
 	@ls -lh $(LINUX_DEB_DIST)/*.deb 2>/dev/null || echo "  (no .deb found — check container logs)"
 	@ls -lh $(LINUX_APPIMAGE_DIST)/*.AppImage 2>/dev/null || echo "  (no .AppImage found — check container logs)"
+
+# ----- macOS desktop -----
+# Builds a .dmg from a macOS host (or macos-latest CI runner).
+# Prerequisites: Xcode CLT, Node, Go, Rust toolchain (no extra deps needed).
+#
+# Division of labor:
+#   make macos-sidecar  → Go arm64 sidecar in src-tauri/binaries/
+#   make macos-installer → web + sidecar + npx tauri build --bundles dmg
+#
+# Artifacts land in:
+#   src-tauri/target/release/bundle/dmg/
+#   src-tauri/target/release/bundle/macos/  (.app)
+
+MAC_TRIPLE     := aarch64-apple-darwin
+MAC_SIDECAR    := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(MAC_TRIPLE)
+
+.PHONY: macos-sidecar
+macos-sidecar:
+	@echo "Building wisper sidecar for $(MAC_TRIPLE)..."
+	@mkdir -p $(SIDECAR_DIR)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(MAC_SIDECAR) .
+	@echo "Sidecar ready: $(MAC_SIDECAR)"
+
+# Full pipeline: web → macos-sidecar → cargo tauri build → .dmg.
+# Only works on a macOS host (or macOS CI runner). Run `make macos-installer`
+# to produce the release DMG.
+.PHONY: macos-installer
+macos-installer: web macos-sidecar
+	@echo "==> Building macOS DMG..."
+	cd src-tauri && npx --yes @tauri-apps/cli@latest build --bundles dmg
+	@echo "==> macOS installer ready:"
+	@ls -lh src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null || echo "  (no .dmg found)"
+	@ls -lh src-tauri/target/release/bundle/macos/*.app 2>/dev/null || echo "  (no .app found)"
 
 # ----- Cross-platform Go binaries (no Tauri shell) -----
 

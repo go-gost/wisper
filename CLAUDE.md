@@ -214,9 +214,37 @@ API tests (`api/api_test.go`) use `httptest.NewServer` and pre-register tunnel/e
 
 ## Desktop/Mobile Wrapping
 
-The Lit web app is designed (but not yet implemented) for wrapping into desktop and mobile apps:
+The Tauri 2 desktop shell lives at `src-tauri/`. It spawns the Go binary as a sidecar, serves the Lit web UI through a system WebView, and provides a system tray icon. Build targets:
 
-- **Electron/Tauri**: Load `index.html` in a BrowserWindow/WebView, spawn Go backend as sidecar
-- **Capacitor**: Copy `web/` into Capacitor `www/`, run Go backend as embedded server
+```bash
+# Linux (.deb + .AppImage)
+make linux-installer         # Docker-based (no host system deps needed)
+make sidecar && cargo tauri build   # native (requires webkit2gtk dev headers)
 
-The key design decisions: all API calls use relative paths, no Node.js-specific APIs, optional `baseUrl` on GoBackend for non-embedded scenarios, CSS custom properties for theming everywhere.
+# macOS (.dmg)
+make macos-installer         # macOS host only (or macos-latest CI)
+make macos-sidecar           # cross-compile Go sidecar for darwin-arm64 only
+
+# Windows (NSIS .exe)
+make windows-installer       # Docker cross-compile from Linux
+make windows-sidecar         # cross-compile Go sidecar for windows-amd64 only
+
+# Development
+make tauri-dev               # hot-reload frontend + sidecar
+
+# Icons — regenerate all brand assets from appicon.png
+make icons                   # requires Python 3 + Pillow
+```
+
+Android APK is built via Docker + NDK cross-compile: `make android` / `make android-release`.
+
+The sidecar binary name is `wisper-api` (must differ from the Cargo package name `wisper`). All API calls use relative paths, no Node.js-specific APIs, optional `baseUrl` on GoBackend for non-embedded scenarios, CSS custom properties for theming everywhere.
+
+### GitHub Actions release pipeline (`release.yml`)
+
+Current desktop build jobs (all `needs: create-release`):
+- **`desktop-linux`** — ubuntu-latest, native `deb+appimage` via `npx tauri build`
+- **`desktop-macos`** — macos-latest, native `.dmg` via `npx tauri build` (unsigned, ARM-native)
+- **`desktop-windows`** — windows-latest, native `.nsis` via `npx tauri build`
+- **`goreleaser`** — cross-compiles Go CLI binaries (linux/darwin/windows, amd64/arm64)
+- **`android`** — Docker-based NDK cross-compile + Gradle release APK
