@@ -290,6 +290,17 @@ jobs:
         run: npx --yes @tauri-apps/cli@latest build --bundles dmg
         working-directory: src-tauri
 
+      - name: Ad-hoc code sign (avoids "damaged" Gatekeeper error)
+        run: |
+          APP="src-tauri/target/release/bundle/macos/Wisper.app"
+          if [ -d "$APP" ]; then
+            echo "Ad-hoc signing $APP..."
+            codesign --force --deep --sign - "$APP"
+            codesign --verify --verbose=2 "$APP" || true
+          else
+            echo "WARNING: .app not found at $APP, skipping signing"
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
