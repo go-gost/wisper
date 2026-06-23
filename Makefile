@@ -259,10 +259,27 @@ macos-sidecar:
 # Full pipeline: web → macos-sidecar → cargo tauri build → .dmg.
 # Only works on a macOS host (or macOS CI runner). Run `make macos-installer`
 # to produce the release DMG.
+#
+# Build order matters: Tauri builds the .app, then we ad-hoc code sign it
+# BEFORE creating the DMG. Without any signature, macOS shows "damaged and
+# can't be opened"; with an ad-hoc signature users get the bypassable
+# "unidentified developer" dialog (right-click → Open).
+MACOS_APP := src-tauri/target/release/bundle/macos/Wisper.app
+
 .PHONY: macos-installer
 macos-installer: web macos-sidecar
-	@echo "==> Building macOS DMG..."
-	cd src-tauri && npx --yes @tauri-apps/cli@latest build --bundles dmg
+	@echo "==> Building macOS .app..."
+	cd src-tauri && npx --yes @tauri-apps/cli@latest build --bundles app
+	@echo "==> Ad-hoc code signing .app..."
+	find "$(MACOS_APP)" -type f \( -perm +111 -o -name "*.dylib" -o -name "*.so" \) | while read f; do \
+		codesign --force --sign - --timestamp=none "$$f" 2>/dev/null || true; \
+	done
+	codesign --force --deep --sign - --timestamp=none "$(MACOS_APP)"
+	codesign --verify --verbose=1 "$(MACOS_APP)"
+	@echo "==> Creating DMG..."
+	hdiutil create -volname Wisper -srcfolder "$(MACOS_APP)" \
+		-ov -format UDZO -fs HFS+ \
+		src-tauri/target/release/bundle/dmg/Wisper_$$(git describe --tags --abbrev=0 | sed 's/^v//')_aarch64.dmg
 	@echo "==> macOS installer ready:"
 	@ls -lh src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null || echo "  (no .dmg found)"
 	@ls -lh src-tauri/target/release/bundle/macos/*.app 2>/dev/null || echo "  (no .app found)"

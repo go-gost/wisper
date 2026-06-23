@@ -286,20 +286,33 @@ jobs:
             go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${VERSION}" \
             -o src-tauri/binaries/wisper-api-aarch64-apple-darwin .
 
-      - name: Build macOS DMG
-        run: npx --yes @tauri-apps/cli@latest build --bundles dmg
+      - name: Build macOS .app (unsigned)
+        run: npx --yes @tauri-apps/cli@latest build --bundles app
         working-directory: src-tauri
 
-      - name: Ad-hoc code sign (avoids "damaged" Gatekeeper error)
+      - name: Ad-hoc code sign .app
         run: |
           APP="src-tauri/target/release/bundle/macos/Wisper.app"
-          if [ -d "$APP" ]; then
-            echo "Ad-hoc signing $APP..."
-            codesign --force --deep --sign - "$APP"
-            codesign --verify --verbose=2 "$APP" || true
-          else
-            echo "WARNING: .app not found at $APP, skipping signing"
-          fi
+          # Sign inner binaries first (sidecar + Rust binary), then the bundle.
+          find "$APP" -type f \( -perm +111 -o -name "*.dylib" -o -name "*.so" \) | while read f; do
+            codesign --force --sign - --timestamp=none --preserve-metadata=entitlements "$f" 2>/dev/null || true
+          done
+          codesign --force --deep --sign - --timestamp=none "$APP"
+          echo "Verifying signature..."
+          codesign --verify --verbose=1 "$APP"
+
+      - name: Create DMG
+        run: |
+          APP="src-tauri/target/release/bundle/macos/Wisper.app"
+          DMG="src-tauri/target/release/bundle/dmg/Wisper_${VERSION}_aarch64.dmg"
+          mkdir -p "$(dirname "$DMG")"
+          # Unmount any stale mount with the same name first.
+          hdiutil detach /Volumes/Wisper 2>/dev/null || true
+          hdiutil create -volname Wisper -srcfolder "$APP" \
+            -ov -format UDZO -fs HFS+ \
+            "$DMG"
+          echo "DMG created: $DMG"
+          ls -lh "$DMG"
 
       - uses: softprops/action-gh-release@v2
         with:
