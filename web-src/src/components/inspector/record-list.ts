@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { InspectorRecord, ProtocolType } from '../../api/types';
+import { InspectorApiClient } from '../../api/inspector';
 import { t } from '../../i18n/i18n';
 import { formatBytes, formatTimestamp, formatDuration } from '../../utils/format';
 import './record-detail';
@@ -46,6 +47,7 @@ export class RecordList extends LitElement {
   @property({ type: Number }) selectedIndex = -1;
   @property({ type: Boolean }) hasMore = false;
   @property({ type: Boolean }) loading = false;
+  @property({ attribute: false }) client: InspectorApiClient | null = null;
 
   private _observer: IntersectionObserver | null = null;
 
@@ -179,7 +181,7 @@ export class RecordList extends LitElement {
         @click=${() => this.dispatchEvent(new CustomEvent('record-select', { detail: i, bubbles: true, composed: true }))}>
         ${body}
       </div>
-      ${this.selectedIndex === i ? html`<record-detail .record=${r}></record-detail>` : ''}
+      ${this.selectedIndex === i ? html`<record-detail .record=${r} .client=${this.client}></record-detail>` : ''}
     `;
   }
 

@@ -153,8 +153,8 @@ export interface HttpRecord {
   scheme: string;
   uri: string;
   statusCode: number;
-  request: { header: HttpHeaders; body: string };   // body = base64
-  response: { header: HttpHeaders; body: string };  // body = base64
+  request: { header: HttpHeaders | null; body: string | null };   // null when from list (excluded via projection)
+  response: { header: HttpHeaders | null; body: string | null };  // null when from list
 }
 
 export interface WsRecord {
@@ -167,10 +167,11 @@ export interface WsRecord {
   masked: boolean;
   maskKey?: number;
   length: number;
-  payload: string;  // base64
+  payload: string | null;  // null when from list
 }
 
 export interface InspectorRecord {
+  id?: string;          // MongoDB ObjectID hex — set from list cursor & detail endpoint
   node?: string;
   service: string;
   network: string;

@@ -1,4 +1,4 @@
-import type { InspectorQueryResponse, ProtocolType } from './types';
+import type { InspectorQueryResponse, InspectorRecord, ProtocolType } from './types';
 
 export class InspectorApiClient {
   private baseUrl: string;
@@ -61,6 +61,15 @@ export class InspectorApiClient {
 
     const wsUrl = this.baseUrl.replace(/^http/, 'ws');
     return new WebSocket(`${wsUrl}/api/records/tail?${search.toString()}`);
+  }
+
+  /** GET /api/records/:id — full record with body + headers */
+  async getRecord(id: string): Promise<InspectorRecord> {
+    const res = await fetch(`${this.baseUrl}/api/records/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error(`Inspector record detail failed: ${res.status}`);
+    const resp = await res.json();
+    if (resp.code !== 0) throw new Error(resp.msg || resp.error || 'Unknown error');
+    return resp.data;
   }
 }
 

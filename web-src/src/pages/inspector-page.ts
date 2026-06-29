@@ -382,6 +382,7 @@ export class InspectorPage extends LitElement {
             .selectedIndex=${this._selectedIndex}
             .loading=${this._mode === 'query' && this._loading}
             .hasMore=${this._mode === 'query' && this._hasMore}
+            .client=${this._client}
             @record-select=${this._onRecordSelect}
             @load-more=${() => this._onLoadMore()}>
           </record-list>
