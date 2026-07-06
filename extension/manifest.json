@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Wisper Tunnel",
+  "version": "1.0.0",
+  "description": "Expose local HTTP services to the internet via GOST tunnels. One click, no CLI.",
+  "permissions": [
+    "offscreen",
+    "storage",
+    "sidePanel",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*",
+    "http://192.168.*.*:*/*",
+    "http://10.*.*.*:*/*",
+    "ws://localhost:*/*",
+    "ws://127.0.0.1:*/*",
+    "ws://192.168.*.*:*/*",
+    "ws://10.*.*.*:*/*",
+    "https://wisper.gost.run/"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Wisper Tunnel"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

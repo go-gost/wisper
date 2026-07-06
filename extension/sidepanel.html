@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wisper Tunnel</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-card: #f8f9fa;
+    --text: #1a1a2e;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --radius: 8px;
+    --font-mono: 'SF Mono', 'Cascadia Code', monospace;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a2e;
+      --bg-card: #16213e;
+      --text: #e8e8f0;
+      --text-muted: #9ca3af;
+      --border: #374151;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; }
+
+  /* ── Cards ──────────────────────────────────────── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow);
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .card-title { font-weight: 600; }
+  .card-meta { font-size: 12px; color: var(--text-muted); }
+
+  /* ── Status badges ──────────────────────────────── */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+  .badge-running { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-stopped { background: rgba(107,114,128,0.15); color: var(--text-muted); }
+  .badge-error   { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-connecting { background: rgba(245,158,11,0.15); color: var(--amber); }
+
+  /* ── Buttons ────────────────────────────────────── */
+  .btn {
+    padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 500; transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-danger  { background: var(--red); color: white; }
+  .btn-ghost   { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-small   { padding: 3px 10px; font-size: 12px; }
+
+  /* ── Forms ──────────────────────────────────────── */
+  .form-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .form-row input, .form-row select {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--bg); color: var(--text);
+    font-size: 13px;
+  }
+  .form-row input::placeholder { color: var(--text-muted); }
+
+  /* ── Misc ───────────────────────────────────────── */
+  .entrypoint {
+    font-family: var(--font-mono); font-size: 12px; color: var(--accent);
+    word-break: break-all; margin: 4px 0;
+  }
+  .empty { text-align: center; color: var(--text-muted); padding: 32px 0; font-size: 13px; }
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+  .flex-row { display: flex; align-items: center; gap: 8px; }
+  .flex-grow { flex: 1; }
+  .section-toggle { cursor: pointer; user-select: none; color: var(--text-muted); font-size: 12px; }
+  .section-toggle:hover { color: var(--accent); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h1>🚇 Wisper Tunnel</h1>
+
+<!-- Tunnel list -->
+<div id="tunnel-list"></div>
+
+<!-- Create form -->
+<div id="create-section" class="hidden">
+  <h2>New Tunnel</h2>
+  <div class="form-row">
+    <input id="new-name" placeholder="Name (optional)" maxlength="64">
+    <input id="new-port" placeholder="Local port (e.g. 8080)" type="number" min="1" max="65535">
+  </div>
+  <button class="btn btn-primary" id="btn-create">Create & Start</button>
+  <button class="btn btn-ghost" id="btn-cancel-create">Cancel</button>
+</div>
+
+<button class="btn btn-primary" id="btn-show-create" style="width:100%; margin-top:8px">+ New Tunnel</button>
+
+<div class="divider"></div>
+
+<!-- Settings -->
+<div id="settings-section" class="hidden">
+  <h2>Settings</h2>
+  <div class="form-row">
+    <input id="settings-relay" placeholder="Relay server URL">
+  </div>
+  <div class="form-row">
+    <input id="settings-username" placeholder="Username (optional)">
+    <input id="settings-password" placeholder="Password (optional)" type="password">
+  </div>
+  <button class="btn btn-primary" id="btn-save-settings">Save</button>
+</div>
+
+<button class="btn btn-ghost" id="btn-toggle-settings" style="width:100%; margin-top:8px">⚙ Settings</button>
+
+<script src="sidepanel.js"></script>
+</body>
+</html>
