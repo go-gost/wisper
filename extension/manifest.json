@@ -6,29 +6,26 @@
   "permissions": [
     "offscreen",
     "storage",
-    "sidePanel",
     "alarms"
   ],
   "host_permissions": [
-    "http://localhost:*/*",
-    "http://127.0.0.1:*/*",
-    "http://192.168.*.*:*/*",
-    "http://10.*.*.*:*/*",
-    "ws://localhost:*/*",
-    "ws://127.0.0.1:*/*",
-    "ws://192.168.*.*:*/*",
-    "ws://10.*.*.*:*/*",
-    "https://wisper.gost.run/"
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://wisper.gost.run/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
   "action": {
-    "default_title": "Wisper Tunnel"
+    "default_title": "Wisper Tunnel",
+    "default_popup": "sidepanel.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "icons": {
     "16": "icons/icon16.png",

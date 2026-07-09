@@ -1,141 +1,952 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wisper Tunnel</title>
-<style>
-  :root {
-    --bg: #ffffff;
-    --bg-card: #f8f9fa;
-    --text: #1a1a2e;
-    --text-muted: #6b7280;
-    --border: #e5e7eb;
-    --accent: #3b82f6;
-    --green: #22c55e;
-    --red: #ef4444;
-    --amber: #f59e0b;
-    --radius: 8px;
-    --font-mono: 'SF Mono', 'Cascadia Code', monospace;
-    --shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  @media (prefers-color-scheme: dark) {
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>Wisper Tunnel</title>
+  <style>
+    /* ── Design system — matches web UI theme.css ───────────────────── */
+
     :root {
-      --bg: #1a1a2e;
-      --bg-card: #16213e;
-      --text: #e8e8f0;
+      --bg: #fafafa;
+      --surface: #fff;
+      --border: #e5e7eb;
+      --border-subtle: #f3f4f6;
+      --text: #111827;
+      --text-secondary: #6b7280;
       --text-muted: #9ca3af;
-      --border: #374151;
+      --accent: #374151;
+      --accent-fg: #fff;
+      --green: #10b981;
+      --green-bg: #ecfdf5;
+      --green-border: #a7f3d0;
+      --green-text: #059669;
+      --red: #ef4444;
+      --red-bg: #fef2f2;
+      --red-border: #fecaca;
+      --red-text: #dc2626;
+      --amber: #f59e0b;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+      --font-xs: 0.6875rem;
+      --font-sm: 0.8125rem;
+      --font-md: 1rem;
+      --font-lg: 1.25rem;
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --radius-pill: 24px;
+      --transition-fast: 0.15s;
     }
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    background: var(--bg);
-    color: var(--text);
-    padding: 16px;
-  }
-  h1 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
-  h2 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; }
 
-  /* ── Cards ──────────────────────────────────────── */
-  .card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    margin-bottom: 8px;
-    box-shadow: var(--shadow);
-  }
-  .card-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 8px;
-  }
-  .card-title { font-weight: 600; }
-  .card-meta { font-size: 12px; color: var(--text-muted); }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --surface: #222240;
+        --border: #3a3a5c;
+        --border-subtle: #2a2a45;
+        --text: #e8e8f0;
+        --text-secondary: #a0a0b8;
+        --text-muted: #6e6e88;
+        --accent: #818cf8;
+        --accent-fg: #fff;
+        --green: #4ade80;
+        --green-bg: rgba(74, 222, 128, 0.1);
+        --green-border: rgba(74, 222, 128, 0.2);
+        --green-text: #4ade80;
+        --red: #f87171;
+        --red-bg: rgba(248, 113, 113, 0.1);
+        --red-border: rgba(248, 113, 113, 0.2);
+        --red-text: #f87171;
+        --amber: #fbbf24;
+        --amber-bg: rgba(251, 191, 36, 0.1);
+        --amber-border: rgba(251, 191, 36, 0.2);
+      }
+    }
 
-  /* ── Status badges ──────────────────────────────── */
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 12px;
-    font-size: 11px; font-weight: 600; text-transform: uppercase;
-  }
-  .badge-running { background: rgba(34,197,94,0.15); color: var(--green); }
-  .badge-stopped { background: rgba(107,114,128,0.15); color: var(--text-muted); }
-  .badge-error   { background: rgba(239,68,68,0.15); color: var(--red); }
-  .badge-connecting { background: rgba(245,158,11,0.15); color: var(--amber); }
+    /* ── Reset ── */
 
-  /* ── Buttons ────────────────────────────────────── */
-  .btn {
-    padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
-    font-size: 13px; font-weight: 500; transition: opacity 0.15s;
-  }
-  .btn:hover { opacity: 0.85; }
-  .btn-primary { background: var(--accent); color: white; }
-  .btn-danger  { background: var(--red); color: white; }
-  .btn-ghost   { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-  .btn-small   { padding: 3px 10px; font-size: 12px; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── Forms ──────────────────────────────────────── */
-  .form-row { display: flex; gap: 8px; margin-bottom: 8px; }
-  .form-row input, .form-row select {
-    flex: 1; padding: 8px 10px; border: 1px solid var(--border);
-    border-radius: 6px; background: var(--bg); color: var(--text);
-    font-size: 13px;
-  }
-  .form-row input::placeholder { color: var(--text-muted); }
+    body {
+      width: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-size: var(--font-sm);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
 
-  /* ── Misc ───────────────────────────────────────── */
-  .entrypoint {
-    font-family: var(--font-mono); font-size: 12px; color: var(--accent);
-    word-break: break-all; margin: 4px 0;
-  }
-  .empty { text-align: center; color: var(--text-muted); padding: 32px 0; font-size: 13px; }
-  .divider { height: 1px; background: var(--border); margin: 16px 0; }
-  .flex-row { display: flex; align-items: center; gap: 8px; }
-  .flex-grow { flex: 1; }
-  .section-toggle { cursor: pointer; user-select: none; color: var(--text-muted); font-size: 12px; }
-  .section-toggle:hover { color: var(--accent); }
-  .hidden { display: none; }
-</style>
+    /* ── Header ── */
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .header-logo {
+      width: 22px;
+      height: 22px;
+    }
+
+    .header-title {
+      font-size: var(--font-md);
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .header-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      transition: color var(--transition-fast), background var(--transition-fast);
+    }
+    .header-btn:hover {
+      color: var(--text);
+      background: var(--border-subtle);
+    }
+
+    /* ── Views ── */
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── List container ── */
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 10px 4px 10px;
+    }
+
+    /* ── Tunnel Card (matches tunnel-card.ts) ── */
+
+    .tunnel-card-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 12px;
+      background: var(--border-subtle);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+    .tunnel-card-row:hover {
+      background: var(--border);
+    }
+    .tunnel-card-row.stopped {
+      opacity: 0.55;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--text-muted);
+      align-self: center;
+    }
+    .status-dot.running {
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+    }
+    .status-dot.error {
+      background: var(--red);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+    }
+
+    .card-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-name {
+      font-size: var(--font-md);
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-meta {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+    }
+
+    .card-right {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      min-width: 60px;
+    }
+
+    .card-time {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    .card-traffic {
+      text-align: right;
+      font-size: var(--font-sm);
+      color: var(--text);
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-traffic-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 2px;
+    }
+
+    .card-traffic-total {
+      color: var(--text-secondary);
+      font-size: var(--font-sm);
+    }
+
+    .card-chevron {
+      flex-shrink: 0;
+      color: var(--text-muted);
+      transition: transform var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      align-self: stretch;
+      padding: 0 8px;
+      margin: -8px -12px;
+      margin-left: 0;
+    }
+    .card-chevron.open {
+      transform: rotate(90deg);
+    }
+
+    .card-chevron svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ── Error banner (matches tunnel-card.ts) ── */
+
+    .card-error {
+      padding: 5px 14px 5px 34px;
+      background: var(--red-bg);
+      border-radius: var(--radius-sm);
+      margin-top: 2px;
+      font-size: var(--font-sm);
+      color: var(--red-text);
+    }
+
+    /* ── Expand panel (matches home-page.ts) ── */
+
+    .expand-panel {
+      display: none;
+      padding: 12px 16px 12px 30px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-direction: column;
+      gap: 8px;
+    }
+    .expand-panel.open { display: flex; }
+
+    .detail-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--font-sm);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+
+    .detail-label {
+      color: var(--text-muted);
+      width: 70px;
+      flex-shrink: 0;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      flex: 1;
+      color: var(--text);
+    }
+
+    .copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 1px;
+      display: inline-flex;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .copy-btn:hover {
+      background: var(--border-subtle);
+      color: var(--text);
+    }
+
+    .copy-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* ── Action buttons (matches home-page.ts action-btn) ── */
+
+    .expand-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .action-btn {
+      padding: 5px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: var(--font-sm);
+      line-height: 1;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .action-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+    .action-btn:hover {
+      background: var(--border-subtle);
+    }
+    .action-btn.start {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+    }
+    .action-btn.stop {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red);
+    }
+    .action-btn.danger {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red);
+    }
+    .action-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── Empty state ── */
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+    }
+    .empty-state svg {
+      width: 32px;
+      height: 32px;
+      margin-bottom: 8px;
+      opacity: 0.4;
+    }
+    .empty-state p {
+      font-size: var(--font-sm);
+      margin-bottom: 16px;
+    }
+
+    /* ── AppBar (form header) ── */
+
+    .appbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .back-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text);
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+    }
+    .back-btn:hover {
+      background: var(--border-subtle);
+    }
+
+    .appbar-title {
+      font-size: var(--font-md);
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .save-btn {
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: var(--font-sm);
+      font-weight: 500;
+      font-family: inherit;
+      background: var(--accent);
+      color: var(--accent-fg);
+      transition: opacity var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .save-btn:hover { opacity: 0.85; }
+    .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .save-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* ── Form ── */
+
+    .form-scroll {
+      padding: 16px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: var(--font-sm);
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      color: var(--text);
+      font-size: var(--font-sm);
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition-fast);
+    }
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+    .form-input[readonly] {
+      background: var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    /* ── Switch ── */
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 0;
+    }
+
+    .switch-label {
+      font-size: var(--font-sm);
+      color: var(--text);
+    }
+
+    .switch {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      flex-shrink: 0;
+    }
+    .switch.on {
+      background: var(--accent);
+    }
+
+    .switch-knob {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    }
+    .switch.on .switch-knob {
+      left: 20px;
+    }
+
+    /* ── Danger zone ── */
+
+    .danger-zone {
+      margin-top: 20px;
+      padding: 14px;
+      border: 1px solid var(--red-border);
+      border-radius: var(--radius-md);
+    }
+
+    .danger-zone-label {
+      font-size: var(--font-sm);
+      font-weight: 600;
+      color: var(--red-text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .pill-btn {
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: var(--font-sm);
+      font-weight: 500;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pill-btn.danger {
+      background: var(--red);
+      color: #fff;
+    }
+    .pill-btn:hover { opacity: 0.85; }
+
+    /* ── FAB ── */
+
+    .fab-area {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .fab {
+      width: 100%;
+      padding: 10px;
+      border-radius: var(--radius-lg);
+      border: 1px dashed var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: var(--font-sm);
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
+    }
+    .fab:hover {
+      border-color: var(--accent);
+      background: var(--border-subtle);
+    }
+
+    .fab svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .footer-link {
+      text-align: center;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+    }
+    .footer-link span {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .footer-link span:hover {
+      color: var(--text);
+    }
+    .footer-link svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* ── Toast ── */
+
+    .toast {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: var(--radius-lg);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-size: var(--font-sm);
+      z-index: 100;
+      animation: toast-in 0.25s ease;
+      border: 1px solid var(--border-subtle);
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* ── Delete dialog ── */
+
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      animation: fade-in 0.15s ease;
+    }
+    @keyframes fade-in { from { opacity: 0; } }
+
+    .dialog-box {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      max-width: 280px;
+      width: 90%;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .dialog-title {
+      font-weight: 600;
+      font-size: var(--font-md);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .dialog-message {
+      color: var(--text-secondary);
+      font-size: var(--font-sm);
+      margin-bottom: 20px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .dialog-btn {
+      padding: 8px 20px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: var(--font-sm);
+      font-weight: 500;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .dialog-btn.cancel {
+      background: var(--border-subtle);
+      color: var(--text);
+    }
+    .dialog-btn.danger {
+      background: var(--red);
+      color: #fff;
+    }
+    .dialog-btn:hover { opacity: 0.85; }
+
+    /* ── Settings ── */
+
+    .section-label {
+      font-size: var(--font-xs);
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 12px 14px 6px;
+    }
+
+    .settings-card {
+      background: var(--surface);
+      margin: 0 14px 12px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+    }
+
+    .settings-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      gap: 10px;
+    }
+    .settings-item:last-child { border-bottom: none; }
+
+    .settings-label {
+      font-size: var(--font-sm);
+      font-weight: 500;
+      color: var(--text);
+      width: 65px;
+      flex-shrink: 0;
+    }
+
+    .settings-input {
+      flex: 1;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: var(--font-xs);
+      font-family: inherit;
+      outline: none;
+    }
+    .settings-input:focus {
+      border-color: var(--accent);
+    }
+
+    .settings-actions {
+      margin: 0 14px 14px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .settings-btn {
+      flex: 1;
+      padding: 8px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: var(--font-sm);
+      font-weight: 500;
+      font-family: inherit;
+      transition: opacity var(--transition-fast);
+    }
+    .settings-btn.primary { background: var(--accent); color: var(--accent-fg); }
+    .settings-btn.ghost {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .settings-btn:hover { opacity: 0.85; }
+  </style>
 </head>
 <body>
+  <!-- ── Toast ── -->
+  <div id="toast" class="toast" style="display:none"></div>
 
-<h1>🚇 Wisper Tunnel</h1>
-
-<!-- Tunnel list -->
-<div id="tunnel-list"></div>
-
-<!-- Create form -->
-<div id="create-section" class="hidden">
-  <h2>New Tunnel</h2>
-  <div class="form-row">
-    <input id="new-name" placeholder="Name (optional)" maxlength="64">
-    <input id="new-port" placeholder="Local port (e.g. 8080)" type="number" min="1" max="65535">
+  <!-- ── Delete dialog ── -->
+  <div id="deleteDialog" class="dialog-overlay" style="display:none">
+    <div class="dialog-box">
+      <div class="dialog-title">Delete Tunnel</div>
+      <div class="dialog-message" id="deleteMsg">Are you sure you want to delete this tunnel?</div>
+      <div class="dialog-actions">
+        <button class="dialog-btn cancel" id="deleteCancel">Cancel</button>
+        <button class="dialog-btn danger" id="deleteConfirm">Delete</button>
+      </div>
+    </div>
   </div>
-  <button class="btn btn-primary" id="btn-create">Create & Start</button>
-  <button class="btn btn-ghost" id="btn-cancel-create">Cancel</button>
-</div>
 
-<button class="btn btn-primary" id="btn-show-create" style="width:100%; margin-top:8px">+ New Tunnel</button>
+  <!-- ════════════════════════════════════════════════════════════
+       VIEW 1: List
+       ════════════════════════════════════════════════════════════ -->
+  <div id="viewList" class="view active">
+    <div class="header">
+      <svg class="header-logo" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="11" cy="11" r="9" stroke="var(--accent)" />
+        <path d="M6 11h10M11 6v10" stroke="var(--accent)" stroke-width="1.5" />
+        <circle cx="11" cy="11" r="1.5" fill="var(--accent)" stroke="none" />
+      </svg>
+      <span class="header-title">Wisper Tunnel</span>
+      <button class="header-btn" id="btnSettings" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </button>
+    </div>
 
-<div class="divider"></div>
+    <div id="tunnelList">
+      <div class="list" id="cardsContainer"></div>
+    </div>
 
-<!-- Settings -->
-<div id="settings-section" class="hidden">
-  <h2>Settings</h2>
-  <div class="form-row">
-    <input id="settings-relay" placeholder="Relay server URL">
+    <div id="emptyState" class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="2" />
+        <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+      </svg>
+      <p>No tunnels yet</p>
+    </div>
+
+    <div class="fab-area">
+      <button class="fab" id="btnNewTunnel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        New Tunnel
+      </button>
+      <div class="footer-link">
+        <span id="btnOpenSettings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+          Settings
+        </span>
+      </div>
+    </div>
   </div>
-  <div class="form-row">
-    <input id="settings-username" placeholder="Username (optional)">
-    <input id="settings-password" placeholder="Password (optional)" type="password">
+
+  <!-- ════════════════════════════════════════════════════════════
+       VIEW 2: Create / Edit Form
+       ════════════════════════════════════════════════════════════ -->
+  <div id="viewForm" class="view">
+    <div class="appbar">
+      <button class="back-btn" id="formBack">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+      <span class="appbar-title" id="formTitle">New Tunnel</span>
+      <button class="save-btn" id="formSave">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        Save
+      </button>
+    </div>
+
+    <div class="form-scroll">
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <input class="form-input" id="fType" readonly value="HTTP Tunnel" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input class="form-input" id="fName" placeholder="My Tunnel" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Target</label>
+        <input class="form-input" id="fEndpoint" placeholder="localhost:8080" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Hostname</label>
+        <input class="form-input" id="fHostname" placeholder="example.com" />
+      </div>
+
+      <div class="switch-row">
+        <span class="switch-label">TLS Backend</span>
+        <div class="switch" id="fTLS"><div class="switch-knob"></div></div>
+      </div>
+
+      <div class="switch-row">
+        <span class="switch-label">Basic Auth</span>
+        <div class="switch" id="fAuth"><div class="switch-knob"></div></div>
+      </div>
+
+      <div id="authFields" style="display:none; margin-top:12px;">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input class="form-input" id="fUsername" placeholder="admin" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" id="fPassword" type="password" placeholder="••••" />
+        </div>
+      </div>
+
+      <div id="dangerZone" class="danger-zone" style="display:none;">
+        <div class="danger-zone-label">Danger Zone</div>
+        <button class="pill-btn danger" id="formDelete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          Delete Tunnel
+        </button>
+      </div>
+    </div>
   </div>
-  <button class="btn btn-primary" id="btn-save-settings">Save</button>
-</div>
 
-<button class="btn btn-ghost" id="btn-toggle-settings" style="width:100%; margin-top:8px">⚙ Settings</button>
+  <!-- ════════════════════════════════════════════════════════════
+       VIEW 3: Settings
+       ════════════════════════════════════════════════════════════ -->
+  <div id="viewSettings" class="view">
+    <div class="appbar">
+      <button class="back-btn" id="settingsBack">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+      <span class="appbar-title">Settings</span>
+    </div>
 
-<script src="sidepanel.js"></script>
+    <div class="section-label">Server</div>
+
+    <div class="settings-card">
+      <div class="settings-item">
+        <span class="settings-label">Relay</span>
+        <input class="settings-input" id="sRelay" placeholder="wss://wisper.gost.run/ws" />
+      </div>
+      <div class="settings-item">
+        <span class="settings-label">User</span>
+        <input class="settings-input" id="sUser" placeholder="(optional)" />
+      </div>
+      <div class="settings-item">
+        <span class="settings-label">Pass</span>
+        <input class="settings-input" id="sPass" type="password" placeholder="(optional)" />
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="settings-btn primary" id="settingsSave">Save</button>
+      <button class="settings-btn ghost" id="settingsReset">Reset to Default</button>
+    </div>
+  </div>
+
+  <script src="sidepanel.js"></script>
 </body>
 </html>

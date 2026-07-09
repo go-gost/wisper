@@ -100,16 +100,19 @@ async function handleStartTunnel(config) {
 }
 
 async function handleStopTunnel(tunnelId) {
-  // Remove from storage
+  // Preserve config but mark as stopped
   const stored = await chrome.storage.local.get('tunnels');
-  const saved = (stored.tunnels || []).filter(t => t.tunnelId !== tunnelId);
+  const saved = (stored.tunnels || []).map(t =>
+    t.tunnelId === tunnelId ? { ...t, status: 'stopped', entrypoint: null, error: null } : t
+  );
   await chrome.storage.local.set({ tunnels: saved });
 
   // Forward to offscreen
   chrome.runtime.sendMessage({ type: 'stop-tunnel', tunnelId });
 
-  // If no more tunnels, close offscreen
-  if (saved.length === 0) {
+  // If no running/connecting/error tunnels remain, close offscreen
+  const alive = saved.filter(t => t.status !== 'stopped');
+  if (alive.length === 0) {
     closeOffscreen();
   }
 }
