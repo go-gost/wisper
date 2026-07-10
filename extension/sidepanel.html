@@ -90,16 +90,22 @@
 
     /* ── Reset ── */
 
+    html {
+      overflow-x: hidden;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       width: 480px;
+      max-height: 600px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       font-size: var(--font-sm);
       color: var(--text);
       background: var(--bg);
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+      overflow: hidden;
     }
 
     /* ── Header (matches web UI home-page.ts) ── */
@@ -155,7 +161,7 @@
     /* ── Views ── */
 
     .view { display: none; }
-    .view.active { display: block; }
+    .view.active { display: flex; flex-direction: column; max-height: 600px; }
 
     /* ── List container ── */
 
@@ -166,6 +172,13 @@
       padding: 8px 10px 4px 10px;
     }
 
+    #tunnelList {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
+    }
+
     /* ── Tunnel Card (matches tunnel-card.ts) ── */
 
     .tunnel-card-row {
@@ -174,7 +187,7 @@
       gap: 10px;
       padding: 8px 12px;
       background: var(--border-subtle);
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-lg);
       cursor: pointer;
       transition: background var(--transition-fast);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -301,6 +314,7 @@
       background: var(--surface);
       flex-direction: column;
       gap: 10px;
+      overflow: hidden;
     }
     .expand-panel.open { display: flex; }
 
@@ -342,6 +356,8 @@
     }
 
     .dval-mono {
+      display: block;
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -544,9 +560,16 @@
     /* ── Form ── */
 
     .form-scroll {
-      padding: 16px;
-      max-height: 500px;
+      flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px;
+    }
+
+    .settings-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .form-group {
@@ -953,11 +976,10 @@
         </svg>
       </button>
       <span class="appbar-title" id="formTitle">New Tunnel</span>
-      <button class="save-btn" id="formSave">
+      <button class="save-btn" id="formSave" title="Save">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12" />
         </svg>
-        Save
       </button>
     </div>
 
@@ -1028,6 +1050,8 @@
       <span class="appbar-title">Settings</span>
     </div>
 
+    <div class="settings-scroll">
+
     <!-- App Info -->
     <div class="settings-app-info">
       <img class="settings-logo" src="icons/icon48.png" alt="Wisper" />
@@ -1069,6 +1093,8 @@
         </div>
         <div class="switch" id="sDarkMode"><div class="switch-knob"></div></div>
       </div>
+    </div>
+
     </div>
   </div>
 

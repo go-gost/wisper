@@ -519,13 +519,15 @@ function buildCard(t) {
   if (t.status === 'running' || t.status === 'connecting') {
     const stopBtn = document.createElement('button');
     stopBtn.className = 'action-btn stop';
-    stopBtn.textContent = '■ Stop';
+    stopBtn.innerHTML = iconSvg('stop', 14, 14);
+    stopBtn.title = 'Stop tunnel';
     stopBtn.addEventListener('click', (e) => { e.stopPropagation(); stopTunnel(t.tunnelId); });
     actions.appendChild(stopBtn);
   } else {
     const startBtn = document.createElement('button');
     startBtn.className = 'action-btn start';
-    startBtn.textContent = '▶ Start';
+    startBtn.innerHTML = iconSvg('play', 14, 14);
+    startBtn.title = 'Start tunnel';
     startBtn.addEventListener('click', (e) => { e.stopPropagation(); startTunnel(t.tunnelId); });
     actions.appendChild(startBtn);
   }
@@ -533,7 +535,8 @@ function buildCard(t) {
   // Edit button
   const editBtn = document.createElement('button');
   editBtn.className = 'action-btn';
-  editBtn.innerHTML = iconSvg('edit', 14, 14) + ' Edit';
+  editBtn.innerHTML = iconSvg('edit', 14, 14);
+  editBtn.title = 'Edit tunnel';
   editBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     openEditForm(t.tunnelId);
@@ -543,7 +546,8 @@ function buildCard(t) {
   // Delete button (danger = outline red, matches home-page.ts)
   const delBtn = document.createElement('button');
   delBtn.className = 'action-btn danger';
-  delBtn.innerHTML = iconSvg('trash', 14, 14) + ' Delete';
+  delBtn.innerHTML = iconSvg('trash', 14, 14);
+  delBtn.title = 'Delete tunnel';
   delBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     showDeleteDialog(t.tunnelId);
@@ -601,7 +605,6 @@ function expandDetailRow(label, value, showCopy) {
 function openNewForm() {
   editingId = null;
   document.getElementById('formTitle').textContent = 'New Tunnel';
-  document.getElementById('formSave').textContent = 'Save';
   document.getElementById('dangerZone').style.display = 'none';
   document.getElementById('fName').value = '';
   document.getElementById('fEndpoint').value = '';
@@ -620,7 +623,6 @@ function openEditForm(tunnelId) {
 
   editingId = tunnelId;
   document.getElementById('formTitle').textContent = 'Edit Tunnel';
-  document.getElementById('formSave').textContent = 'Save';
   document.getElementById('dangerZone').style.display = 'block';
   document.getElementById('fName').value = t.name || '';
   document.getElementById('fEndpoint').value = t.localEndpoint || '';
