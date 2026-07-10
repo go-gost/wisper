@@ -126,9 +126,32 @@ async function writeUnauthorized(stream) {
 
 // ── HTTP forwarder ─────────────────────────────────────────────────────
 
+/**
+ * Per-tunnel URL marker, kept in sync with background.js (_dnrMarker). The
+ * forwarder tags each host-rewrite request with it so the matching DNR rule
+ * (which embeds the same marker) does not collide with another tunnel sharing
+ * the same local backend.
+ */
+function _dnrMarker(tunnelId) {
+  return tunnelId.replace(/-/g, '');
+}
+
 export async function forwardHTTP(stream, req, config) {
   const scheme = config.enableTLS ? 'https' : 'http';
-  const url = `${scheme}://${config.localEndpoint}${req.path}`;
+  let url = `${scheme}://${config.localEndpoint}${req.path}`;
+  // Tag the request with a per-tunnel marker so chrome.declarativeNetRequest
+  // can scope the Host rewrite to this tunnel instead of applying it globally
+  // to every request hitting the shared local endpoint.
+  if (config.hostname && config.tunnelId) {
+    const sep = url.includes('?') ? '&' : '?';
+    url += `${sep}__wtr=${_dnrMarker(config.tunnelId)}`;
+  } else if (config.hostname && !config.tunnelId) {
+    console.warn('Wisper: hostname set but tunnelId missing — DNR marker not appended', {
+      localEndpoint: config.localEndpoint,
+      hostname: config.hostname,
+      hasAuth: !!config.auth,
+    });
+  }
   const method = req.method || 'GET';
 
   // Build a Headers object, appending each value so duplicates (Set-Cookie,

@@ -81,7 +81,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // so we use chrome.declarativeNetRequest to modify it on outgoing requests
 // made by the offscreen document.
 //
-// Rule IDs 10000-19999 are reserved for Wisper hostname rewriting.
+// Rule IDs 10000-19999 are reserved for Wisper hostname rewriting (per-tunnel marker rules).
+// Rule IDs 20000-29999 are reserved for Wisper hostname fallback rules (endpoint-based).
 
 /** Deterministic rule ID from a tunnelId within our reserved range. */
 function _dnrRuleId(tunnelId) {
@@ -92,18 +93,23 @@ function _dnrRuleId(tunnelId) {
   return 10000 + ((h >>> 0) % 10000);
 }
 
+/** Fallback rule ID for the same tunnel (same hash offset, different base). */
+function _dnrFallbackRuleId(tunnelId) {
+  let h = 0;
+  for (let i = 0; i < tunnelId.length; i++) {
+    h = (Math.imul(31, h) + tunnelId.charCodeAt(i)) | 0;
+  }
+  return 20000 + ((h >>> 0) % 10000);
+}
+
 /**
- * Build the DNR urlFilter for a local endpoint.
- *
- * The browser normalizes fetch() URLs (WHATWG URL parser) BEFORE DNR matching,
- * which strips the default port for the scheme (:80 for http, :443 for https).
- * So a rule like "://host:80" never matches the normalized "http://host/path".
- * We must strip the default port here to mirror that normalization.
+ * Build the old-style host+port anchored urlFilter for the fallback rule.
+ * This matches the normalized URL without needing the per-tunnel marker,
+ * so host rewrite works even when the marker isn't present in the URL.
  */
-function _dnrUrlFilter(localEndpoint, enableTLS) {
+function _fallbackUrlFilter(localEndpoint, enableTLS) {
   let host = localEndpoint;
   let port = '';
-  // Split host:port, guarding IPv6 literals like [::1]:80.
   const bracket = localEndpoint.lastIndexOf(']');
   const colon = localEndpoint.lastIndexOf(':');
   if (colon > bracket) {
@@ -112,48 +118,82 @@ function _dnrUrlFilter(localEndpoint, enableTLS) {
   }
   const defaultPort = enableTLS ? '443' : '80';
   if (!port || port === defaultPort) {
-    // Default (or absent) port is dropped from the normalized URL. Anchor with
-    // a trailing "/" so "://host/" cannot substring-match a longer host.
     return `://${host}/`;
   }
   return `://${host}:${port}`;
 }
 
+/**
+ * Per-tunnel URL marker used to disambiguate DNR rules.
+ *
+ * DNR matches purely on the request URL, so when two tunnels forward to the
+ * SAME local backend (the normal use case for host rewrite — one backend
+ * serving several virtual hosts) their rules would collide on an identical
+ * urlFilter and one Host value would win globally. The forwarder tags each
+ * request with this marker in the query string; the matching DNR rule embeds
+ * the same marker so the two rules no longer overlap.
+ *
+ * Keep this formula in sync with lib/forwarder.js (_dnrMarker).
+ */
+function _dnrMarker(tunnelId) {
+  return tunnelId.replace(/-/g, '');
+}
+
 async function setHostnameDNR(tunnelId, localEndpoint, hostname, enableTLS) {
   if (!hostname) return;
-  const ruleId = _dnrRuleId(tunnelId);
-  const urlFilter = _dnrUrlFilter(localEndpoint, enableTLS);
-  console.log('Wisper: installing DNR rule', { ruleId, localEndpoint, hostname, urlFilter });
+  const markerId = _dnrRuleId(tunnelId);
+  const fallbackId = _dnrFallbackRuleId(tunnelId);
+  const marker = _dnrMarker(tunnelId);
+  const fallbackFilter = _fallbackUrlFilter(localEndpoint, enableTLS);
+  console.log('Wisper: installing DNR rules', {
+    tunnelId, localEndpoint, hostname,
+    markerId, markerUrlFilter: `__wtr=${marker}`,
+    fallbackId, fallbackUrlFilter: fallbackFilter,
+  });
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [ruleId],
+      removeRuleIds: [markerId],
       addRules: [{
-        id: ruleId,
+        id: markerId,
+        priority: 2,
+        action: {
+          type: 'modifyHeaders',
+          requestHeaders: [{ header: 'host', operation: 'set', value: hostname }],
+        },
+        condition: {
+          urlFilter: `__wtr=${marker}`,
+          resourceTypes: ['xmlhttprequest'],
+        },
+      }],
+    });
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [fallbackId],
+      addRules: [{
+        id: fallbackId,
         priority: 1,
         action: {
           type: 'modifyHeaders',
           requestHeaders: [{ header: 'host', operation: 'set', value: hostname }],
         },
         condition: {
-          urlFilter,
+          urlFilter: fallbackFilter,
           resourceTypes: ['xmlhttprequest'],
         },
       }],
     });
     const rules = await chrome.declarativeNetRequest.getDynamicRules();
-    console.log('Wisper: DNR rule installed, current dynamic rules:', rules.map(r => ({ id: r.id, urlFilter: r.condition.urlFilter })));
+    console.log('Wisper: DNR rules installed, current:', rules.map(r => ({
+      id: r.id, priority: r.priority, urlFilter: r.condition.urlFilter,
+    })));
   } catch (e) {
     console.error('Wisper: DNR rule failed', e);
   }
 }
 
 async function removeHostnameDNR(tunnelId) {
-  const ruleId = _dnrRuleId(tunnelId);
+  const removeRuleIds = [_dnrRuleId(tunnelId), _dnrFallbackRuleId(tunnelId)];
   try {
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [ruleId],
-      addRules: [],
-    });
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules: [] });
   } catch { /* ignore */ }
 }
 
@@ -161,21 +201,25 @@ async function removeHostnameDNR(tunnelId) {
 async function syncHostnameDNR() {
   const stored = await chrome.storage.local.get('tunnels');
   const tunnels = stored.tunnels || [];
-  const activeIds = new Set(
-    tunnels.filter(t => t.hostname).map(t => _dnrRuleId(t.tunnelId)),
+  const activeHostnameTunnels = tunnels.filter(
+    t => t.hostname && (t.status === 'running' || t.status === 'connecting')
   );
+  const activeMarkerIds = new Set(activeHostnameTunnels.map(t => _dnrRuleId(t.tunnelId)));
+  const activeFallbackIds = new Set(activeHostnameTunnels.map(t => _dnrFallbackRuleId(t.tunnelId)));
   const allRules = await chrome.declarativeNetRequest.getDynamicRules();
   const stale = allRules
-    .filter(r => r.id >= 10000 && r.id < 20000 && !activeIds.has(r.id))
+    .filter(r => {
+      if (r.id >= 10000 && r.id < 20000) return !activeMarkerIds.has(r.id);
+      if (r.id >= 20000 && r.id < 30000) return !activeFallbackIds.has(r.id);
+      return false;
+    })
     .map(r => r.id);
   if (stale.length) {
     await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: stale, addRules: [] });
   }
   // Re-install rules for active tunnels
-  for (const t of tunnels) {
-    if (t.hostname && (t.status === 'running' || t.status === 'connecting')) {
-      await setHostnameDNR(t.tunnelId, t.localEndpoint, t.hostname, t.enableTLS);
-    }
+  for (const t of activeHostnameTunnels) {
+    await setHostnameDNR(t.tunnelId, t.localEndpoint, t.hostname, t.enableTLS);
   }
 }
 
