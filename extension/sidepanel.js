@@ -7,7 +7,7 @@
 
 // ── State ──────────────────────────────────────────────────────────────
 
-/** @type {Array<{tunnelId:string,name:string,localEndpoint:string,relayUrl?:string,auth?:{username:string,password:string},status:string,error?:string,entrypoint?:string,createdAt:string,hostname?:string,enableTLS?:boolean}>} */
+/** @type {Array<{tunnelId:string,name:string,localEndpoint:string,relayUrl?:string,auth?:{username:string,password:string},status:string,error?:string,entrypoint?:string,createdAt:string,hostname?:string}>} */
 let tunnels = [];
 let settings = { relayUrl: '', entrypoint: '', insecure: false, darkMode: false };
 let currentView = 'list'; // 'list' | 'form' | 'settings'
@@ -46,7 +46,6 @@ function loadTunnels() {
       entrypoint: t.entrypoint || null,
       createdAt: t.createdAt || new Date().toISOString(),
       hostname: t.hostname || '',
-      enableTLS: !!t.enableTLS,
     }));
     render();
   });
@@ -76,7 +75,6 @@ function persistTunnels() {
     entrypoint: t.entrypoint,
     createdAt: t.createdAt,
     hostname: t.hostname,
-    enableTLS: t.enableTLS,
   })) });
 }
 
@@ -105,7 +103,6 @@ function createTunnel(data) {
     entrypoint: null,
     createdAt: new Date().toISOString(),
     hostname: data.hostname || '',
-    enableTLS: !!data.enableTLS,
   };
 
   tunnels.push(tunnel);
@@ -133,7 +130,6 @@ function startTunnel(tunnelId) {
       insecure: settings.insecure || false,
       auth: t.auth,
       hostname: t.hostname || undefined,
-      enableTLS: t.enableTLS || false,
     },
   });
 }
@@ -178,7 +174,6 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
           entrypoint: fromStorage.entrypoint || null,
           createdAt: fromStorage.createdAt || new Date().toISOString(),
           hostname: fromStorage.hostname || '',
-          enableTLS: !!fromStorage.enableTLS,
         });
         chrome.storage.local.set({ tunnels: data.tunnels });
         render();
@@ -224,7 +219,6 @@ function saveForm() {
 
   try {
     const hostname = document.getElementById('fHostname').value;
-    const enableTLS = document.getElementById('fTLS').classList.contains('on');
     const hasAuth = document.getElementById('fAuth').classList.contains('on');
     const username = hasAuth ? document.getElementById('fUsername').value : '';
     const password = hasAuth ? document.getElementById('fPassword').value : '';
@@ -233,7 +227,6 @@ function saveForm() {
       name: name.trim() || undefined,
       endpoint: endpoint.trim(),
       hostname: hostname.trim() || undefined,
-      enableTLS,
       username: username.trim() || undefined,
       password: password || undefined,
     };
@@ -251,7 +244,6 @@ function saveForm() {
         oldTunnel.name = formData.name || oldTunnel.name;
         oldTunnel.localEndpoint = formData.endpoint;
         oldTunnel.hostname = formData.hostname;
-        oldTunnel.enableTLS = !!formData.enableTLS;
         oldTunnel.auth = formData.username
           ? { username: formData.username, password: formData.password || '' }
           : undefined;
@@ -621,7 +613,6 @@ function openNewForm() {
   document.getElementById('fName').value = '';
   document.getElementById('fEndpoint').value = '';
   document.getElementById('fHostname').value = '';
-  document.getElementById('fTLS').classList.remove('on');
   document.getElementById('fAuth').classList.remove('on');
   document.getElementById('authFields').style.display = 'none';
   document.getElementById('fUsername').value = '';
@@ -639,12 +630,6 @@ function openEditForm(tunnelId) {
   document.getElementById('fName').value = t.name || '';
   document.getElementById('fEndpoint').value = t.localEndpoint || '';
   document.getElementById('fHostname').value = t.hostname || '';
-
-  if (t.enableTLS) {
-    document.getElementById('fTLS').classList.add('on');
-  } else {
-    document.getElementById('fTLS').classList.remove('on');
-  }
 
   const hasAuth = !!(t.auth && t.auth.username);
   if (hasAuth) {
@@ -712,10 +697,6 @@ function bindEvents() {
   if (formDelete) formDelete.addEventListener('click', () => {
     if (editingId) showDeleteDialog(editingId);
   });
-
-  // TLS toggle
-  const fTLS = document.getElementById('fTLS');
-  if (fTLS) fTLS.addEventListener('click', () => fTLS.classList.toggle('on'));
 
   // Auth toggle
   const fAuth = document.getElementById('fAuth');
