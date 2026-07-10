@@ -19,10 +19,11 @@ import { SmuxServer } from './smux.js';
 export class TunnelConnection {
   /**
    * @param {object} config
-   * @param {string} config.tunnelId — 20-byte tunnel ID (Uint8Array)
+   * @param {Uint8Array} config.tunnelId — 20-byte tunnel ID
    * @param {string} config.localEndpoint — e.g. "localhost:8080"
    * @param {object} [config.auth] — { username, password }
    * @param {string} [config.relayUrl] — defaults to wss://wisper.gost.run:443
+   * @param {string} [config.entrypointUrl] — pre-computed public URL, e.g. "https://abc123.gost.run"
    */
   constructor(config) {
     this._config = config;
@@ -33,6 +34,8 @@ export class TunnelConnection {
     this._onStream = config.onStream || null;
     this._closed = false;
     this._reconnectAttempts = 0;
+    /** @type {string|null} */
+    this._bindAddr = config.entrypointUrl || null;
   }
 
   /**
@@ -73,13 +76,9 @@ export class TunnelConnection {
               return;
             }
 
-            // Extract connector ID (TunnelFeature) and bind address (AddrFeature)
+            // Extract connector ID
             const tunnelFeat = findFeature(resp.features, FeatureTunnel);
-            const addrFeat = findFeature(resp.features, FeatureAddr);
             this._connectorId = tunnelFeat ? tunnelFeat.value : null;
-            this._bindAddr = addrFeat
-              ? `${addrFeat.value.host}:${addrFeat.value.port}`
-              : null;
 
             // Initialize SMUX server
             this._smux = new SmuxServer({
@@ -126,7 +125,7 @@ export class TunnelConnection {
     return this._bound && !this._closed;
   }
 
-  /** The public entrypoint URL (set after connect). */
+  /** The public entrypoint URL (set from config). */
   get entrypoint() {
     return this._bindAddr;
   }

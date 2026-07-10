@@ -9,7 +9,7 @@
 
 /** @type {Array<{tunnelId:string,name:string,localEndpoint:string,relayUrl?:string,auth?:{username:string,password:string},status:string,error?:string,entrypoint?:string,createdAt:string,hostname?:string,enableTLS?:boolean}>} */
 let tunnels = [];
-let settings = { relayUrl: '', username: '', password: '' };
+let settings = { relayUrl: '', entrypoint: '', insecure: false, darkMode: false };
 let currentView = 'list'; // 'list' | 'form' | 'settings'
 let editingId = null;       // tunnelId being edited, or null for create
 let formSaving = false;
@@ -34,8 +34,20 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Data loading ───────────────────────────────────────────────────────
 
 function loadTunnels() {
-  chrome.runtime.sendMessage({ type: 'load-tunnels' }, (resp) => {
-    tunnels = (resp && resp.tunnels) || [];
+  chrome.storage.local.get('tunnels', (data) => {
+    tunnels = (data.tunnels || []).map(t => ({
+      tunnelId: t.tunnelId,
+      name: t.name || '',
+      localEndpoint: t.localEndpoint || '',
+      relayUrl: t.relayUrl || '',
+      auth: t.auth || null,
+      status: t.status || 'stopped',
+      error: t.error || null,
+      entrypoint: t.entrypoint || null,
+      createdAt: t.createdAt || new Date().toISOString(),
+      hostname: t.hostname || '',
+      enableTLS: !!t.enableTLS,
+    }));
     render();
   });
 }
@@ -43,8 +55,13 @@ function loadTunnels() {
 function loadSettings() {
   chrome.storage.local.get('settings', (data) => {
     if (data.settings) settings = { ...settings, ...data.settings };
+    applyTheme(settings.darkMode);
     render();
   });
+}
+
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', dark);
 }
 
 function persistTunnels() {
@@ -82,7 +99,7 @@ function createTunnel(data) {
     name: data.name.trim() || `tunnel-${data.endpoint.split(':').pop() || '0'}`,
     localEndpoint: data.endpoint.trim(),
     relayUrl: settings.relayUrl || undefined,
-    auth: settings.username ? { username: settings.username, password: settings.password } : undefined,
+    auth: data.username ? { username: data.username, password: data.password || '' } : undefined,
     status: 'stopped',
     error: null,
     entrypoint: null,
@@ -94,7 +111,7 @@ function createTunnel(data) {
   tunnels.push(tunnel);
   persistTunnels();
   render();
-  showToast('Tunnel created');
+  showToast('✓ Tunnel created');
 
   // Auto-start
   startTunnel(tunnelId);
@@ -112,6 +129,8 @@ function startTunnel(tunnelId) {
       name: t.name,
       localEndpoint: t.localEndpoint,
       relayUrl: t.relayUrl || undefined,
+      entrypointDomain: settings.entrypoint || undefined,
+      insecure: settings.insecure || false,
       auth: t.auth,
       hostname: t.hostname || undefined,
       enableTLS: t.enableTLS || false,
@@ -132,8 +151,35 @@ function stopTunnel(tunnelId) {
 }
 
 function updateTunnelStatus(tunnelId, status, error, entrypoint) {
-  const t = tunnels.find(x => x.tunnelId === tunnelId);
-  if (!t) return;
+  let t = tunnels.find(x => x.tunnelId === tunnelId);
+  if (!t) {
+    // Tunnel not yet in local array — may have arrived before loadTunnels completed.
+    // Sync from storage to be safe.
+    chrome.storage.local.get('tunnels', (data) => {
+      const fromStorage = (data.tunnels || []).find(x => x.tunnelId === tunnelId);
+      if (fromStorage) {
+        fromStorage.status = status;
+        if (error !== undefined && error !== null) fromStorage.error = error;
+        if (entrypoint !== undefined && entrypoint !== null) fromStorage.entrypoint = entrypoint;
+        tunnels.push({
+          tunnelId: fromStorage.tunnelId,
+          name: fromStorage.name || '',
+          localEndpoint: fromStorage.localEndpoint || '',
+          relayUrl: fromStorage.relayUrl || '',
+          auth: fromStorage.auth || null,
+          status: fromStorage.status,
+          error: fromStorage.error || null,
+          entrypoint: fromStorage.entrypoint || null,
+          createdAt: fromStorage.createdAt || new Date().toISOString(),
+          hostname: fromStorage.hostname || '',
+          enableTLS: !!fromStorage.enableTLS,
+        });
+        chrome.storage.local.set({ tunnels: data.tunnels });
+        render();
+      }
+    });
+    return;
+  }
   t.status = status;
   if (error !== undefined && error !== null) t.error = error;
   if (entrypoint !== undefined && entrypoint !== null) t.entrypoint = entrypoint;
@@ -147,7 +193,7 @@ function deleteTunnel(tunnelId) {
   tunnels = tunnels.filter(x => x.tunnelId !== tunnelId);
   persistTunnels();
   render();
-  showToast('Tunnel deleted');
+  showToast('✓ Tunnel deleted');
 }
 
 function saveForm() {
@@ -207,7 +253,7 @@ function saveForm() {
           startTunnel(editingId);
         }
       }
-      showToast('Tunnel updated');
+      showToast('✓ Tunnel updated');
     } else {
       // Create mode
       createTunnel(formData);
@@ -259,7 +305,7 @@ function showToast(msg) {
   el.style.display = 'block';
   el.style.animation = 'none';
   el.offsetHeight; // reflow
-  el.style.animation = 'toast-in 0.25s ease';
+  el.style.animation = 'toast-in 0.3s ease';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     el.style.display = 'none';
@@ -422,39 +468,49 @@ function buildCard(t) {
 
   wrapper.appendChild(row);
 
-  // ── Error banner ──
-  if (t.error) {
-    const errEl = document.createElement('div');
-    errEl.className = 'card-error';
-    errEl.textContent = t.error;
-    wrapper.appendChild(errEl);
-  }
-
   // ── Expand panel (matches home-page.ts) ──
   const expand = document.createElement('div');
   expand.className = `expand-panel ${expandedMap[t.tunnelId] ? 'open' : ''}`;
 
+  // Detail card
+  const detailCard = document.createElement('div');
+  detailCard.className = 'detail-card';
+
+  // Tunnel ID row
+  detailCard.appendChild(expandDetailRow('Tunnel ID', t.tunnelId, true));
+
   // Entrypoint row
   if (t.entrypoint) {
-    const epRow = expandRow('Entrypoint', t.entrypoint, true);
-    expand.appendChild(epRow);
+    detailCard.appendChild(expandDetailRow('Entrypoint', t.entrypoint, true));
   }
 
   // Target row
-  const targetRow = expandRow('Target', t.localEndpoint, true);
-  expand.appendChild(targetRow);
+  detailCard.appendChild(expandDetailRow('Target', t.localEndpoint, true));
 
   // Hostname row (if set)
   if (t.hostname) {
-    const hnRow = expandRow('Hostname', t.hostname, false);
-    expand.appendChild(hnRow);
+    detailCard.appendChild(expandDetailRow('Host Rewrite', t.hostname, false));
   }
 
-  // Auth row (if set)
-  if (t.auth && t.auth.username) {
-    const authRow = expandRow('Auth', `Basic · ${t.auth.username}`, false);
-    expand.appendChild(authRow);
+  // Error row (inside detail card)
+  if (t.error) {
+    const errRow = document.createElement('div');
+    errRow.className = 'detail-row error';
+    const errLabel = document.createElement('span');
+    errLabel.className = 'dlabel';
+    errLabel.textContent = 'Error';
+    errRow.appendChild(errLabel);
+    const errVal = document.createElement('span');
+    errVal.className = 'dval error-text';
+    const errMono = document.createElement('span');
+    errMono.className = 'dval-mono';
+    errMono.textContent = t.error;
+    errVal.appendChild(errMono);
+    errRow.appendChild(errVal);
+    detailCard.appendChild(errRow);
   }
+
+  expand.appendChild(detailCard);
 
   // Actions (matches home-page.ts action-btn)
   const actions = document.createElement('div');
@@ -463,13 +519,13 @@ function buildCard(t) {
   if (t.status === 'running' || t.status === 'connecting') {
     const stopBtn = document.createElement('button');
     stopBtn.className = 'action-btn stop';
-    stopBtn.innerHTML = '■ Stop';
+    stopBtn.textContent = '■ Stop';
     stopBtn.addEventListener('click', (e) => { e.stopPropagation(); stopTunnel(t.tunnelId); });
     actions.appendChild(stopBtn);
   } else {
     const startBtn = document.createElement('button');
     startBtn.className = 'action-btn start';
-    startBtn.innerHTML = '▶ Start';
+    startBtn.textContent = '▶ Start';
     startBtn.addEventListener('click', (e) => { e.stopPropagation(); startTunnel(t.tunnelId); });
     actions.appendChild(startBtn);
   }
@@ -484,7 +540,7 @@ function buildCard(t) {
   });
   actions.appendChild(editBtn);
 
-  // Delete button
+  // Delete button (danger = outline red, matches home-page.ts)
   const delBtn = document.createElement('button');
   delBtn.className = 'action-btn danger';
   delBtn.innerHTML = iconSvg('trash', 14, 14) + ' Delete';
@@ -509,31 +565,34 @@ function buildCard(t) {
   return wrapper;
 }
 
-function expandRow(label, value, showCopy) {
+function expandDetailRow(label, value, showCopy) {
   const row = document.createElement('div');
   row.className = 'detail-row';
 
   const lbl = document.createElement('span');
-  lbl.className = 'detail-label';
+  lbl.className = 'dlabel';
   lbl.textContent = label;
   row.appendChild(lbl);
 
   const val = document.createElement('span');
-  val.className = 'detail-value';
-  val.textContent = value;
-  row.appendChild(val);
+  val.className = 'dval';
+  const vmono = document.createElement('span');
+  vmono.className = 'dval-mono';
+  vmono.textContent = value;
+  val.appendChild(vmono);
 
   if (showCopy) {
     const btn = document.createElement('button');
-    btn.className = 'copy-btn';
+    btn.className = 'copy-btn-mini';
     btn.innerHTML = iconSvg('copy', 14, 14);
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       copyToClipboard(value);
     });
-    row.appendChild(btn);
+    val.appendChild(btn);
   }
 
+  row.appendChild(val);
   return row;
 }
 
@@ -590,34 +649,29 @@ function openEditForm(tunnelId) {
 // ── Settings ───────────────────────────────────────────────────────────
 
 function openSettings() {
-  const relayEl = document.getElementById('sRelay');
-  const userEl = document.getElementById('sUser');
-  const passEl = document.getElementById('sPass');
-  if (relayEl) relayEl.value = settings.relayUrl || '';
-  if (userEl) userEl.value = settings.username || '';
-  if (passEl) passEl.value = settings.password || '';
+  document.getElementById('sRelay').value = settings.relayUrl || '';
+  document.getElementById('sEntrypoint').value = settings.entrypoint || '';
+  document.getElementById('sInsecure').classList.toggle('on', !!settings.insecure);
+  document.getElementById('sDarkMode').classList.toggle('on', !!settings.darkMode);
+  const versionEl = document.getElementById('settingsVersion');
+  if (versionEl) {
+    try {
+      const m = chrome.runtime.getManifest();
+      versionEl.textContent = `v${m.version}`;
+    } catch { versionEl.textContent = ''; }
+  }
   switchView('settings');
 }
 
 function saveSettings() {
   settings.relayUrl = document.getElementById('sRelay').value.trim();
-  settings.username = document.getElementById('sUser').value.trim();
-  settings.password = document.getElementById('sPass').value.trim();
+  settings.entrypoint = document.getElementById('sEntrypoint').value.trim();
+  settings.insecure = document.getElementById('sInsecure').classList.contains('on');
+  settings.darkMode = document.getElementById('sDarkMode').classList.contains('on');
   chrome.storage.local.set({ settings });
-  showToast('Settings saved');
+  applyTheme(settings.darkMode);
+  showToast('✓ Saved');
   switchView('list');
-}
-
-function resetSettings() {
-  settings = { relayUrl: '', username: '', password: '' };
-  chrome.storage.local.set({ settings });
-  const relayEl = document.getElementById('sRelay');
-  const userEl = document.getElementById('sUser');
-  const passEl = document.getElementById('sPass');
-  if (relayEl) relayEl.value = '';
-  if (userEl) userEl.value = '';
-  if (passEl) passEl.value = '';
-  showToast('Settings reset');
 }
 
 // ── Events ─────────────────────────────────────────────────────────────
@@ -626,10 +680,6 @@ function bindEvents() {
   // Header settings button
   const btnS = document.getElementById('btnSettings');
   if (btnS) btnS.addEventListener('click', openSettings);
-
-  // Footer settings link
-  const btnOS = document.getElementById('btnOpenSettings');
-  if (btnOS) btnOS.addEventListener('click', openSettings);
 
   // New tunnel
   const btnNew = document.getElementById('btnNewTunnel');
@@ -706,8 +756,13 @@ function bindEvents() {
   const settingsSave = document.getElementById('settingsSave');
   if (settingsSave) settingsSave.addEventListener('click', saveSettings);
 
-  const settingsReset = document.getElementById('settingsReset');
-  if (settingsReset) settingsReset.addEventListener('click', resetSettings);
+  // Insecure toggle
+  const sInsecure = document.getElementById('sInsecure');
+  if (sInsecure) sInsecure.addEventListener('click', () => sInsecure.classList.toggle('on'));
+
+  // Dark mode toggle
+  const sDarkMode = document.getElementById('sDarkMode');
+  if (sDarkMode) sDarkMode.addEventListener('click', () => sDarkMode.classList.toggle('on'));
 
   // Enter key in form inputs
   const formInputs = ['fName', 'fEndpoint', 'fHostname', 'fUsername', 'fPassword'];

@@ -64,12 +64,36 @@
       }
     }
 
+    /* ── Dark mode override (toggled via JS, matches @media values) ── */
+    :root.dark {
+      --bg: #1a1a2e;
+      --surface: #222240;
+      --border: #3a3a5c;
+      --border-subtle: #2a2a45;
+      --text: #e8e8f0;
+      --text-secondary: #a0a0b8;
+      --text-muted: #6e6e88;
+      --accent: #818cf8;
+      --accent-fg: #fff;
+      --green: #4ade80;
+      --green-bg: rgba(74, 222, 128, 0.1);
+      --green-border: rgba(74, 222, 128, 0.2);
+      --green-text: #4ade80;
+      --red: #f87171;
+      --red-bg: rgba(248, 113, 113, 0.1);
+      --red-border: rgba(248, 113, 113, 0.2);
+      --red-text: #f87171;
+      --amber: #fbbf24;
+      --amber-bg: rgba(251, 191, 36, 0.1);
+      --amber-border: rgba(251, 191, 36, 0.2);
+    }
+
     /* ── Reset ── */
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 400px;
+      width: 480px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       font-size: var(--font-sm);
       color: var(--text);
@@ -78,7 +102,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Header ── */
+    /* ── Header (matches web UI home-page.ts) ── */
 
     .header {
       display: flex;
@@ -90,13 +114,22 @@
     }
 
     .header-logo {
-      width: 22px;
-      height: 22px;
+      width: 28px;
+      height: 28px;
+      padding: 4px;
+      border-radius: 50%;
+      background: #000;
+      object-fit: contain;
+      flex-shrink: 0;
     }
 
     .header-title {
       font-size: var(--font-md);
-      font-weight: 700;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .header-spacer {
       flex: 1;
     }
 
@@ -110,6 +143,9 @@
       display: flex;
       align-items: center;
       transition: color var(--transition-fast), background var(--transition-fast);
+      width: 28px;
+      height: 28px;
+      justify-content: center;
     }
     .header-btn:hover {
       color: var(--text);
@@ -141,9 +177,11 @@
       border-radius: var(--radius-sm);
       cursor: pointer;
       transition: background var(--transition-fast);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
     .tunnel-card-row:hover {
       background: var(--border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
     .tunnel-card-row.stopped {
       opacity: 0.55;
@@ -258,52 +296,79 @@
 
     .expand-panel {
       display: none;
-      padding: 12px 16px 12px 30px;
+      padding: 12px 16px 12px 16px;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
     }
     .expand-panel.open { display: flex; }
+
+    /* ── Detail card inside expand panel ── */
+    .detail-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
 
     .detail-row {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: var(--font-sm);
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      color: var(--text-secondary);
-      word-break: break-all;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
     }
+    .detail-row:last-child { border-bottom: none; }
 
-    .detail-label {
+    .detail-row .dlabel {
       color: var(--text-muted);
-      width: 70px;
+      font-size: var(--font-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
       flex-shrink: 0;
-      font-weight: 500;
     }
 
-    .detail-value {
-      flex: 1;
+    .detail-row .dval {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-sm);
       color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
     }
 
-    .copy-btn {
+    .dval-mono {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .detail-row.error {
+      background: var(--red-bg);
+    }
+    .detail-row .error-text {
+      color: var(--red-text);
+    }
+
+    .copy-btn-mini {
       background: none;
       border: none;
       cursor: pointer;
+      padding: 2px;
       color: var(--text-muted);
-      padding: 1px;
-      display: inline-flex;
+      display: flex;
       border-radius: 3px;
-      flex-shrink: 0;
     }
-    .copy-btn:hover {
+    .copy-btn-mini:hover {
       background: var(--border-subtle);
       color: var(--text);
     }
 
-    .copy-btn svg {
+    .copy-btn-mini svg {
       width: 14px;
       height: 14px;
     }
@@ -313,7 +378,6 @@
     .expand-actions {
       display: flex;
       gap: 8px;
-      margin-top: 4px;
     }
 
     .action-btn {
@@ -349,9 +413,8 @@
       border-color: var(--red);
     }
     .action-btn.danger {
-      background: var(--red);
-      color: #fff;
-      border-color: var(--red);
+      color: var(--red);
+      border-color: var(--red-border);
     }
     .action-btn:disabled {
       opacity: 0.4;
@@ -376,7 +439,56 @@
       margin-bottom: 16px;
     }
 
-    /* ── AppBar (form header) ── */
+    /* ── Settings styles (matches web UI settings-page.ts) ── */
+
+.settings-app-info {
+  text-align: center;
+  padding: 24px 16px 16px;
+}
+.settings-logo {
+  width: 52px;
+  height: 52px;
+  padding: 6px;
+  border-radius: 50%;
+  background: #000;
+  margin: 0 auto 8px;
+  object-fit: contain;
+  display: block;
+}
+.settings-app-name {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.settings-version {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.switch-desc {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+.selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+}
+.selector-row:last-child { border-bottom: none; }
+.selector-row:hover { background: var(--border-subtle); }
+.selector-label { font-size: var(--font-sm); color: var(--text); }
+.selector-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+
+/* ── AppBar (form header) ── */
 
     .appbar {
       display: flex;
@@ -477,10 +589,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 0;
+      padding: 10px 0;
       border-bottom: 1px solid var(--border-subtle);
       margin-bottom: 0;
     }
+    .switch-row:last-child { border-bottom: none; }
 
     .switch-label {
       font-size: var(--font-sm);
@@ -613,22 +726,22 @@
 
     .toast {
       position: fixed;
-      top: 10px;
+      top: 60px;
       left: 50%;
       transform: translateX(-50%);
       background: var(--surface);
       color: var(--text);
-      padding: 8px 16px;
+      padding: 10px 20px;
       border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       font-size: var(--font-sm);
       z-index: 100;
-      animation: toast-in 0.25s ease;
-      border: 1px solid var(--border-subtle);
+      animation: toast-in 0.3s ease;
+      border: none;
     }
     @keyframes toast-in {
-      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
     /* ── Delete dialog ── */
@@ -796,12 +909,9 @@
        ════════════════════════════════════════════════════════════ -->
   <div id="viewList" class="view active">
     <div class="header">
-      <svg class="header-logo" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8">
-        <circle cx="11" cy="11" r="9" stroke="var(--accent)" />
-        <path d="M6 11h10M11 6v10" stroke="var(--accent)" stroke-width="1.5" />
-        <circle cx="11" cy="11" r="1.5" fill="var(--accent)" stroke="none" />
-      </svg>
-      <span class="header-title">Wisper Tunnel</span>
+      <img class="header-logo" src="icons/icon48.png" alt="Wisper" />
+      <span class="header-title">Wisper</span>
+      <span class="header-spacer"></span>
       <button class="header-btn" id="btnSettings" title="Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3" />
@@ -829,12 +939,6 @@
         </svg>
         New Tunnel
       </button>
-      <div class="footer-link">
-        <span id="btnOpenSettings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-          Settings
-        </span>
-      </div>
     </div>
   </div>
 
@@ -912,7 +1016,7 @@
   </div>
 
   <!-- ════════════════════════════════════════════════════════════
-       VIEW 3: Settings
+       VIEW 3: Settings (matches web UI settings-page.ts)
        ════════════════════════════════════════════════════════════ -->
   <div id="viewSettings" class="view">
     <div class="appbar">
@@ -924,26 +1028,47 @@
       <span class="appbar-title">Settings</span>
     </div>
 
-    <div class="section-label">Server</div>
+    <!-- App Info -->
+    <div class="settings-app-info">
+      <img class="settings-logo" src="icons/icon48.png" alt="Wisper" />
+      <div class="settings-app-name">Wisper</div>
+      <div class="settings-version" id="settingsVersion"></div>
+    </div>
 
+    <!-- Server Configuration -->
+    <div class="section-label">Server Configuration</div>
     <div class="settings-card">
       <div class="settings-item">
-        <span class="settings-label">Relay</span>
+        <span class="settings-label">Server</span>
         <input class="settings-input" id="sRelay" placeholder="wss://wisper.gost.run/ws" />
       </div>
       <div class="settings-item">
-        <span class="settings-label">User</span>
-        <input class="settings-input" id="sUser" placeholder="(optional)" />
+        <span class="settings-label">Entrypoint</span>
+        <input class="settings-input" id="sEntrypoint" placeholder="wisper.gost.run" />
       </div>
-      <div class="settings-item">
-        <span class="settings-label">Pass</span>
-        <input class="settings-input" id="sPass" type="password" placeholder="(optional)" />
+      <div class="switch-row" style="border-bottom:none;">
+        <div>
+          <div class="switch-label">Insecure</div>
+          <div class="switch-desc">Allow insecure TLS connections</div>
+        </div>
+        <div class="switch" id="sInsecure"><div class="switch-knob"></div></div>
       </div>
     </div>
 
     <div class="settings-actions">
       <button class="settings-btn primary" id="settingsSave">Save</button>
-      <button class="settings-btn ghost" id="settingsReset">Reset to Default</button>
+    </div>
+
+    <!-- Preferences -->
+    <div class="section-label">Preferences</div>
+    <div class="settings-card">
+      <div class="switch-row" style="border-bottom:none;">
+        <div>
+          <div class="switch-label">Dark Mode</div>
+          <div class="switch-desc">Use dark color theme</div>
+        </div>
+        <div class="switch" id="sDarkMode"><div class="switch-knob"></div></div>
+      </div>
     </div>
   </div>
 

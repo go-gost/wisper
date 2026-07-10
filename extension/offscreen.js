@@ -14,6 +14,7 @@
  */
 
 import { TunnelConnection } from './lib/tunnel-connection.js';
+import md5 from './lib/md5.js';
 
 // ── State ──────────────────────────────────────────────────────────────
 
@@ -85,6 +86,10 @@ async function connect(entry) {
 
   notifyStatus(config.tunnelId, 'connecting');
 
+  // Compute entrypoint: https://{md5(uuid)}.{domain} (matches Go: fmt.Sprintf("https://%x.%s", md5.Sum([]byte(id)), domain))
+  const entrypointDomain = config.entrypointDomain || 'gost.run';
+  const entrypointUrl = `https://${md5(config.tunnelId).substring(0, 16)}.${entrypointDomain}`;
+
   const conn = new TunnelConnection({
     tunnelId: config.tunnelIdBytes
       ? new Uint8Array(config.tunnelIdBytes)
@@ -92,6 +97,7 @@ async function connect(entry) {
     localEndpoint: config.localEndpoint,
     auth: config.auth || {},
     relayUrl: config.relayUrl,
+    entrypointUrl,
     onStream: ({ stream, request }) => handleRequest(stream, request, config),
   });
 

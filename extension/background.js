@@ -118,6 +118,16 @@ async function handleStopTunnel(tunnelId) {
 }
 
 function handleTunnelStatus(msg) {
+  // Persist status to storage so it survives popup closure
+  chrome.storage.local.get('tunnels', (data) => {
+    const saved = (data.tunnels || []).map(t =>
+      t.tunnelId === msg.tunnelId
+        ? { ...t, status: msg.status, error: msg.error || null, entrypoint: msg.entrypoint || null }
+        : t
+    );
+    chrome.storage.local.set({ tunnels: saved });
+  });
+
   // Forward to side panel if open
   chrome.runtime.sendMessage(msg).catch(() => {
     // Side panel not open — ignore
