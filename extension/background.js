@@ -75,6 +75,110 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
+// ── DNR hostname rewrite ─────────────────────────────────────────────
+//
+// Host header cannot be set via fetch() (forbidden header per Fetch spec),
+// so we use chrome.declarativeNetRequest to modify it on outgoing requests
+// made by the offscreen document.
+//
+// Rule IDs 10000-19999 are reserved for Wisper hostname rewriting.
+
+/** Deterministic rule ID from a tunnelId within our reserved range. */
+function _dnrRuleId(tunnelId) {
+  let h = 0;
+  for (let i = 0; i < tunnelId.length; i++) {
+    h = (Math.imul(31, h) + tunnelId.charCodeAt(i)) | 0;
+  }
+  return 10000 + ((h >>> 0) % 10000);
+}
+
+/**
+ * Build the DNR urlFilter for a local endpoint.
+ *
+ * The browser normalizes fetch() URLs (WHATWG URL parser) BEFORE DNR matching,
+ * which strips the default port for the scheme (:80 for http, :443 for https).
+ * So a rule like "://host:80" never matches the normalized "http://host/path".
+ * We must strip the default port here to mirror that normalization.
+ */
+function _dnrUrlFilter(localEndpoint, enableTLS) {
+  let host = localEndpoint;
+  let port = '';
+  // Split host:port, guarding IPv6 literals like [::1]:80.
+  const bracket = localEndpoint.lastIndexOf(']');
+  const colon = localEndpoint.lastIndexOf(':');
+  if (colon > bracket) {
+    host = localEndpoint.slice(0, colon);
+    port = localEndpoint.slice(colon + 1);
+  }
+  const defaultPort = enableTLS ? '443' : '80';
+  if (!port || port === defaultPort) {
+    // Default (or absent) port is dropped from the normalized URL. Anchor with
+    // a trailing "/" so "://host/" cannot substring-match a longer host.
+    return `://${host}/`;
+  }
+  return `://${host}:${port}`;
+}
+
+async function setHostnameDNR(tunnelId, localEndpoint, hostname, enableTLS) {
+  if (!hostname) return;
+  const ruleId = _dnrRuleId(tunnelId);
+  const urlFilter = _dnrUrlFilter(localEndpoint, enableTLS);
+  console.log('Wisper: installing DNR rule', { ruleId, localEndpoint, hostname, urlFilter });
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [ruleId],
+      addRules: [{
+        id: ruleId,
+        priority: 1,
+        action: {
+          type: 'modifyHeaders',
+          requestHeaders: [{ header: 'host', operation: 'set', value: hostname }],
+        },
+        condition: {
+          urlFilter,
+          resourceTypes: ['xmlhttprequest'],
+        },
+      }],
+    });
+    const rules = await chrome.declarativeNetRequest.getDynamicRules();
+    console.log('Wisper: DNR rule installed, current dynamic rules:', rules.map(r => ({ id: r.id, urlFilter: r.condition.urlFilter })));
+  } catch (e) {
+    console.error('Wisper: DNR rule failed', e);
+  }
+}
+
+async function removeHostnameDNR(tunnelId) {
+  const ruleId = _dnrRuleId(tunnelId);
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [ruleId],
+      addRules: [],
+    });
+  } catch { /* ignore */ }
+}
+
+/** Clean up stale Wisper DNR rules and re-install for active tunnels. */
+async function syncHostnameDNR() {
+  const stored = await chrome.storage.local.get('tunnels');
+  const tunnels = stored.tunnels || [];
+  const activeIds = new Set(
+    tunnels.filter(t => t.hostname).map(t => _dnrRuleId(t.tunnelId)),
+  );
+  const allRules = await chrome.declarativeNetRequest.getDynamicRules();
+  const stale = allRules
+    .filter(r => r.id >= 10000 && r.id < 20000 && !activeIds.has(r.id))
+    .map(r => r.id);
+  if (stale.length) {
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: stale, addRules: [] });
+  }
+  // Re-install rules for active tunnels
+  for (const t of tunnels) {
+    if (t.hostname && (t.status === 'running' || t.status === 'connecting')) {
+      await setHostnameDNR(t.tunnelId, t.localEndpoint, t.hostname, t.enableTLS);
+    }
+  }
+}
+
 // ── Tunnel lifecycle ───────────────────────────────────────────────────
 
 async function handleStartTunnel(config) {
@@ -92,6 +196,11 @@ async function handleStartTunnel(config) {
   }
   await chrome.storage.local.set({ tunnels: saved });
 
+  // Install DNR rule for hostname rewrite BEFORE offscreen starts fetching
+  if (config.hostname) {
+    await setHostnameDNR(tunnelId, config.localEndpoint, config.hostname, config.enableTLS);
+  }
+
   // Ensure offscreen document exists
   await ensureOffscreen();
 
@@ -100,6 +209,9 @@ async function handleStartTunnel(config) {
 }
 
 async function handleStopTunnel(tunnelId) {
+  // Remove DNR rule for hostname rewrite
+  await removeHostnameDNR(tunnelId);
+
   // Preserve config but mark as stopped
   const stored = await chrome.storage.local.get('tunnels');
   const saved = (stored.tunnels || []).map(t =>
@@ -158,9 +270,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// ── Startup: auto-start tunnels that were running ──────────────────────
+// ── Startup: sync DNR rules and auto-start tunnels ─────────────────────
 
 chrome.runtime.onInstalled.addListener(async () => {
+  await syncHostnameDNR();
   const stored = await chrome.storage.local.get('tunnels');
   const tunnels = stored.tunnels || [];
   const running = tunnels.filter(t => t.status !== 'stopped');
@@ -171,6 +284,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // Service worker must call keepAlive check on start
 chrome.runtime.onStartup.addListener(async () => {
+  await syncHostnameDNR();
   const stored = await chrome.storage.local.get('tunnels');
   const tunnels = stored.tunnels || [];
   for (const t of tunnels) {

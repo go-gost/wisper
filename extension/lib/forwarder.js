@@ -84,10 +84,11 @@ export async function forwardHTTP(stream, req, config) {
     for (const v of values) fwdHeaders.append(name, v);
   }
 
-  // Host rewrite (matches Go httpTunnel's hostname option). The browser
-  // forbids overriding the Host header on fetch(), so this is a best-effort
-  // that takes effect only in contexts where the header is not filtered;
-  // otherwise the backend sees the localEndpoint host (as it always did).
+  // Host rewrite (matches Go httpTunnel's hostname option). fetch() forbids
+  // setting the Host header directly, so this is a no-op in the extension.
+  // The actual rewrite is handled by chrome.declarativeNetRequest in the
+  // background service worker (background.js), which modifies the host header
+  // at the network level before the request is sent.
   if (config.hostname) {
     try { fwdHeaders.set('Host', config.hostname); } catch { /* forbidden header */ }
   }
