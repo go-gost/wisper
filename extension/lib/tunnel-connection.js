@@ -104,18 +104,42 @@ export class TunnelConnection {
         }
       };
 
-      this._ws.onclose = () => {
+      this._ws.onclose = (e) => {
         if (!this._bound && !this._closed) {
-          reject(new Error('WebSocket closed before bind response'));
+          reject(new Error(
+            `WebSocket closed before bind response: ` +
+            `code=${e.code || 'none'} reason="${e.reason || ''}"`,
+          ));
         }
+        // Surface the status code so _onError + onClose callbacks have context.
+        this._closeCode = e.code || 0;
+        this._closeReason = e.reason || '';
         this._onSmuxClose();
       };
 
       this._ws.onerror = (e) => {
+        // Browser WebSocket ErrorEvent is deliberately sparse (no error code,
+        // no reason string) for security. The actual cause — TLS failure,
+        // DNS NXDOMAIN, connection refused, non-101 response — is only
+        // visible through chrome://net-export (net-internals). We collect
+        // what little the browser gives us and pair it with the close event,
+        // which arrives immediately after onerror with code/reason.
+        const ctx = { url: this._relayUrl, type: 'WebSocket' };
         if (!this._bound) {
-          reject(new Error('WebSocket connection failed'));
+          reject(new Error(
+            `WebSocket connect failed to ${this._relayUrl}. ` +
+            `Check: (1) is wisper.gost.run reachable? ` +
+            `(2) does the extension manifest's host_permissions include the relay host? ` +
+            `(3) is there a proxy/VPN blocking wss:// traffic?`,
+          ));
         }
-        this._onError(new Error('WebSocket error'));
+        // The close event follows onerror immediately; defer _onError so
+        // onclose can surface a real status code if the server sent a close
+        // frame before the error.
+        this._onError(new Error(
+          `WebSocket error on ${this._relayUrl}` +
+          (e && e.message ? ` — ${e.message}` : ''),
+        ));
       };
     });
   }
@@ -263,9 +287,23 @@ export class TunnelConnection {
 
     const { method, path, headers } = parseHTTPRequest(headerStr);
 
-    // Read remaining body based on Content-Length if not all buffered
-    const contentLength = parseInt(headers['content-length'], 10);
-    if (contentLength > 0) {
+    // Read the request body. The relay may carry either a Content-Length or a
+    // Transfer-Encoding: chunked body (Go's http.ReadRequest decodes chunked
+    // before forwarding, so what reaches us is always either a fixed-length
+    // Content-Length body or chunked-encoded bytes). fetch() understands
+    // neither raw chunked bytes nor a Uint8Array carrying them, so we decode
+    // chunked here and hand fetch() a plain byte body + Content-Length.
+    const contentLength = parseInt(headerValue(headers, 'content-length'), 10);
+    const transferEncoding = (headerValue(headers, 'transfer-encoding') || '').toLowerCase();
+
+    if (transferEncoding.includes('chunked')) {
+      // Read the full chunked stream (may span more SMUX frames) and decode.
+      bodyBytes = await readChunkedBody(stream, bodyBytes);
+      // We decoded the body — replace the framing headers so fetch() sends it
+      // as a fixed-length body. Strip the original headers below.
+      delete headers['transfer-encoding'];
+      headers['content-length'] = [String(bodyBytes.length)];
+    } else if (contentLength > 0) {
       while (bodyBytes.length < contentLength) {
         const chunk = await stream.read();
         if (!chunk) break;
@@ -273,6 +311,10 @@ export class TunnelConnection {
         merged.set(bodyBytes);
         merged.set(chunk, bodyBytes.length);
         bodyBytes = merged;
+      }
+      // Truncate any over-read bytes that belong to the next request.
+      if (bodyBytes.length > contentLength) {
+        bodyBytes = bodyBytes.slice(0, contentLength);
       }
     }
 
@@ -291,7 +333,10 @@ export class TunnelConnection {
   }
 
   _onError(err) {
-    console.error('TunnelConnection error:', err.message);
+    const extra = this._closeCode
+      ? ` (ws close: code=${this._closeCode} reason="${this._closeReason}")`
+      : '';
+    console.error(`TunnelConnection(${this._relayUrl}):`, err.message + extra);
   }
 }
 
@@ -302,9 +347,10 @@ export class TunnelConnection {
  *
  * Input: "GET /path HTTP/1.1\r\nHost: example.com\r\nHeader: value\r\n"
  *
- * Returns { method, path, headers }.
+ * Returns { method, path, headers }. Header names are lowercased; values are
+ * stored as arrays to preserve duplicate headers (e.g. Set-Cookie, Cookie).
  */
-function parseHTTPRequest(raw) {
+export function parseHTTPRequest(raw) {
   const lines = raw.split('\r\n');
   if (lines.length === 0) throw new Error('empty HTTP request');
 
@@ -313,7 +359,7 @@ function parseHTTPRequest(raw) {
   const method = reqLine[0] || 'GET';
   const path = reqLine[1] || '/';
 
-  // Headers
+  // Headers — preserve multi-value (array) headers like Set-Cookie/Cookie.
   const headers = {};
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
@@ -322,10 +368,103 @@ function parseHTTPRequest(raw) {
     if (colonPos === -1) continue;
     const name = line.substring(0, colonPos).trim().toLowerCase();
     const value = line.substring(colonPos + 1).trim();
-    headers[name] = value;
+    if (headers[name] === undefined) {
+      headers[name] = [value];
+    } else {
+      headers[name].push(value);
+    }
   }
 
   return { method, path, headers };
+}
+
+/**
+ * headerValue — first value for a (possibly multi-value) header, joined by
+ * ", " for multiple values when joined=true.
+ */
+function headerValue(headers, name, joined = false) {
+  const v = headers[name];
+  if (v === undefined) return undefined;
+  return joined ? v.join(', ') : v[0];
+}
+
+/**
+ * readChunkedBody — read and decode an HTTP/1.1 chunked body from a stream.
+ *
+ * `carry` holds any chunked bytes already buffered past the header boundary.
+ * Reads further chunks from the stream until the terminating 0-length chunk.
+ * Returns the fully decoded body as a Uint8Array.
+ */
+async function readChunkedBody(stream, carry) {
+  let buf = carry;
+  const out = [];
+
+  for (;;) {
+    // Find the next CRLF that delimits a chunk-size line.
+    let crlf = indexOfSequence(buf, [0x0d, 0x0a]);
+    while (crlf === -1) {
+      const chunk = await stream.read();
+      if (!chunk) throw new Error('stream closed mid chunked body');
+      const merged = new Uint8Array(buf.length + chunk.length);
+      merged.set(buf);
+      merged.set(chunk, buf.length);
+      buf = merged;
+      crlf = indexOfSequence(buf, [0x0d, 0x0a]);
+    }
+
+    const sizeLine = new TextDecoder().decode(buf.subarray(0, crlf));
+    const sizeToken = sizeLine.split(';')[0].trim(); // ignore chunk extensions
+    const size = parseInt(sizeToken, 16);
+    if (isNaN(size)) throw new Error(`bad chunk size: "${sizeLine}"`);
+
+    buf = buf.subarray(crlf + 2); // past the size CRLF
+
+    if (size === 0) {
+      // Read trailing CRLF (after any trailer headers). Trailers are rare; we
+      // consume up to and including the final CRLF that ends the chunked body.
+      for (;;) {
+        const end = indexOfSequence(buf, [0x0d, 0x0a]);
+        if (end !== -1) {
+          if (end === 0) break; // empty line → end of trailers
+          buf = buf.subarray(end + 2);
+          continue;
+        }
+        const chunk = await stream.read();
+        if (!chunk) break;
+        const merged = new Uint8Array(buf.length + chunk.length);
+        merged.set(buf);
+        merged.set(chunk, buf.length);
+        buf = merged;
+      }
+      break;
+    }
+
+    // Read `size` bytes of chunk data plus the trailing CRLF.
+    while (buf.length < size + 2) {
+      const chunk = await stream.read();
+      if (!chunk) throw new Error('stream closed mid chunked body');
+      const merged = new Uint8Array(buf.length + chunk.length);
+      merged.set(buf);
+      merged.set(chunk, buf.length);
+      buf = merged;
+    }
+    out.push(buf.subarray(0, size));
+    buf = buf.subarray(size + 2); // skip chunk data + trailing CRLF
+  }
+
+  const total = out.reduce((n, c) => n + c.length, 0);
+  const body = new Uint8Array(total);
+  let off = 0;
+  for (const c of out) {
+    body.set(c, off);
+    off += c.length;
+  }
+  return body;
+}
+
+// Exposed for unit testing (decode a chunked body from a fake stream).
+export async function decodeChunkedBodyFromStream(stream, carry) {
+  return readChunkedBody(stream, carry);
 }
 
 /**

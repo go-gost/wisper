@@ -6,15 +6,18 @@
  * timeout. It hosts:
  *
  *   - TunnelConnection instances (WebSocket + relay + SMUX)
- *   - HTTP forwarder (fetch() to localhost)
- *   - WebSocket forwarder (bidirectional relay to localhost)
+ *   - HTTP/WebSocket forwarding to a local backend (see lib/forwarder.js)
  *   - Reconnection with exponential backoff
  *
  * Communication: service worker ↔ offscreen via chrome.runtime.sendMessage().
+ *
+ * The request-forwarding logic lives in lib/forwarder.js (pure, no chrome
+ * dependency) so it can be unit/integration tested in Node.
  */
 
 import { TunnelConnection } from './lib/tunnel-connection.js';
-import md5 from './lib/md5.js';
+import { handleRequest } from './lib/forwarder.js';
+import { uuidToTunnelIdBytes, entrypointFromUuid } from './lib/tunnel-id.js';
 
 // ── State ──────────────────────────────────────────────────────────────
 
@@ -86,14 +89,14 @@ async function connect(entry) {
 
   notifyStatus(config.tunnelId, 'connecting');
 
-  // Compute entrypoint: https://{md5(uuid)}.{domain} (matches Go: fmt.Sprintf("https://%x.%s", md5.Sum([]byte(id)), domain))
+  // Entrypoint: https://{md5(uuid)}.{domain} — matches Go's entrypoint derivation.
   const entrypointDomain = config.entrypointDomain || 'gost.run';
-  const entrypointUrl = `https://${md5(config.tunnelId).substring(0, 16)}.${entrypointDomain}`;
+  const entrypointUrl = entrypointFromUuid(config.tunnelId, entrypointDomain);
 
   const conn = new TunnelConnection({
     tunnelId: config.tunnelIdBytes
       ? new Uint8Array(config.tunnelIdBytes)
-      : generateTunnelId(),
+      : uuidToTunnelIdBytes(config.tunnelId),
     localEndpoint: config.localEndpoint,
     auth: config.auth || {},
     relayUrl: config.relayUrl,
@@ -122,159 +125,6 @@ async function connect(entry) {
   }
 }
 
-// ── Request handler (HTTP + WebSocket dispatch) ────────────────────────
-
-async function handleRequest(stream, req, config) {
-  try {
-    if (isWebSocketUpgrade(req.headers)) {
-      await forwardWebSocket(stream, req, config);
-    } else {
-      await forwardHTTP(stream, req, config);
-    }
-  } catch (e) {
-    console.error(`Wisper: forwarding error for ${req.path}:`, e.message);
-    stream.close();
-  }
-}
-
-// ── HTTP forwarder ─────────────────────────────────────────────────────
-
-async function forwardHTTP(stream, req, config) {
-  const url = `http://${config.localEndpoint}${req.path}`;
-  const method = req.method || 'GET';
-
-  // Build fetch options
-  const fetchOpts = {
-    method,
-    headers: stripHopByHopHeaders(req.headers),
-  };
-
-  // Don't set body for methods that don't support it
-  if (!['GET', 'HEAD'].includes(method) && req.body && req.body.length > 0) {
-    fetchOpts.body = req.body;
-  }
-
-  const resp = await fetch(url, fetchOpts);
-
-  // Serialize response
-  const respBody = new Uint8Array(await resp.arrayBuffer());
-  const respHeaders = {};
-  for (const [name, value] of resp.headers) {
-    respHeaders[name] = value;
-  }
-
-  // Write HTTP response + body back through the SMUX stream
-  const statusLine = `HTTP/1.1 ${resp.status} ${resp.statusText}\r\n`;
-  const headerLines = Object.entries(respHeaders)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join('\r\n');
-  const responseHead = new TextEncoder().encode(`${statusLine}${headerLines}\r\n\r\n`);
-
-  await stream.write(responseHead);
-  if (respBody.length > 0) {
-    await stream.write(respBody);
-  }
-  stream.close();
-}
-
-// ── WebSocket forwarder ────────────────────────────────────────────────
-
-/**
- * activeWebSockets — maps stream id → local WebSocket connection.
- *
- * ponytail: global map, per-stream granularity is enough;
- * add per-tunnel ShardedMap if hundreds of concurrent WS.
- */
-const activeWebSockets = new Map();
-
-async function forwardWebSocket(stream, req, config) {
-  const protocols = req.headers['sec-websocket-protocol'] || undefined;
-  const wsUrl = `ws://${config.localEndpoint}${req.path}`;
-
-  const ws = new WebSocket(wsUrl, protocols);
-  ws.binaryType = 'arraybuffer';
-
-  const streamId = stream.id;
-
-  ws.onopen = () => {
-    activeWebSockets.set(streamId, ws);
-
-    // Write HTTP 101 Switching Protocols back through SMUX stream
-    const switching = new TextEncoder().encode(
-      'HTTP/1.1 101 Switching Protocols\r\n' +
-      'Upgrade: websocket\r\n' +
-      'Connection: Upgrade\r\n\r\n'
-    );
-    stream.write(switching);
-  };
-
-  // local → tunnel
-  ws.onmessage = (event) => {
-    const data = event.data instanceof ArrayBuffer
-      ? new Uint8Array(event.data)
-      : new TextEncoder().encode(event.data);
-    stream.write(data).catch(() => {});
-  };
-
-  ws.onclose = (event) => {
-    activeWebSockets.delete(streamId);
-    stream.close();
-  };
-
-  ws.onerror = () => {
-    activeWebSockets.delete(streamId);
-    stream.close();
-  };
-
-  // tunnel → local: start reading from the stream
-  relayWebSocketData(stream, streamId);
-}
-
-async function relayWebSocketData(stream, streamId) {
-  try {
-    while (true) {
-      const chunk = await stream.read();
-      if (!chunk) break; // EOF
-      const ws = activeWebSockets.get(streamId);
-      if (!ws || ws.readyState !== WebSocket.OPEN) break;
-      ws.send(chunk);
-    }
-  } catch (e) {
-    // Stream closed
-  }
-  const ws = activeWebSockets.get(streamId);
-  if (ws) {
-    ws.close();
-    activeWebSockets.delete(streamId);
-  }
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────
-
-function isWebSocketUpgrade(headers) {
-  const upgrade = (headers['upgrade'] || '').toLowerCase();
-  return upgrade === 'websocket';
-}
-
-/**
- * stripHopByHopHeaders — remove HTTP/1.1 hop-by-hop headers.
- * Must be stripped: connection, keep-alive, proxy-*, transfer-encoding, te,
- * trailer, upgrade (for non-WS requests).
- */
-function stripHopByHopHeaders(headers) {
-  const hopByHop = new Set([
-    'connection', 'keep-alive', 'proxy-authorization', 'proxy-authenticate',
-    'transfer-encoding', 'te', 'trailer', 'upgrade',
-  ]);
-  const result = {};
-  for (const [k, v] of Object.entries(headers)) {
-    if (!hopByHop.has(k.toLowerCase())) {
-      result[k] = v;
-    }
-  }
-  return result;
-}
-
 function notifyStatus(tunnelId, status, error, entrypoint) {
   chrome.runtime.sendMessage({
     type: 'tunnel-status',
@@ -298,14 +148,4 @@ function getTunnelStatuses() {
     });
   }
   return result;
-}
-
-function generateTunnelId() {
-  // 16-byte UUID → 20-byte TunnelID (16 bytes ID + 1 flag + 2 rsv + 1 weight)
-  const id = new Uint8Array(20);
-  crypto.getRandomValues(id.subarray(0, 16));
-  // flag byte (offset 16) defaults to 0 (public tunnel)
-  // rsv bytes (offset 17-18) default to 0
-  // weight byte (offset 19) defaults to 0
-  return id;
 }

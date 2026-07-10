@@ -199,19 +199,22 @@ describe('SmuxServer write path', () => {
     server.feed(synFrame(1));
   });
 
-  it('stream.close() sends FIN frame', (t, done) => {
+  it('stream.close() sends FIN frame', async (t) => {
     const server = new SmuxServer({
-      onStream: (stream) => {
-        stream.close();
+      onStream: async (stream) => {
+        // close() drains pending writes then sends FIN asynchronously — await
+        // it before inspecting the output buffer.
+        await stream.close();
         const last = output[output.length - 1];
-        const dv = new DataView(last.buffer);
+        const dv = new DataView(last.buffer, last.byteOffset, last.byteLength);
         assert.equal(dv.getUint8(1), 1); // cmdFIN
         assert.equal(dv.getUint32(4, LE), stream.id);
-        done();
       },
     });
     const output = captureOutput(server);
     server.feed(synFrame(1));
+    // Give the async onStream/close drain a tick to complete.
+    await new Promise(r => setTimeout(r, 0));
   });
 });
 

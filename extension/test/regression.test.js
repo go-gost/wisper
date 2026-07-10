@@ -1,0 +1,270 @@
+/**
+ * regression.test.js — tests for the data-flow bug fixes.
+ *
+ * Covers:
+ *   - Bug 1: SMUX PSH frame splitting (no uint16 LENGTH overflow on >64KB)
+ *   - Bug 3: WebSocket frame codec (wsAccept, encode/decode, fragmentation)
+ *   - Bug 4: multi-value HTTP headers preserved as arrays
+ *   - Bug 5: chunked request body decoding
+ *
+ * Run: node --test test/regression.test.js
+ */
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { SmuxServer } from '../lib/smux.js';
+import {
+  WsDecoder, encodeWsFrame, wsAccept,
+  OP_TEXT, OP_BINARY, OP_CLOSE, OP_PONG, OP_CONT,
+} from '../lib/ws-codec.js';
+import { parseHTTPRequest, decodeChunkedBodyFromStream } from '../lib/tunnel-connection.js';
+
+const LE = true;
+
+function makeFrame(ver, cmd, sid, data = new Uint8Array(0)) {
+  const buf = new Uint8Array(8 + data.length);
+  const dv = new DataView(buf.buffer);
+  dv.setUint8(0, ver); dv.setUint8(1, cmd);
+  dv.setUint16(2, data.length, LE); dv.setUint32(4, sid, LE);
+  if (data.length) buf.set(data, 8);
+  return buf;
+}
+const synFrame = (sid, data) => makeFrame(2, 0, sid, data);
+
+function captureOutput(server) {
+  const frames = [];
+  server.setOutput((f) => frames.push(f));
+  return frames;
+}
+
+// ── Bug 1: frame splitting ─────────────────────────────────────────────
+
+describe('Bug 1: SMUX PSH frame splitting', () => {
+  it('a >64KB write is split into ≤32KB frames, none overflow LENGTH', async () => {
+    const N = 200000; // > 65535 → would overflow uint16 LENGTH without splitting
+    const big = new Uint8Array(N);
+    for (let i = 0; i < N; i++) big[i] = i & 0xff;
+
+    let resolveDone;
+    const done = new Promise(r => { resolveDone = r; });
+
+    const server = new SmuxServer({
+      onStream: async (stream) => {
+        await stream.write(big);
+        resolveDone();
+      },
+    });
+    const output = captureOutput(server);
+    server.feed(synFrame(1));
+    await done;
+
+    const psh = output.filter(f => new DataView(f.buffer, f.byteOffset, f.byteLength).getUint8(1) === 2);
+    assert.ok(psh.length > 1, `expected multiple PSH frames, got ${psh.length}`);
+
+    let totalData = 0;
+    for (const f of psh) {
+      const dv = new DataView(f.buffer, f.byteOffset, f.byteLength);
+      const len = dv.getUint16(2, LE);
+      assert.ok(len <= 32768, `frame LENGTH ${len} exceeds MAX_FRAME_SIZE 32768`);
+      // The frame buffer must exactly match its declared LENGTH (the old bug
+      // wrote LENGTH = N & 0xFFFF while attaching all N bytes, desyncing the peer).
+      assert.equal(f.length, 8 + len, 'frame buffer must match declared LENGTH');
+      totalData += len;
+    }
+    assert.equal(totalData, N, 'reassembled PSH data must equal the original payload');
+
+    // Byte-for-byte reassembly check.
+    let off = 0;
+    for (const f of psh) {
+      const dv = new DataView(f.buffer, f.byteOffset, f.byteLength);
+      const len = dv.getUint16(2, LE);
+      for (let i = 0; i < len; i++) assert.equal(f[8 + i], big[off + i]);
+      off += len;
+    }
+  });
+
+  it('flow control blocks then resumes on cmdUPD', async () => {
+    // Peer advertises a tiny window; write must block until a UPD opens it.
+    const payload = new Uint8Array(1000);
+    payload.fill(0x7e);
+
+    let resolveDone;
+    const done = new Promise(r => { resolveDone = r; });
+
+    const server = new SmuxServer({
+      onStream: async (stream) => {
+        // Give a window of only 100 bytes, then write 1000 → must block.
+        // (initial peer window is 262144, so shrink it via a UPD first)
+        const upd = makeFrame(2, 4, stream.id, (() => {
+          const d = new Uint8Array(8); const dv = new DataView(d.buffer);
+          dv.setUint32(0, 0, LE);    // consumed = 0
+          dv.setUint32(4, 100, LE);  // window = 100
+          return d;
+        })());
+        server.feed(upd);
+
+        const writePromise = stream.write(payload);
+        // Yield so the write blocks at the 100-byte window.
+        await Promise.resolve();
+        // Open the window fully → write should now complete.
+        const upd2 = makeFrame(2, 4, stream.id, (() => {
+          const d = new Uint8Array(8); const dv = new DataView(d.buffer);
+          dv.setUint32(0, 0, LE);
+          dv.setUint32(4, 1048576, LE);
+          return d;
+        })());
+        server.feed(upd2);
+        await writePromise;
+        resolveDone();
+      },
+    });
+    const output = captureOutput(server);
+    server.feed(synFrame(3));
+    await done;
+
+    const psh = output.filter(f => new DataView(f.buffer, f.byteOffset, f.byteLength).getUint8(1) === 2);
+    let total = 0;
+    for (const f of psh) total += new DataView(f.buffer, f.byteOffset, f.byteLength).getUint16(2, LE);
+    assert.equal(total, 1000, 'all bytes eventually sent after window opened');
+  });
+});
+
+// ── Bug 3: WebSocket frame codec ───────────────────────────────────────
+
+describe('Bug 3: WebSocket frame codec', () => {
+  it('wsAccept matches the RFC 6455 §4.2.2 example vector', async () => {
+    const accept = await wsAccept('dGhlIHNhbXBsZSBub25jZQ==');
+    assert.equal(accept, 's3pPLMBiTxaQ9kYGzzhZRbK+xOo=');
+  });
+
+  it('round-trips an unmasked text frame (server→visitor)', () => {
+    const payload = new TextEncoder().encode('hello');
+    const frame = encodeWsFrame(OP_TEXT, payload, false);
+    const dec = new WsDecoder();
+    dec.push(frame);
+    const [ev] = dec.parse();
+    assert.equal(ev.type, 'data');
+    assert.equal(ev.opcode, OP_TEXT);
+    assert.deepEqual(ev.payload, payload);
+  });
+
+  it('round-trips a masked binary frame (visitor→server, demasked)', () => {
+    const payload = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) payload[i] = i;
+    const frame = encodeWsFrame(OP_BINARY, payload, true); // masked
+    const dec = new WsDecoder();
+    dec.push(frame);
+    const [ev] = dec.parse();
+    assert.equal(ev.type, 'data');
+    assert.equal(ev.opcode, OP_BINARY);
+    assert.deepEqual(ev.payload, payload);
+  });
+
+  it('handles a >125-byte payload (16-bit length)', () => {
+    const payload = new Uint8Array(300);
+    payload.fill(0x41);
+    const frame = encodeWsFrame(OP_BINARY, payload, false);
+    const dec = new WsDecoder();
+    dec.push(frame);
+    const [ev] = dec.parse();
+    assert.deepEqual(ev.payload, payload);
+  });
+
+  it('reassembles a fragmented message (FIN=0 text + FIN=1 continuation)', () => {
+    const part1 = new TextEncoder().encode('hel');
+    const part2 = new TextEncoder().encode('lo');
+    // FIN=0 text frame
+    const f1 = new Uint8Array([0x01, part1.length, ...part1]);
+    // FIN=1 continuation frame
+    const f2 = new Uint8Array([0x80 | OP_CONT, part2.length, ...part2]);
+    const dec = new WsDecoder();
+    dec.push(f1);
+    assert.equal(dec.parse().length, 0, 'no complete message yet');
+    dec.push(f2);
+    const [ev] = dec.parse();
+    assert.equal(ev.type, 'data');
+    assert.equal(ev.opcode, OP_TEXT);
+    assert.deepEqual(new TextDecoder().decode(ev.payload), 'hello');
+  });
+
+  it('decodes a close frame with status code', () => {
+    const payload = new Uint8Array(2);
+    new DataView(payload.buffer).setUint16(0, 1000, false); // BE
+    const frame = encodeWsFrame(OP_CLOSE, payload, false);
+    const dec = new WsDecoder();
+    dec.push(frame);
+    const [ev] = dec.parse();
+    assert.equal(ev.type, 'close');
+    assert.equal(new DataView(ev.payload.buffer, ev.payload.byteOffset, 2).getUint16(0, false), 1000);
+  });
+
+  it('echoes a ping as a pong via event type', () => {
+    const payload = new TextEncoder().encode('ping!');
+    const frame = encodeWsFrame(0x9, payload, false); // 0x9 = OP_PING
+    const dec = new WsDecoder();
+    dec.push(frame);
+    const [ev] = dec.parse();
+    assert.equal(ev.type, 'ping');
+    assert.deepEqual(ev.payload, payload);
+  });
+
+  it('handles partial frames across pushes', () => {
+    const payload = new TextEncoder().encode('split-me');
+    const frame = encodeWsFrame(OP_TEXT, payload, false);
+    const dec = new WsDecoder();
+    dec.push(frame.subarray(0, 3));
+    assert.equal(dec.parse().length, 0);
+    dec.push(frame.subarray(3));
+    const [ev] = dec.parse();
+    assert.equal(ev.type, 'data');
+    assert.deepEqual(ev.payload, payload);
+  });
+});
+
+// ── Bug 4: multi-value headers ─────────────────────────────────────────
+
+describe('Bug 4: multi-value HTTP headers', () => {
+  it('preserves duplicate Set-Cookie as an array', () => {
+    const raw = [
+      'GET / HTTP/1.1',
+      'Host: example.com',
+      'Set-Cookie: a=1',
+      'Set-Cookie: b=2; Expires=Wed, 09 Jun 2021 10:18:14 GMT',
+      '',
+      '',
+    ].join('\r\n');
+    const { method, path, headers } = parseHTTPRequest(raw);
+    assert.equal(method, 'GET');
+    assert.equal(path, '/');
+    assert.deepEqual(headers['set-cookie'], ['a=1', 'b=2; Expires=Wed, 09 Jun 2021 10:18:14 GMT']);
+    assert.deepEqual(headers['host'], ['example.com']);
+  });
+});
+
+// ── Bug 5: chunked request body ────────────────────────────────────────
+
+describe('Bug 5: chunked request body decoding', () => {
+  it('decodes a simple chunked body', async () => {
+    const chunked = new TextEncoder().encode('5\r\nHello\r\n0\r\n\r\n');
+    const stream = { async read() { return null; } };
+    const body = await decodeChunkedBodyFromStream(stream, chunked);
+    assert.deepEqual(body, new TextEncoder().encode('Hello'));
+  });
+
+  it('decodes multiple chunks and ignores chunk extensions', async () => {
+    const chunked = new TextEncoder().encode('5;name=value\r\nHello\r\n6\r\n World\r\n0\r\n\r\n');
+    const stream = { async read() { return null; } };
+    const body = await decodeChunkedBodyFromStream(stream, chunked);
+    assert.deepEqual(body, new TextEncoder().encode('Hello World'));
+  });
+
+  it('reads across stream.read() boundaries', async () => {
+    const parts = [
+      new TextEncoder().encode('5\r\nHel'),
+      new TextEncoder().encode('lo\r\n0\r\n\r\n'),
+    ];
+    const stream = { async read() { return parts.shift() ?? null; } };
+    const body = await decodeChunkedBodyFromStream(stream, new Uint8Array(0));
+    assert.deepEqual(body, new TextEncoder().encode('Hello'));
+  });
+});
