@@ -561,19 +561,21 @@
 
     .form-scroll {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 16px;
+      padding: 12px 16px;
     }
 
     .settings-scroll {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
     }
 
     .form-group {
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
 
     .form-label {
@@ -588,7 +590,7 @@
 
     .form-input {
       width: 100%;
-      padding: 10px 12px;
+      padding: 8px 12px;
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background: var(--surface);
@@ -612,7 +614,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 0;
+      padding: 8px 0;
       border-bottom: 1px solid var(--border-subtle);
       margin-bottom: 0;
     }
@@ -655,8 +657,8 @@
     /* ── Danger zone ── */
 
     .danger-zone {
-      margin-top: 20px;
-      padding: 14px;
+      margin-top: 14px;
+      padding: 12px;
       border: 1px solid var(--red-border);
       border-radius: var(--radius-md);
     }
@@ -985,11 +987,6 @@
 
     <div class="form-scroll">
       <div class="form-group">
-        <label class="form-label">Type</label>
-        <input class="form-input" id="fType" readonly value="HTTP Tunnel" />
-      </div>
-
-      <div class="form-group">
         <label class="form-label">Name</label>
         <input class="form-input" id="fName" placeholder="My Tunnel" />
       </div>
@@ -1014,7 +1011,7 @@
         <div class="switch" id="fAuth"><div class="switch-knob"></div></div>
       </div>
 
-      <div id="authFields" style="display:none; margin-top:12px;">
+      <div id="authFields" style="display:none; margin-top:8px;">
         <div class="form-group">
           <label class="form-label">Username</label>
           <input class="form-input" id="fUsername" placeholder="admin" />

@@ -24,6 +24,14 @@ import {
 
 export async function handleRequest(stream, req, config) {
   try {
+    // HTTP basic auth guards the public endpoint (matches Go's sniffer_http.go:
+    // it checks req.BasicAuth() and returns 401 + WWW-Authenticate before ever
+    // reaching the backend). Enforced client-side because the relay only pipes
+    // bytes — the tunnel operator (this forwarder) is where auth must happen.
+    if (!isAuthorized(req.headers, config.auth)) {
+      await writeUnauthorized(stream);
+      return;
+    }
     if (isWebSocketUpgrade(req.headers)) {
       await forwardWebSocket(stream, req, config);
     } else {
@@ -62,6 +70,58 @@ export function headerHasToken(headers, name, token) {
     }
   }
   return false;
+}
+
+// ── HTTP basic auth ────────────────────────────────────────────────────
+
+/**
+ * Validate the visitor's `Authorization: Basic` header against the tunnel's
+ * configured credentials. Returns true when auth is not configured (no
+ * username) or when the supplied credentials match exactly.
+ *
+ * Mirrors Go's http.Request.BasicAuth(): base64-decode the token, split the
+ * "username:password" on the FIRST colon (passwords may contain colons).
+ */
+export function isAuthorized(headers, auth) {
+  if (!auth || !auth.username) return true; // auth not configured → open
+  const header = firstHeader(headers, 'authorization');
+  if (!header) return false;
+  const m = /^basic\s+(\S+)$/i.exec(header.trim());
+  if (!m) return false;
+  let decoded;
+  try {
+    decoded = decodeBase64Utf8(m[1]);
+  } catch {
+    return false;
+  }
+  const idx = decoded.indexOf(':');
+  const user = idx === -1 ? decoded : decoded.slice(0, idx);
+  const pass = idx === -1 ? '' : decoded.slice(idx + 1);
+  return user === auth.username && pass === (auth.password || '');
+}
+
+/** Decode a base64 string to UTF-8 text (browser + Node compatible). */
+function decodeBase64Utf8(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+/** Write a 401 with WWW-Authenticate: Basic and close the stream. */
+async function writeUnauthorized(stream) {
+  const body = 'Unauthorized';
+  const head =
+    'HTTP/1.1 401 Unauthorized\r\n' +
+    'WWW-Authenticate: Basic\r\n' +
+    'Content-Type: text/plain\r\n' +
+    `Content-Length: ${body.length}\r\n` +
+    '\r\n';
+  try {
+    await stream.write(new TextEncoder().encode(head + body));
+  } finally {
+    try { stream.close(); } catch { /* already closed */ }
+  }
 }
 
 // ── HTTP forwarder ─────────────────────────────────────────────────────

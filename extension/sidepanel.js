@@ -159,7 +159,13 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
       const fromStorage = (data.tunnels || []).find(x => x.tunnelId === tunnelId);
       if (fromStorage) {
         fromStorage.status = status;
-        if (error !== undefined && error !== null) fromStorage.error = error;
+        // A successful (re)connect explicitly sends error:null — honor it and clear
+        // any stale error, rather than only updating when a truthy error arrives.
+        if (status === 'running') {
+          fromStorage.error = null;
+        } else if (error !== undefined && error !== null) {
+          fromStorage.error = error;
+        }
         if (entrypoint !== undefined && entrypoint !== null) fromStorage.entrypoint = entrypoint;
         tunnels.push({
           tunnelId: fromStorage.tunnelId,
@@ -181,7 +187,13 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
     return;
   }
   t.status = status;
-  if (error !== undefined && error !== null) t.error = error;
+  // A successful (re)connect explicitly sends error:null — honor it and clear any
+  // stale error. Only keep/set an error when the service is actually in 'error'.
+  if (status === 'running') {
+    t.error = null;
+  } else if (error !== undefined && error !== null) {
+    t.error = error;
+  }
   if (entrypoint !== undefined && entrypoint !== null) t.entrypoint = entrypoint;
   persistTunnels();
   render();
@@ -604,7 +616,7 @@ function expandDetailRow(label, value, showCopy) {
 
 function openNewForm() {
   editingId = null;
-  document.getElementById('formTitle').textContent = 'New Tunnel';
+  document.getElementById('formTitle').textContent = 'New HTTP Tunnel';
   document.getElementById('dangerZone').style.display = 'none';
   document.getElementById('fName').value = '';
   document.getElementById('fEndpoint').value = '';
@@ -622,7 +634,7 @@ function openEditForm(tunnelId) {
   if (!t) return;
 
   editingId = tunnelId;
-  document.getElementById('formTitle').textContent = 'Edit Tunnel';
+  document.getElementById('formTitle').textContent = 'Edit HTTP Tunnel';
   document.getElementById('dangerZone').style.display = 'block';
   document.getElementById('fName').value = t.name || '';
   document.getElementById('fEndpoint').value = t.localEndpoint || '';

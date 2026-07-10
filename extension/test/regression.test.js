@@ -18,6 +18,7 @@ import {
   OP_TEXT, OP_BINARY, OP_CLOSE, OP_PONG, OP_CONT,
 } from '../lib/ws-codec.js';
 import { parseHTTPRequest, decodeChunkedBodyFromStream } from '../lib/tunnel-connection.js';
+import { isAuthorized, handleRequest } from '../lib/forwarder.js';
 
 const LE = true;
 
@@ -266,5 +267,73 @@ describe('Bug 5: chunked request body decoding', () => {
     const stream = { async read() { return parts.shift() ?? null; } };
     const body = await decodeChunkedBodyFromStream(stream, new Uint8Array(0));
     assert.deepEqual(body, new TextEncoder().encode('Hello'));
+  });
+});
+
+// ── HTTP basic auth (public-endpoint guard) ────────────────────────────
+
+const b64 = (s) => Buffer.from(s).toString('base64');
+const authHeader = (v) => ({ authorization: [v] });
+
+describe('HTTP basic auth: isAuthorized', () => {
+  const auth = { username: 'admin', password: 'p:ss' }; // password with a colon
+
+  it('open when no auth configured', () => {
+    assert.equal(isAuthorized({}, undefined), true);
+    assert.equal(isAuthorized({}, { username: '' }), true);
+  });
+
+  it('rejects when credentials are missing', () => {
+    assert.equal(isAuthorized({}, auth), false);
+  });
+
+  it('accepts exact credentials', () => {
+    assert.equal(isAuthorized(authHeader('Basic ' + b64('admin:p:ss')), auth), true);
+  });
+
+  it('splits username:password on the first colon', () => {
+    // password "p:ss" must survive — only the first colon delimits.
+    assert.equal(isAuthorized(authHeader('Basic ' + b64('admin:wrong')), auth), false);
+  });
+
+  it('scheme match is case-insensitive', () => {
+    assert.equal(isAuthorized(authHeader('basic ' + b64('admin:p:ss')), auth), true);
+  });
+
+  it('rejects malformed base64 token', () => {
+    assert.equal(isAuthorized(authHeader('Basic @@@@'), auth), false);
+  });
+
+  it('rejects non-Basic scheme', () => {
+    assert.equal(isAuthorized(authHeader('Bearer ' + b64('admin:p:ss')), auth), false);
+  });
+
+  it('supports an empty configured password', () => {
+    assert.equal(isAuthorized(authHeader('Basic ' + b64('u:')), { username: 'u', password: '' }), true);
+  });
+});
+
+describe('HTTP basic auth: handleRequest 401', () => {
+  function mockStream() {
+    const writes = [];
+    return {
+      writes,
+      closed: false,
+      async write(b) { writes.push(b); },
+      close() { this.closed = true; },
+      text() { return Buffer.concat(writes.map(Buffer.from)).toString('utf8'); },
+    };
+  }
+
+  it('writes 401 + WWW-Authenticate and does not forward on missing creds', async () => {
+    const stream = mockStream();
+    const req = { method: 'GET', path: '/', headers: {}, body: null };
+    // localEndpoint points nowhere; if we forwarded, fetch would run. The 401
+    // short-circuit must fire first, so no fetch and a clean close.
+    await handleRequest(stream, req, { localEndpoint: '127.0.0.1:1', auth: { username: 'admin', password: 'x' } });
+    const out = stream.text();
+    assert.match(out, /^HTTP\/1\.1 401 Unauthorized\r\n/);
+    assert.match(out, /WWW-Authenticate: Basic\r\n/);
+    assert.equal(stream.closed, true);
   });
 });

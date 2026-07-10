@@ -188,9 +188,14 @@ export class TunnelConnection {
     // TunnelFeature with our tunnel ID
     req.addFeature(FeatureTunnel, this._tunnelId);
 
-    // UserAuthFeature
-    const auth = this._config.auth || {};
-    req.addFeature(FeatureUserAuth, [auth.username || '', auth.password || '']);
+    // UserAuthFeature — relay-level bind auth. wisper uses public tunnels, so
+    // this is empty (matches the Go reference: its chain node sets no connector
+    // Auth, so GOST's tunnel connector sends no/empty UserAuth). This is NOT the
+    // HTTP basic-auth credential — that guards the public endpoint and is
+    // enforced client-side in forwarder.js (isAuthorized). Do not put
+    // config.auth here: it would leak the endpoint password to the relay bind
+    // and conflate two unrelated credentials.
+    req.addFeature(FeatureUserAuth, ['', '']);
 
     // AddrFeature for source (local address)
     req.addFeature(FeatureAddr, [host, port]);
