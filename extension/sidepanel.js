@@ -1,20 +1,160 @@
 /**
  * sidepanel.js — Popup management UI for Wisper Chrome Extension.
- *
- * Faithfully replicates the web UI (Lit) using DOM manipulation.
- * Communicates with background.js service worker for tunnel lifecycle.
  */
+
+// ── i18n ──────────────────────────────────────────────────────────────
+
+const TRANSLATIONS = {
+  en: {
+    emptyTunnels: 'No tunnels yet',
+    btnNewTunnel: 'New Tunnel',
+    formTitleNew: 'New HTTP Tunnel',
+    formTitleEdit: 'Edit HTTP Tunnel',
+    fieldName: 'Name',
+    fieldTarget: 'Target',
+    fieldHostname: 'Hostname',
+    fieldAuth: 'Basic Auth',
+    fieldUsername: 'Username',
+    fieldPassword: 'Password',
+    dangerZone: 'Danger Zone',
+    btnDelete: 'Delete Tunnel',
+    dialogDeleteTitle: 'Delete Tunnel',
+    dialogDeleteMsg: 'Are you sure you want to delete "{name}"?',
+    btnCancel: 'Cancel',
+    btnDeleteConfirm: 'Delete',
+    titleSettings: 'Settings',
+    sectionPreferences: 'Preferences',
+    settingAppearance: 'Appearance',
+    settingLanguage: 'Language',
+    appearanceLight: 'Light',
+    appearanceDark: 'Dark',
+    appearanceSystem: 'System',
+    langEn: 'English',
+    langZh: '中文',
+    typeHttp: 'HTTP',
+    statusRunning: 'Connected',
+    statusConnecting: 'Connecting',
+    statusStopped: 'Stopped',
+    statusError: 'Error',
+    labelActive: 'active',
+    actionStop: 'Stop tunnel',
+    actionStart: 'Start tunnel',
+    actionEdit: 'Edit tunnel',
+    actionDelete: 'Delete tunnel',
+    actionInspect: 'Open in GOST Inspector',
+    detailId: 'Tunnel ID',
+    detailEntrypoint: 'Entrypoint',
+    detailTarget: 'Target',
+    detailHostRewrite: 'Host Rewrite',
+    detailError: 'Error',
+    msgCopied: 'Copied to clipboard',
+    msgTargetRequired: 'Target is required',
+    msgCreated: 'Tunnel created',
+    msgUpdated: 'Tunnel updated',
+    msgDeleted: 'Tunnel deleted',
+  },
+  zh: {
+    emptyTunnels: '暂无隧道',
+    btnNewTunnel: '新建隧道',
+    formTitleNew: '新建 HTTP 隧道',
+    formTitleEdit: '编辑 HTTP 隧道',
+    fieldName: '名称',
+    fieldTarget: '目标地址',
+    fieldHostname: '主机名',
+    fieldAuth: '基本认证',
+    fieldUsername: '用户名',
+    fieldPassword: '密码',
+    dangerZone: '危险区域',
+    btnDelete: '删除隧道',
+    dialogDeleteTitle: '删除隧道',
+    dialogDeleteMsg: '确定要删除 "{name}" 吗？',
+    btnCancel: '取消',
+    btnDeleteConfirm: '删除',
+    titleSettings: '设置',
+    sectionPreferences: '偏好设置',
+    settingAppearance: '外观',
+    settingLanguage: '语言',
+    appearanceLight: '浅色',
+    appearanceDark: '深色',
+    appearanceSystem: '跟随系统',
+    langEn: 'English',
+    langZh: '中文',
+    typeHttp: 'HTTP',
+    statusRunning: '已连接',
+    statusConnecting: '连接中',
+    statusStopped: '已停止',
+    statusError: '错误',
+    labelActive: '活跃',
+    actionStop: '停止隧道',
+    actionStart: '启动隧道',
+    actionEdit: '编辑隧道',
+    actionDelete: '删除隧道',
+    actionInspect: '打开 GOST Inspector',
+    detailId: '隧道 ID',
+    detailEntrypoint: '入口地址',
+    detailTarget: '目标地址',
+    detailHostRewrite: '主机重写',
+    detailError: '错误',
+    msgCopied: '已复制到剪贴板',
+    msgTargetRequired: '目标地址不能为空',
+    msgCreated: '隧道已创建',
+    msgUpdated: '隧道已更新',
+    msgDeleted: '隧道已删除',
+  },
+};
+
+let currentLocale = 'en';
+
+function t(key, params) {
+  const text = TRANSLATIONS[currentLocale]?.[key] ?? TRANSLATIONS.en[key] ?? key;
+  if (params) {
+    return text.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
+  }
+  return text;
+}
+
+function setLocale(lang) {
+  currentLocale = lang;
+  document.documentElement.lang = lang;
+  updateI18nElements();
+  render();
+}
+
+function updateI18nElements() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+}
+
+// ── Theme ────────────────────────────────────────────────────────────
+
+function applyTheme(theme) {
+  let dark = false;
+  if (theme === 'dark') dark = true;
+  else if (theme === 'system') dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.classList.toggle('dark', dark);
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (settings.theme === 'system') applyTheme('system');
+});
 
 // ── State ──────────────────────────────────────────────────────────────
 
 /** @type {Array<{tunnelId:string,name:string,localEndpoint:string,relayUrl?:string,auth?:{username:string,password:string},status:string,error?:string,entrypoint?:string,createdAt:string,hostname?:string}>} */
 let tunnels = [];
-let settings = { relayUrl: '', entrypoint: '', insecure: false, darkMode: false };
+let settings = { theme: 'system', lang: 'en' };
 let currentView = 'list'; // 'list' | 'form' | 'settings'
-let editingId = null;       // tunnelId being edited, or null for create
+let editingId = null;
 let formSaving = false;
-let expandedMap = {};       // { [tunnelId]: true/false }
-let deletingId = null;      // tunnelId pending delete confirmation
+let expandedMap = {};
+let deletingId = null;
 
 // ── Init ───────────────────────────────────────────────────────────────
 
@@ -23,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTunnels();
   bindEvents();
 
-  // Listen for tunnel status updates forwarded by background.js
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'tunnel-status') {
       updateTunnelStatus(msg.tunnelId, msg.status, msg.error, msg.entrypoint);
@@ -53,14 +192,19 @@ function loadTunnels() {
 
 function loadSettings() {
   chrome.storage.local.get('settings', (data) => {
-    if (data.settings) settings = { ...settings, ...data.settings };
-    applyTheme(settings.darkMode);
+    if (data.settings) {
+      settings = { ...settings, ...data.settings };
+      // Migrate old darkMode boolean → theme
+      if (settings.darkMode !== undefined && settings.theme === undefined) {
+        settings.theme = settings.darkMode ? 'dark' : 'system';
+        delete settings.darkMode;
+      }
+    }
+    setLocale(settings.lang || 'en');
+    applyTheme(settings.theme || 'system');
+    updateI18nElements();
     render();
   });
-}
-
-function applyTheme(dark) {
-  document.documentElement.classList.toggle('dark', dark);
 }
 
 function persistTunnels() {
@@ -92,11 +236,10 @@ function switchView(view) {
 
 function createTunnel(data) {
   const tunnelId = crypto.randomUUID();
-  const tunnel = {
+  const tun = {
     tunnelId,
     name: data.name.trim() || `tunnel-${data.endpoint.split(':').pop() || '0'}`,
     localEndpoint: data.endpoint.trim(),
-    relayUrl: settings.relayUrl || undefined,
     auth: data.username ? { username: data.username, password: data.password || '' } : undefined,
     status: 'stopped',
     error: null,
@@ -105,41 +248,38 @@ function createTunnel(data) {
     hostname: data.hostname || '',
   };
 
-  tunnels.push(tunnel);
+  tunnels.push(tun);
   persistTunnels();
   render();
-  showToast('✓ Tunnel created');
+  showToast(t('msgCreated'));
 
   // Auto-start
   startTunnel(tunnelId);
 }
 
 function startTunnel(tunnelId) {
-  const t = tunnels.find(x => x.tunnelId === tunnelId);
-  if (!t) return;
-  t.status = 'connecting';
+  const tun = tunnels.find(x => x.tunnelId === tunnelId);
+  if (!tun) return;
+  tun.status = 'connecting';
   render();
   chrome.runtime.sendMessage({
     type: 'start-tunnel',
     config: {
-      tunnelId: t.tunnelId,
-      name: t.name,
-      localEndpoint: t.localEndpoint,
-      relayUrl: t.relayUrl || undefined,
-      entrypointDomain: settings.entrypoint || undefined,
-      insecure: settings.insecure || false,
-      auth: t.auth,
-      hostname: t.hostname || undefined,
+      tunnelId: tun.tunnelId,
+      name: tun.name,
+      localEndpoint: tun.localEndpoint,
+      auth: tun.auth,
+      hostname: tun.hostname || undefined,
     },
   });
 }
 
 function stopTunnel(tunnelId) {
-  const t = tunnels.find(x => x.tunnelId === tunnelId);
-  if (t) {
-    t.status = 'stopped';
-    t.entrypoint = null;
-    t.error = null;
+  const tun = tunnels.find(x => x.tunnelId === tunnelId);
+  if (tun) {
+    tun.status = 'stopped';
+    tun.entrypoint = null;
+    tun.error = null;
   }
   render();
   chrome.runtime.sendMessage({ type: 'stop-tunnel', tunnelId });
@@ -147,16 +287,12 @@ function stopTunnel(tunnelId) {
 }
 
 function updateTunnelStatus(tunnelId, status, error, entrypoint) {
-  let t = tunnels.find(x => x.tunnelId === tunnelId);
-  if (!t) {
-    // Tunnel not yet in local array — may have arrived before loadTunnels completed.
-    // Sync from storage to be safe.
+  let tun = tunnels.find(x => x.tunnelId === tunnelId);
+  if (!tun) {
     chrome.storage.local.get('tunnels', (data) => {
       const fromStorage = (data.tunnels || []).find(x => x.tunnelId === tunnelId);
       if (fromStorage) {
         fromStorage.status = status;
-        // A successful (re)connect explicitly sends error:null — honor it and clear
-        // any stale error, rather than only updating when a truthy error arrives.
         if (status === 'running') {
           fromStorage.error = null;
         } else if (error !== undefined && error !== null) {
@@ -181,26 +317,23 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
     });
     return;
   }
-  t.status = status;
-  // A successful (re)connect explicitly sends error:null — honor it and clear any
-  // stale error. Only keep/set an error when the service is actually in 'error'.
+  tun.status = status;
   if (status === 'running') {
-    t.error = null;
+    tun.error = null;
   } else if (error !== undefined && error !== null) {
-    t.error = error;
+    tun.error = error;
   }
-  if (entrypoint !== undefined && entrypoint !== null) t.entrypoint = entrypoint;
+  if (entrypoint !== undefined && entrypoint !== null) tun.entrypoint = entrypoint;
   persistTunnels();
   render();
 }
 
 function deleteTunnel(tunnelId) {
-  // Stop first
   chrome.runtime.sendMessage({ type: 'stop-tunnel', tunnelId });
   tunnels = tunnels.filter(x => x.tunnelId !== tunnelId);
   persistTunnels();
   render();
-  showToast('✓ Tunnel deleted');
+  showToast(t('msgDeleted'));
 }
 
 function saveForm() {
@@ -209,7 +342,7 @@ function saveForm() {
   const name = document.getElementById('fName').value;
   const endpoint = document.getElementById('fEndpoint').value;
   if (!endpoint.trim()) {
-    showToast('Target is required');
+    showToast(t('msgTargetRequired'));
     return;
   }
 
@@ -232,15 +365,12 @@ function saveForm() {
     };
 
     if (editingId) {
-      // Edit mode: stop old, update config, optionally restart
       const oldTunnel = tunnels.find(x => x.tunnelId === editingId);
       if (oldTunnel) {
         const wasRunning = oldTunnel.status === 'running' || oldTunnel.status === 'connecting';
-        // Stop if running
         if (oldTunnel.status === 'running' || oldTunnel.status === 'connecting' || oldTunnel.status === 'error') {
           chrome.runtime.sendMessage({ type: 'stop-tunnel', tunnelId: editingId });
         }
-        // Update in-place
         oldTunnel.name = formData.name || oldTunnel.name;
         oldTunnel.localEndpoint = formData.endpoint;
         oldTunnel.hostname = formData.hostname;
@@ -252,14 +382,12 @@ function saveForm() {
         oldTunnel.entrypoint = null;
         persistTunnels();
 
-        // Restart if it was running
         if (wasRunning) {
           startTunnel(editingId);
         }
       }
-      showToast('✓ Tunnel updated');
+      showToast(t('msgUpdated'));
     } else {
-      // Create mode
       createTunnel(formData);
     }
 
@@ -275,7 +403,7 @@ function saveForm() {
 function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
-      showToast('Copied to clipboard');
+      showToast(t('msgCopied'));
     }).catch(() => {
       fallbackCopy(text);
     });
@@ -293,7 +421,7 @@ function fallbackCopy(text) {
   ta.select();
   try {
     document.execCommand('copy');
-    showToast('Copied to clipboard');
+    showToast(t('msgCopied'));
   } catch { /* ignore */ }
   document.body.removeChild(ta);
 }
@@ -320,10 +448,10 @@ function showToast(msg) {
 
 function showDeleteDialog(tunnelId) {
   deletingId = tunnelId;
-  const t = tunnels.find(x => x.tunnelId === tunnelId);
+  const tun = tunnels.find(x => x.tunnelId === tunnelId);
   const msgEl = document.getElementById('deleteMsg');
   if (msgEl) {
-    msgEl.textContent = `Are you sure you want to delete "${t ? t.name : tunnelId}"?`;
+    msgEl.textContent = t('dialogDeleteMsg', { name: tun ? tun.name : tunnelId });
   }
   document.getElementById('deleteDialog').style.display = 'flex';
 }
@@ -389,7 +517,6 @@ function setActiveView() {
 function renderTunnelList() {
   const container = document.getElementById('cardsContainer');
   const emptyState = document.getElementById('emptyState');
-  // Clear list (keep empty state)
   while (container.firstChild) container.removeChild(container.firstChild);
 
   if (tunnels.length === 0) {
@@ -399,112 +526,105 @@ function renderTunnelList() {
 
   emptyState.style.display = 'none';
 
-  // Sort: newest first by createdAt
   const sorted = [...tunnels].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  for (const t of sorted) {
-    container.appendChild(buildCard(t));
+  for (const tun of sorted) {
+    container.appendChild(buildCard(tun));
   }
 }
 
-function buildCard(t) {
+function buildCard(tun) {
   const wrapper = document.createElement('div');
 
-  // ── Card row (clickable, matches tunnel-card.ts .row) ──
   const row = document.createElement('div');
-  row.className = `tunnel-card-row ${t.status === 'stopped' ? 'stopped' : ''}`;
+  row.className = `tunnel-card-row ${tun.status === 'stopped' ? 'stopped' : ''}`;
 
-  // Status dot
   const dot = document.createElement('span');
-  dot.className = `status-dot ${t.status}`;
+  dot.className = `status-dot ${tun.status}`;
   row.appendChild(dot);
 
-  // Body
   const body = document.createElement('div');
   body.className = 'card-body';
 
   const nameEl = document.createElement('div');
   nameEl.className = 'card-name';
-  nameEl.textContent = t.name || t.tunnelId;
+  nameEl.textContent = tun.name || tun.tunnelId;
   body.appendChild(nameEl);
 
   const meta = document.createElement('div');
   meta.className = 'card-meta';
-  meta.textContent = `HTTP · ${t.status === 'running' ? 'Connected' : t.status.charAt(0).toUpperCase() + t.status.slice(1)}`;
+  const statusLabels = {
+    running: t('statusRunning'),
+    connecting: t('statusConnecting'),
+    stopped: t('statusStopped'),
+    error: t('statusError'),
+  };
+  meta.textContent = `${t('typeHttp')} · ${statusLabels[tun.status] || tun.status}`;
   body.appendChild(meta);
 
   row.appendChild(body);
 
-  // Right side
   const right = document.createElement('div');
   right.className = 'card-right';
 
   const timeEl = document.createElement('div');
   timeEl.className = 'card-time';
-  timeEl.textContent = formatRelativeTime(t.createdAt);
+  timeEl.textContent = formatRelativeTime(tun.createdAt);
   right.appendChild(timeEl);
 
-  if (t.status === 'running') {
+  if (tun.status === 'running') {
     const traffic = document.createElement('div');
     traffic.className = 'card-traffic';
-    traffic.innerHTML = '<div class="card-traffic-row"><span class="card-traffic-total">&uarr;&darr; active</span></div>';
+    traffic.innerHTML = `<div class="card-traffic-row"><span class="card-traffic-total">&uarr;&darr; ${t('labelActive')}</span></div>`;
     right.appendChild(traffic);
   }
 
   row.appendChild(right);
 
-  // Chevron
   const chev = document.createElement('span');
-  chev.className = `card-chevron ${expandedMap[t.tunnelId] ? 'open' : ''}`;
+  chev.className = `card-chevron ${expandedMap[tun.tunnelId] ? 'open' : ''}`;
   chev.innerHTML = iconSvg('chevron-right', 16, 16);
   chev.addEventListener('click', (e) => {
     e.stopPropagation();
-    expandedMap[t.tunnelId] = !expandedMap[t.tunnelId];
+    expandedMap[tun.tunnelId] = !expandedMap[tun.tunnelId];
     const panel = wrapper.querySelector('.expand-panel');
-    chev.classList.toggle('open', expandedMap[t.tunnelId]);
-    if (panel) panel.classList.toggle('open', expandedMap[t.tunnelId]);
+    chev.classList.toggle('open', expandedMap[tun.tunnelId]);
+    if (panel) panel.classList.toggle('open', expandedMap[tun.tunnelId]);
   });
   row.appendChild(chev);
 
   wrapper.appendChild(row);
 
-  // ── Expand panel (matches home-page.ts) ──
   const expand = document.createElement('div');
-  expand.className = `expand-panel ${expandedMap[t.tunnelId] ? 'open' : ''}`;
+  expand.className = `expand-panel ${expandedMap[tun.tunnelId] ? 'open' : ''}`;
 
-  // Detail card
   const detailCard = document.createElement('div');
   detailCard.className = 'detail-card';
 
-  // Tunnel ID row
-  detailCard.appendChild(expandDetailRow('Tunnel ID', t.tunnelId, true));
+  detailCard.appendChild(expandDetailRow(t('detailId'), tun.tunnelId, true));
 
-  // Entrypoint row
-  if (t.entrypoint) {
-    detailCard.appendChild(expandDetailRow('Entrypoint', t.entrypoint, true));
+  if (tun.entrypoint) {
+    detailCard.appendChild(expandDetailRow(t('detailEntrypoint'), tun.entrypoint, true));
   }
 
-  // Target row
-  detailCard.appendChild(expandDetailRow('Target', t.localEndpoint, true));
+  detailCard.appendChild(expandDetailRow(t('detailTarget'), tun.localEndpoint, true));
 
-  // Hostname row (if set)
-  if (t.hostname) {
-    detailCard.appendChild(expandDetailRow('Host Rewrite', t.hostname, false));
+  if (tun.hostname) {
+    detailCard.appendChild(expandDetailRow(t('detailHostRewrite'), tun.hostname, false));
   }
 
-  // Error row (inside detail card)
-  if (t.error) {
+  if (tun.error) {
     const errRow = document.createElement('div');
     errRow.className = 'detail-row error';
     const errLabel = document.createElement('span');
     errLabel.className = 'dlabel';
-    errLabel.textContent = 'Error';
+    errLabel.textContent = t('detailError');
     errRow.appendChild(errLabel);
     const errVal = document.createElement('span');
     errVal.className = 'dval error-text';
     const errMono = document.createElement('span');
     errMono.className = 'dval-mono';
-    errMono.textContent = t.error;
+    errMono.textContent = tun.error;
     errVal.appendChild(errMono);
     errRow.appendChild(errVal);
     detailCard.appendChild(errRow);
@@ -512,69 +632,63 @@ function buildCard(t) {
 
   expand.appendChild(detailCard);
 
-  // Actions (matches home-page.ts action-btn)
   const actions = document.createElement('div');
   actions.className = 'expand-actions';
 
-  if (t.status === 'running' || t.status === 'connecting') {
+  if (tun.status === 'running' || tun.status === 'connecting') {
     const stopBtn = document.createElement('button');
     stopBtn.className = 'action-btn stop';
     stopBtn.innerHTML = iconSvg('stop', 14, 14);
-    stopBtn.title = 'Stop tunnel';
-    stopBtn.addEventListener('click', (e) => { e.stopPropagation(); stopTunnel(t.tunnelId); });
+    stopBtn.title = t('actionStop');
+    stopBtn.addEventListener('click', (e) => { e.stopPropagation(); stopTunnel(tun.tunnelId); });
     actions.appendChild(stopBtn);
   } else {
     const startBtn = document.createElement('button');
     startBtn.className = 'action-btn start';
     startBtn.innerHTML = iconSvg('play', 14, 14);
-    startBtn.title = 'Start tunnel';
-    startBtn.addEventListener('click', (e) => { e.stopPropagation(); startTunnel(t.tunnelId); });
+    startBtn.title = t('actionStart');
+    startBtn.addEventListener('click', (e) => { e.stopPropagation(); startTunnel(tun.tunnelId); });
     actions.appendChild(startBtn);
   }
 
-  // Edit button
   const editBtn = document.createElement('button');
   editBtn.className = 'action-btn';
   editBtn.innerHTML = iconSvg('edit', 14, 14);
-  editBtn.title = 'Edit tunnel';
+  editBtn.title = t('actionEdit');
   editBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    openEditForm(t.tunnelId);
+    openEditForm(tun.tunnelId);
   });
   actions.appendChild(editBtn);
 
-  // Delete button (danger = outline red, matches home-page.ts)
   const delBtn = document.createElement('button');
   delBtn.className = 'action-btn danger';
   delBtn.innerHTML = iconSvg('trash', 14, 14);
-  delBtn.title = 'Delete tunnel';
+  delBtn.title = t('actionDelete');
   delBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    showDeleteDialog(t.tunnelId);
+    showDeleteDialog(tun.tunnelId);
   });
   actions.appendChild(delBtn);
 
-  // Inspector button — opens GOST inspector for this tunnel
   const inspectBtn = document.createElement('button');
   inspectBtn.className = 'action-btn inspect';
   inspectBtn.innerHTML = iconSvg('search', 14, 14);
-  inspectBtn.title = 'Open in GOST Inspector';
+  inspectBtn.title = t('actionInspect');
   inspectBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    window.open(`https://inspector.gost.run/query/http?tunnel_id=${encodeURIComponent(t.tunnelId)}`, '_blank');
+    window.open(`https://inspector.gost.run/query/http?tunnel_id=${encodeURIComponent(tun.tunnelId)}`, '_blank');
   });
   actions.appendChild(inspectBtn);
 
   expand.appendChild(actions);
   wrapper.appendChild(expand);
 
-  // ── Click row to toggle expand ──
   row.addEventListener('click', (e) => {
-    // Don't toggle when clicking buttons inside the expand panel
     if (e.target.closest('.action-btn') || e.target.closest('.copy-btn')) return;
-    expandedMap[t.tunnelId] = !expandedMap[t.tunnelId];
-    chev.classList.toggle('open', expandedMap[t.tunnelId]);
-    expand.classList.toggle('open', expandedMap[t.tunnelId]);
+    expandedMap[tun.tunnelId] = !expandedMap[tun.tunnelId];
+    chev.classList.toggle('open', expandedMap[tun.tunnelId]);
+    expand.classList.toggle('open', expandedMap[tun.tunnelId]);
   });
 
   return wrapper;
@@ -615,7 +729,7 @@ function expandDetailRow(label, value, showCopy) {
 
 function openNewForm() {
   editingId = null;
-  document.getElementById('formTitle').textContent = 'New HTTP Tunnel';
+  document.getElementById('formTitle').textContent = t('formTitleNew');
   document.getElementById('dangerZone').style.display = 'none';
   document.getElementById('fName').value = '';
   document.getElementById('fEndpoint').value = '';
@@ -628,17 +742,17 @@ function openNewForm() {
 }
 
 function openEditForm(tunnelId) {
-  const t = tunnels.find(x => x.tunnelId === tunnelId);
-  if (!t) return;
+  const tun = tunnels.find(x => x.tunnelId === tunnelId);
+  if (!tun) return;
 
   editingId = tunnelId;
-  document.getElementById('formTitle').textContent = 'Edit HTTP Tunnel';
+  document.getElementById('formTitle').textContent = t('formTitleEdit');
   document.getElementById('dangerZone').style.display = 'block';
-  document.getElementById('fName').value = t.name || '';
-  document.getElementById('fEndpoint').value = t.localEndpoint || '';
-  document.getElementById('fHostname').value = t.hostname || '';
+  document.getElementById('fName').value = tun.name || '';
+  document.getElementById('fEndpoint').value = tun.localEndpoint || '';
+  document.getElementById('fHostname').value = tun.hostname || '';
 
-  const hasAuth = !!(t.auth && t.auth.username);
+  const hasAuth = !!(tun.auth && tun.auth.username);
   if (hasAuth) {
     document.getElementById('fAuth').classList.add('on');
     document.getElementById('authFields').style.display = 'block';
@@ -646,8 +760,8 @@ function openEditForm(tunnelId) {
     document.getElementById('fAuth').classList.remove('on');
     document.getElementById('authFields').style.display = 'none';
   }
-  document.getElementById('fUsername').value = (t.auth && t.auth.username) || '';
-  document.getElementById('fPassword').value = (t.auth && t.auth.password) || '';
+  document.getElementById('fUsername').value = (tun.auth && tun.auth.username) || '';
+  document.getElementById('fPassword').value = (tun.auth && tun.auth.password) || '';
 
   switchView('form');
 }
@@ -655,10 +769,7 @@ function openEditForm(tunnelId) {
 // ── Settings ───────────────────────────────────────────────────────────
 
 function openSettings() {
-  document.getElementById('sRelay').value = settings.relayUrl || '';
-  document.getElementById('sEntrypoint').value = settings.entrypoint || '';
-  document.getElementById('sInsecure').classList.toggle('on', !!settings.insecure);
-  document.getElementById('sDarkMode').classList.toggle('on', !!settings.darkMode);
+  refreshSettingsValues();
   const versionEl = document.getElementById('settingsVersion');
   if (versionEl) {
     try {
@@ -669,15 +780,12 @@ function openSettings() {
   switchView('settings');
 }
 
-function saveSettings() {
-  settings.relayUrl = document.getElementById('sRelay').value.trim();
-  settings.entrypoint = document.getElementById('sEntrypoint').value.trim();
-  settings.insecure = document.getElementById('sInsecure').classList.contains('on');
-  settings.darkMode = document.getElementById('sDarkMode').classList.contains('on');
-  chrome.storage.local.set({ settings });
-  applyTheme(settings.darkMode);
-  showToast('✓ Saved');
-  switchView('list');
+function refreshSettingsValues() {
+  const el = document.getElementById('sAppearanceValue');
+  if (el) el.textContent = t('appearance' + settings.theme.charAt(0).toUpperCase() + settings.theme.slice(1));
+
+  const lv = document.getElementById('sLangValue');
+  if (lv) lv.textContent = settings.lang === 'zh' ? t('langZh') : t('langEn');
 }
 
 // ── Events ─────────────────────────────────────────────────────────────
@@ -732,7 +840,6 @@ function bindEvents() {
       hideDeleteDialog();
       if (id) {
         if (currentView === 'form' && editingId === id) {
-          // Delete from form view — return to list
           deleteTunnel(id);
           editingId = null;
           switchView('list');
@@ -755,16 +862,28 @@ function bindEvents() {
   const settingsBack = document.getElementById('settingsBack');
   if (settingsBack) settingsBack.addEventListener('click', () => switchView('list'));
 
-  const settingsSave = document.getElementById('settingsSave');
-  if (settingsSave) settingsSave.addEventListener('click', saveSettings);
+  // Appearance cycle (Light → Dark → System)
+  const sAppearance = document.getElementById('sAppearance');
+  if (sAppearance) {
+    sAppearance.addEventListener('click', () => {
+      const cycle = { light: 'dark', dark: 'system', system: 'light' };
+      settings.theme = cycle[settings.theme] || 'system';
+      applyTheme(settings.theme);
+      chrome.storage.local.set({ settings });
+      refreshSettingsValues();
+    });
+  }
 
-  // Insecure toggle
-  const sInsecure = document.getElementById('sInsecure');
-  if (sInsecure) sInsecure.addEventListener('click', () => sInsecure.classList.toggle('on'));
-
-  // Dark mode toggle
-  const sDarkMode = document.getElementById('sDarkMode');
-  if (sDarkMode) sDarkMode.addEventListener('click', () => sDarkMode.classList.toggle('on'));
+  // Language cycle (English ↔ 中文)
+  const sLang = document.getElementById('sLang');
+  if (sLang) {
+    sLang.addEventListener('click', () => {
+      settings.lang = settings.lang === 'en' ? 'zh' : 'en';
+      setLocale(settings.lang);
+      chrome.storage.local.set({ settings });
+      refreshSettingsValues();
+    });
+  }
 
   // Enter key in form inputs
   const formInputs = ['fName', 'fEndpoint', 'fHostname', 'fUsername', 'fPassword'];
