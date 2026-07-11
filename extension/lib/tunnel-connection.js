@@ -32,6 +32,7 @@ export class TunnelConnection {
     this._ws = null;
     this._smux = null;
     this._onStream = config.onStream || null;
+    this._wrapStream = config.wrapStream || null;
     this._closed = false;
     this._reconnectAttempts = 0;
     /** @type {string|null} */
@@ -210,6 +211,13 @@ export class TunnelConnection {
   }
 
   _handleStream(stream) {
+    // Apply stream wrapper (e.g. byte counting) before ANY reads — the relay
+    // response header and HTTP request are both consumed from this stream before
+    // the onStream callback fires, so wrapping too late misses those bytes.
+    if (this._wrapStream) {
+      stream = this._wrapStream(stream);
+    }
+
     // Step 1: Read the relay Response (peer address info) from the stream.
     // Escaped carry bytes (from over-reading the stream) must be forwarded
     // to _readHTTP or they are lost forever.
