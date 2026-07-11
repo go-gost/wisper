@@ -604,7 +604,7 @@ function buildCard(tun) {
   detailCard.appendChild(expandDetailRow(t('detailId'), tun.tunnelId, true));
 
   if (tun.entrypoint) {
-    detailCard.appendChild(expandDetailRow(t('detailEntrypoint'), tun.entrypoint, true));
+    detailCard.appendChild(expandDetailRow(t('detailEntrypoint'), tun.entrypoint, true, true));
   }
 
   detailCard.appendChild(expandDetailRow(t('detailTarget'), tun.localEndpoint, true));
@@ -685,7 +685,7 @@ function buildCard(tun) {
   wrapper.appendChild(expand);
 
   row.addEventListener('click', (e) => {
-    if (e.target.closest('.action-btn') || e.target.closest('.copy-btn')) return;
+    if (e.target.closest('.action-btn') || e.target.closest('.copy-btn') || e.target.closest('.dval-link')) return;
     expandedMap[tun.tunnelId] = !expandedMap[tun.tunnelId];
     chev.classList.toggle('open', expandedMap[tun.tunnelId]);
     expand.classList.toggle('open', expandedMap[tun.tunnelId]);
@@ -694,7 +694,7 @@ function buildCard(tun) {
   return wrapper;
 }
 
-function expandDetailRow(label, value, showCopy) {
+function expandDetailRow(label, value, showCopy, link) {
   const row = document.createElement('div');
   row.className = 'detail-row';
 
@@ -705,9 +705,14 @@ function expandDetailRow(label, value, showCopy) {
 
   const val = document.createElement('span');
   val.className = 'dval';
-  const vmono = document.createElement('span');
-  vmono.className = 'dval-mono';
+  const vmono = document.createElement(link ? 'a' : 'span');
+  vmono.className = 'dval-mono' + (link ? ' dval-link' : '');
   vmono.textContent = value;
+  if (link) {
+    vmono.href = value;
+    vmono.target = '_blank';
+    vmono.rel = 'noopener noreferrer';
+  }
   val.appendChild(vmono);
 
   if (showCopy) {
