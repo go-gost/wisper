@@ -697,6 +697,7 @@
       justify-content: center;
       gap: 6px;
       transition: border-color var(--transition-fast), background var(--transition-fast);
+      outline: none;
     }
     .fab:hover {
       border-color: var(--accent);
@@ -706,6 +707,11 @@
     .fab svg {
       width: 16px;
       height: 16px;
+    }
+
+    .fab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
     }
 
     .footer-link {
