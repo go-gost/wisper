@@ -849,6 +849,37 @@
     }
     .dialog-btn:hover { opacity: 0.85; }
 
+    .qr-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    #qrCanvas {
+      width: 200px;
+      height: 200px;
+      background: #fff;
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      box-sizing: border-box;
+      image-rendering: pixelated;
+    }
+    .qr-url {
+      font-size: var(--font-xs);
+      color: var(--text-secondary);
+      text-align: center;
+      word-break: break-all;
+      line-height: 1.4;
+      max-width: 100%;
+    }
+    .qr-empty {
+      font-size: var(--font-sm);
+      color: var(--text-secondary);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
     /* ── Settings ── */
 
     .section-label {
@@ -938,6 +969,21 @@
       <div class="dialog-actions">
         <button class="dialog-btn cancel" id="deleteCancel" data-i18n="btnCancel">Cancel</button>
         <button class="dialog-btn danger" id="deleteConfirm" data-i18n="btnDeleteConfirm">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── QR dialog ── -->
+  <div id="qrDialog" class="dialog-overlay" style="display:none">
+    <div class="dialog-box">
+      <div class="dialog-title" data-i18n="dialogQrTitle">QR Code</div>
+      <div class="qr-body">
+        <canvas id="qrCanvas"></canvas>
+        <div class="qr-url" id="qrUrl"></div>
+        <div class="qr-empty" id="qrEmpty" data-i18n="qrNoEntrypoint" style="display:none;">Entrypoint not available</div>
+      </div>
+      <div class="dialog-actions">
+        <button class="dialog-btn cancel" id="qrClose" data-i18n="btnClose">Close</button>
       </div>
     </div>
   </div>
@@ -1094,6 +1140,7 @@
     </div>
   </div>
 
+  <script src="lib/qrcode.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

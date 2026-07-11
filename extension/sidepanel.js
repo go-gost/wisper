@@ -42,6 +42,9 @@ const TRANSLATIONS = {
     actionEdit: 'Edit tunnel',
     actionDelete: 'Delete tunnel',
     actionInspect: 'Open in GOST Inspector',
+    actionQr: 'Show QR code',
+    dialogQrTitle: 'QR Code',
+    qrNoEntrypoint: 'Entrypoint not available',
     detailId: 'Tunnel ID',
     detailEntrypoint: 'Entrypoint',
     detailTarget: 'Target',
@@ -90,6 +93,9 @@ const TRANSLATIONS = {
     actionEdit: '编辑隧道',
     actionDelete: '删除隧道',
     actionInspect: '打开 GOST Inspector',
+    actionQr: '显示二维码',
+    dialogQrTitle: '二维码',
+    qrNoEntrypoint: '入口地址不可用',
     detailId: '隧道 ID',
     detailEntrypoint: '入口地址',
     detailTarget: '目标地址',
@@ -461,6 +467,57 @@ function hideDeleteDialog() {
   document.getElementById('deleteDialog').style.display = 'none';
 }
 
+function showQrDialog(url) {
+  const canvas = document.getElementById('qrCanvas');
+  const urlEl = document.getElementById('qrUrl');
+  const emptyEl = document.getElementById('qrEmpty');
+  if (!canvas || !urlEl) return;
+  if (!url) {
+    canvas.style.display = 'none';
+    urlEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+  } else {
+    if (emptyEl) emptyEl.style.display = 'none';
+    canvas.style.display = 'block';
+    urlEl.style.display = 'block';
+    urlEl.textContent = url;
+    renderQrToCanvas(canvas, url);
+  }
+  document.getElementById('qrDialog').style.display = 'flex';
+}
+
+function hideQrDialog() {
+  document.getElementById('qrDialog').style.display = 'none';
+}
+
+function renderQrToCanvas(canvas, text) {
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    const count = qr.getModuleCount();
+    const ctx = canvas.getContext('2d');
+    const size = 200;
+    const padding = 8;
+    const inner = size - padding * 2;
+    const cell = inner / count;
+    canvas.width = size;
+    canvas.height = size;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000';
+    for (let r = 0; r < count; r++) {
+      for (let c = 0; c < count; c++) {
+        if (qr.isDark(r, c)) {
+          ctx.fillRect(padding + c * cell, padding + r * cell, Math.ceil(cell), Math.ceil(cell));
+        }
+      }
+    }
+  } catch (err) {
+    console.error('QR render failed:', err);
+  }
+}
+
 // ── Format utilities ───────────────────────────────────────────────────
 
 function formatRelativeTime(iso) {
@@ -490,6 +547,7 @@ const ICONS = {
   play: '<polygon points="5 3 19 12 5 21 5 3"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="1"/>',
   search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M19 19h2v2h-2z"/><path d="M14 19h2v2h-2z"/>',
 };
 
 function iconSvg(name, w = 14, h = 14) {
@@ -689,6 +747,18 @@ function buildCard(tun) {
   });
   actions.appendChild(delBtn);
 
+  if (tun.entrypoint) {
+    const qrBtn = document.createElement('button');
+    qrBtn.className = 'action-btn qr';
+    qrBtn.innerHTML = iconSvg('qr', 14, 14);
+    qrBtn.title = t('actionQr');
+    qrBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showQrDialog(tun.entrypoint);
+    });
+    actions.appendChild(qrBtn);
+  }
+
   const inspectBtn = document.createElement('button');
   inspectBtn.className = 'action-btn inspect';
   inspectBtn.innerHTML = iconSvg('search', 14, 14);
@@ -876,6 +946,17 @@ function bindEvents() {
   if (dialogOverlay) {
     dialogOverlay.addEventListener('click', (e) => {
       if (e.target === dialogOverlay) hideDeleteDialog();
+    });
+  }
+
+  // QR dialog
+  const qrClose = document.getElementById('qrClose');
+  if (qrClose) qrClose.addEventListener('click', hideQrDialog);
+
+  const qrOverlay = document.getElementById('qrDialog');
+  if (qrOverlay) {
+    qrOverlay.addEventListener('click', (e) => {
+      if (e.target === qrOverlay) hideQrDialog();
     });
   }
 
