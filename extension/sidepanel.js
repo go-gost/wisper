@@ -55,6 +55,9 @@ const TRANSLATIONS = {
     msgCreated: 'Tunnel created',
     msgUpdated: 'Tunnel updated',
     msgDeleted: 'Tunnel deleted',
+    statsIn: 'In',
+    statsOut: 'Out',
+    statsConns: 'Conns',
     actionResetStats: 'Reset stats',
   },
   zh: {
@@ -107,6 +110,9 @@ const TRANSLATIONS = {
     msgCreated: '隧道已创建',
     msgUpdated: '隧道已更新',
     msgDeleted: '隧道已删除',
+    statsIn: '入',
+    statsOut: '出',
+    statsConns: '连接',
     actionResetStats: '重置计数',
   },
 };
@@ -346,10 +352,16 @@ function updateTunnelStats(tunnelId, stats) {
   const tun = tunnels.find(x => x.tunnelId === tunnelId);
   if (tun) tun.stats = stats;
 
-  // Card traffic row (always updated when visible).
+  // Card traffic rate row.
   const trafficEl = document.getElementById(`traffic-${tunnelId}`);
   if (trafficEl) {
     trafficEl.textContent = `↑ ${formatRate(stats.outputRate)} ↓ ${formatRate(stats.inputRate)}`;
+  }
+
+  // Card cumulative stats row.
+  const cumEl = document.getElementById(`traffic-cum-${tunnelId}`);
+  if (cumEl) {
+    cumEl.textContent = `${t('statsIn')}: ${formatBytes(stats.inputBytes)}  ${t('statsOut')}: ${formatBytes(stats.outputBytes)}  ${t('statsConns')}: ${stats.currentConns}`;
   }
 }
 
@@ -695,6 +707,11 @@ function buildCard(tun) {
     row.id = `traffic-${tun.tunnelId}`;
     row.textContent = `↑ 0 B/s ↓ 0 B/s`;
     traffic.appendChild(row);
+    const cumRow = document.createElement('div');
+    cumRow.className = 'card-traffic-cum';
+    cumRow.id = `traffic-cum-${tun.tunnelId}`;
+    cumRow.textContent = `${t('statsIn')}: 0 B  ${t('statsOut')}: 0 B  ${t('statsConns')}: 0`;
+    traffic.appendChild(cumRow);
     right.appendChild(traffic);
   }
 
