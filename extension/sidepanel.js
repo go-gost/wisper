@@ -55,10 +55,6 @@ const TRANSLATIONS = {
     msgCreated: 'Tunnel created',
     msgUpdated: 'Tunnel updated',
     msgDeleted: 'Tunnel deleted',
-    statsIn: 'In',
-    statsOut: 'Out',
-    statsConns: 'Conns',
-    statsTotal: 'Total',
     actionResetStats: 'Reset stats',
   },
   zh: {
@@ -111,10 +107,6 @@ const TRANSLATIONS = {
     msgCreated: '隧道已创建',
     msgUpdated: '隧道已更新',
     msgDeleted: '隧道已删除',
-    statsIn: '入',
-    statsOut: '出',
-    statsConns: '连接',
-    statsTotal: '总计',
     actionResetStats: '重置计数',
   },
 };
@@ -350,21 +342,6 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
   render();
 }
 
-function _statsHtml(stats) {
-  return (
-    `<div class="detail-row"><span class="dlabel">${t('statsIn')}</span>` +
-    `<span class="dval">↑ ${formatRate(stats.inputRate)}  (${formatBytes(stats.inputBytes)})</span></div>` +
-    `<div class="detail-row"><span class="dlabel">${t('statsOut')}</span>` +
-    `<span class="dval">↓ ${formatRate(stats.outputRate)}  (${formatBytes(stats.outputBytes)})</span></div>` +
-    `<div class="detail-row"><span class="dlabel">${t('statsConns')}</span>` +
-    `<span class="dval">${stats.currentConns}  (${t('statsTotal')}: ${stats.totalConns})</span></div>`
-  );
-}
-
-/**
- * Update a tunnel's stats on each 1s tick from offscreen.
- * Patches DOM directly without a full render() call.
- */
 function updateTunnelStats(tunnelId, stats) {
   const tun = tunnels.find(x => x.tunnelId === tunnelId);
   if (tun) tun.stats = stats;
@@ -373,12 +350,6 @@ function updateTunnelStats(tunnelId, stats) {
   const trafficEl = document.getElementById(`traffic-${tunnelId}`);
   if (trafficEl) {
     trafficEl.textContent = `↑ ${formatRate(stats.outputRate)} ↓ ${formatRate(stats.inputRate)}`;
-  }
-
-  // Expanded stats block.
-  const statsEl = document.getElementById(`stats-${tunnelId}`);
-  if (statsEl) {
-    statsEl.innerHTML = _statsHtml(stats);
   }
 }
 
@@ -776,15 +747,6 @@ function buildCard(tun) {
   }
 
   expand.appendChild(detailCard);
-
-  // Stats block — populated live by updateTunnelStats, seeded from storage.
-  const statsBlock = document.createElement('div');
-  statsBlock.className = 'detail-card';
-  statsBlock.id = `stats-${tun.tunnelId}`;
-  if (tun.stats) {
-    statsBlock.innerHTML = _statsHtml(tun.stats);
-  }
-  expand.appendChild(statsBlock);
 
   const actions = document.createElement('div');
   actions.className = 'expand-actions';
