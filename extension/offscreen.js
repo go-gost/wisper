@@ -30,6 +30,11 @@ console.log('Wisper offscreen loaded — build=host-via-url (2026-07-11)');
 /** Map<tunnelId, { config, connection, reconnectTimer }> */
 const tunnels = new Map();
 
+/** Set of tunnelIds with an in-flight startTunnel() — prevents duplicate
+ * processing when both the sidepanel and the background worker forward the
+ * same start-tunnel message (MV3 chrome.runtime.sendMessage broadcasts). */
+const _pendingStarts = new Set();
+
 // ── Message handler ────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -61,6 +66,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 function startTunnel(config) {
   const { tunnelId } = config;
 
+  // Ignore duplicate start-tunnel messages. In MV3, chrome.runtime.sendMessage
+  // broadcasts to all listeners — the sidepanel's message reaches both the
+  // background worker AND this offscreen document directly. The background
+  // then also forwards it here, causing a double delivery. Without this guard,
+  // the second invocation calls stopTunnel() which closes the in-flight
+  // WebSocket from the first, and conn.connect() rejects with the "Websocket
+  // connect failed" error the user sees.
+  if (_pendingStarts.has(tunnelId)) return;
+  _pendingStarts.add(tunnelId);
+
   if (tunnels.has(tunnelId)) {
     // Already running — restart
     stopTunnel(tunnelId);
@@ -69,7 +84,7 @@ function startTunnel(config) {
   const entry = { config, connection: null, reconnectTimer: null };
   tunnels.set(tunnelId, entry);
 
-  connect(entry);
+  connect(entry).finally(() => _pendingStarts.delete(tunnelId));
 }
 
 function stopTunnel(tunnelId) {
@@ -81,12 +96,17 @@ function stopTunnel(tunnelId) {
     entry.reconnectTimer = null;
   }
 
+  // Delete from map BEFORE closing the connection. TunnelConnection.close()
+  // triggers onClose synchronously (via _onSmuxClose → onClose callback).
+  // onClose checks tunnels.has() to decide whether to reconnect — removing
+  // the entry first prevents a spurious reconnect after an intentional stop.
+  tunnels.delete(tunnelId);
+
   if (entry.connection) {
     entry.connection.close();
     entry.connection = null;
   }
 
-  tunnels.delete(tunnelId);
   notifyStatus(tunnelId, 'stopped');
 }
 

@@ -399,13 +399,8 @@ function renderTunnelList() {
 
   emptyState.style.display = 'none';
 
-  // Sort: running/connecting first, then by createdAt desc
-  const sorted = [...tunnels].sort((a, b) => {
-    const order = { running: 0, connecting: 1, error: 2, stopped: 3 };
-    const diff = (order[a.status] || 9) - (order[b.status] || 9);
-    if (diff !== 0) return diff;
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  });
+  // Sort: newest first by createdAt
+  const sorted = [...tunnels].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   for (const t of sorted) {
     container.appendChild(buildCard(t));
