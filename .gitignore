@@ -47,3 +47,6 @@ android/keystore.properties
 
 # Generated API spec / config dump
 api/wisper.yaml
+
+# Extension npm dependencies
+/extension/node_modules/
