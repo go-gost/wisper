@@ -21,6 +21,12 @@ import { uuidToTunnelIdBytes, entrypointFromUuid } from './lib/tunnel-id.js';
 
 // ── State ──────────────────────────────────────────────────────────────
 
+// Version banner — if you DON'T see this line in the offscreen console after a
+// reload, you are running stale code. Host rewrite ships via lib/forwarder.js
+// (fetch FROM the hostname), so the fetch URL for a Host-Rewrite tunnel must
+// read http://<hostname>/<path>, NOT http://192.168.100.200:80/<path>.
+console.log('Wisper offscreen loaded — build=host-via-url (2026-07-11)');
+
 /** Map<tunnelId, { config, connection, reconnectTimer }> */
 const tunnels = new Map();
 

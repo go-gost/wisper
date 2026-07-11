@@ -18,7 +18,7 @@ import {
   OP_TEXT, OP_BINARY, OP_CLOSE, OP_PONG, OP_CONT,
 } from '../lib/ws-codec.js';
 import { parseHTTPRequest, decodeChunkedBodyFromStream } from '../lib/tunnel-connection.js';
-import { isAuthorized, handleRequest } from '../lib/forwarder.js';
+import { isAuthorized, handleRequest, forwardHTTP } from '../lib/forwarder.js';
 
 const LE = true;
 
@@ -335,5 +335,208 @@ describe('HTTP basic auth: handleRequest 401', () => {
     assert.match(out, /^HTTP\/1\.1 401 Unauthorized\r\n/);
     assert.match(out, /WWW-Authenticate: Basic\r\n/);
     assert.equal(stream.closed, true);
+  });
+});
+
+// ── Host rewrite: fetch FROM the hostname (Bug: all paths returned homepage) ─
+//
+// Root cause recap: fetch() forbids setting Host, and DNR treats Host as a
+// protected header it won't override, so every DNR rewrite attempt silently
+// failed — the backend's default vhost (SPA `try_files $uri /index.html`)
+// then served index.html for EVERY path, so /transmission-app.css and
+// /transmission-app.js returned the homepage. Fix: make the fetch target the
+// configured hostname itself, so the browser sets Host = hostname from the
+// URL. These tests pin that the upstream URL's authority is the hostname and
+// the visitor's path is preserved verbatim.
+
+// Monkey-patch fetch() to capture the request URL instead of hitting a real
+// backend. Each test restores the original after.
+function captureFetch() {
+  const calls = [];
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = (url, opts) => {
+    calls.push({ url: String(url), method: opts && opts.method });
+    const body = new ReadableStream({
+      start(ctrl) {
+        ctrl.enqueue(new TextEncoder().encode('ok'));
+        ctrl.close();
+      },
+    });
+    return Promise.resolve(new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    }));
+  };
+  return { calls, restore: () => { globalThis.fetch = origFetch; } };
+}
+
+function mockStreamRW() {
+  const writes = [];
+  return {
+    writes,
+    async write(b) { writes.push(b); return Promise.resolve(); },
+    close() {},
+  };
+}
+
+describe('Host rewrite: fetch target is the configured hostname', () => {
+  it('routes to the hostname and preserves the sub-resource path', async () => {
+    const { calls, restore } = captureFetch();
+    const stream = mockStreamRW();
+    await forwardHTTP(stream, {
+      method: 'GET', path: '/transmission-app.css',
+      headers: { host: ['aaca85f9a4190e4f.gost.run'] }, body: null,
+    }, {
+      localEndpoint: '192.168.100.200:80', hostname: 'bt.home.pi',
+    });
+    restore();
+    assert.equal(calls.length, 1, 'exactly one upstream fetch');
+    assert.equal(
+      calls[0].url,
+      'http://bt.home.pi/transmission-app.css',
+      'authority must be the hostname; default port :80 omitted (Host = "bt.home.pi", no port)',
+    );
+    assert.equal(calls[0].method, 'GET');
+  });
+
+  it('keeps a non-default port on the rewritten authority', async () => {
+    const { calls, restore } = captureFetch();
+    const stream = mockStreamRW();
+    await forwardHTTP(stream, {
+      method: 'GET', path: '/style.css',
+      headers: { host: ['x.gost.run'] }, body: null,
+    }, {
+      localEndpoint: '192.168.100.200:8080', hostname: 'bt.home.pi',
+    });
+    restore();
+    assert.equal(calls[0].url, 'http://bt.home.pi:8080/style.css',
+      'non-default port is retained on the rewritten hostname');
+  });
+
+  it('uses the localEndpoint host when no hostname is configured', async () => {
+    const { calls, restore } = captureFetch();
+    const stream = mockStreamRW();
+    await forwardHTTP(stream, {
+      method: 'GET', path: '/large',
+      headers: { host: ['x.gost.run'] }, body: null,
+    }, {
+      localEndpoint: 'localhost:8000',
+    });
+    restore();
+    assert.equal(calls[0].url, 'http://localhost:8000/large',
+      'without hostname the original localEndpoint authority is used');
+  });
+
+  it('omits :443 for https when hostname is configured', async () => {
+    const { calls, restore } = captureFetch();
+    const stream = mockStreamRW();
+    await forwardHTTP(stream, {
+      method: 'GET', path: '/api',
+      headers: { host: ['x.gost.run'] }, body: null,
+    }, {
+      localEndpoint: '192.168.100.200:443', hostname: 'bt.home.pi', enableTLS: true,
+    });
+    restore();
+    assert.equal(calls[0].url, 'https://bt.home.pi/api',
+      'default https port :443 omitted so Host = "bt.home.pi"');
+  });
+});
+
+// ── Redirect transparency: fetch follows 3xx silently; synthesize 302 back ─
+//
+// fetch(redirect:'follow') absorbs server 3xx redirects and returns the final
+// response at the ORIGINAL url, so the browser keeps the wrong base path and
+// relative sub-resources resolve incorrectly (the "CSS/JS return homepage
+// HTML" symptom for prefix-mounted backends like Transmission). The fix:
+// when fetch reports it followed a redirect (resp.redirected), synthesize a
+// 302 to the final path so the browser navigates. 'manual' mode can't be used
+// because it yields an opaque-redirect (status 0, unreadable Location).
+
+// A fake fetch Response carrying redirected:true (a flag a Response built via
+// `new Response()` does NOT expose, so we hand-roll it).
+function fakeRedirectedResponse(finalUrl, { status = 200, statusText = 'OK', contentType = 'text/html' } = {}) {
+  const body = new ReadableStream({
+    start(ctrl) {
+      ctrl.enqueue(new TextEncoder().encode('final-body'));
+      ctrl.close();
+    },
+  });
+  return {
+    redirected: true, url: finalUrl, status, statusText,
+    headers: new Headers({ 'content-type': contentType }),
+    body,
+  };
+}
+
+describe('Redirect transparency: synthesize 302 when fetch followed a redirect', () => {
+  it('emits 302 to the final path for a redirected GET', async () => {
+    const origFetch = globalThis.fetch;
+    let called;
+    globalThis.fetch = (url, opts) => { called = String(url); return Promise.resolve(fakeRedirectedResponse('http://bt.home.pi/transmission/web/')); };
+    try {
+      const stream = mockStreamRW();
+      await forwardHTTP(stream, {
+        method: 'GET', path: '/',
+        headers: { host: ['x.gost.run'] }, body: null,
+      }, { localEndpoint: '192.168.100.200:80', hostname: 'bt.home.pi' });
+      const out = Buffer.concat(stream.writes.map(Buffer.from)).toString('utf8');
+      assert.equal(called, 'http://bt.home.pi/', 'upstream fetch went to the hostname at the request path');
+      assert.match(out, /^HTTP\/1\.1 302 Found\r\n/);
+      assert.match(out, /Location: \/transmission\/web\/\r\n/);
+      // The final body must NOT be leaked to the visitor — only the redirect.
+      assert.doesNotMatch(out, /final-body/);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('passes the final response through when no redirect occurred', async () => {
+    const origFetch = globalThis.fetch;
+    // A constructed Response has redirected=false; emulate that exact shape so
+    // we exercise the "no synthesis" branch with a redirected:false value.
+    const body = new ReadableStream({
+      start(c) { c.enqueue(new TextEncoder().encode('css-body')); c.close(); },
+    });
+    globalThis.fetch = () => Promise.resolve({
+      redirected: false, url: 'http://bt.home.pi/transmission-app.css',
+      status: 200, statusText: 'OK',
+      headers: new Headers({ 'content-type': 'text/css' }),
+      body,
+    });
+    try {
+      const stream = mockStreamRW();
+      await forwardHTTP(stream, {
+        method: 'GET', path: '/transmission-app.css',
+        headers: { host: ['x.gost.run'] }, body: null,
+      }, { localEndpoint: 'bt.home.pi', hostname: 'bt.home.pi' });
+      const out = Buffer.concat(stream.writes.map(Buffer.from)).toString('utf8');
+      assert.match(out, /^HTTP\/1\.1 200 OK\r\n/);
+      assert.doesNotMatch(out, /302 Found/);
+      assert.doesNotMatch(out, /Location: /);
+      assert.match(out, /css-body/);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('does NOT synthesize a redirect for redirected POST (body/method semantics)', async () => {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = () => Promise.resolve(fakeRedirectedResponse('http://bt.home.pi/new'));
+    try {
+      const stream = mockStreamRW();
+      await forwardHTTP(stream, {
+        method: 'POST', path: '/echo',
+        body: new TextEncoder().encode('payload'),
+        headers: { host: ['x.gost.run'] },
+      }, { localEndpoint: 'bt.home.pi', hostname: 'bt.home.pi' });
+      const out = Buffer.concat(stream.writes.map(Buffer.from)).toString('utf8');
+      // POST redirected: fetch already preserved method+body internally; we
+      // hand the final response through (200 with body), NOT a 302.
+      assert.match(out, /^HTTP\/1\.1 200/);
+      assert.doesNotMatch(out, /Location: /);
+      assert.match(out, /final-body/);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });

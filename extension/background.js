@@ -140,54 +140,17 @@ function _dnrMarker(tunnelId) {
 }
 
 async function setHostnameDNR(tunnelId, localEndpoint, hostname, enableTLS) {
+  // Host rewrite no longer uses declarativeNetRequest. DNR treats `Host` as a
+  // protected header and silently refuses to override it (fetch() forbids
+  // setting Host for the same reason), so the DNR approach never worked. Host
+  // rewriting is now done in lib/forwarder.js by fetching FROM the configured
+  // hostname (fetch() derives Host from the URL). We keep this call site as a
+  // no-op that just removes any stale rules installed by an older version so
+  // they don't linger on upgraded installs.
   if (!hostname) return;
-  const markerId = _dnrRuleId(tunnelId);
-  const fallbackId = _dnrFallbackRuleId(tunnelId);
-  const marker = _dnrMarker(tunnelId);
-  const fallbackFilter = _fallbackUrlFilter(localEndpoint, enableTLS);
-  console.log('Wisper: installing DNR rules', {
-    tunnelId, localEndpoint, hostname,
-    markerId, markerUrlFilter: `__wtr=${marker}`,
-    fallbackId, fallbackUrlFilter: fallbackFilter,
-  });
   try {
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [markerId],
-      addRules: [{
-        id: markerId,
-        priority: 2,
-        action: {
-          type: 'modifyHeaders',
-          requestHeaders: [{ header: 'host', operation: 'set', value: hostname }],
-        },
-        condition: {
-          urlFilter: `__wtr=${marker}`,
-          resourceTypes: ['xmlhttprequest'],
-        },
-      }],
-    });
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [fallbackId],
-      addRules: [{
-        id: fallbackId,
-        priority: 1,
-        action: {
-          type: 'modifyHeaders',
-          requestHeaders: [{ header: 'host', operation: 'set', value: hostname }],
-        },
-        condition: {
-          urlFilter: fallbackFilter,
-          resourceTypes: ['xmlhttprequest'],
-        },
-      }],
-    });
-    const rules = await chrome.declarativeNetRequest.getDynamicRules();
-    console.log('Wisper: DNR rules installed, current:', rules.map(r => ({
-      id: r.id, priority: r.priority, urlFilter: r.condition.urlFilter,
-    })));
-  } catch (e) {
-    console.error('Wisper: DNR rule failed', e);
-  }
+    await removeHostnameDNR(tunnelId);
+  } catch { /* DNR unavailable or no rules — ignore */ }
 }
 
 async function removeHostnameDNR(tunnelId) {

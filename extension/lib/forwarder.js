@@ -127,32 +127,54 @@ async function writeUnauthorized(stream) {
 // ── HTTP forwarder ─────────────────────────────────────────────────────
 
 /**
- * Per-tunnel URL marker, kept in sync with background.js (_dnrMarker). The
- * forwarder tags each host-rewrite request with it so the matching DNR rule
- * (which embeds the same marker) does not collide with another tunnel sharing
- * the same local backend.
+ * Build the URL authority (host[:port]) for the upstream fetch.
+ *
+ * When a hostname is configured (Host rewrite), we substitute it for the
+ * localEndpoint's host so fetch() sets the Host header FROM the URL — the
+ * only reliable way to get `Host: <hostname>` on the wire. fetch() forbids
+ * setting Host directly (forbidden request-header per Fetch spec), and
+ * chrome.declarativeNetRequest treats Host as a protected header it silently
+ * refuses to override either, so neither route works. Making the request TO
+ * <hostname> makes the browser set Host = <hostname> itself, which the
+ * backend's `server_name <hostname>` vhost then matches.
+ *
+ * The default port for the scheme is omitted so Host carries no port, matching
+ * Go's sniffer_http.go (`req.Host = httpSettings.Host`, host-only). Path is
+ * preserved verbatim below, so each sub-resource resolves to its own content
+ * (the root cause of the prior "all paths return the homepage" symptom: with
+ * the wrong vhost selected, an SPA catch-all `try_files $uri /index.html`
+ * served index.html for every path).
+ *
+ * Requires <hostname> to resolve on the host running Chrome — true for the
+ * typical Host-Rewrite case (a local DNS name → backend IP). If it does not
+ * resolve, fetch() fails with a DNS error and the visitor gets a 502.
  */
-function _dnrMarker(tunnelId) {
-  return tunnelId.replace(/-/g, '');
+export function _urlAuthority(localEndpoint, hostname, scheme) {
+  let host = localEndpoint;
+  let port = '';
+  const bracket = localEndpoint.lastIndexOf(']');
+  const colon = localEndpoint.lastIndexOf(':');
+  if (colon > bracket) {
+    host = localEndpoint.slice(0, colon);
+    port = localEndpoint.slice(colon + 1);
+  }
+  const targetHost = hostname || host;
+  const defaultPort = scheme === 'https' ? '443' : '80';
+  if (!port || port === defaultPort) return targetHost;
+  return `${targetHost}:${port}`;
 }
 
 export async function forwardHTTP(stream, req, config) {
   const scheme = config.enableTLS ? 'https' : 'http';
-  let url = `${scheme}://${config.localEndpoint}${req.path}`;
-  // Tag the request with a per-tunnel marker so chrome.declarativeNetRequest
-  // can scope the Host rewrite to this tunnel instead of applying it globally
-  // to every request hitting the shared local endpoint.
-  if (config.hostname && config.tunnelId) {
-    const sep = url.includes('?') ? '&' : '?';
-    url += `${sep}__wtr=${_dnrMarker(config.tunnelId)}`;
-  } else if (config.hostname && !config.tunnelId) {
-    console.warn('Wisper: hostname set but tunnelId missing — DNR marker not appended', {
-      localEndpoint: config.localEndpoint,
-      hostname: config.hostname,
-      hasAuth: !!config.auth,
-    });
-  }
+  // Use the configured hostname as the fetch target (Host rewrite). See
+  // _urlAuthority for why we route TO the hostname instead of rewriting Host.
+  const authority = _urlAuthority(config.localEndpoint, config.hostname, scheme);
+  const url = `${scheme}://${authority}${req.path}`;
   const method = req.method || 'GET';
+
+  console.log(
+    `Wisper: forward → ${method} ${url}  (path="${req.path}" hostname="${config.hostname || ''}")`,
+  );
 
   // Build a Headers object, appending each value so duplicates (Set-Cookie,
   // Cookie, ...) survive. Strip hop-by-hop and transport-framing headers.
@@ -167,14 +189,10 @@ export async function forwardHTTP(stream, req, config) {
     for (const v of values) fwdHeaders.append(name, v);
   }
 
-  // Host rewrite (matches Go httpTunnel's hostname option). fetch() forbids
-  // setting the Host header directly, so this is a no-op in the extension.
-  // The actual rewrite is handled by chrome.declarativeNetRequest in the
-  // background service worker (background.js), which modifies the host header
-  // at the network level before the request is sent.
-  if (config.hostname) {
-    try { fwdHeaders.set('Host', config.hostname); } catch { /* forbidden header */ }
-  }
+  // Host is NOT set explicitly here: fetch() forbids setting Host, so it is
+  // derived from the URL authority (see _urlAuthority). When a hostname is
+  // configured we fetch FROM the hostname, so the browser sets Host = hostname
+  // for us and the backend's virtual host is selected correctly.
 
   const fetchOpts = { method, headers: fwdHeaders };
   if (!['GET', 'HEAD'].includes(method) && req.body && req.body.length > 0) {
@@ -184,6 +202,10 @@ export async function forwardHTTP(stream, req, config) {
   let resp;
   try {
     resp = await fetch(url, fetchOpts);
+    console.log(
+      `Wisper: fetch response ← ${resp.status} ${resp.statusText}  for ${method} ${url}`,
+      { contentType: resp.headers.get('content-type') },
+    );
   } catch (e) {
     // The fetch() to the local backend failed — connection refused, DNS failure,
     // timeout, or the backend isn't running on the configured localEndpoint.
@@ -194,14 +216,61 @@ export async function forwardHTTP(stream, req, config) {
       path: req.path,
     });
     // Return a well-formed 502 so the visitor sees a meaningful error instead
-    // of a hanging connection or generic reset.
+    // of a hanging connection or generic reset. Use TextEncoder for the byte
+    // length — Buffer is a Node global absent in the offscreen DOM context,
+    // so Buffer.byteLength would throw ReferenceError there.
     const body = `backend unreachable: ${config.localEndpoint} — ${e.message}`;
+    const bodyBytes = new TextEncoder().encode(body);
     await stream.write(new TextEncoder().encode(
       `HTTP/1.1 502 Bad Gateway\r\n` +
       `Content-Type: text/plain\r\n` +
-      `Content-Length: ${Buffer.byteLength(body)}\r\n` +
-      `\r\n${body}`,
+      `Content-Length: ${bodyBytes.length}\r\n` +
+      `\r\n`,
     ));
+    await stream.write(bodyBytes);
+    stream.close();
+    return;
+  }
+
+  // Redirect transparency for safe methods.
+  //
+  // fetch() follows 3xx redirects by default (redirect:'follow' is the only
+  // mode that yields a readable response — 'manual' returns an opaque-redirect
+  // with status 0 and no readable Location, 'error' throws). That silently
+  // ABSORBS server-side redirects: the visitor never sees the 301/302, and
+  // because fetch returns the final response while the browser keeps the
+  // ORIGINAL url, the page's relative sub-resource URLs resolve against the
+  // wrong base path. That is the real mechanism behind "CSS/JS sub-paths
+  // return the homepage HTML" for backends that serve their UI under a path
+  // prefix and redirect / there (e.g. Transmission → /transmission/web/):
+  // fetch follows / → /transmission/web/, hands the HTML back at /, and
+  // <link href="transmission-app.css"> resolves to /transmission-app.css,
+  // which redirects again → HTML served as CSS.
+  //
+  // We can't read the original 3xx (fetch hid it), so for safe methods we
+  // synthesize a 302 to the final URL's PATH (relative, so the visitor's
+  // browser stays on the entrypoint host) and let the browser perform the
+  // navigation. That loads the page at its real base so relative assets
+  // resolve correctly. Non-safe methods are left as fetch left them: fetch
+  // preserved method+body across 307/308 internally, and reconstructing that
+  // from an opaque redirect isn't faithful, so the final response passes
+  // through unchanged.
+  if (resp.redirected && (method === 'GET' || method === 'HEAD')) {
+    const finalUrl = new URL(resp.url);
+    const loc = (finalUrl.pathname || '/') + finalUrl.search;
+    const bodyBytes = new TextEncoder().encode(`redirected to ${loc}`);
+    const head =
+      `HTTP/1.1 302 Found\r\n` +
+      `Location: ${loc}\r\n` +
+      `Content-Type: text/plain\r\n` +
+      `Content-Length: ${bodyBytes.length}\r\n` +
+      `\r\n`;
+    const headBytes = new TextEncoder().encode(head);
+    const out = new Uint8Array(headBytes.length + bodyBytes.length);
+    out.set(headBytes, 0);
+    out.set(bodyBytes, headBytes.length);
+    console.log(`Wisper: redirect absorbed by fetch → synthesized 302 → ${loc} (orig ${method} ${url})`);
+    await stream.write(out);
     stream.close();
     return;
   }

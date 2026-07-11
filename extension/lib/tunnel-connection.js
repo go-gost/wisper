@@ -210,15 +210,17 @@ export class TunnelConnection {
   }
 
   _handleStream(stream) {
-    // Step 1: Read the relay Response (peer address info) from the stream
-    this._readRelayResponse(stream).then((peerAddr) => {
+    // Step 1: Read the relay Response (peer address info) from the stream.
+    // Escaped carry bytes (from over-reading the stream) must be forwarded
+    // to _readHTTP or they are lost forever.
+    this._readRelayResponse(stream).then(({peerAddr, carry}) => {
       if (!this._onStream) {
         stream.close();
         return;
       }
 
       // Step 2: Read HTTP request from the stream
-      this._readHTTP(stream, peerAddr).then((req) => {
+      this._readHTTP(stream, peerAddr, carry).then((req) => {
         if (!req) {
           stream.close();
           return;
@@ -259,19 +261,28 @@ export class TunnelConnection {
       dataBuf = merged;
     }
 
-    const resp = relayResponseFromWire(new Uint8Array([...headerBuf, ...dataBuf]));
+    const totalFeatures = dataBuf.slice(0, flen);
+    const carry = dataBuf.slice(flen);
+
+    // Build the wire buffer from just the header + known feature bytes so
+    // relayResponseFromWire never sees stray bytes past the feature span.
+    const resp = relayResponseFromWire(
+      new Uint8Array([...headerBuf.slice(0, 4), ...totalFeatures]),
+    );
     if (resp.status !== StatusOK) {
       throw new Error(`peer relay response: status ${resp.status}`);
     }
 
     const addrFeat = findFeature(resp.features, FeatureAddr);
-    return addrFeat ? addrFeat.value : null;
+    return { peerAddr: addrFeat ? addrFeat.value : null, carry };
   }
 
-  async _readHTTP(stream, peerAddr) {
-    // Read until we have the full HTTP request headers (\r\n\r\n)
-    let buf = new Uint8Array(0);
-    let headerEnd = -1;
+  async _readHTTP(stream, peerAddr, carry = new Uint8Array(0)) {
+    // Read until we have the full HTTP request headers (\r\n\r\n).
+    // carry holds any bytes over-read from the relay response that belong
+    // to this HTTP request; seed the buffer with them so nothing is lost.
+    let buf = new Uint8Array(carry);
+    let headerEnd = indexOfSequence(buf, [0x0d, 0x0a, 0x0d, 0x0a]);
 
     while (headerEnd === -1) {
       const chunk = await stream.read();
