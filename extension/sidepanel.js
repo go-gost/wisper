@@ -55,9 +55,7 @@ const TRANSLATIONS = {
     msgCreated: 'Tunnel created',
     msgUpdated: 'Tunnel updated',
     msgDeleted: 'Tunnel deleted',
-    statsIn: 'In',
-    statsOut: 'Out',
-    statsConns: 'Conns',
+    statsConns: 'conns',
     actionResetStats: 'Reset stats',
   },
   zh: {
@@ -110,8 +108,6 @@ const TRANSLATIONS = {
     msgCreated: '隧道已创建',
     msgUpdated: '隧道已更新',
     msgDeleted: '隧道已删除',
-    statsIn: '入',
-    statsOut: '出',
     statsConns: '连接',
     actionResetStats: '重置计数',
   },
@@ -352,16 +348,22 @@ function updateTunnelStats(tunnelId, stats) {
   const tun = tunnels.find(x => x.tunnelId === tunnelId);
   if (tun) tun.stats = stats;
 
-  // Card traffic rate row.
-  const trafficEl = document.getElementById(`traffic-${tunnelId}`);
-  if (trafficEl) {
-    trafficEl.textContent = `↑ ${formatRate(stats.outputRate)} ↓ ${formatRate(stats.inputRate)}`;
+  // Meta line: update conn count ("HTTP · 3 conns")
+  const metaEl = document.getElementById(`meta-${tunnelId}`);
+  if (metaEl) {
+    metaEl.textContent = `${t('typeHttp')} · ${stats.currentConns} ${t('statsConns')}`;
   }
 
-  // Card cumulative stats row.
-  const cumEl = document.getElementById(`traffic-cum-${tunnelId}`);
-  if (cumEl) {
-    cumEl.textContent = `${t('statsIn')}: ${formatBytes(stats.inputBytes)}  ${t('statsOut')}: ${formatBytes(stats.outputBytes)}  ${t('statsConns')}: ${stats.currentConns}`;
+  // Input row: cumulative bytes ↑ rate
+  const inEl = document.getElementById(`traffic-in-${tunnelId}`);
+  if (inEl) {
+    inEl.innerHTML = `<span class="card-traffic-total">${formatBytes(stats.inputBytes)}</span> <span>↑ ${formatRate(stats.inputRate)}</span>`;
+  }
+
+  // Output row: cumulative bytes ↓ rate
+  const outEl = document.getElementById(`traffic-out-${tunnelId}`);
+  if (outEl) {
+    outEl.innerHTML = `<span class="card-traffic-total">${formatBytes(stats.outputBytes)}</span> <span>↓ ${formatRate(stats.outputRate)}</span>`;
   }
 }
 
@@ -680,8 +682,9 @@ function buildCard(tun) {
 
   const meta = document.createElement('div');
   meta.className = 'card-meta';
+  meta.id = tun.status === 'running' ? `meta-${tun.tunnelId}` : undefined;
   const statusLabels = {
-    running: t('statusRunning'),
+    running: `0 ${t('statsConns')}`,
     connecting: t('statusConnecting'),
     stopped: t('statusStopped'),
     error: t('statusError'),
@@ -702,16 +705,18 @@ function buildCard(tun) {
   if (tun.status === 'running') {
     const traffic = document.createElement('div');
     traffic.className = 'card-traffic';
-    const row = document.createElement('div');
-    row.className = 'card-traffic-row';
-    row.id = `traffic-${tun.tunnelId}`;
-    row.textContent = `↑ 0 B/s ↓ 0 B/s`;
-    traffic.appendChild(row);
-    const cumRow = document.createElement('div');
-    cumRow.className = 'card-traffic-cum';
-    cumRow.id = `traffic-cum-${tun.tunnelId}`;
-    cumRow.textContent = `${t('statsIn')}: 0 B  ${t('statsOut')}: 0 B  ${t('statsConns')}: 0`;
-    traffic.appendChild(cumRow);
+    // Input row: cumulative bytes ↑ rate
+    const inRow = document.createElement('div');
+    inRow.className = 'card-traffic-row';
+    inRow.id = `traffic-in-${tun.tunnelId}`;
+    inRow.innerHTML = `<span class="card-traffic-total">0 B</span> <span>↑ 0 B/s</span>`;
+    traffic.appendChild(inRow);
+    // Output row: cumulative bytes ↓ rate
+    const outRow = document.createElement('div');
+    outRow.className = 'card-traffic-row';
+    outRow.id = `traffic-out-${tun.tunnelId}`;
+    outRow.innerHTML = `<span class="card-traffic-total">0 B</span> <span>↓ 0 B/s</span>`;
+    traffic.appendChild(outRow);
     right.appendChild(traffic);
   }
 
