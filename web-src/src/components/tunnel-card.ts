@@ -120,6 +120,7 @@ export class TunnelCard extends LitElement {
       align-items: flex-end;
       gap: 2px;
       min-width: 60px;
+      align-self: center;
     }
 
     .created-at {
