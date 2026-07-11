@@ -758,6 +758,7 @@ function buildCard(tun) {
       e.stopPropagation();
       showQrDialog(tun.entrypoint);
     });
+    qrBtn.style.marginLeft = 'auto';
     actions.appendChild(qrBtn);
   }
 
@@ -769,6 +770,7 @@ function buildCard(tun) {
     e.stopPropagation();
     window.open(`https://inspector.gost.run/query/http?tunnel_id=${encodeURIComponent(tun.tunnelId)}`, '_blank');
   });
+  if (!tun.entrypoint) inspectBtn.style.marginLeft = 'auto';
   actions.appendChild(inspectBtn);
 
   expand.appendChild(actions);
