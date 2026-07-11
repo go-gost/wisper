@@ -533,8 +533,29 @@ function renderTunnelList() {
   }
 }
 
+// Accordion: expand one card, collapse all others.
+function toggleExpand(tunnelId) {
+  const willExpand = !expandedMap[tunnelId];
+
+  document.querySelectorAll('#cardsContainer .expand-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('#cardsContainer .card-chevron.open').forEach(c => c.classList.remove('open'));
+  for (const id in expandedMap) expandedMap[id] = false;
+
+  if (willExpand) {
+    expandedMap[tunnelId] = true;
+    const card = document.querySelector(`#cardsContainer [data-tunnel-id="${tunnelId}"]`);
+    if (card) {
+      const panel = card.querySelector('.expand-panel');
+      const chev = card.querySelector('.card-chevron');
+      if (panel) panel.classList.add('open');
+      if (chev) chev.classList.add('open');
+    }
+  }
+}
+
 function buildCard(tun) {
   const wrapper = document.createElement('div');
+  wrapper.dataset.tunnelId = tun.tunnelId;
 
   const row = document.createElement('div');
   row.className = `tunnel-card-row ${tun.status === 'stopped' ? 'stopped' : ''}`;
@@ -586,10 +607,7 @@ function buildCard(tun) {
   chev.innerHTML = iconSvg('chevron-right', 16, 16);
   chev.addEventListener('click', (e) => {
     e.stopPropagation();
-    expandedMap[tun.tunnelId] = !expandedMap[tun.tunnelId];
-    const panel = wrapper.querySelector('.expand-panel');
-    chev.classList.toggle('open', expandedMap[tun.tunnelId]);
-    if (panel) panel.classList.toggle('open', expandedMap[tun.tunnelId]);
+    toggleExpand(tun.tunnelId);
   });
   row.appendChild(chev);
 
@@ -686,9 +704,7 @@ function buildCard(tun) {
 
   row.addEventListener('click', (e) => {
     if (e.target.closest('.action-btn') || e.target.closest('.copy-btn') || e.target.closest('.dval-link')) return;
-    expandedMap[tun.tunnelId] = !expandedMap[tun.tunnelId];
-    chev.classList.toggle('open', expandedMap[tun.tunnelId]);
-    expand.classList.toggle('open', expandedMap[tun.tunnelId]);
+    toggleExpand(tun.tunnelId);
   });
 
   return wrapper;
