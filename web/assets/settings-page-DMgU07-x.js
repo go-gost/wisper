@@ -1,4 +1,4 @@
-import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}from"./index-CjGnlVYM.js";import{r}from"./state-Coqr79iz.js";import{i as c}from"./app-scaffold-DGl1HcMG.js";var $=Object.defineProperty,S=Object.getOwnPropertyDescriptor,i=(t,s,o,p)=>{for(var n=p>1?void 0:p?S(s,o):s,d=t.length-1,v;d>=0;d--)(v=t[d])&&(n=(p?v(s,o,n):v(n))||n);return p&&n&&$(s,o,n),n};const h=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],u=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],b=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];let a=class extends _{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new m,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=g();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(y(()=>{const s=g();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate()}),x(()=>this.requestUpdate())),this._fetchVersion()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await l({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(h.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await l({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await l({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e(b.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await l({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok}catch{this._inspectorConnected=!1}this.requestUpdate()}async _saveInspectorUrl(){try{await l({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const o=s.indexOf(t);return s[(o+1)%s.length]}render(){return f`
+import{a as _,G as m,o as b,h as x,y,z as l,j as e,b as f,i as w,t as k}from"./index-CHF63uSd.js";import{r as n}from"./state-CTHua9I2.js";import{i as c}from"./app-scaffold-Cd2go2T2.js";var $=Object.defineProperty,T=Object.getOwnPropertyDescriptor,a=(t,s,o,p)=>{for(var r=p>1?void 0:p?T(s,o):s,d=t.length-1,v;d>=0;d--)(v=t[d])&&(r=(p?v(s,o,r):v(r))||r);return p&&r&&$(s,o,r),r};const h=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],g=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],u=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];let i=class extends _{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._inspectorTested=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new m,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=b();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(x(()=>{const s=b();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate()}),y(()=>this.requestUpdate())),this._fetchVersion()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await l({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(h.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await l({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(g.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await l({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await l({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1,this._inspectorTested=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok,this._inspectorTested=!0}catch{this._inspectorConnected=!1,this._inspectorTested=!0}this.requestUpdate()}async _saveInspectorUrl(){try{await l({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const o=s.indexOf(t);return s[(o+1)%s.length]}render(){return f`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -14,6 +14,20 @@ import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}fro
           <div class="app-name">${e("appName")}</div>
           <div class="app-tagline">${e("appSubtitle")}</div>
           <div class="app-version">${this._version?`v${this._version}`:""}</div>
+          <div class="settings-links">
+            <a href="https://wisper.gost.run/" target="_blank" rel="noopener" title="Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span>Home</span>
+            </a>
+            <a href="https://github.com/go-gost/wisper" target="_blank" rel="noopener" title="GitHub">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+              <span>GitHub</span>
+            </a>
+            <a href="https://t.me/gogost" target="_blank" rel="noopener" title="Telegram">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.94 4.6L3.2 11.37c-1.06.43-1.05 1.95.02 2.36l4.46 1.7 1.72 5.45c.36 1.13 1.78 1.31 2.4.31l2.45-3.87 4.36 3.23c.83.61 2.01.13 2.13-.92l1.9-13.94c.13-1-.76-1.77-1.7-1.42z"/></svg>
+              <span>Telegram</span>
+            </a>
+          </div>
         </div>
 
         <!-- Server Configuration -->
@@ -68,8 +82,8 @@ import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}fro
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;font-size:var(--font-sm);padding-top:8px;">
                 <span style="display:flex;align-items:center;gap:6px;color:var(--text-muted);">
-                  <span style="width:8px;height:8px;border-radius:50%;background:${this._inspectorConnected?"var(--green)":"var(--red)"};display:inline-block;"></span>
-                  ${this._inspectorConnected?e("inspectorConnected"):this._inspectorUrl?e("inspectorUnreachable"):"—"}
+                  <span style="width:8px;height:8px;border-radius:50%;background:${this._inspectorTested?this._inspectorConnected?"var(--green)":"var(--red)":"var(--text-muted)"};display:inline-block;"></span>
+                  ${this._inspectorTested?this._inspectorConnected?e("inspectorConnected"):e("inspectorUnreachable"):e("inspectorUntested")}
                 </span>
                 <button class="save-btn" style="width:auto;padding:6px 16px;margin:0;"
                   @click=${()=>this._checkLiveness()}>
@@ -84,10 +98,10 @@ import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}fro
         <div class="section">
           <div class="section-title">Preferences</div>
           <div class="card">
-            <div class="selector-row" @click=${()=>this._setLang(this._cycleOption(this._lang,u.map(t=>t.value)))}>
+            <div class="selector-row" @click=${()=>this._setLang(this._cycleOption(this._lang,g.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsLanguage")}</span>
               <span class="selector-value">
-                ${e(u.find(t=>t.value===this._lang)?.labelKey??"settingsLangEn")}
+                ${e(g.find(t=>t.value===this._lang)?.labelKey??"settingsLangEn")}
                 ${c("chevron-right")}
               </span>
             </div>
@@ -98,10 +112,10 @@ import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}fro
                 ${c("chevron-right")}
               </span>
             </div>
-            <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,b.map(t=>t.value)))}>
+            <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,u.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsStatsInterval")}</span>
               <span class="selector-value">
-                ${e(b.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
+                ${e(u.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
                 ${c("chevron-right")}
               </span>
             </div>
@@ -110,7 +124,7 @@ import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}fro
 
         ${this._snackbar?f`<div class="toast">${this._snackbar}</div>`:""}
       </app-scaffold>
-    `}};a.styles=w`
+    `}};i.styles=w`
     /* ── Back nav ── */
     .back-btn {
       background: none; border: none; cursor: pointer;
@@ -141,6 +155,28 @@ import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}fro
     .app-version {
       font-size: var(--font-sm); color: var(--text-muted);
       margin-top: 4px;
+    }
+    .settings-links {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      margin-top: 12px;
+    }
+    .settings-links a {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--font-sm);
+      color: var(--accent);
+      text-decoration: none;
+      transition: opacity var(--transition-fast);
+    }
+    .settings-links a:hover {
+      opacity: 0.75;
+    }
+    .settings-links svg {
+      width: 15px;
+      height: 15px;
     }
     .app-tagline {
       font-size: var(--font-sm); color: var(--text-muted);
@@ -253,4 +289,4 @@ import{a as _,G as m,u as g,h as y,y as x,z as l,j as e,b as f,i as w,t as k}fro
       from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-  `;i([r()],a.prototype,"_server",2);i([r()],a.prototype,"_entrypoint",2);i([r()],a.prototype,"_insecure",2);i([r()],a.prototype,"_theme",2);i([r()],a.prototype,"_lang",2);i([r()],a.prototype,"_statsInterval",2);i([r()],a.prototype,"_inspectorUrl",2);i([r()],a.prototype,"_inspectorConnected",2);i([r()],a.prototype,"_snackbar",2);i([r()],a.prototype,"_saving",2);i([r()],a.prototype,"_version",2);a=i([k("settings-page")],a);export{a as SettingsPage};
+  `;a([n()],i.prototype,"_server",2);a([n()],i.prototype,"_entrypoint",2);a([n()],i.prototype,"_insecure",2);a([n()],i.prototype,"_theme",2);a([n()],i.prototype,"_lang",2);a([n()],i.prototype,"_statsInterval",2);a([n()],i.prototype,"_inspectorUrl",2);a([n()],i.prototype,"_inspectorConnected",2);a([n()],i.prototype,"_inspectorTested",2);a([n()],i.prototype,"_snackbar",2);a([n()],i.prototype,"_saving",2);a([n()],i.prototype,"_version",2);i=a([k("settings-page")],i);export{i as SettingsPage};

@@ -19,7 +19,9 @@ import {
   subscribe as subEntrypoint,
 } from '../store/entrypoint-store';
 import { subscribe as subSettings } from '../store/settings-store';
+import { getSettings } from '../store/settings-store';
 import type { Tunnel, Entrypoint, ServiceStatus } from '../api/types';
+import qrcode from '../lib/qrcode.js';
 import '../components/app-scaffold';
 import '../components/nav-tabs';
 import '../components/tunnel-card';
@@ -87,15 +89,17 @@ export class HomePage extends LitElement {
   // ── Filters ───────────────────────────────────────────────────────────
 
   private get _filteredTunnels(): Tunnel[] {
-    return this.showFavorites
+    const list = this.showFavorites
       ? this._tunnels.filter(t => t.favorite)
       : this._tunnels;
+    return [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   private get _filteredEntrypoints(): Entrypoint[] {
-    return this.showFavorites
+    const list = this.showFavorites
       ? this._entrypoints.filter(e => e.favorite)
       : this._entrypoints;
+    return [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   private get _items(): Item[] {
@@ -370,6 +374,48 @@ export class HomePage extends LitElement {
       color: var(--text);
     }
 
+    .dval-link {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .dval-link:hover {
+      text-decoration: underline;
+    }
+
+    .action-btn.qr {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .action-btn.inspect {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .qr-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .qr-body canvas {
+      width: 200px;
+      height: 200px;
+      background: #fff;
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      box-sizing: border-box;
+      image-rendering: pixelated;
+    }
+    .qr-url {
+      font-size: var(--font-xs);
+      color: var(--text-secondary);
+      text-align: center;
+      word-break: break-all;
+      line-height: 1.4;
+      max-width: 100%;
+    }
+
     /* ── Empty state ── */
     .empty {
       flex: 1;
@@ -579,6 +625,7 @@ export class HomePage extends LitElement {
 
   @state() private _snackbar = '';
   @state() private _deleteTarget: { kind: 'tunnel' | 'entrypoint'; id: string; name: string } | null = null;
+  @state() private _qrUrl = '';
 
   private _showSnackbar(msg: string) {
     this._snackbar = msg;
@@ -632,6 +679,52 @@ export class HomePage extends LitElement {
       this._showSnackbar(t('deleted'));
     } catch {
       this._showSnackbar(t('deleteFailed'));
+    }
+  }
+
+  // ── QR dialog ───────────────────────────────────────────────────────
+
+  private _openQrDialog(url: string) {
+    this._qrUrl = url;
+  }
+
+  private _closeQrDialog() {
+    this._qrUrl = '';
+  }
+
+  updated(changed: Map<string, unknown>) {
+    if (changed.has('_qrUrl') && this._qrUrl) {
+      const canvas = this.renderRoot.querySelector('#qrCanvas') as HTMLCanvasElement | null;
+      this._renderQrCanvas(canvas, this._qrUrl);
+    }
+  }
+
+  private _renderQrCanvas(canvas: HTMLCanvasElement | null, text: string) {
+    if (!canvas) return;
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      const moduleCount = qr.getModuleCount();
+      const cellSize = 4;
+      const margin = 4;
+      const size = moduleCount * cellSize + margin * 2;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = '#000';
+      for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+          if (qr.isDark(r, c)) {
+            ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('QR render failed:', e);
     }
   }
 
@@ -708,7 +801,7 @@ export class HomePage extends LitElement {
                               <div class="detail-row">
                                 <span class="dlabel">${item.kind === 'tunnel' ? 'Entrypoint' : 'Endpoint'}</span>
                                 <span class="dval">
-                                  <span class="dval-mono">${item.data.entrypoint}</span>
+                                  <a class="dval-link dval-mono" href="${item.data.entrypoint.startsWith('http') ? item.data.entrypoint : 'https://' + item.data.entrypoint}" target="_blank" rel="noopener">${item.data.entrypoint}</a>
                                   <button class="copy-btn-mini" @click=${async (e: Event) => { e.stopPropagation(); await copyToClipboard(item.data.entrypoint); this._showSnackbar(t('copiedToClipboard')); }}>
                                     ${icon('copy')}
                                   </button>
@@ -731,25 +824,38 @@ export class HomePage extends LitElement {
                             <div class="expand-actions">
                               ${item.data.status === 'running'
                                 ? html`
-                                  <button class="action-btn stop" @click=${(e: Event) => {
+                                  <button class="action-btn stop" title="${t('btnStop')}" @click=${(e: Event) => {
                                     e.stopPropagation();
                                     this._handleStop(item);
-                                  }}>■ ${t('btnStop')}</button>
+                                  }}>${icon('stop')}</button>
                                 `
                                 : html`
-                                  <button class="action-btn start" @click=${(e: Event) => {
+                                  <button class="action-btn start" title="${t('btnStart')}" @click=${(e: Event) => {
                                     e.stopPropagation();
                                     this._handleStart(item);
-                                  }}>▶ ${t('btnStart')}</button>
+                                  }}>${icon('play')}</button>
                                 `}
-                              <button class="action-btn" @click=${(e: Event) => {
+                              <button class="action-btn" title="${t('btnEdit')}" @click=${(e: Event) => {
                                 e.stopPropagation();
                                 this._navigate(detailPath + '?edit');
-                              }}>${icon('edit')} ${t('btnEdit')}</button>
-                              <button class="action-btn danger" @click=${(e: Event) => {
+                              }}>${icon('edit')}</button>
+                              <button class="action-btn danger" title="${t('btnDelete')}" @click=${(e: Event) => {
                                 e.stopPropagation();
                                 this._confirmDelete(item.kind, item.data.id, item.data.name);
-                              }}>${icon('trash')} ${t('btnDelete')}</button>
+                              }}>${icon('trash')}</button>
+                              ${item.data.entrypoint
+                                ? html`<button class="action-btn qr" title="${t('qrCode')}" style="margin-left:auto;"
+                                    @click=${(e: Event) => { e.stopPropagation(); this._openQrDialog(item.data.entrypoint); }}>
+                                    ${icon('qr')}
+                                  </button>`
+                                : ''}
+                              ${item.kind === 'tunnel' && ((item.data as Tunnel).type === 'http' || (item.data as Tunnel).type === 'file') && getSettings().inspector_url
+                                ? html`<button class="action-btn inspect" title="${t('inspectorEntryTitle')}"
+                                    style="${item.data.entrypoint ? '' : 'margin-left:auto;'}"
+                                    @click=${(e: Event) => { e.stopPropagation(); this._navigate(`/tunnel/${(item.data as Tunnel).type}/${item.data.id}/inspector`); }}>
+                                    ${icon('search')}
+                                  </button>`
+                                : ''}
                             </div>
                           </div>
                         `
@@ -769,6 +875,25 @@ export class HomePage extends LitElement {
       </app-scaffold>
 
       ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
+
+      ${this._qrUrl
+        ? html`
+          <div class="dialog-overlay" @click=${() => this._closeQrDialog()}>
+            <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+              <div class="dialog-title">${t('qrCode')}</div>
+              <div class="qr-body">
+                <canvas id="qrCanvas"></canvas>
+                <div class="qr-url">${this._qrUrl}</div>
+              </div>
+              <div class="dialog-actions">
+                <button class="dialog-btn cancel" @click=${() => this._closeQrDialog()}>
+                  ${t('btnClose')}
+                </button>
+              </div>
+            </div>
+          </div>
+        `
+        : ''}
 
       ${this._deleteTarget
         ? html`

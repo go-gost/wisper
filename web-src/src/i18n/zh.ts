@@ -36,6 +36,7 @@ const zh: Record<string, string> = {
   btnDelete: '删除',
   btnCancel: '取消',
   btnCopy: '复制',
+  btnClose: '关闭',
   btnResetStats: '清零',
   btnResetInput: '清零上传',
   btnResetOutput: '清零下载',
@@ -117,6 +118,7 @@ const zh: Record<string, string> = {
   settingsInsecureDesc: '跳过隧道连接的证书验证',
 
   // Inspector
+  qrCode: '二维码',
   inspectorEntryTitle: '流量检查',
   inspectorEntryDesc: '查看 HTTP / WebSocket 记录',
   inspectorTitle: '流量',
@@ -126,6 +128,7 @@ const zh: Record<string, string> = {
   inspectorSettingsDesc: '流量检查服务地址。设置后，隧道详情页会出现"流量检查"按钮。',
   inspectorUrlPlaceholder: 'https://inspector.gost.run',
   inspectorConnected: '已连接',
+  inspectorUntested: '未测试',
   inspectorUnreachable: '无法访问',
   inspectorTest: '测试',
   inspectorQuery: '查询',

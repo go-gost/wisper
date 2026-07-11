@@ -36,6 +36,7 @@ const en: Record<string, string> = {
   btnDelete: 'Delete',
   btnCancel: 'Cancel',
   btnCopy: 'Copy',
+  btnClose: 'Close',
   btnResetStats: 'Reset',
   btnResetInput: 'Reset Upload',
   btnResetOutput: 'Reset Download',
@@ -117,6 +118,7 @@ const en: Record<string, string> = {
   settingsInsecureDesc: 'Skip certificate verification for tunnel connections',
 
   // Inspector
+  qrCode: 'QR Code',
   inspectorEntryTitle: 'Traffic Inspection',
   inspectorEntryDesc: 'View HTTP / WebSocket records',
   inspectorTitle: 'Traffic',
@@ -126,6 +128,7 @@ const en: Record<string, string> = {
   inspectorSettingsDesc: 'Traffic inspection service base URL. When set, a "Traffic Inspection" button appears on tunnel detail pages.',
   inspectorUrlPlaceholder: 'https://inspector.gost.run',
   inspectorConnected: 'Connected',
+  inspectorUntested: 'Untested',
   inspectorUnreachable: 'Unreachable',
   inspectorTest: 'Test',
   inspectorQuery: 'Query',

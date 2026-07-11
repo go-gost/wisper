@@ -734,16 +734,16 @@ export class TunnelDetailPage extends LitElement {
           ${this.mode === 'view' && t2
             ? html`
               ${t2.status === 'running'
-                ? html`<button class="pill-btn danger appbar-action" @click=${() => this._handleStop()}>
-                  ■ ${t('btnStop')}
+                ? html`<button class="pill-btn danger appbar-action" title="${t('btnStop')}" @click=${() => this._handleStop()}>
+                  ${icon('stop')}
                 </button>`
-                : html`<button class="pill-btn primary appbar-action" @click=${() => this._handleStart()}>
-                  ▶ ${t('btnStart')}
+                : html`<button class="pill-btn primary appbar-action" title="${t('btnStart')}" @click=${() => this._handleStart()}>
+                  ${icon('play')}
                 </button>`}
             `
             : html`
-              <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${() => this._handleSave()}>
-                ${icon('check')} ${t('btnSave')}
+              <button class="pill-btn primary appbar-action" title="${t('btnSave')}" ?disabled=${this._saving} @click=${() => this._handleSave()}>
+                ${icon('check')}
               </button>
             `}
         </div>
@@ -880,8 +880,8 @@ export class TunnelDetailPage extends LitElement {
             ${this.mode === 'view' && t2
               ? html`
                 <div class="section">
-                  <button class="btn-edit-bottom" @click=${() => this._enterEdit()}>
-                    ${icon('edit')} ${t('btnEdit')}
+                  <button class="btn-edit-bottom" title="${t('btnEdit')}" @click=${() => this._enterEdit()}>
+                    ${icon('edit')}
                   </button>
                 </div>
               `
@@ -992,8 +992,8 @@ export class TunnelDetailPage extends LitElement {
                   ? html`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
-                      <button class="pill-btn danger" @click=${() => { this._showDeleteDialog = true; }}>
-                        ${icon('trash')} ${t('btnDelete')}
+                      <button class="pill-btn danger" title="${t('btnDelete')}" @click=${() => { this._showDeleteDialog = true; }}>
+                        ${icon('trash')}
                       </button>
                     </div>
                   `

@@ -52,7 +52,7 @@ export class TunnelCard extends LitElement {
       align-items: flex-start;
       padding: 8px 12px;
       background: var(--border-subtle);
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-lg);
       cursor: pointer;
       transition: background var(--transition-fast);
       gap: 10px;
