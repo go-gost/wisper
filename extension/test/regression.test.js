@@ -18,7 +18,7 @@ import {
   OP_TEXT, OP_BINARY, OP_CLOSE, OP_PONG, OP_CONT,
 } from '../lib/ws-codec.js';
 import { parseHTTPRequest, decodeChunkedBodyFromStream } from '../lib/tunnel-connection.js';
-import { isAuthorized, handleRequest, forwardHTTP } from '../lib/forwarder.js';
+import { isAuthorized, handleRequest, forwardHTTP, _urlAuthority } from '../lib/forwarder.js';
 
 const LE = true;
 
@@ -556,5 +556,45 @@ describe('Redirect transparency: synthesize 302 when fetch followed a redirect',
     } finally {
       globalThis.fetch = origFetch;
     }
+  });
+});
+
+// ── WebSocket hostname rewrite: ws/wss schemes use _urlAuthority too ─────
+//
+// forwardWebSocket() must construct its backend URL with _urlAuthority() so
+// the Host header (derived from the URL by the browser's WebSocket API)
+// matches the configured hostname. Without this, WebSocket upgrades hit the
+// wrong virtual host on name-based backends (the same bug as the DNR Host
+// rewrite fix for HTTP).
+
+describe('WebSocket hostname rewrite: _urlAuthority for ws/wss schemes', () => {
+  it('routes ws:// to the hostname (default port 80 omitted)', () => {
+    const authority = _urlAuthority('192.168.100.200:80', 'bt.home.pi', 'ws');
+    assert.equal(authority, 'bt.home.pi');
+  });
+
+  it('routes wss:// to the hostname (default port 443 omitted)', () => {
+    const authority = _urlAuthority('192.168.100.200:443', 'bt.home.pi', 'wss');
+    assert.equal(authority, 'bt.home.pi');
+  });
+
+  it('keeps a non-default port for ws', () => {
+    const authority = _urlAuthority('192.168.100.200:8080', 'bt.home.pi', 'ws');
+    assert.equal(authority, 'bt.home.pi:8080');
+  });
+
+  it('keeps a non-default port for wss', () => {
+    const authority = _urlAuthority('192.168.100.200:8443', 'bt.home.pi', 'wss');
+    assert.equal(authority, 'bt.home.pi:8443');
+  });
+
+  it('uses localEndpoint host when no hostname is configured (ws)', () => {
+    const authority = _urlAuthority('localhost:8000', undefined, 'ws');
+    assert.equal(authority, 'localhost:8000');
+  });
+
+  it('strips default ws port 80 from the authority', () => {
+    const authority = _urlAuthority('localhost:80', 'bt.home.pi', 'ws');
+    assert.equal(authority, 'bt.home.pi');
   });
 });

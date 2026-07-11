@@ -159,7 +159,7 @@ export function _urlAuthority(localEndpoint, hostname, scheme) {
     port = localEndpoint.slice(colon + 1);
   }
   const targetHost = hostname || host;
-  const defaultPort = scheme === 'https' ? '443' : '80';
+  const defaultPort = (scheme === 'https' || scheme === 'wss') ? '443' : '80';
   if (!port || port === defaultPort) return targetHost;
   return `${targetHost}:${port}`;
 }
@@ -458,31 +458,125 @@ export async function forwardWebSocket(stream, req, config) {
 
   // Open the backend WebSocket. The backend performs its own handshake; we
   // never expose its 101 to the visitor.
+  //
+  // Use _urlAuthority so that when a hostname is configured (Host rewrite),
+  // the WebSocket connects TO the hostname and the browser sets Host from the
+  // URL. Without this, WebSocket connections went to the raw localEndpoint
+  // while HTTP requests fetched from the hostname — name-based virtual
+  // hosting selected the wrong server block for WebSocket upgrades.
+  //
+  // IMPORTANT: Chrome extension pages (including offscreen documents) are
+  // secure contexts. Chrome's mixed content policy BLOCKS `ws://` from secure
+  // contexts — the connection is killed before the TCP handshake. `wss://`
+  // works because it uses TLS. `fetch()` to `http://` works because Chrome
+  // has a localhost exception for fetch, but that exception does NOT extend
+  // to the WebSocket API. So: WebSocket to a plain-HTTP backend WILL fail
+  // from an extension page. The user must enable TLS for the tunnel when they
+  // need WebSocket forwarding.
   const scheme = config.enableTLS ? 'wss' : 'ws';
-  const backendUrl = `${scheme}://${config.localEndpoint}${req.path}`;
+  const authority = _urlAuthority(config.localEndpoint, config.hostname, scheme);
+  const backendUrl = `${scheme}://${authority}${req.path}`;
+
+  // Detect when Chrome will block this connection so we can surface a
+  // specific error instead of a generic "connection failed" message.
+  const isSecureContext = typeof globalThis.isSecureContext === 'boolean'
+    ? globalThis.isSecureContext
+    : false;
+  const wsWillBeBlocked = isSecureContext && scheme === 'ws';
+
+  if (wsWillBeBlocked) {
+    console.warn(
+      `Wisper: WebSocket to ${backendUrl} will be blocked — ` +
+      `Chrome blocks ws:// from secure extension pages. ` +
+      `Enable TLS on this tunnel to use wss:// instead.`,
+    );
+  }
+
+  console.log(
+    `Wisper: WebSocket connect → ${backendUrl}` +
+    (protocol ? ` (protocol: ${protocol})` : '') +
+    (wsWillBeBlocked ? ' [WILL BE BLOCKED by Chrome secure-context policy]' : ''),
+  );
+
   const backend = new WebSocket(backendUrl, protocol || undefined);
   backend.binaryType = 'arraybuffer';
 
   // Visitor→backend frame decoder, fed from the SMUX stream.
   const decoder = new WsDecoder();
 
-  // If the backend closes before it opens (e.g. refused), tell the visitor.
+  // Guard: make sure we only respond once (onerror + onclose both fire on
+  // failure, and we must not double-write). Track whether we already sent a
+  // response back through the SMUX stream.
+  let responded = false;
+
+  /**
+   * Write an HTTP error response to the SMUX stream when the backend WebSocket
+   * fails before onopen. The Go entrypoint's transport.RoundTrip() is waiting
+   * for an HTTP response — if we just close the stream it gets a connection
+   * reset and the visitor sees a generic 503. Sending a well-formed 502 gives
+   * the visitor a meaningful error instead of a hung/nulled connection.
+   */
+  async function failVisitor(status, reason) {
+    if (responded) return;
+    responded = true;
+    const body = reason || 'WebSocket backend unreachable';
+    const bodyBytes = new TextEncoder().encode(body);
+    const head =
+      `HTTP/1.1 ${status} ${reason || 'Error'}\r\n` +
+      `Content-Type: text/plain\r\n` +
+      `Content-Length: ${bodyBytes.length}\r\n` +
+      `\r\n`;
+    const headBytes = new TextEncoder().encode(head);
+    const out = new Uint8Array(headBytes.length + bodyBytes.length);
+    out.set(headBytes, 0);
+    out.set(bodyBytes, headBytes.length);
+    try {
+      await stream.write(out);
+    } catch { /* stream already closed */ }
+    try { stream.close(); } catch { /* already closed */ }
+  }
+
   backend.onerror = () => {
-    // Send a close frame if we've already answered 101; else the visitor will
-    // see the stream close as a failed handshake.
+    console.error(
+      `Wisper: WebSocket error → ${backendUrl}` +
+      ` (readyState=${backend.readyState})`,
+    );
+    // If the backend already opened and we're relaying frames, send a close
+    // frame to the visitor so the client gets an orderly shutdown. Otherwise
+    // (error before onopen), write an HTTP error — the visitor is waiting for
+    // a 101 and won't understand a raw close frame at the HTTP level.
     if (activeWebSockets.has(streamId)) {
-      sendVisitorClose(stream, 1011); // internal error
+      sendVisitorClose(stream, 1011);
     }
     activeWebSockets.delete(streamId);
-    try { stream.close(); } catch { /* already closed */ }
+    if (!responded) {
+      const reason = wsWillBeBlocked
+        ? `Chrome blocks ws:// from extension pages (secure context). Enable TLS on this tunnel to use wss:// instead. Backend: ${backendUrl}`
+        : `backend unreachable: ${backendUrl}`;
+      failVisitor(502, reason);
+    } else {
+      try { stream.close(); } catch { /* already closed */ }
+    }
   };
-  backend.onclose = () => {
+
+  backend.onclose = (event) => {
+    console.log(
+      `Wisper: WebSocket closed ← ${backendUrl}` +
+      ` (code=${event.code || 'none'} reason="${event.reason || ''}" wasClean=${event.wasClean})`,
+    );
+    if (activeWebSockets.has(streamId)) {
+      sendVisitorClose(stream, event.code || 1000);
+    }
     activeWebSockets.delete(streamId);
-    sendVisitorClose(stream, 1000);
-    try { stream.close(); } catch { /* already closed */ }
+    if (!responded) {
+      failVisitor(502, `backend closed before handshake: ${backendUrl} (code=${event.code})`);
+    } else {
+      try { stream.close(); } catch { /* already closed */ }
+    }
   };
 
   backend.onopen = async () => {
+    console.log(`Wisper: WebSocket opened ← ${backendUrl}`);
     activeWebSockets.set(streamId, backend);
 
     // Synthesize the visitor's 101 response with a correct Accept and the
@@ -501,6 +595,7 @@ export async function forwardWebSocket(stream, req, config) {
     respLines.push('', '');
     try {
       await stream.write(new TextEncoder().encode(respLines.join('\r\n')));
+      responded = true;
     } catch {
       try { backend.close(); } catch { /* */ }
       return;
@@ -538,7 +633,17 @@ async function relayVisitorFrames(stream, streamId, decoder, backend) {
         if (!be || be.readyState !== WebSocket.OPEN) return;
         switch (ev.type) {
           case 'data':
-            be.send(ev.payload);
+            // Preserve the original frame's opcode: send text frames as
+            // strings (WebSocket.send(string) → OP_TEXT) and binary frames
+            // as byte arrays (WebSocket.send(Uint8Array) → OP_BINARY).
+            // Before this fix, all payloads were Uint8Arrays and sent as
+            // binary — text-protocol backends like Cockpit (cockpit1 over
+            // JSON text frames) would receive binary frames they can't parse.
+            if (ev.opcode === OP_TEXT) {
+              be.send(new TextDecoder().decode(ev.payload));
+            } else {
+              be.send(ev.payload);
+            }
             break;
           case 'ping':
             // Echo as a pong frame back to the visitor.

@@ -15,7 +15,9 @@
     "http://127.0.0.1/*",
     "https://127.0.0.1/*",
     "https://wisper.gost.run/*",
-    "http://*/*"
+    "http://*/*",
+    "http://*:*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js",
