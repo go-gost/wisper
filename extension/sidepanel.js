@@ -361,6 +361,7 @@ const ICONS = {
   edit: '<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
   play: '<polygon points="5 3 19 12 5 21 5 3"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="1"/>',
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
 };
 
 function iconSvg(name, w = 14, h = 14) {
@@ -557,6 +558,17 @@ function buildCard(t) {
     showDeleteDialog(t.tunnelId);
   });
   actions.appendChild(delBtn);
+
+  // Inspector button — opens GOST inspector for this tunnel
+  const inspectBtn = document.createElement('button');
+  inspectBtn.className = 'action-btn inspect';
+  inspectBtn.innerHTML = iconSvg('search', 14, 14);
+  inspectBtn.title = 'Open in GOST Inspector';
+  inspectBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.open(`https://inspector.gost.run/query/http?tunnel_id=${encodeURIComponent(t.tunnelId)}`, '_blank');
+  });
+  actions.appendChild(inspectBtn);
 
   expand.appendChild(actions);
   wrapper.appendChild(expand);
