@@ -18,6 +18,7 @@
 import { TunnelConnection } from './lib/tunnel-connection.js';
 import { handleRequest } from './lib/forwarder.js';
 import { uuidToTunnelIdBytes, entrypointFromUuid } from './lib/tunnel-id.js';
+import { TunnelStats } from './lib/tunnel-stats.js';
 
 // ── State ──────────────────────────────────────────────────────────────
 
@@ -34,6 +35,9 @@ const tunnels = new Map();
  * processing when both the sidepanel and the background worker forward the
  * same start-tunnel message (MV3 chrome.runtime.sendMessage broadcasts). */
 const _pendingStarts = new Set();
+
+/** Shared 1s sampling timer for all tunnels. null when no tunnel is active. */
+let _statsTimer = null;
 
 // ── Message handler ────────────────────────────────────────────────────
 
@@ -52,6 +56,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'get-tunnels':
       sendResponse({ tunnels: getTunnelStatuses() });
       break;
+
+    case 'reset-stats': {
+      const entry = tunnels.get(msg.tunnelId);
+      if (entry) {
+        entry.stats?.reset();
+        notifyStats(msg.tunnelId, entry.stats.sample(1));
+      }
+      sendResponse({ ok: true });
+      break;
+    }
 
     default:
       sendResponse({ ok: false, error: `unknown message: ${msg.type}` });
@@ -81,8 +95,9 @@ function startTunnel(config) {
     stopTunnel(tunnelId);
   }
 
-  const entry = { config, connection: null, reconnectTimer: null };
+  const entry = { config, connection: null, reconnectTimer: null, stats: new TunnelStats() };
   tunnels.set(tunnelId, entry);
+  startStatsSampler();
 
   connect(entry).finally(() => _pendingStarts.delete(tunnelId));
 }
@@ -96,11 +111,14 @@ function stopTunnel(tunnelId) {
     entry.reconnectTimer = null;
   }
 
+  entry.stats?.reset();
+
   // Delete from map BEFORE closing the connection. TunnelConnection.close()
   // triggers onClose synchronously (via _onSmuxClose → onClose callback).
   // onClose checks tunnels.has() to decide whether to reconnect — removing
   // the entry first prevents a spurious reconnect after an intentional stop.
   tunnels.delete(tunnelId);
+  if (tunnels.size === 0) stopStatsSampler();
 
   if (entry.connection) {
     entry.connection.close();
@@ -127,7 +145,10 @@ async function connect(entry) {
     auth: config.auth || {},
     relayUrl: config.relayUrl,
     entrypointUrl,
-    onStream: ({ stream, request }) => handleRequest(stream, request, config),
+    onStream: ({ stream, request }) => {
+      entry.stats.markRequest();
+      handleRequest(entry.stats.wrapStream(stream), request, config);
+    },
   });
 
   conn.onClose = () => {
@@ -161,6 +182,40 @@ function notifyStatus(tunnelId, status, error, entrypoint) {
   }).catch(() => {
     // Service worker may not be listening — ignore
   });
+}
+
+function notifyStats(tunnelId, stats) {
+  chrome.runtime.sendMessage({
+    type: 'tunnel-stats',
+    tunnelId,
+    stats,
+  }).catch(() => {
+    // Service worker or side panel not open — ignore
+  });
+}
+
+function sampleAllStats() {
+  for (const [id, entry] of tunnels) {
+    if (!entry.connection?.connected) {
+      // Keep baseline fresh even while disconnected, to avoid rate spikes
+      // on reconnect when no bytes have flowed.
+      entry.stats.sample(1);
+      continue;
+    }
+    const snapshot = entry.stats.sample(1);
+    notifyStats(id, snapshot);
+  }
+}
+
+function startStatsSampler() {
+  if (_statsTimer !== null) return;
+  _statsTimer = setInterval(sampleAllStats, 1000);
+}
+
+function stopStatsSampler() {
+  if (_statsTimer === null) return;
+  clearInterval(_statsTimer);
+  _statsTimer = null;
 }
 
 function getTunnelStatuses() {

@@ -5,7 +5,7 @@
   "description": "Wisper Chrome Extension — test harness only (the extension itself has no build step).",
   "type": "module",
   "scripts": {
-    "test": "node --test test/smux.test.js test/relay.test.js test/regression.test.js",
+    "test": "node --test test/smux.test.js test/relay.test.js test/stats.test.js test/regression.test.js",
     "test:live": "node --test test/live-relay.test.js"
   },
   "devDependencies": {

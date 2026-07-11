@@ -14,6 +14,9 @@
 const OFFSCREEN_DOC_PATH = 'offscreen.html';
 let offscreenCreating = null; // Promise to avoid concurrent creation
 
+/** Throttle timer for stats persistence to chrome.storage (max every 3s). */
+let _lastStatsPersist = 0;
+
 async function ensureOffscreen() {
   // Check if already exists
   const clients = await chrome.offscreen.hasDocument();
@@ -63,6 +66,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'tunnel-status':
       // Forwarded from offscreen → side panel
       handleTunnelStatus(msg);
+      sendResponse({ ok: true });
+      break;
+
+    case 'tunnel-stats':
+      handleTunnelStats(msg);
       sendResponse({ ok: true });
       break;
 
@@ -250,6 +258,25 @@ function handleTunnelStatus(msg) {
   // Forward to side panel if open
   chrome.runtime.sendMessage(msg).catch(() => {
     // Side panel not open — ignore
+  });
+}
+
+function handleTunnelStats(msg) {
+  // Always re-broadcast to side panel (if open).
+  chrome.runtime.sendMessage(msg).catch(() => {});
+
+  // Throttle storage writes to every 3s to avoid quota churn.
+  const now = Date.now();
+  if (now - _lastStatsPersist < 3000) return;
+  _lastStatsPersist = now;
+
+  chrome.storage.local.get('tunnels', (data) => {
+    const saved = (data.tunnels || []).map(t =>
+      t.tunnelId === msg.tunnelId
+        ? { ...t, stats: msg.stats }
+        : t
+    );
+    chrome.storage.local.set({ tunnels: saved });
   });
 }
 

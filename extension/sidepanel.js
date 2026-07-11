@@ -37,7 +37,6 @@ const TRANSLATIONS = {
     statusConnecting: 'Connecting',
     statusStopped: 'Stopped',
     statusError: 'Error',
-    labelActive: 'active',
     actionStop: 'Stop tunnel',
     actionStart: 'Start tunnel',
     actionEdit: 'Edit tunnel',
@@ -56,6 +55,11 @@ const TRANSLATIONS = {
     msgCreated: 'Tunnel created',
     msgUpdated: 'Tunnel updated',
     msgDeleted: 'Tunnel deleted',
+    statsIn: 'In',
+    statsOut: 'Out',
+    statsConns: 'Conns',
+    statsTotal: 'Total',
+    actionResetStats: 'Reset stats',
   },
   zh: {
     emptyTunnels: '暂无隧道',
@@ -89,7 +93,6 @@ const TRANSLATIONS = {
     statusConnecting: '连接中',
     statusStopped: '已停止',
     statusError: '错误',
-    labelActive: '活跃',
     actionStop: '停止隧道',
     actionStart: '启动隧道',
     actionEdit: '编辑隧道',
@@ -108,6 +111,11 @@ const TRANSLATIONS = {
     msgCreated: '隧道已创建',
     msgUpdated: '隧道已更新',
     msgDeleted: '隧道已删除',
+    statsIn: '入',
+    statsOut: '出',
+    statsConns: '连接',
+    statsTotal: '总计',
+    actionResetStats: '重置计数',
   },
 };
 
@@ -174,6 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'tunnel-status') {
       updateTunnelStatus(msg.tunnelId, msg.status, msg.error, msg.entrypoint);
+    } else if (msg.type === 'tunnel-stats') {
+      updateTunnelStats(msg.tunnelId, msg.stats);
     }
   });
 });
@@ -193,6 +203,7 @@ function loadTunnels() {
       entrypoint: t.entrypoint || null,
       createdAt: t.createdAt || new Date().toISOString(),
       hostname: t.hostname || '',
+      stats: t.stats || null,
     }));
     render();
   });
@@ -227,6 +238,7 @@ function persistTunnels() {
     entrypoint: t.entrypoint,
     createdAt: t.createdAt,
     hostname: t.hostname,
+    stats: t.stats,
   })) });
 }
 
@@ -254,6 +266,7 @@ function createTunnel(data) {
     entrypoint: null,
     createdAt: new Date().toISOString(),
     hostname: data.hostname || '',
+    stats: null,
   };
 
   tunnels.push(tun);
@@ -318,6 +331,7 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
           entrypoint: fromStorage.entrypoint || null,
           createdAt: fromStorage.createdAt || new Date().toISOString(),
           hostname: fromStorage.hostname || '',
+          stats: fromStorage.stats || null,
         });
         chrome.storage.local.set({ tunnels: data.tunnels });
         render();
@@ -334,6 +348,42 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
   if (entrypoint !== undefined && entrypoint !== null) tun.entrypoint = entrypoint;
   persistTunnels();
   render();
+}
+
+function _statsHtml(stats) {
+  return (
+    `<div class="detail-row"><span class="dlabel">${t('statsIn')}</span>` +
+    `<span class="dval">↑ ${formatRate(stats.inputRate)}  (${formatBytes(stats.inputBytes)})</span></div>` +
+    `<div class="detail-row"><span class="dlabel">${t('statsOut')}</span>` +
+    `<span class="dval">↓ ${formatRate(stats.outputRate)}  (${formatBytes(stats.outputBytes)})</span></div>` +
+    `<div class="detail-row"><span class="dlabel">${t('statsConns')}</span>` +
+    `<span class="dval">${stats.currentConns}  (${t('statsTotal')}: ${stats.totalConns})</span></div>`
+  );
+}
+
+/**
+ * Update a tunnel's stats on each 1s tick from offscreen.
+ * Patches DOM directly without a full render() call.
+ */
+function updateTunnelStats(tunnelId, stats) {
+  const tun = tunnels.find(x => x.tunnelId === tunnelId);
+  if (tun) tun.stats = stats;
+
+  // Card traffic row (always updated when visible).
+  const trafficEl = document.getElementById(`traffic-${tunnelId}`);
+  if (trafficEl) {
+    trafficEl.textContent = `↑ ${formatRate(stats.outputRate)} ↓ ${formatRate(stats.inputRate)}`;
+  }
+
+  // Expanded stats block.
+  const statsEl = document.getElementById(`stats-${tunnelId}`);
+  if (statsEl) {
+    statsEl.innerHTML = _statsHtml(stats);
+  }
+}
+
+function resetTunnelStats(tunnelId) {
+  chrome.runtime.sendMessage({ type: 'reset-stats', tunnelId }).catch(() => {});
 }
 
 function deleteTunnel(tunnelId) {
@@ -539,6 +589,18 @@ function formatRelativeTime(iso) {
   return `${Math.floor(day / 7)}w`;
 }
 
+function formatBytes(n) {
+  if (!n || n <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
+  const v = n / Math.pow(1024, i);
+  return (v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)) + ' ' + units[i];
+}
+
+function formatRate(bps) {
+  return formatBytes(bps) + '/s';
+}
+
 // ── SVG icon helpers ───────────────────────────────────────────────────
 
 const ICONS = {
@@ -550,6 +612,7 @@ const ICONS = {
   stop: '<rect x="6" y="6" width="12" height="12" rx="1"/>',
   search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
   qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M19 19h2v2h-2z"/><path d="M14 19h2v2h-2z"/>',
+  refresh: '<path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
 };
 
 function iconSvg(name, w = 14, h = 14) {
@@ -656,7 +719,11 @@ function buildCard(tun) {
   if (tun.status === 'running') {
     const traffic = document.createElement('div');
     traffic.className = 'card-traffic';
-    traffic.innerHTML = `<div class="card-traffic-row"><span class="card-traffic-total">&uarr;&darr; ${t('labelActive')}</span></div>`;
+    const row = document.createElement('div');
+    row.className = 'card-traffic-row';
+    row.id = `traffic-${tun.tunnelId}`;
+    row.textContent = `↑ 0 B/s ↓ 0 B/s`;
+    traffic.appendChild(row);
     right.appendChild(traffic);
   }
 
@@ -709,6 +776,15 @@ function buildCard(tun) {
   }
 
   expand.appendChild(detailCard);
+
+  // Stats block — populated live by updateTunnelStats, seeded from storage.
+  const statsBlock = document.createElement('div');
+  statsBlock.className = 'detail-card';
+  statsBlock.id = `stats-${tun.tunnelId}`;
+  if (tun.stats) {
+    statsBlock.innerHTML = _statsHtml(tun.stats);
+  }
+  expand.appendChild(statsBlock);
 
   const actions = document.createElement('div');
   actions.className = 'expand-actions';
@@ -772,6 +848,13 @@ function buildCard(tun) {
   });
   if (!tun.entrypoint) inspectBtn.style.marginLeft = 'auto';
   actions.appendChild(inspectBtn);
+
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'action-btn';
+  resetBtn.innerHTML = iconSvg('refresh', 14, 14);
+  resetBtn.title = t('actionResetStats');
+  resetBtn.addEventListener('click', (e) => { e.stopPropagation(); resetTunnelStats(tun.tunnelId); });
+  actions.appendChild(resetBtn);
 
   expand.appendChild(actions);
   wrapper.appendChild(expand);
