@@ -490,6 +490,24 @@ describe('Redirect transparency: synthesize 302 when fetch followed a redirect',
     }
   });
 
+  it('emits the full absolute URL when the redirect crossed origins', async () => {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = () => Promise.resolve(fakeRedirectedResponse('https://cdn.example.com/assets/x'));
+    try {
+      const stream = mockStreamRW();
+      await forwardHTTP(stream, {
+        method: 'GET', path: '/',
+        headers: { host: ['x.gost.run'] }, body: null,
+      }, { localEndpoint: '192.168.100.200:80', hostname: 'bt.home.pi' });
+      const out = Buffer.concat(stream.writes.map(Buffer.from)).toString('utf8');
+      // Cross-origin redirect must NOT be folded onto the entrypoint host.
+      assert.match(out, /Location: https:\/\/cdn\.example\.com\/assets\/x\r\n/);
+      assert.doesNotMatch(out, /Location: \/assets\/x/);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   it('passes the final response through when no redirect occurred', async () => {
     const origFetch = globalThis.fetch;
     // A constructed Response has redirected=false; emulate that exact shape so

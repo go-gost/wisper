@@ -248,16 +248,26 @@ export async function forwardHTTP(stream, req, config) {
   // which redirects again → HTML served as CSS.
   //
   // We can't read the original 3xx (fetch hid it), so for safe methods we
-  // synthesize a 302 to the final URL's PATH (relative, so the visitor's
-  // browser stays on the entrypoint host) and let the browser perform the
-  // navigation. That loads the page at its real base so relative assets
-  // resolve correctly. Non-safe methods are left as fetch left them: fetch
-  // preserved method+body across 307/308 internally, and reconstructing that
-  // from an opaque redirect isn't faithful, so the final response passes
-  // through unchanged.
+  // synthesize a 302 and let the browser perform the navigation. When the
+  // redirect chain stayed on the SAME origin as our fetch (the common case:
+  // `<hostname>/` → `<hostname>/transmission/web/`), emit a PATH-relative
+  // Location so the visitor's browser stays on the entrypoint host (the
+  // backend hostname like bt.home.pi is reachable on this machine but the
+  // VISITOR can only reach it through the entrypoint, so we must not leak
+  // it into the Location). When the chain crossed to a DIFFERENT origin
+  // (backend redirected to an external site), emit the full absolute URL so
+  // the browser leaves the entrypoint to that destination — a path-relative
+  // Location would wrongly bind it to the entrypoint host.
+  //
+  // Non-safe methods are left as fetch left them: fetch preserved method+body
+  // across 307/308 internally, and reconstructing that from an opaque
+  // redirect isn't faithful, so the final response passes through unchanged.
   if (resp.redirected && (method === 'GET' || method === 'HEAD')) {
     const finalUrl = new URL(resp.url);
-    const loc = (finalUrl.pathname || '/') + finalUrl.search;
+    const fetchOrigin = new URL(url).origin;
+    const loc = finalUrl.origin === fetchOrigin
+      ? (finalUrl.pathname || '/') + finalUrl.search
+      : finalUrl.href;
     const bodyBytes = new TextEncoder().encode(`redirected to ${loc}`);
     const head =
       `HTTP/1.1 302 Found\r\n` +
