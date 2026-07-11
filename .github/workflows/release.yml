@@ -445,3 +445,39 @@ jobs:
           files: Wisper_*_android.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  browser-extension:
+    name: Browser Extension (Chrome)
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Inject version (tag → bare semver)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" extension/manifest.json
+          echo "Version set to ${VERSION}"
+          grep '"version"' extension/manifest.json
+
+      - name: Package extension
+        run: |
+          cd extension
+          zip -r "../Wisper_${VERSION}_chrome.zip" \
+            manifest.json \
+            background.js \
+            offscreen.html \
+            offscreen.js \
+            sidepanel.html \
+            sidepanel.js \
+            lib/ \
+            icons/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: Wisper_*_chrome.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -33,7 +33,7 @@ SIDECAR_DIR   := src-tauri/binaries
 SIDECAR_NAME  := wisper-api
 SIDECAR       := $(SIDECAR_DIR)/$(SIDECAR_NAME)-$(TARGET_TRIPLE)
 
-.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer macos-sidecar macos-installer android android-release android-test-image android-test-smoke android-test-full android-test-stop
+.PHONY: all linux darwin windows web web-force typecheck clean sidecar tauri-dev tauri-build tauri-deps icons windows-sidecar windows-installer linux-installer macos-sidecar macos-installer android android-release android-test-image android-test-smoke android-test-full android-test-stop extension-zip
 
 all: linux darwin windows
 
@@ -478,6 +478,20 @@ android-test-full: android-test-image android
 android-test-stop:
 	docker stop $(TEST_CONTAINER) 2>/dev/null || true
 	docker rm $(TEST_CONTAINER) 2>/dev/null || true
+
+# ----- Chrome Extension (manual packaging) -----
+# Zips the extension source files into a distributable archive, injecting the
+# current version from git tag into manifest.json. The CI job in release.yml
+# does the same on each tag push.
+.PHONY: extension-zip
+extension-zip:
+	@VERSION="$$(node -p "require('./extension/package.json').version" 2>/dev/null)" || VERSION="$(VERSION)"; \
+	EXT_FILE="Wisper_$${VERSION}_chrome.zip"; \
+	sed -i 's/"version": "[^"]*"/"version": "'$$VERSION'"/' extension/manifest.json; \
+	cd extension && zip -r "../$$EXT_FILE" \
+		manifest.json background.js offscreen.html offscreen.js \
+		sidepanel.html sidepanel.js lib/ icons/; \
+	echo "Created $$EXT_FILE"
 
 # ----- Clean -----
 clean:
