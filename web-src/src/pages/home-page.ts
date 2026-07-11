@@ -120,12 +120,14 @@ export class HomePage extends LitElement {
   }
 
   private _metaLine(item: Item): string {
-    const type = item.data.type.toUpperCase();
-    const status = this._statusLabel(item.data.status);
     if (item.data.status === 'running') {
-      return `${type} · ${formatNumber(item.data.stats.current_conns)} conns`;
+      return `${formatNumber(item.data.stats.current_conns)} ${t('conns')}`;
     }
-    return `${type} · ${status}`;
+    return this._statusLabel(item.data.status);
+  }
+
+  private _typeLabel(item: Item): string {
+    return item.data.type.toUpperCase();
   }
 
   // ── Empty state ───────────────────────────────────────────────────────
@@ -680,6 +682,7 @@ export class HomePage extends LitElement {
                     <div>
                       <tunnel-card
                         .name=${item.data.name}
+                        .typeLabel=${this._typeLabel(item)}
                         .meta=${this._metaLine(item)}
                         .status=${item.data.status}
                         .endpoint=${item.data.endpoint}

@@ -348,10 +348,10 @@ function updateTunnelStats(tunnelId, stats) {
   const tun = tunnels.find(x => x.tunnelId === tunnelId);
   if (tun) tun.stats = stats;
 
-  // Meta line: update conn count ("HTTP · 3 conns")
+  // Meta line: update conn count
   const metaEl = document.getElementById(`meta-${tunnelId}`);
   if (metaEl) {
-    metaEl.textContent = `${t('typeHttp')} · ${stats.currentConns} ${t('statsConns')}`;
+    metaEl.textContent = `${stats.currentConns} ${t('statsConns')}`;
   }
 
   // Input row: cumulative bytes ↑ rate
@@ -680,6 +680,11 @@ function buildCard(tun) {
   nameEl.textContent = tun.name || tun.tunnelId;
   body.appendChild(nameEl);
 
+  const typeLabel = document.createElement('div');
+  typeLabel.className = 'card-type-label';
+  typeLabel.textContent = t('typeHttp');
+  body.appendChild(typeLabel);
+
   const meta = document.createElement('div');
   meta.className = 'card-meta';
   meta.id = tun.status === 'running' ? `meta-${tun.tunnelId}` : undefined;
@@ -689,7 +694,7 @@ function buildCard(tun) {
     stopped: t('statusStopped'),
     error: t('statusError'),
   };
-  meta.textContent = `${t('typeHttp')} · ${statusLabels[tun.status] || tun.status}`;
+  meta.textContent = statusLabels[tun.status] || tun.status;
   body.appendChild(meta);
 
   row.appendChild(body);

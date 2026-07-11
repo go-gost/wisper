@@ -66,6 +66,7 @@ const zh: Record<string, string> = {
   statusStopped: '已停止',
   statusError: '错误',
   activeConnections: '个活跃连接',
+  conns: '个连接',
 
   // Type descriptions
   typeFile: '文件',

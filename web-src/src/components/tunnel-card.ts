@@ -7,19 +7,21 @@ import type { ServiceStatus } from '../api/types';
 /**
  * TunnelCard — list row for a tunnel or entrypoint.
  *
- * Layout: status-dot · name + meta · traffic column · chevron
+ * Layout: status-dot · name + type + meta · traffic column · chevron
  * Renders separately inside its own Shadow DOM with design-token colours.
  *
- * @attr name     - Display name.
- * @attr meta     - Secondary line text (e.g. "HTTP · Running").
- * @attr status   - running | stopped | error (drives dot colour).
- * @attr endpoint - Copyable address shown in expanded/standalone mode.
- * @attr expanded - Whether the inline expand panel is open.
- * @attr compact  - When true, hides the traffic column (used on home list).
+ * @attr name      - Display name.
+ * @attr typeLabel - Service type label (e.g. "HTTP").
+ * @attr meta      - Secondary line text (e.g. "3 conns" or "Stopped").
+ * @attr status    - running | stopped | error (drives dot colour).
+ * @attr endpoint  - Copyable address shown in expanded/standalone mode.
+ * @attr expanded  - Whether the inline expand panel is open.
+ * @attr compact   - When true, hides the traffic column (used on home list).
  */
 @customElement('tunnel-card')
 export class TunnelCard extends LitElement {
   @property() name = '';
+  @property() typeLabel = '';
   @property() meta = '';
   @property() status: ServiceStatus = 'stopped';
   @property() endpoint = '';
@@ -91,7 +93,8 @@ export class TunnelCard extends LitElement {
       align-self: stretch;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: center;
+      gap: 1px;
     }
 
     .name {
@@ -103,6 +106,7 @@ export class TunnelCard extends LitElement {
       white-space: nowrap;
     }
 
+    .type-label,
     .meta {
       font-size: var(--font-sm);
       color: var(--text-muted);
@@ -195,7 +199,8 @@ export class TunnelCard extends LitElement {
 
         <div class="info">
           <div class="name">${this.name}</div>
-          <div class="meta">${this.meta}</div>
+          ${this.typeLabel ? html`<div class="type-label">${this.typeLabel}</div>` : ''}
+          ${this.meta ? html`<div class="meta">${this.meta}</div>` : ''}
         </div>
 
         <div class="right-col">

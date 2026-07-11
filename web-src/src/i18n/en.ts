@@ -66,6 +66,7 @@ const en: Record<string, string> = {
   statusStopped: 'Stopped',
   statusError: 'Error',
   activeConnections: 'active connections',
+  conns: 'conns',
 
   // Type descriptions
   typeFile: 'File',
