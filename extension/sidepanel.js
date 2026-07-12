@@ -410,10 +410,7 @@ function saveForm() {
     if (editingId) {
       const oldTunnel = tunnels.find(x => x.tunnelId === editingId);
       if (oldTunnel) {
-        const wasRunning = oldTunnel.status === 'running' || oldTunnel.status === 'connecting';
-        if (oldTunnel.status === 'running' || oldTunnel.status === 'connecting' || oldTunnel.status === 'error') {
-          chrome.runtime.sendMessage({ type: 'stop-tunnel', tunnelId: editingId });
-        }
+        const wasActive = oldTunnel.status === 'running' || oldTunnel.status === 'connecting' || oldTunnel.status === 'error';
         oldTunnel.name = formData.name || oldTunnel.name;
         oldTunnel.localEndpoint = formData.endpoint;
         oldTunnel.hostname = formData.hostname;
@@ -425,7 +422,14 @@ function saveForm() {
         oldTunnel.entrypoint = null;
         persistTunnels();
 
-        if (wasRunning) {
+        // Restart by sending start-tunnel only. The offscreen document already
+        // restarts a tunnel it knows about (its startTunnel() stops the old
+        // connection, then connects with the new config). Do NOT send a separate
+        // stop-tunnel first: that stop lands in the background worker, which sees
+        // the tunnel just persisted as "stopped" and tears down the whole offscreen
+        // document (closeOffscreen) right as the replacement connection is coming
+        // up — which is why editing a running tunnel failed to reconnect.
+        if (wasActive) {
           startTunnel(editingId);
         }
       }
