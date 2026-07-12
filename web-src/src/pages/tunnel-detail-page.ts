@@ -37,6 +37,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _rewriteHost = false;
   @state() private _fileUpload = false;
   @state() private _showAuth = false;
+  @state() private _showPassword = false;
 
   // Native bridge detection
   private get _isNativeDirPicker(): boolean {
@@ -522,6 +523,32 @@ export class TunnelDetailPage extends LitElement {
       color: var(--text-muted);
     }
 
+    /* ── Password field ── */
+    .password-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .password-wrapper .form-input {
+      padding-right: 36px;
+    }
+    .password-toggle {
+      position: absolute;
+      right: 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      border-radius: var(--radius-sm);
+      transition: color var(--transition-fast);
+    }
+    .password-toggle:hover {
+      color: var(--text);
+    }
+
     /* ── Directory picker ── */
     .dir-input-row {
       display: flex;
@@ -967,8 +994,16 @@ export class TunnelDetailPage extends LitElement {
                         </div>
                         <div class="form-group">
                           <label class="form-label">${t('fieldPassword')}</label>
-                          <input class="form-input" type="password" .value=${this._password} placeholder="••••"
-                            @input=${(e: Event) => { this._password = (e.target as HTMLInputElement).value; }}>
+                          <div class="password-wrapper">
+                            <input class="form-input" type=${this._showPassword ? 'text' : 'password'}
+                              .value=${this._password} placeholder="••••"
+                              @input=${(e: Event) => { this._password = (e.target as HTMLInputElement).value; }}>
+                            <button type="button" class="password-toggle"
+                              @click=${() => { this._showPassword = !this._showPassword; }}
+                              title=${this._showPassword ? t('hidePassword') : t('showPassword')}>
+                              ${icon(this._showPassword ? 'eye-off' : 'eye')}
+                            </button>
+                          </div>
                         </div>
                       `
                       : ''}

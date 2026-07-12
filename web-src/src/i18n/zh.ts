@@ -48,6 +48,8 @@ const zh: Record<string, string> = {
   fieldTunnelChain: '隧道链路',
   fieldUsername: '用户名',
   fieldPassword: '密码',
+  showPassword: '显示密码',
+  hidePassword: '隐藏密码',
   fieldDirectory: '目录',
   browseDirectory: '浏览',
   fieldTTL: 'TTL',

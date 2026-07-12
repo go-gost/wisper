@@ -1,24 +1,24 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DzBVISRo.js","assets/index-B3f8Rhiy.css"])))=>i.map(i=>d[i]);
-import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u as S,b as a,o as D,i as z,t as E}from"./index-DzBVISRo.js";import{n as m,r}from"./state-Cp8Mu2D8.js";import{i as d}from"./app-scaffold-BwrUcHih.js";import{c as C}from"./clipboard-C3x8_sid.js";import{c,d as R,a as v,b as f}from"./format-BcWb47bn.js";var F=Object.defineProperty,L=Object.getOwnPropertyDescriptor,o=(t,s,l,i)=>{for(var p=i>1?void 0:i?L(s,l):s,h=t.length-1,u;h>=0;h--)(u=t[h])&&(p=(i?u(s,l,p):u(p))||p);return i&&p&&F(s,l,p),p};let n=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=s=>{this._endpoint=s,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const l=w().find(i=>i.id===t);l&&(this._tunnel=l,s?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this._showAuth&&(t.username=this._username.trim()||void 0,t.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-DzBVISRo.js").then(s=>s.D),__vite__mapDeps([0,1])).then(s=>s.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-DzBVISRo.js").then(s=>s.D),__vite__mapDeps([0,1])).then(s=>s.update(this.tunnelId,t)),this._showSnackbar(e("saved")),this.mode="view",await x())}catch(t){const s=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await C(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await T(this.tunnelId,this._resetKind),this._tunnel&&S(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,s=t?t.stats:null,l=this._typeLabel();return a`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BqGzV4nu.js","assets/index-B3f8Rhiy.css"])))=>i.map(i=>d[i]);
+import{a as g,s as _,g as w,j as s,_ as b,r as x,p as y,k as $,m as k,q as T,u as S,b as a,o as D,i as z,t as P}from"./index-BqGzV4nu.js";import{n as m,r}from"./state-rlIIs7f7.js";import{i as l}from"./app-scaffold-CoPMcydK.js";import{c as E}from"./clipboard-C3x8_sid.js";import{c,d as C,a as v,b as f}from"./format-BcWb47bn.js";var R=Object.defineProperty,F=Object.getOwnPropertyDescriptor,n=(t,e,d,o)=>{for(var p=o>1?void 0:o?F(e,d):e,h=t.length-1,u;h>=0;h--)(u=t[h])&&(p=(o?u(e,d,p):u(p))||p);return o&&p&&R(e,d,p),p};let i=class extends g{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=e=>{this._endpoint=e,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.tunnelId,e=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const d=w().find(o=>o.id===t);d&&(this._tunnel=d,e?(this.mode="edit",this._populateForm(d)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(d)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(s("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload};this._showAuth&&(t.username=this._username.trim()||void 0,t.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-BqGzV4nu.js").then(e=>e.D),__vite__mapDeps([0,1])).then(e=>e.create(t)),this._showSnackbar(s("saved")),this._navigate("/")):(await b(()=>import("./index-BqGzV4nu.js").then(e=>e.D),__vite__mapDeps([0,1])).then(e=>e.update(this.tunnelId,t)),this._showSnackbar(s("saved")),this.mode="view",await x())}catch(t){const e=t instanceof Error?t.message:"";this._showSnackbar(`${s("saveFailed")}${e?": "+e:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await y(this.tunnelId),this._showSnackbar(s("deleted")),this._navigate("/")}catch{this._showSnackbar(s("deleteFailed"))}}async _handleStart(){try{await $(this.tunnelId),this._showSnackbar(s("started"))}catch{this._showSnackbar(s("startFailed"))}}async _handleStop(){try{await k(this.tunnelId),this._showSnackbar(s("stopped"))}catch{this._showSnackbar(s("stopFailed"))}}async _handleCopy(t){await E(t),this._showSnackbar(s("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await T(this.tunnelId,this._resetKind),this._tunnel&&S(this.tunnelId,this._tunnel.stats),this._showSnackbar(s("saved"))}catch{this._showSnackbar(s("saveFailed"))}}_typeLabel(){return s(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}render(){const t=this._tunnel,e=t?t.stats:null,d=this._typeLabel();return a`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
-            ${d("chevron-left")}
+            ${l("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${e("tunnelNewTitle")} — ${l}`:l+" Tunnel"}
+            ${this.mode==="create"?`${s("tunnelNewTitle")} — ${d}`:d+" Tunnel"}
           </span>
 
           ${this.mode==="view"&&t?a`
-              ${t.status==="running"?a`<button class="pill-btn danger appbar-action" title="${e("btnStop")}" @click=${()=>this._handleStop()}>
-                  ${d("stop")}
-                </button>`:a`<button class="pill-btn primary appbar-action" title="${e("btnStart")}" @click=${()=>this._handleStart()}>
-                  ${d("play")}
+              ${t.status==="running"?a`<button class="pill-btn danger appbar-action" title="${s("btnStop")}" @click=${()=>this._handleStop()}>
+                  ${l("stop")}
+                </button>`:a`<button class="pill-btn primary appbar-action" title="${s("btnStart")}" @click=${()=>this._handleStart()}>
+                  ${l("play")}
                 </button>`}
             `:a`
-              <button class="pill-btn primary appbar-action" title="${e("btnSave")}" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
-                ${d("check")}
+              <button class="pill-btn primary appbar-action" title="${s("btnSave")}" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
+                ${l("check")}
               </button>
             `}
         </div>
@@ -28,7 +28,7 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
             <!-- Status banner -->
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
-              ${t.status==="running"?e("statusRunning")+" · "+c(t.stats.current_conns)+" "+e("activeConnections"):t.status==="error"?e("statusError"):e("statusStopped")}
+              ${t.status==="running"?s("statusRunning")+" · "+c(t.stats.current_conns)+" "+s("activeConnections"):t.status==="error"?s("statusError"):s("statusStopped")}
               ${t.error?a` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
@@ -38,11 +38,11 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${l} Tunnel</span>
+                  <span class="info-value text">${d} Tunnel</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Created</span>
-                  <span class="info-value text">${R(t.created_at)}</span>
+                  <span class="info-value text">${C(t.created_at)}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Target</span>
@@ -52,7 +52,7 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
                   <span class="info-label">Entrypoint</span>
                   <span class="info-value">${t.entrypoint}</span>
                   <button class="copy-btn-mini" @click=${()=>this._handleCopy(t.entrypoint)}>
-                    ${d("copy")}
+                    ${l("copy")}
                   </button>
                 </div>
                 ${t.options.hostname?a`
@@ -83,32 +83,32 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
                   <span class="info-label">ID</span>
                   <span class="info-value uuid">${t.id}</span>
                   <button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
-                    ${d("copy")}
+                    ${l("copy")}
                   </button>
                 </div>
               </div>
 
               <!-- Stats grid -->
-              ${s?a`
+              ${e?a`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${c(s.total_conns)}</div>
-                      <div class="stat-rate">${c(s.current_conns)} active · ${s.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${s("btnResetStats")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${c(e.total_conns)}</div>
+                      <div class="stat-rate">${c(e.current_conns)} active · ${e.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${c(s.total_errs)}</div>
+                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${s("btnResetStats")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${c(e.total_errs)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(s.output_bytes)}</div>
-                      <div class="stat-rate">${f(s.output_rate_bytes)}</div>
+                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${s("btnResetOutput")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${v(e.output_bytes)}</div>
+                      <div class="stat-rate">${f(e.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(s.input_bytes)}</div>
-                      <div class="stat-rate">${f(s.input_rate_bytes)}</div>
+                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${s("btnResetInput")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${v(e.input_bytes)}</div>
+                      <div class="stat-rate">${f(e.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
@@ -123,10 +123,10 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
                       background:linear-gradient(135deg,var(--accent-bg-subtle, rgba(88,166,255,0.06)),rgba(163,113,247,0.04));
                       border-radius:var(--radius-lg);cursor:pointer;"
                       @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/inspector`)}>
-                      <span style="color:var(--accent);">${d("search")}</span>
+                      <span style="color:var(--accent);">${l("search")}</span>
                       <div style="flex:1;">
-                        <div style="font-size:var(--font-sm);font-weight:600;">${e("inspectorEntryTitle")}</div>
-                        <div style="font-size:var(--font-sm);color:var(--text-muted);">${e("inspectorEntryDesc")}</div>
+                        <div style="font-size:var(--font-sm);font-weight:600;">${s("inspectorEntryTitle")}</div>
+                        <div style="font-size:var(--font-sm);color:var(--text-muted);">${s("inspectorEntryDesc")}</div>
                       </div>
                       <span style="color:var(--text-muted);">&rarr;</span>
                     </div>
@@ -137,8 +137,8 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
             <!-- Edit button (view mode only) -->
             ${this.mode==="view"&&t?a`
                 <div class="section">
-                  <button class="btn-edit-bottom" title="${e("btnEdit")}" @click=${()=>this._enterEdit()}>
-                    ${d("edit")}
+                  <button class="btn-edit-bottom" title="${s("btnEdit")}" @click=${()=>this._enterEdit()}>
+                    ${l("edit")}
                   </button>
                 </div>
               `:""}
@@ -151,43 +151,43 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
                 <!-- Type (readonly) -->
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${l+" Tunnel"}>
+                  <input class="form-input" readonly .value=${d+" Tunnel"}>
                 </div>
 
                 <!-- Name -->
                 <div class="form-group">
-                  <label class="form-label">${e("fieldName")}</label>
+                  <label class="form-label">${s("fieldName")}</label>
                   <input class="form-input" .value=${this._name} placeholder="My Tunnel"
-                    @input=${i=>{this._name=i.target.value}}>
+                    @input=${o=>{this._name=o.target.value}}>
                 </div>
 
                 <!-- Target / Directory -->
                 <div class="form-group">
                   <label class="form-label">
-                    ${this.tunnelType==="file"?e("fieldDirectory"):e("fieldEndpoint")}
+                    ${this.tunnelType==="file"?s("fieldDirectory"):s("fieldEndpoint")}
                   </label>
                   <div class="dir-input-row">
                     <input class="form-input dir-input" .value=${this._endpoint}
                       placeholder=${this.tunnelType==="http"?"host:port":this.tunnelType==="file"?"/path/to/dir":"host:port"}
-                      @input=${i=>{this._endpoint=i.target.value}}>
+                      @input=${o=>{this._endpoint=o.target.value}}>
                     ${this.tunnelType==="file"&&this._isNativeDirPicker?a`<button type="button" class="browse-btn"
-                          @click=${this._browseDir}>📁 ${e("browseDirectory")}</button>`:""}
+                          @click=${this._browseDir}>📁 ${s("browseDirectory")}</button>`:""}
                   </div>
                 </div>
 
                 <!-- Hostname (HTTP only) -->
                 ${this.tunnelType==="http"?a`
                     <div class="form-group">
-                      <label class="form-label">${e("fieldHostname")}</label>
+                      <label class="form-label">${s("fieldHostname")}</label>
                       <input class="form-input" .value=${this._hostname} placeholder="example.com"
-                        @input=${i=>{this._hostname=i.target.value}}>
+                        @input=${o=>{this._hostname=o.target.value}}>
                     </div>
                   `:""}
 
                 <!-- TLS toggle (HTTP only) -->
                 ${this.tunnelType==="http"?a`
                     <div class="switch-row">
-                      <span class="switch-label">${e("switchEnableTLS")}</span>
+                      <span class="switch-label">${s("switchEnableTLS")}</span>
                       <div class="switch ${this._enableTLS?"on":""}"
                         @click=${()=>{this._enableTLS=!this._enableTLS}}>
                         <div class="switch-knob"></div>
@@ -198,7 +198,7 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
                 <!-- Auth section (HTTP/File) -->
                 ${this.tunnelType==="http"||this.tunnelType==="file"?a`
                     <div class="switch-row" style="border-bottom:none;">
-                      <span class="switch-label">${e("switchBasicAuth")}</span>
+                      <span class="switch-label">${s("switchBasicAuth")}</span>
                       <div class="switch ${this._showAuth?"on":""}"
                         @click=${()=>{this._showAuth=!this._showAuth,this._showAuth||(this._username="",this._password="")}}>
                         <div class="switch-knob"></div>
@@ -207,20 +207,28 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
 
                     ${this._showAuth?a`
                         <div class="form-group" style="margin-top:12px;">
-                          <label class="form-label">${e("fieldUsername")}</label>
+                          <label class="form-label">${s("fieldUsername")}</label>
                           <input class="form-input" .value=${this._username} placeholder="admin"
-                            @input=${i=>{this._username=i.target.value}}>
+                            @input=${o=>{this._username=o.target.value}}>
                         </div>
                         <div class="form-group">
-                          <label class="form-label">${e("fieldPassword")}</label>
-                          <input class="form-input" type="password" .value=${this._password} placeholder="••••"
-                            @input=${i=>{this._password=i.target.value}}>
+                          <label class="form-label">${s("fieldPassword")}</label>
+                          <div class="password-wrapper">
+                            <input class="form-input" type=${this._showPassword?"text":"password"}
+                              .value=${this._password} placeholder="••••"
+                              @input=${o=>{this._password=o.target.value}}>
+                            <button type="button" class="password-toggle"
+                              @click=${()=>{this._showPassword=!this._showPassword}}
+                              title=${this._showPassword?s("hidePassword"):s("showPassword")}>
+                              ${l(this._showPassword?"eye-off":"eye")}
+                            </button>
+                          </div>
                         </div>
                       `:""}
 
                     ${this.tunnelType==="file"?a`
                         <div class="switch-row">
-                          <span class="switch-label">${e("switchFileUpload")}</span>
+                          <span class="switch-label">${s("switchFileUpload")}</span>
                           <div class="switch ${this._fileUpload?"on":""}"
                             @click=${()=>{this._fileUpload=!this._fileUpload}}>
                             <div class="switch-knob"></div>
@@ -233,8 +241,8 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
                 ${this.mode==="edit"?a`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
-                      <button class="pill-btn danger" title="${e("btnDelete")}" @click=${()=>{this._showDeleteDialog=!0}}>
-                        ${d("trash")}
+                      <button class="pill-btn danger" title="${s("btnDelete")}" @click=${()=>{this._showDeleteDialog=!0}}>
+                        ${l("trash")}
                       </button>
                     </div>
                   `:""}
@@ -246,15 +254,15 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
 
         ${this._showResetDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
-              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
-                <div class="dialog-title">${e("resetStatsConfirmTitle")}</div>
-                <div class="dialog-message">${e("resetStatsConfirm")}</div>
+              <div class="dialog-box" @click=${o=>o.stopPropagation()}>
+                <div class="dialog-title">${s("resetStatsConfirmTitle")}</div>
+                <div class="dialog-message">${s("resetStatsConfirm")}</div>
                 <div class="dialog-actions">
                   <button class="dialog-btn cancel" @click=${()=>{this._showResetDialog=!1}}>
-                    ${e("btnCancel")}
+                    ${s("btnCancel")}
                   </button>
                   <button class="dialog-btn danger" @click=${()=>this._doResetStats()}>
-                    ${e("btnResetStats")}
+                    ${s("btnResetStats")}
                   </button>
                 </div>
               </div>
@@ -263,22 +271,22 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
 
         ${this._showDeleteDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
-              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
-                <div class="dialog-title">${e("deleteConfirmTitle")}</div>
-                <div class="dialog-message">${e("deleteConfirmMessage")}</div>
+              <div class="dialog-box" @click=${o=>o.stopPropagation()}>
+                <div class="dialog-title">${s("deleteConfirmTitle")}</div>
+                <div class="dialog-message">${s("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
                   <button class="dialog-btn cancel" @click=${()=>{this._showDeleteDialog=!1}}>
-                    ${e("btnCancel")}
+                    ${s("btnCancel")}
                   </button>
                   <button class="dialog-btn danger" @click=${()=>this._handleDelete()}>
-                    ${e("btnDelete")}
+                    ${s("btnDelete")}
                   </button>
                 </div>
               </div>
             </div>
           `:""}
       </app-scaffold>
-    `}};n.styles=z`
+    `}};i.styles=z`
     /* ── AppBar ── */
     .back-btn {
       background: none;
@@ -540,6 +548,32 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
       color: var(--text-muted);
     }
 
+    /* ── Password field ── */
+    .password-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .password-wrapper .form-input {
+      padding-right: 36px;
+    }
+    .password-toggle {
+      position: absolute;
+      right: 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      border-radius: var(--radius-sm);
+      transition: color var(--transition-fast);
+    }
+    .password-toggle:hover {
+      color: var(--text);
+    }
+
     /* ── Directory picker ── */
     .dir-input-row {
       display: flex;
@@ -727,4 +761,4 @@ import{a as g,s as _,g as w,j as e,_ as b,r as x,p as y,k as $,m as k,q as T,u a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([m()],n.prototype,"tunnelType",2);o([m()],n.prototype,"tunnelId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_tunnel",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_hostname",2);o([r()],n.prototype,"_username",2);o([r()],n.prototype,"_password",2);o([r()],n.prototype,"_enableTLS",2);o([r()],n.prototype,"_rewriteHost",2);o([r()],n.prototype,"_fileUpload",2);o([r()],n.prototype,"_showAuth",2);n=o([E("tunnel-detail-page")],n);export{n as TunnelDetailPage};
+  `;n([m()],i.prototype,"tunnelType",2);n([m()],i.prototype,"tunnelId",2);n([r()],i.prototype,"mode",2);n([r()],i.prototype,"_tunnel",2);n([r()],i.prototype,"_saving",2);n([r()],i.prototype,"_snackbar",2);n([r()],i.prototype,"_showDeleteDialog",2);n([r()],i.prototype,"_showResetDialog",2);n([r()],i.prototype,"_name",2);n([r()],i.prototype,"_endpoint",2);n([r()],i.prototype,"_hostname",2);n([r()],i.prototype,"_username",2);n([r()],i.prototype,"_password",2);n([r()],i.prototype,"_enableTLS",2);n([r()],i.prototype,"_rewriteHost",2);n([r()],i.prototype,"_fileUpload",2);n([r()],i.prototype,"_showAuth",2);n([r()],i.prototype,"_showPassword",2);i=n([P("tunnel-detail-page")],i);export{i as TunnelDetailPage};

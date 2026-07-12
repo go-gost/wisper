@@ -48,6 +48,8 @@ const en: Record<string, string> = {
   fieldTunnelChain: 'Tunnel Chain',
   fieldUsername: 'Username',
   fieldPassword: 'Password',
+  showPassword: 'Show password',
+  hidePassword: 'Hide password',
   fieldDirectory: 'Directory',
   browseDirectory: 'Browse',
   fieldTTL: 'TTL',

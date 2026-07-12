@@ -16,6 +16,8 @@ const TRANSLATIONS = {
     fieldAuth: 'Basic Auth',
     fieldUsername: 'Username',
     fieldPassword: 'Password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     dangerZone: 'Danger Zone',
     btnDelete: 'Delete Tunnel',
     dialogDeleteTitle: 'Delete Tunnel',
@@ -76,6 +78,8 @@ const TRANSLATIONS = {
     fieldAuth: '基本认证',
     fieldUsername: '用户名',
     fieldPassword: '密码',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     dangerZone: '危险区域',
     btnDelete: '删除隧道',
     dialogDeleteTitle: '删除隧道',
@@ -1141,6 +1145,19 @@ function bindEvents() {
       if (e.key === 'Enter') saveForm();
     });
   });
+
+  // Password visibility toggle
+  const pwdToggle = document.getElementById('fPasswordToggle');
+  const pwdInput = document.getElementById('fPassword');
+  if (pwdToggle && pwdInput) {
+    pwdToggle.addEventListener('click', () => {
+      const isVisible = pwdInput.type === 'text';
+      pwdInput.type = isVisible ? 'password' : 'text';
+      pwdToggle.querySelector('.eye-icon').style.display = isVisible ? '' : 'none';
+      pwdToggle.querySelector('.eye-off-icon').style.display = isVisible ? 'none' : '';
+      pwdToggle.title = isVisible ? t('showPassword') : t('hidePassword');
+    });
+  }
 }
 
 // ── Export for tests ───────────────────────────────────────────────────
