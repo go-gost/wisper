@@ -60,6 +60,10 @@ const TRANSLATIONS = {
     dialogResetTitle: 'Reset Stats',
     dialogResetMsg: 'Reset traffic counters for this tunnel? This cannot be undone.',
     btnResetConfirm: 'Reset',
+    tipTitle: 'Limited in this extension',
+    tipBody: 'Due to Chrome browser restrictions, this extension offers limited functionality. For the full experience, download the Wisper desktop app.',
+    tipDownload: 'Get Desktop App',
+    tipDismiss: 'Dismiss',
   },
   zh: {
     emptyTunnels: '暂无隧道',
@@ -116,6 +120,10 @@ const TRANSLATIONS = {
     dialogResetTitle: '重置计数',
     dialogResetMsg: '确定要重置该隧道的流量计数吗？此操作不可撤销。',
     btnResetConfirm: '重置',
+    tipTitle: '此扩展功能有限',
+    tipBody: '受 Chrome 浏览器限制，本扩展功能有限。如需完整体验，请下载 Wisper 桌面版。',
+    tipDownload: '下载桌面版',
+    tipDismiss: '不再提示',
   },
 };
 
@@ -224,6 +232,7 @@ function loadSettings() {
     applyTheme(settings.theme || 'system');
     updateI18nElements();
     render();
+    maybeShowTip();
   });
 }
 
@@ -518,6 +527,22 @@ function hideDeleteDialog() {
 function showResetDialog(tunnelId) {
   resettingId = tunnelId;
   document.getElementById('resetDialog').style.display = 'flex';
+}
+
+// ── First-open tip ──────────────────────────────────────────────────
+
+// Shows the limitation tip once, unless the user has dismissed it before.
+function maybeShowTip() {
+  const banner = document.getElementById('tipBanner');
+  if (!banner) return;
+  banner.style.display = settings.tipDismissed ? 'none' : 'flex';
+}
+
+function dismissTip() {
+  settings.tipDismissed = true;
+  chrome.storage.local.set({ settings });
+  const banner = document.getElementById('tipBanner');
+  if (banner) banner.style.display = 'none';
 }
 
 function hideResetDialog() {
@@ -1080,6 +1105,10 @@ function bindEvents() {
   // Settings
   const settingsBack = document.getElementById('settingsBack');
   if (settingsBack) settingsBack.addEventListener('click', () => switchView('list'));
+
+  // First-open tip
+  const tipDismiss = document.getElementById('tipDismiss');
+  if (tipDismiss) tipDismiss.addEventListener('click', dismissTip);
 
   // Appearance cycle (Light → Dark → System)
   const sAppearance = document.getElementById('sAppearance');
