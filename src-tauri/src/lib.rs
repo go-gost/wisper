@@ -8,6 +8,7 @@ use tauri::{
     Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_shell::ShellExt;
+use url::Url;
 
 // ---------------------------------------------------------------------------
 // Sidecar lifecycle — keeps the Go process alive for the app's lifetime.
@@ -105,6 +106,27 @@ fn shutdown_sidecar(app: &tauri::AppHandle) {
 }
 
 // ---------------------------------------------------------------------------
+// External links
+// ---------------------------------------------------------------------------
+
+/// Open an http(s) URL in the system's default handler (browser).
+///
+/// Called from the web UI's external-link interceptor (desktop Tauri shell)
+/// via `invoke('open_external', { url })`. A custom command needs no capability
+/// permission in Tauri 2 — unlike the shell plugin's `open` webview command —
+/// so this is the reliable path for opening links. Only http(s) schemes are
+/// allowed; anything else is rejected to avoid handing arbitrary URIs to the OS.
+#[tauri::command]
+fn open_external(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    match Url::parse(&url) {
+        Ok(parsed) if parsed.scheme() == "http" || parsed.scheme() == "https" => {
+            app.shell().open(url, None).map_err(|e| e.to_string())
+        }
+        _ => Err("refusing to open non-http(s) URL".to_string()),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tauri entry point
 // ---------------------------------------------------------------------------
 
@@ -120,6 +142,9 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
+        // Custom command to open external links in the system browser. Needs no
+        // capability permission (custom commands are allowed by default in Tauri 2).
+        .invoke_handler(tauri::generate_handler![open_external])
         // ---- setup (runs once at startup) ----
         .setup(|app| {
             // 1. Pick a free localhost port and spawn the Go sidecar
@@ -176,6 +201,14 @@ pub fn run() {
             //    resize/maximize.
             wait_for_sidecar(&addr);
             let url_str = format!("http://{}", addr);
+
+            // Belt-and-suspenders for external links: if the web UI's click
+            // interceptor doesn't preventDefault a target="_blank" link (or a
+            // window.open happens), Tauri still fires this. We open http(s)
+            // URLs in the system browser and deny the in-app window so the
+            // link is never opened twice. app.shell().open() is called from
+            // Rust with no scope, so it needs no capability permission.
+            let app_handle = app.handle().clone();
             let window = WebviewWindowBuilder::new(
                 app,
                 "main",
@@ -184,6 +217,12 @@ pub fn run() {
             .title("Wisper")
             .inner_size(900.0, 700.0)
             .min_inner_size(600.0, 400.0)
+            .on_new_window(move |url, _features| {
+                if matches!(url.scheme(), "http" | "https") {
+                    let _ = app_handle.shell().open(url.to_string(), None);
+                }
+                tauri::webview::NewWindowResponse::Deny
+            })
             .build()?;
 
             // Close button → hide to tray instead of quitting.

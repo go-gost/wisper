@@ -22,7 +22,8 @@ export class WisperApp extends LitElement {
   constructor() {
     super();
     this.router = createRouter(this);
-    // Open external links in the system browser (Android WebView only — no-op elsewhere).
+    // Open external links in the system browser (Android bridge, desktop
+    // Tauri shell, or default <a> behavior in a plain browser).
     initExternalLinkInterceptor();
   }
 

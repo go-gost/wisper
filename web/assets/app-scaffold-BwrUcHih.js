@@ -1,4 +1,4 @@
-import{b as o,C as t,i as h,a as c,t as d}from"./index-BbOzUT6j.js";function f(i){const a=x[i];return a?o`<svg
+import{b as o,C as t,i as h,a as c,t as d}from"./index-DzBVISRo.js";function f(i){const a=x[i];return a?o`<svg
     width="20"
     height="20"
     viewBox="0 0 24 24"

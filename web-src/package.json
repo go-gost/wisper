@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@lit-labs/router": "^0.1.4",
+    "@tauri-apps/api": "^2.11.1",
     "lit": "^3.2.1"
   },
   "devDependencies": {
