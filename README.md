@@ -6,7 +6,7 @@
 
 Expose local services to the public internet without opening firewall ports. Wisper handles the tunnel lifecycle — create, start, stop, update, and monitor — through a browser-based UI.
 
-<video src="./wisper.mp4" controls width="100%"></video>
+<img src="./wisper.gif" alt="Wisper Demo" width="100%">
 
 ## Features
 
