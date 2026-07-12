@@ -430,5 +430,24 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // Open an external URL in the system browser. Called from the web UI
+        // when an off-origin <a> is clicked, since the app's WebView does not
+        // launch a browser on its own. Only http(s) schemes are allowed.
+        @android.webkit.JavascriptInterface
+        fun openExternal(url: String) {
+            runOnUiThread {
+                try {
+                    val uri = Uri.parse(url)
+                    if (uri.scheme != "http" && uri.scheme != "https") return@runOnUiThread
+                    val intent = Intent(Intent.ACTION_VIEW, uri)
+                    if (intent.resolveActivity(packageManager) != null) {
+                        startActivity(intent)
+                    }
+                } catch (_: Exception) {
+                    // No browser available or invalid URI — ignore.
+                }
+            }
+        }
     }
 }

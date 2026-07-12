@@ -5,6 +5,7 @@ import { loadSettings, subscribe, getSettings } from './store/settings-store';
 import { refresh as refreshTunnels } from './store/tunnel-store';
 import { refresh as refreshEntrypoints } from './store/entrypoint-store';
 import { startPolling, stopPolling, updatePollingInterval } from './store/stats-store';
+import { initExternalLinkInterceptor } from './utils/open-external';
 
 /**
  * WisperApp — root application component.
@@ -21,6 +22,8 @@ export class WisperApp extends LitElement {
   constructor() {
     super();
     this.router = createRouter(this);
+    // Open external links in the system browser (Android WebView only — no-op elsewhere).
+    initExternalLinkInterceptor();
   }
 
   async firstUpdated() {
