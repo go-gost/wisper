@@ -6,6 +6,10 @@
 
 Expose local services to the public internet without opening firewall ports. Wisper handles the tunnel lifecycle — create, start, stop, update, and monitor — through a browser-based UI.
 
+<a href="https://www.youtube.com/watch?v=CZZQjsm_cvc">
+  <img src="https://img.youtube.com/vi/CZZQjsm_cvc/maxresdefault.jpg" alt="Wisper Demo" width="100%">
+</a>
+
 ## Features
 
 - **4 tunnel types** — File server, HTTP reverse proxy, TCP relay, UDP relay
