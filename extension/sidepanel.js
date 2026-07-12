@@ -57,6 +57,9 @@ const TRANSLATIONS = {
     msgDeleted: 'Tunnel deleted',
     statsConns: 'conns',
     actionResetStats: 'Reset stats',
+    dialogResetTitle: 'Reset Stats',
+    dialogResetMsg: 'Reset traffic counters for this tunnel? This cannot be undone.',
+    btnResetConfirm: 'Reset',
   },
   zh: {
     emptyTunnels: '暂无隧道',
@@ -110,6 +113,9 @@ const TRANSLATIONS = {
     msgDeleted: '隧道已删除',
     statsConns: '连接',
     actionResetStats: '重置计数',
+    dialogResetTitle: '重置计数',
+    dialogResetMsg: '确定要重置该隧道的流量计数吗？此操作不可撤销。',
+    btnResetConfirm: '重置',
   },
 };
 
@@ -165,6 +171,7 @@ let editingId = null;
 let formSaving = false;
 let expandedMap = {};
 let deletingId = null;
+let resettingId = null;
 
 // ── Init ───────────────────────────────────────────────────────────────
 
@@ -508,6 +515,16 @@ function hideDeleteDialog() {
   document.getElementById('deleteDialog').style.display = 'none';
 }
 
+function showResetDialog(tunnelId) {
+  resettingId = tunnelId;
+  document.getElementById('resetDialog').style.display = 'flex';
+}
+
+function hideResetDialog() {
+  resettingId = null;
+  document.getElementById('resetDialog').style.display = 'none';
+}
+
 function showQrDialog(url) {
   const canvas = document.getElementById('qrCanvas');
   const urlEl = document.getElementById('qrUrl');
@@ -846,7 +863,7 @@ function buildCard(tun) {
   resetBtn.className = 'action-btn';
   resetBtn.innerHTML = iconSvg('refresh', 14, 14);
   resetBtn.title = t('actionResetStats');
-  resetBtn.addEventListener('click', (e) => { e.stopPropagation(); resetTunnelStats(tun.tunnelId); });
+  resetBtn.addEventListener('click', (e) => { e.stopPropagation(); showResetDialog(tun.tunnelId); });
   actions.appendChild(resetBtn);
 
   expand.appendChild(actions);
@@ -1037,6 +1054,26 @@ function bindEvents() {
   if (qrOverlay) {
     qrOverlay.addEventListener('click', (e) => {
       if (e.target === qrOverlay) hideQrDialog();
+    });
+  }
+
+  // Reset-stats dialog
+  const resetCancel = document.getElementById('resetCancel');
+  if (resetCancel) resetCancel.addEventListener('click', hideResetDialog);
+
+  const resetConfirm = document.getElementById('resetConfirm');
+  if (resetConfirm) {
+    resetConfirm.addEventListener('click', () => {
+      const id = resettingId;
+      hideResetDialog();
+      if (id) resetTunnelStats(id);
+    });
+  }
+
+  const resetOverlay = document.getElementById('resetDialog');
+  if (resetOverlay) {
+    resetOverlay.addEventListener('click', (e) => {
+      if (e.target === resetOverlay) hideResetDialog();
     });
   }
 

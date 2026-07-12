@@ -280,6 +280,30 @@ function handleTunnelStats(msg) {
   });
 }
 
+// ── Badge: connected tunnel count on the toolbar icon ──────────────────
+//
+// Mirrors the Checker Plus for Gmail pattern: a numeric badge overlaying the
+// action icon. "Connected" = tunnels whose status is 'running'. A zero count
+// clears the badge entirely. Recomputed from chrome.storage.local on every
+// change so it stays correct across start/stop/status/side-panel edits.
+
+const BADGE_BG = '#1e8e3e'; // Green, signals an active/connected tunnel
+
+async function updateBadge() {
+  const stored = await chrome.storage.local.get('tunnels');
+  const tunnels = stored.tunnels || [];
+  const connected = tunnels.filter(t => t.status === 'running').length;
+  await chrome.action.setBadgeBackgroundColor({ color: BADGE_BG });
+  await chrome.action.setBadgeText({ text: connected > 0 ? String(connected) : '' });
+}
+
+// Recompute whenever persisted tunnels change (start, stop, status, stats).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.tunnels) {
+    updateBadge();
+  }
+});
+
 // ── Keepalive ──────────────────────────────────────────────────────────
 
 chrome.alarms.create('keepalive', { periodInMinutes: 1 });
@@ -314,6 +338,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   for (const t of running) {
     handleStartTunnel(t);
   }
+  updateBadge();
 });
 
 // Service worker must call keepAlive check on start
@@ -326,4 +351,5 @@ chrome.runtime.onStartup.addListener(async () => {
       handleStartTunnel(t);
     }
   }
+  updateBadge();
 });
