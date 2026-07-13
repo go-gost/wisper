@@ -186,11 +186,18 @@ export class HomePage extends LitElement {
     .app-icon {
       width: 28px;
       height: 28px;
-      padding: 4px;
       border-radius: 50%;
       background: #000;
-      object-fit: contain;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
+    }
+    .app-icon img {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      display: block;
     }
 
     .appbar-title {
@@ -739,7 +746,9 @@ export class HomePage extends LitElement {
       <app-scaffold>
         <!-- Appbar -->
         <div slot="appBar" class="home-header">
-          <img class="app-icon" src="/logo.png" alt="Wisper" />
+          <div class="app-icon">
+            <img src="/logo.png" alt="Wisper" />
+          </div>
           <span class="appbar-title">${t('appName')}</span>
           <span class="header-spacer"></span>
           <button class="icon-btn" @click=${() => this._navigate('/settings')}>

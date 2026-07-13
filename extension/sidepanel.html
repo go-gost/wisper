@@ -97,11 +97,18 @@
     .header-logo {
       width: 28px;
       height: 28px;
-      padding: 4px;
       border-radius: 50%;
       background: #000;
-      object-fit: contain;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
+    }
+    .header-logo img {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      display: block;
     }
 
     .header-title {
@@ -461,10 +468,16 @@
 .settings-logo {
   width: 52px;
   height: 52px;
-  padding: 6px;
   border-radius: 50%;
   background: #000;
   margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-logo img {
+  width: 28px;
+  height: 28px;
   object-fit: contain;
   display: block;
 }
@@ -1097,7 +1110,9 @@
        ════════════════════════════════════════════════════════════ -->
   <div id="viewList" class="view active">
     <div class="header">
-      <img class="header-logo" src="icons/icon48.png" alt="Wisper" />
+      <div class="header-logo">
+        <img src="icons/icon48.png" alt="Wisper" />
+      </div>
       <span class="header-title">Wisper</span>
       <span class="header-spacer"></span>
       <button class="header-btn" id="btnSettings" data-i18n-title="titleSettings">
@@ -1238,7 +1253,9 @@
 
     <!-- App Info -->
     <div class="settings-app-info">
-      <img class="settings-logo" src="icons/icon48.png" alt="Wisper" />
+      <div class="settings-logo">
+        <img src="icons/icon48.png" alt="Wisper" />
+      </div>
       <div class="settings-app-name">Wisper</div>
       <div class="settings-version" id="settingsVersion"></div>
       <div class="settings-links">

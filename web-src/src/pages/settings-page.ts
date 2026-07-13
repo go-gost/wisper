@@ -207,11 +207,18 @@ export class SettingsPage extends LitElement {
     }
     .app-logo {
       width: 64px; height: 64px;
-      padding: 6px;
       border-radius: 50%;
       background: #000;
       margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .app-logo img {
+      width: 36px;
+      height: 36px;
       object-fit: contain;
+      display: block;
     }
     .app-name {
       font-size: var(--font-md); font-weight: 600;
@@ -369,7 +376,9 @@ export class SettingsPage extends LitElement {
 
         <!-- App Info -->
         <div class="app-info">
-          <img class="app-logo" src="/logo.png" alt="Wisper" />
+          <div class="app-logo">
+            <img src="/logo.png" alt="Wisper" />
+          </div>
           <div class="app-name">${t('appName')}</div>
           <div class="app-tagline">${t('appSubtitle')}</div>
           <div class="app-version">${this._version ? `v${this._version}` : ''}</div>
