@@ -6,6 +6,12 @@
 
 Expose local services to the public internet without opening firewall ports. Wisper handles the tunnel lifecycle — create, start, stop, update, and monitor — through a browser-based UI.
 
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/wisper-tunnel/ahlnngkgaoapogmejamomgjelgiekpgf">
+    <img src="./chrome.png" alt="Available in the Chrome Web Store" width="206">
+  </a>
+</p>
+
 <img src="./wisper.gif" alt="Wisper Demo" width="100%">
 
 ## Features
@@ -17,7 +23,7 @@ Expose local services to the public internet without opening firewall ports. Wis
 - **i18n** — English and Chinese
 - **Single binary** — Go backend with embedded Lit web UI, ~15 MB
 - **Graceful state management** — tunnels persist across restarts, auto-resume on startup
-- **Linux, macOS, Windows, Android** — cross-compiled Go binary + Tauri desktop shell + APK
+- **Linux, macOS, Windows, Android, Chrome** — cross-compiled Go binary + Tauri desktop shell + APK + [Chrome Extension](https://chromewebstore.google.com/detail/wisper-tunnel/ahlnngkgaoapogmejamomgjelgiekpgf)
 
 ## Quick Start
 

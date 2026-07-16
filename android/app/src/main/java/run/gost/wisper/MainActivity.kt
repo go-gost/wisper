@@ -375,6 +375,36 @@ class MainActivity : AppCompatActivity() {
     // ── WebViewClient ──────────────────────────────────────────────────
     private inner class WisperWebViewClient : WebViewClient() {
 
+        override fun shouldOverrideUrlLoading(
+            view: WebView?,
+            request: WebResourceRequest?
+        ): Boolean {
+            val uri = request?.url ?: return false
+
+            // Only intercept http/https links
+            if (uri.scheme != "http" && uri.scheme != "https") {
+                return false
+            }
+
+            // Let backend URLs load in the WebView — compare host, not raw
+            // string prefix, to prevent bypass via subdomain-like hosts
+            // (e.g. http://127.0.0.1:8900.evil.com).
+            val backendUri = Uri.parse(BACKEND_URL)
+            if (uri.host == backendUri.host && uri.port == backendUri.port) {
+                return false
+            }
+
+            // Open everything else in the system browser
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri.toString()))
+                startActivity(intent)
+                return true
+            } catch (_: Exception) {
+                // No browser available — fall through to WebView
+            }
+            return false
+        }
+
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
             progressBar.visibility = View.GONE
