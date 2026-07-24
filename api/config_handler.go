@@ -22,7 +22,6 @@ type configResponse struct {
 	Theme         string `json:"theme"`
 	StatsInterval int    `json:"stats_interval"`
 	InspectorURL  string `json:"inspector_url"`
-	RecordMode    string `json:"record_mode"`
 }
 
 func handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +44,6 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		Theme:         settings.Theme,
 		StatsInterval: statsInterval,
 		InspectorURL:  settings.InspectorURL,
-		RecordMode:    settings.RecordMode,
 	})
 }
 
@@ -58,7 +56,6 @@ type configUpdateRequest struct {
 	Theme         *string `json:"theme,omitempty"`
 	StatsInterval *int    `json:"stats_interval,omitempty"`
 	InspectorURL  *string `json:"inspector_url,omitempty"`
-	RecordMode    *string `json:"record_mode,omitempty"`
 }
 
 func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +73,6 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	entrypointChanged := req.Entrypoint != nil && *req.Entrypoint != cfg.Settings.Entrypoint
 	insecureChanged := req.Insecure != nil && *req.Insecure != cfg.Settings.Insecure
 	intervalChanged := req.StatsInterval != nil && *req.StatsInterval != cfg.Settings.StatsInterval
-	recordModeChanged := req.RecordMode != nil && *req.RecordMode != cfg.Settings.RecordMode
 
 	if req.Server != nil {
 		cfg.Settings.Server = *req.Server
@@ -99,9 +95,6 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if req.InspectorURL != nil {
 		cfg.Settings.InspectorURL = *req.InspectorURL
 	}
-	if req.RecordMode != nil {
-		cfg.Settings.RecordMode = *req.RecordMode
-	}
 
 	config.Set(cfg)
 	if err := cfg.Write(); err != nil {
@@ -110,7 +103,7 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Restart all running tunnels/entrypoints so they reconnect with the
 	// new server, entrypoint domain, TLS, or recording settings.
-	if serverChanged || entrypointChanged || insecureChanged || recordModeChanged {
+	if serverChanged || entrypointChanged || insecureChanged {
 		tunnel.RestartRunning()
 		entrypoint.RestartRunning()
 	}

@@ -129,7 +129,7 @@ func (s *fileTunnel) init() error {
 
 	s.config = &config.Config{
 		Services: []*config.ServiceConfig{fileSvc, rtcpSvc},
-		Chains:   []*config.ChainConfig{ChainConfig(s.opts.ID, s.opts.Name)},
+		Chains:   []*config.ChainConfig{ChainConfig(s.opts.ID, s.opts.Name, s.opts.RecordMode)},
 	}
 
 	return nil

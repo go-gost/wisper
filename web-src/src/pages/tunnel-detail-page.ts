@@ -12,6 +12,12 @@ import '../components/app-scaffold';
 
 type PageMode = 'view' | 'edit' | 'create';
 
+const RECORD_MODE_OPTIONS: { value: string; labelKey: string }[] = [
+  { value: 'off', labelKey: 'settingsRecordOff' },
+  { value: 'headers', labelKey: 'settingsRecordHeaders' },
+  { value: '', labelKey: 'settingsRecordFull' },
+];
+
 @customElement('tunnel-detail-page')
 export class TunnelDetailPage extends LitElement {
   @property() tunnelType: TunnelType = 'tcp';
@@ -38,6 +44,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _fileUpload = false;
   @state() private _showAuth = false;
   @state() private _showPassword = false;
+  @state() private _recordMode = 'off';
 
   // Native bridge detection
   private get _isNativeDirPicker(): boolean {
@@ -120,6 +127,7 @@ export class TunnelDetailPage extends LitElement {
     this._rewriteHost = false;
     this._fileUpload = false;
     this._showAuth = false;
+    this._recordMode = 'off';
   }
 
   private _populateForm(t: Tunnel) {
@@ -132,6 +140,7 @@ export class TunnelDetailPage extends LitElement {
     this._rewriteHost = t.options.rewriteHost ?? false;
     this._fileUpload = t.options.file_upload ?? false;
     this._showAuth = !!(t.options.username || t.options.basic_auth);
+    this._recordMode = t.options.record_mode || 'off';
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -176,6 +185,7 @@ export class TunnelDetailPage extends LitElement {
         enableTLS: this._enableTLS,
         rewriteHost: this._rewriteHost,
         file_upload: this._fileUpload,
+        record_mode: this._recordMode,
       };
       if (this._showAuth) {
         body.username = this._username.trim() || undefined;
@@ -257,6 +267,17 @@ export class TunnelDetailPage extends LitElement {
 
   private _typeLabel(): string {
     return t(`type${this.tunnelType.charAt(0).toUpperCase() + this.tunnelType.slice(1)}`);
+  }
+
+  private _cycleOption<T>(current: T, options: T[]): T {
+    const idx = options.indexOf(current);
+    return options[(idx + 1) % options.length];
+  }
+
+  private _setRecordMode(mode: string) {
+    this._recordMode = mode;
+    this.requestUpdate();
+    this._showSnackbar('✓ ' + t(RECORD_MODE_OPTIONS.find(o => o.value === mode)?.labelKey ?? 'settingsRecordFull'));
   }
 
   // ── Styles ───────────────────────────────────────────────────────────
@@ -845,6 +866,10 @@ export class TunnelDetailPage extends LitElement {
                   `
                   : ''}
                 <div class="info-row">
+                  <span class="info-label">Recording</span>
+                  <span class="info-value text">${t(RECORD_MODE_OPTIONS.find(o => o.value === this._recordMode)?.labelKey ?? 'settingsRecordFull')}</span>
+                </div>
+                <div class="info-row">
                   <span class="info-label">ID</span>
                   <span class="info-value uuid">${t2.id}</span>
                   <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.id)}>
@@ -973,6 +998,17 @@ export class TunnelDetailPage extends LitElement {
                     </div>
                   `
                   : ''}
+
+                <!-- Recording mode -->
+                <div class="switch-row" @click=${() => this._setRecordMode(
+                  this._cycleOption(this._recordMode, RECORD_MODE_OPTIONS.map(o => o.value))
+                )}>
+                  <span class="switch-label">${t('settingsRecordMode')}</span>
+                  <span style="font-size:var(--font-sm);color:var(--text-muted);display:flex;align-items:center;gap:4px;">
+                    ${t(RECORD_MODE_OPTIONS.find(o => o.value === this._recordMode)?.labelKey ?? 'settingsRecordFull')}
+                    ${icon('chevron-right')}
+                  </span>
+                </div>
 
                 <!-- Auth section (HTTP/File) -->
                 ${this.tunnelType === 'http' || this.tunnelType === 'file'

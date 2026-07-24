@@ -111,7 +111,7 @@ func (s *udpEntryPoint) init() error {
 
 	s.config = &config.Config{
 		Services: []*config.ServiceConfig{udpSvc},
-		Chains:   []*config.ChainConfig{tunnel.ChainConfig(s.opts.ID, s.opts.Name)},
+		Chains:   []*config.ChainConfig{tunnel.ChainConfig(s.opts.ID, s.opts.Name, s.opts.RecordMode)},
 	}
 	return nil
 }

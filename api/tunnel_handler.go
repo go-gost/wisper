@@ -34,6 +34,7 @@ type tunnelOptionsResp struct {
 	FileUpload  bool   `json:"file_upload,omitempty"`
 	Keepalive   bool   `json:"keepalive,omitempty"`
 	TTL         int    `json:"ttl,omitempty"`
+	RecordMode  string `json:"record_mode,omitempty"`
 }
 
 type statsResponse struct {
@@ -97,6 +98,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			FileUpload:  opts.FileUpload,
 			Keepalive:   opts.Keepalive,
 			TTL:         opts.TTL,
+			RecordMode:  opts.RecordMode,
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
@@ -129,6 +131,7 @@ type tunnelCreateRequest struct {
 	EnableTLS   bool   `json:"enableTLS,omitempty"`
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
 	FileUpload  bool   `json:"file_upload,omitempty"`
+	RecordMode  string `json:"record_mode,omitempty"`
 }
 
 func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
@@ -141,6 +144,7 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.EnableTLSOption(r.EnableTLS),
 		tunnel.RewriteHostOption(r.RewriteHost),
 		tunnel.FileUploadOption(r.FileUpload),
+		tunnel.RecordModeOption(r.RecordMode),
 	}
 }
 
@@ -315,6 +319,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnel.EnableTLSOption(opts.EnableTLS),
 		tunnel.RewriteHostOption(opts.RewriteHost),
 		tunnel.FileUploadOption(opts.FileUpload),
+		tunnel.RecordModeOption(opts.RecordMode),
 		tunnel.CreatedAtOption(opts.CreatedAt),
 	}
 

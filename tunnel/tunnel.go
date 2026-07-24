@@ -66,6 +66,7 @@ type Options struct {
 	FileUpload  bool
 	Keepalive   bool
 	TTL         int
+	RecordMode  string
 	CreatedAt   time.Time
 	Stats       config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -149,6 +150,12 @@ func CreatedAtOption(createdAt time.Time) Option {
 func StatsBaselineOption(baseline config.ServiceStats) Option {
 	return func(opts *Options) {
 		opts.StatsBaseline = baseline
+	}
+}
+
+func RecordModeOption(mode string) Option {
+	return func(opts *Options) {
+		opts.RecordMode = mode
 	}
 }
 
@@ -325,6 +332,7 @@ func RestartRunning() {
 			EnableTLS:   p.opts.EnableTLS,
 			RewriteHost: p.opts.RewriteHost,
 			FileUpload:  p.opts.FileUpload,
+			RecordMode:  p.opts.RecordMode,
 			CreatedAt:   p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -349,18 +357,18 @@ func RestartRunning() {
 }
 
 // ChainConfig builds a GOST chain configuration that connects to the tunnel server.
-func ChainConfig(id string, name string) *xconfig.ChainConfig {
+func ChainConfig(id string, name string, recordMode string) *xconfig.ChainConfig {
 	s := config.Get().Settings
 	secure := true
 	if s != nil && s.Insecure {
 		secure = false
 	}
 
-	recordMode := "off"
-	if s != nil && s.RecordMode != "" {
-		recordMode = s.RecordMode
+	rm := recordMode
+	if rm == "" {
+		rm = "off"
 	}
-	md := map[string]any{"tunnel.id": id, "record.mode": recordMode}
+	md := map[string]any{"tunnel.id": id, "record.mode": rm}
 
 	return &xconfig.ChainConfig{
 		Name: name,
@@ -406,6 +414,7 @@ func LoadConfig() {
 			EnableTLS:   cfg.EnableTLS,
 			RewriteHost: cfg.RewriteHost,
 			FileUpload:  cfg.FileUpload,
+			RecordMode:  cfg.RecordMode,
 			CreatedAt:   cfg.CreatedAt,
 			Stats:       cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -449,6 +458,7 @@ func SaveConfig() error {
 				EnableTLS:   opts.EnableTLS,
 				RewriteHost: opts.RewriteHost,
 				FileUpload:  opts.FileUpload,
+			RecordMode: opts.RecordMode,
 			Favorite:  tun.IsFavorite(),
 			Closed:    tun.IsClosed(),
 			CreatedAt: opts.CreatedAt,
@@ -478,6 +488,7 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		CreatedAtOption(opts.CreatedAt),
 			RewriteHostOption(opts.RewriteHost),
 			FileUploadOption(opts.FileUpload),
+		RecordModeOption(opts.RecordMode),
 	}
 
 	switch st {

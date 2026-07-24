@@ -54,6 +54,7 @@ export interface TunnelOptions {
   file_upload: boolean;
   keepalive: boolean;
   ttl: number;
+  record_mode: string;
 }
 
 export interface Tunnel {
@@ -80,6 +81,7 @@ export interface TunnelCreateRequest {
   enableTLS?: boolean;
   rewriteHost?: boolean;
   file_upload?: boolean;
+  record_mode?: string;
 }
 
 // ─── Entrypoint ──────────────────────────────────────────────────────────────
@@ -129,7 +131,6 @@ export interface AppSettings {
   theme: ThemePreference;
   stats_interval: number;
   inspector_url?: string;
-  record_mode: string;
 }
 
 export interface AppSettingsUpdate {
@@ -140,7 +141,6 @@ export interface AppSettingsUpdate {
   theme?: string;
   stats_interval?: number;
   inspector_url?: string;
-  record_mode?: string;
 }
 
 // ─── Inspector ───────────────────────────────────────────────────────────

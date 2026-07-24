@@ -18,12 +18,6 @@ const LANG_OPTIONS: { value: LanguagePreference; labelKey: string }[] = [
   { value: 'zh', labelKey: 'settingsLangZh' },
 ];
 
-const RECORD_MODE_OPTIONS: { value: string; labelKey: string }[] = [
-  { value: 'off', labelKey: 'settingsRecordOff' },
-  { value: 'headers', labelKey: 'settingsRecordHeaders' },
-  { value: '', labelKey: 'settingsRecordFull' },
-];
-
 const INTERVAL_OPTIONS: { value: number; labelKey: string }[] = [
   { value: 1, labelKey: 'settingsInterval1s' },
   { value: 2, labelKey: 'settingsInterval2s' },
@@ -42,7 +36,6 @@ export class SettingsPage extends LitElement {
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 3;
   @state() private _inspectorUrl = '';
-  @state() private _recordMode = '';
   @state() private _inspectorConnected = false;
   @state() private _inspectorTested = false;
   @state() private _snackbar = '';
@@ -62,7 +55,6 @@ export class SettingsPage extends LitElement {
     this._lang = s.lang;
     this._statsInterval = s.stats_interval || 1;
     this._inspectorUrl = s.inspector_url || '';
-    this._recordMode = s.record_mode || 'off';
 
     this._unsubs.push(
       subscribe(() => {
@@ -74,7 +66,6 @@ export class SettingsPage extends LitElement {
         this._lang = s2.lang;
         this._statsInterval = s2.stats_interval || 1;
         this._inspectorUrl = s2.inspector_url || '';
-        this._recordMode = s2.record_mode || 'off';
         this.requestUpdate();
       }),
       onLocaleChange(() => this.requestUpdate()),
@@ -154,17 +145,6 @@ export class SettingsPage extends LitElement {
     this._showSnackbar('✓ ' + t(INTERVAL_OPTIONS.find(o => o.value === secs)?.labelKey ?? 'settingsInterval1s'));
     try {
       await updateSettings({ stats_interval: secs });
-    } catch {
-      // UI already updated optimistically
-    }
-  }
-
-  private async _setRecordMode(mode: string) {
-    this._recordMode = mode;
-    this.requestUpdate();
-    this._showSnackbar('✓ ' + t(RECORD_MODE_OPTIONS.find(o => o.value === mode)?.labelKey ?? 'settingsRecordFull'));
-    try {
-      await updateSettings({ record_mode: mode });
     } catch {
       // UI already updated optimistically
     }
@@ -510,15 +490,6 @@ export class SettingsPage extends LitElement {
               <span class="selector-label">${t('settingsStatsInterval')}</span>
               <span class="selector-value">
                 ${t(INTERVAL_OPTIONS.find(o => o.value === this._statsInterval)?.labelKey ?? 'settingsInterval1s')}
-                ${icon('chevron-right')}
-              </span>
-            </div>
-            <div class="selector-row" @click=${() => this._setRecordMode(
-              this._cycleOption(this._recordMode, RECORD_MODE_OPTIONS.map(o => o.value))
-            )}>
-              <span class="selector-label">${t('settingsRecordMode')}</span>
-              <span class="selector-value">
-                ${t(RECORD_MODE_OPTIONS.find(o => o.value === this._recordMode)?.labelKey ?? 'settingsRecordFull')}
                 ${icon('chevron-right')}
               </span>
             </div>

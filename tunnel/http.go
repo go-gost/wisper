@@ -134,7 +134,7 @@ func (s *httpTunnel) init() error {
 
 	s.config = &config.Config{
 		Services: []*config.ServiceConfig{rtcpSvc},
-		Chains:   []*config.ChainConfig{ChainConfig(s.opts.ID, s.opts.Name)},
+		Chains:   []*config.ChainConfig{ChainConfig(s.opts.ID, s.opts.Name, s.opts.RecordMode)},
 	}
 	return nil
 }

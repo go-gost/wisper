@@ -144,8 +144,6 @@ type Settings struct {
 	StatsInterval int `yaml:"stats_interval,omitempty" json:"stats_interval,omitempty"`
 	// Inspector API URL (e.g., http://inspector:8000). Empty = disabled.
 	InspectorURL string `yaml:"inspector_url,omitempty" json:"inspector_url,omitempty"`
-	// RecordMode controls traffic recording: "" (full), "headers", "off".
-	RecordMode string `yaml:"record_mode,omitempty" json:"record_mode,omitempty"`
 }
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.
@@ -162,6 +160,9 @@ type Tunnel struct {
 	FileUpload  bool   `yaml:"fileUpload,omitempty"`
 	Keepalive   bool   `yaml:",omitempty"`
 	TTL         int    `yaml:"ttl,omitempty"`
+
+	// RecordMode controls traffic recording: "" (full), "headers", "off".
+	RecordMode string `yaml:"record_mode,omitempty"`
 
 	Stats         ServiceStats
 	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
