@@ -211,7 +211,7 @@ export class TunnelConnection {
     // Defaults to "off" for Chrome extensions. The server-side handler
     // propagates this to the RecorderObject so no request/response body
     // data is captured unless the user explicitly opts in.
-    req.addFeature(FeatureMetadata, { 'record.mode': 'off' });
+    req.addFeature(FeatureMetadata, { 'record.mode': this._config.recordMode || 'off' });
 
     this._ws.send(req.encode().buffer);
   }

@@ -59,6 +59,10 @@ const TRANSLATIONS = {
     msgDeleted: 'Tunnel deleted',
     statsConns: 'conns',
     actionResetStats: 'Reset stats',
+    settingRecordMode: 'Recording',
+    recordOff: 'Off',
+    recordHeaders: 'Headers only',
+    recordFull: 'Full',
     dialogResetTitle: 'Reset Stats',
     dialogResetMsg: 'Reset traffic counters for this tunnel? This cannot be undone.',
     btnResetConfirm: 'Reset',
@@ -121,6 +125,10 @@ const TRANSLATIONS = {
     msgDeleted: '隧道已删除',
     statsConns: '连接',
     actionResetStats: '重置计数',
+    settingRecordMode: '记录',
+    recordOff: '关闭',
+    recordHeaders: '仅头信息',
+    recordFull: '完整',
     dialogResetTitle: '重置计数',
     dialogResetMsg: '确定要重置该隧道的流量计数吗？此操作不可撤销。',
     btnResetConfirm: '重置',
@@ -160,6 +168,13 @@ function updateI18nElements() {
   });
 }
 
+// ── Record mode options ───────────────────────────────────────────
+const RECORD_OPTIONS = [
+  { value: 'off', label: 'recordOff' },
+  { value: 'headers', label: 'recordHeaders' },
+  { value: '', label: 'recordFull' },
+];
+
 // ── Theme ────────────────────────────────────────────────────────────
 
 function applyTheme(theme) {
@@ -184,6 +199,21 @@ let formSaving = false;
 let expandedMap = {};
 let deletingId = null;
 let resettingId = null;
+let _formRecordMode = 'off';
+
+// ── Record mode ───────────────────────────────────────────────────────
+function _cycleRecordMode() {
+  const idx = RECORD_OPTIONS.findIndex(o => o.value === _formRecordMode);
+  _formRecordMode = RECORD_OPTIONS[(idx + 1) % RECORD_OPTIONS.length].value;
+  _refreshRecordModeValue();
+}
+
+function _refreshRecordModeValue() {
+  const el = document.getElementById('fRecordModeValue');
+  if (!el) return;
+  const opt = RECORD_OPTIONS.find(o => o.value === _formRecordMode);
+  el.textContent = opt ? t(opt.label) : t('recordOff');
+}
 
 // ── Init ───────────────────────────────────────────────────────────────
 
@@ -217,6 +247,7 @@ function loadTunnels() {
       createdAt: t.createdAt || new Date().toISOString(),
       hostname: t.hostname || '',
       stats: t.stats || null,
+      recordMode: t.recordMode || 'off',
     }));
     render();
   });
@@ -253,6 +284,7 @@ function persistTunnels() {
     createdAt: t.createdAt,
     hostname: t.hostname,
     stats: t.stats,
+      recordMode: t.recordMode || 'off',
   })) });
 }
 
@@ -281,6 +313,7 @@ function createTunnel(data) {
     createdAt: new Date().toISOString(),
     hostname: data.hostname || '',
     stats: null,
+    recordMode: data.recordMode || 'off',
   };
 
   tunnels.push(tun);
@@ -305,6 +338,7 @@ function startTunnel(tunnelId) {
       localEndpoint: tun.localEndpoint,
       auth: tun.auth,
       hostname: tun.hostname || undefined,
+        recordMode: tun.recordMode || 'off',
     },
   });
 }
@@ -346,6 +380,7 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
           createdAt: fromStorage.createdAt || new Date().toISOString(),
           hostname: fromStorage.hostname || '',
           stats: fromStorage.stats || null,
+          recordMode: fromStorage.recordMode || 'off',
         });
         chrome.storage.local.set({ tunnels: data.tunnels });
         render();
@@ -425,6 +460,7 @@ function saveForm() {
       hostname: hostname.trim() || undefined,
       username: username.trim() || undefined,
       password: password || undefined,
+      recordMode: _formRecordMode,
     };
 
     if (editingId) {
@@ -437,6 +473,7 @@ function saveForm() {
         oldTunnel.auth = formData.username
           ? { username: formData.username, password: formData.password || '' }
           : undefined;
+        oldTunnel.recordMode = formData.recordMode;
         oldTunnel.status = 'stopped';
         oldTunnel.error = null;
         oldTunnel.entrypoint = null;
@@ -955,6 +992,8 @@ function openNewForm() {
   document.getElementById('authFields').style.display = 'none';
   document.getElementById('fUsername').value = '';
   document.getElementById('fPassword').value = '';
+  _formRecordMode = 'off';
+  _refreshRecordModeValue();
   switchView('form');
 }
 
@@ -979,6 +1018,9 @@ function openEditForm(tunnelId) {
   }
   document.getElementById('fUsername').value = (tun.auth && tun.auth.username) || '';
   document.getElementById('fPassword').value = (tun.auth && tun.auth.password) || '';
+
+  _formRecordMode = tun.recordMode || 'off';
+  _refreshRecordModeValue();
 
   switchView('form');
 }
@@ -1043,6 +1085,14 @@ function bindEvents() {
         document.getElementById('fUsername').value = '';
         document.getElementById('fPassword').value = '';
       }
+    });
+  }
+
+  // Record mode selector
+  const fRecordMode = document.getElementById('fRecordMode');
+  if (fRecordMode) {
+    fRecordMode.addEventListener('click', () => {
+      _cycleRecordMode();
     });
   }
 
