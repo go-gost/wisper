@@ -247,7 +247,7 @@ function loadTunnels() {
       createdAt: t.createdAt || new Date().toISOString(),
       hostname: t.hostname || '',
       stats: t.stats || null,
-      recordMode: t.recordMode || 'off',
+      recordMode: t.recordMode != null ? t.recordMode : 'off',
     }));
     render();
   });
@@ -284,7 +284,7 @@ function persistTunnels() {
     createdAt: t.createdAt,
     hostname: t.hostname,
     stats: t.stats,
-      recordMode: t.recordMode || 'off',
+      recordMode: t.recordMode != null ? t.recordMode : 'off',
   })) });
 }
 
@@ -304,8 +304,8 @@ function createTunnel(data) {
   const tunnelId = crypto.randomUUID();
   const tun = {
     tunnelId,
-    name: data.name.trim() || `tunnel-${data.endpoint.split(':').pop() || '0'}`,
-    localEndpoint: data.endpoint.trim(),
+    name: (data.name || '').trim() || `tunnel-${(data.endpoint || '').split(':').pop() || '0'}`,
+    localEndpoint: (data.endpoint || '').trim(),
     auth: data.username ? { username: data.username, password: data.password || '' } : undefined,
     status: 'stopped',
     error: null,
@@ -313,7 +313,7 @@ function createTunnel(data) {
     createdAt: new Date().toISOString(),
     hostname: data.hostname || '',
     stats: null,
-    recordMode: data.recordMode || 'off',
+    recordMode: data.recordMode != null ? data.recordMode : 'off',
   };
 
   tunnels.push(tun);
@@ -338,7 +338,7 @@ function startTunnel(tunnelId) {
       localEndpoint: tun.localEndpoint,
       auth: tun.auth,
       hostname: tun.hostname || undefined,
-        recordMode: tun.recordMode || 'off',
+        recordMode: tun.recordMode != null ? tun.recordMode : 'off',
     },
   });
 }
@@ -380,7 +380,7 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
           createdAt: fromStorage.createdAt || new Date().toISOString(),
           hostname: fromStorage.hostname || '',
           stats: fromStorage.stats || null,
-          recordMode: fromStorage.recordMode || 'off',
+          recordMode: fromStorage.recordMode != null ? fromStorage.recordMode : 'off',
         });
         chrome.storage.local.set({ tunnels: data.tunnels });
         render();
@@ -1019,7 +1019,7 @@ function openEditForm(tunnelId) {
   document.getElementById('fUsername').value = (tun.auth && tun.auth.username) || '';
   document.getElementById('fPassword').value = (tun.auth && tun.auth.password) || '';
 
-  _formRecordMode = tun.recordMode || 'off';
+  _formRecordMode = tun.recordMode != null ? tun.recordMode : 'off';
   _refreshRecordModeValue();
 
   switchView('form');

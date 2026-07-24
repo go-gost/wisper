@@ -145,6 +145,7 @@ async function connect(entry) {
     auth: config.auth || {},
     relayUrl: config.relayUrl,
     entrypointUrl,
+    recordMode: config.recordMode,
     wrapStream: (stream) => entry.stats.wrapStream(stream),
     onStream: ({ stream, request }) => {
       entry.stats.markRequest();

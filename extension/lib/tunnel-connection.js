@@ -208,10 +208,17 @@ export class TunnelConnection {
     req.addFeature(FeatureNetwork, NetworkTCP);
 
     // MetadataFeature — record.mode controls traffic recording privacy.
-    // Defaults to "off" for Chrome extensions. The server-side handler
-    // propagates this to the RecorderObject so no request/response body
-    // data is captured unless the user explicitly opts in.
-    req.addFeature(FeatureMetadata, { 'record.mode': this._config.recordMode || 'off' });
+    // Valid values: "" (full), "headers" (headers only), "off" (disabled).
+    // Defaults to "off". The server-side handler propagates this to the
+    // RecorderObject so no request/response data is captured unless the
+    // user explicitly opts in.
+    // NOTE: "" is the protocol value for full recording — do NOT use || 'off'
+    // here; empty string is falsy in JS and would collapse full → off.
+    const VALID_RECORD_MODES = new Set(['', 'headers', 'off']);
+    const recordMode = VALID_RECORD_MODES.has(this._config.recordMode)
+      ? this._config.recordMode
+      : 'off';
+    req.addFeature(FeatureMetadata, { 'record.mode': recordMode });
 
     this._ws.send(req.encode().buffer);
   }
