@@ -153,6 +153,12 @@ const en: Record<string, string> = {
   inspectorBtnReconnect: 'Reconnect',
   inspectorStatusConnected: 'Connected',
   inspectorStatusDisconnected: 'Disconnected',
+
+  // Recording
+  settingsRecordMode: 'Recording',
+  settingsRecordFull: 'Full',
+  settingsRecordHeaders: 'Headers only',
+  settingsRecordOff: 'Off',
 };
 
 export default en;

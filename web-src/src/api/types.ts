@@ -129,6 +129,7 @@ export interface AppSettings {
   theme: ThemePreference;
   stats_interval: number;
   inspector_url?: string;
+  record_mode: string;
 }
 
 export interface AppSettingsUpdate {
@@ -139,6 +140,7 @@ export interface AppSettingsUpdate {
   theme?: string;
   stats_interval?: number;
   inspector_url?: string;
+  record_mode?: string;
 }
 
 // ─── Inspector ───────────────────────────────────────────────────────────

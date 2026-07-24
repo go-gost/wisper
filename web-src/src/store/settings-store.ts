@@ -39,6 +39,7 @@ let settings: AppSettings = {
   theme: 'system',
   stats_interval: 3,
   inspector_url: '',
+  record_mode: 'off',
 };
 
 const listeners = new Set<() => void>();
@@ -73,6 +74,7 @@ export async function loadSettings(): Promise<void> {
       theme: cfg.theme || getStoredTheme(),
       stats_interval: cfg.stats_interval || 3,
       inspector_url: cfg.inspector_url || '',
+      record_mode: cfg.record_mode || 'off',
     };
   } catch {
     // Backend unavailable — use stored/local preferences.
@@ -110,6 +112,9 @@ export async function updateSettings(update: AppSettingsUpdate): Promise<void> {
   }
   if (update.inspector_url !== undefined) {
     settings.inspector_url = update.inspector_url;
+  }
+  if (update.record_mode !== undefined) {
+    settings.record_mode = update.record_mode;
   }
 
   notify();

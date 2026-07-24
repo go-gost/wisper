@@ -153,6 +153,12 @@ const zh: Record<string, string> = {
   inspectorBtnReconnect: '重连',
   inspectorStatusConnected: '已连接',
   inspectorStatusDisconnected: '已断开',
+
+  // Recording
+  settingsRecordMode: '记录',
+  settingsRecordFull: '完整',
+  settingsRecordHeaders: '仅头信息',
+  settingsRecordOff: '关闭',
 };
 
 export default zh;

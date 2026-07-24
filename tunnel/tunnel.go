@@ -356,6 +356,12 @@ func ChainConfig(id string, name string) *xconfig.ChainConfig {
 		secure = false
 	}
 
+	recordMode := "off"
+	if s != nil && s.RecordMode != "" {
+		recordMode = s.RecordMode
+	}
+	md := map[string]any{"tunnel.id": id, "record.mode": recordMode}
+
 	return &xconfig.ChainConfig{
 		Name: name,
 		Hops: []*xconfig.HopConfig{
@@ -367,7 +373,7 @@ func ChainConfig(id string, name string) *xconfig.ChainConfig {
 						Addr: GetServerAddr(),
 						Connector: &xconfig.ConnectorConfig{
 							Type:     "tunnel",
-							Metadata: map[string]any{"tunnel.id": id},
+							Metadata: md,
 						},
 						Dialer: &xconfig.DialerConfig{
 							Type: "wss",
