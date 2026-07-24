@@ -12,7 +12,7 @@
  *   5. On each new SMUX stream: read relay Response → parse HTTP → forward to localhost
  */
 
-import { CmdBind, StatusOK, FeatureUserAuth, FeatureAddr, FeatureTunnel, FeatureNetwork, NetworkTCP } from './relay.js';
+import { CmdBind, StatusOK, FeatureUserAuth, FeatureAddr, FeatureTunnel, FeatureNetwork, FeatureMetadata, NetworkTCP } from './relay.js';
 import { RelayRequest, relayResponseFromWire, findFeature, encodeAddr, encodeUserAuth, encodeTunnel, encodeNetwork } from './relay.js';
 import { SmuxServer } from './smux.js';
 
@@ -206,6 +206,12 @@ export class TunnelConnection {
 
     // NetworkFeature (TCP)
     req.addFeature(FeatureNetwork, NetworkTCP);
+
+    // MetadataFeature — record.mode controls traffic recording privacy.
+    // Defaults to "off" for Chrome extensions. The server-side handler
+    // propagates this to the RecorderObject so no request/response body
+    // data is captured unless the user explicitly opts in.
+    req.addFeature(FeatureMetadata, { 'record.mode': 'off' });
 
     this._ws.send(req.encode().buffer);
   }

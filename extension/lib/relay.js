@@ -39,6 +39,7 @@ export const FeatureUserAuth = 0x01;
 export const FeatureAddr = 0x02;
 export const FeatureTunnel = 0x03;
 export const FeatureNetwork = 0x04;
+export const FeatureMetadata = 0x05;
 
 // Address types
 export const AddrIPv4 = 1;
@@ -217,6 +218,68 @@ export function decodeNetwork(data) {
   return new DataView(data.buffer, data.byteOffset, data.byteLength).getUint16(0, false);
 }
 
+/**
+ * encodeMetadata — encode key-value metadata as MetadataFeature.
+ *
+ * Wire format:
+ *   | NKEYS(2, BE) | KEYLEN(2, BE) | KEY(VAR) | VALLEN(2, BE) | VAL(VAR) | ...
+ *
+ * @param {Record<string, string>} kvs
+ */
+export function encodeMetadata(kvs) {
+  const keys = Object.keys(kvs);
+  if (keys.length === 0) {
+    return new Uint8Array([0, 0]);
+  }
+  // Compute total length
+  let total = 2; // NKEYS
+  for (const k of keys) {
+    const keyBytes = new TextEncoder().encode(k);
+    const valBytes = new TextEncoder().encode(kvs[k] || '');
+    total += 2 + keyBytes.length + 2 + valBytes.length;
+  }
+  const buf = new Uint8Array(total);
+  const dv = new DataView(buf.buffer);
+  let off = 0;
+  dv.setUint16(off, keys.length, false); off += 2;
+  for (const k of keys) {
+    const keyBytes = new TextEncoder().encode(k);
+    const valBytes = new TextEncoder().encode(kvs[k] || '');
+    dv.setUint16(off, keyBytes.length, false); off += 2;
+    buf.set(keyBytes, off); off += keyBytes.length;
+    dv.setUint16(off, valBytes.length, false); off += 2;
+    buf.set(valBytes, off); off += valBytes.length;
+  }
+  return buf;
+}
+
+/**
+ * decodeMetadata — decode a MetadataFeature payload.
+ *
+ * @returns {Record<string, string>}
+ */
+export function decodeMetadata(data) {
+  if (data.length < 2) throw new RelayError('short buffer');
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let off = 0;
+  const n = dv.getUint16(off, false); off += 2;
+  const kvs = {};
+  for (let i = 0; i < n; i++) {
+    if (off + 2 > data.length) throw new RelayError('short buffer');
+    const klen = dv.getUint16(off, false); off += 2;
+    if (off + klen > data.length) throw new RelayError('short buffer');
+    const key = new TextDecoder().decode(data.slice(off, off + klen));
+    off += klen;
+    if (off + 2 > data.length) throw new RelayError('short buffer');
+    const vlen = dv.getUint16(off, false); off += 2;
+    if (off + vlen > data.length) throw new RelayError('short buffer');
+    const val = new TextDecoder().decode(data.slice(off, off + vlen));
+    off += vlen;
+    kvs[key] = val;
+  }
+  return kvs;
+}
+
 // ── Feature registry ──────────────────────────────────────────────────
 
 /** Map feature type → { encode, decode } */
@@ -225,6 +288,7 @@ const featureHandlers = {
   [FeatureAddr]: { encode: encodeAddr, decode: decodeAddr },
   [FeatureTunnel]: { encode: encodeTunnel, decode: decodeTunnel },
   [FeatureNetwork]: { encode: encodeNetwork, decode: decodeNetwork },
+  [FeatureMetadata]: { encode: encodeMetadata, decode: decodeMetadata },
 };
 
 /**
