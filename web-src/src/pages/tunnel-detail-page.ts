@@ -41,6 +41,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _name = '';
   @state() private _endpoint = '';
   @state() private _hostname = '';
+  @state() private _prefix = '';
   @state() private _username = '';
   @state() private _password = '';
   @state() private _enableTLS = false;
@@ -125,6 +126,7 @@ export class TunnelDetailPage extends LitElement {
     this._name = '';
     this._endpoint = '';
     this._hostname = '';
+    this._prefix = '';
     this._username = '';
     this._password = '';
     this._enableTLS = false;
@@ -138,6 +140,7 @@ export class TunnelDetailPage extends LitElement {
     this._name = t.name;
     this._endpoint = t.endpoint;
     this._hostname = t.options.hostname ?? '';
+    this._prefix = t.options.prefix ?? '';
     this._username = t.options.username ?? '';
     this._password = t.options.password ?? '';
     this._enableTLS = t.options.enableTLS ?? false;
@@ -179,12 +182,19 @@ export class TunnelDetailPage extends LitElement {
       return;
     }
 
+    const prefix = this._prefix.trim().toLowerCase();
+    if (prefix && (prefix.length < 8 || prefix.length > 63 || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(prefix))) {
+      this._showSnackbar(t('invalidPrefix'));
+      return;
+    }
+
     this._saving = true;
     try {
       const body: TunnelCreateRequest = {
         name: this._name.trim(),
         type: this.tunnelType,
         endpoint: this._endpoint.trim(),
+        prefix: prefix || undefined,
         hostname: this._hostname.trim() || undefined,
         enableTLS: this._enableTLS,
         rewriteHost: this._rewriteHost,
@@ -840,6 +850,14 @@ export class TunnelDetailPage extends LitElement {
                     ${icon('copy')}
                   </button>
                 </div>
+                ${t2.options.prefix
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">${t('fieldPrefix')}</span>
+                      <span class="info-value text">${t2.options.prefix}</span>
+                    </div>
+                  `
+                  : ''}
                 ${t2.options.hostname
                   ? html`
                     <div class="info-row">
@@ -987,6 +1005,20 @@ export class TunnelDetailPage extends LitElement {
                       : ''}
                   </div>
                 </div>
+
+                <!-- URL Prefix (HTTP + file) -->
+                ${this.tunnelType === 'http' || this.tunnelType === 'file'
+                  ? html`
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldPrefix')}</label>
+                      <input class="form-input" .value=${this._prefix} placeholder="my-app-name"
+                        @input=${(e: Event) => { this._prefix = (e.target as HTMLInputElement).value; }}>
+                      <div style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding-top:4px;">
+                        ${t('fieldPrefixHint')}
+                      </div>
+                    </div>
+                  `
+                  : ''}
 
                 <!-- Hostname (HTTP only) -->
                 ${this.tunnelType === 'http'

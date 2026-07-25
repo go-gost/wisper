@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -86,7 +87,7 @@ func (s *fileTunnel) Type() string     { return FileTunnel }
 func (s *fileTunnel) Name() string     { return s.opts.Name }
 func (s *fileTunnel) Endpoint() string { return s.opts.Endpoint }
 func (s *fileTunnel) Entrypoint() string {
-	return fmt.Sprintf("https://%s.%s", s.endpoint, GetEndpointAddr())
+	return fmt.Sprintf("https://%s.%s", entrypointHost(s.endpoint, s.opts.Prefix, s.forward), GetEndpointAddr())
 }
 func (s *fileTunnel) Options() Options { return s.opts }
 func (s *fileTunnel) Favorite(b bool)  { s.favorite.Store(b) }
@@ -117,7 +118,7 @@ func (s *fileTunnel) init() error {
 
 	rtcpSvc := &config.ServiceConfig{
 		Name: s.opts.Name,
-		Addr: s.opts.Hostname,
+		Addr: s.opts.Prefix,
 		Handler: &config.HandlerConfig{
 			Type: "rtcp",
 		},
@@ -252,7 +253,19 @@ func (s *fileTunnel) Run() (err error) {
 		s.setErr(serveErr)
 	}()
 
-	log.Infof("file service run at %s, entrypoint: https://%s.%s", s.file.Addr(), s.endpoint, GetEndpointAddr())
+	// Wait for the initial relay bind so the entrypoint URL reflects the
+	// server-assigned address (not the requested prefix). The rtcp listener's
+	// Addr() returns "host:port" only after the first Accept calls Router.Bind.
+	for range 100 {
+		if addr := s.forward.Addr(); addr != nil {
+			if _, _, err := net.SplitHostPort(addr.String()); err == nil {
+				break
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	log.Infof("file service run at %s, entrypoint: %s", s.file.Addr(), s.Entrypoint())
 	return nil
 }
 

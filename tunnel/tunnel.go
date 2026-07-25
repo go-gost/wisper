@@ -3,10 +3,12 @@ package tunnel
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/core/service"
 	"github.com/go-gost/wisper/config"
 	xconfig "github.com/go-gost/x/config"
 	_ "github.com/go-gost/x/connector/tunnel"
@@ -58,6 +60,10 @@ type Options struct {
 	ID          string
 	Name        string
 	Endpoint    string
+	// Prefix is the custom public URL host prefix (subdomain label) requested
+	// from the tunnel server. Distinct from Hostname, which for HTTP tunnels
+	// means backend Host-header rewrite.
+	Prefix      string
 	Hostname    string
 	Username    string
 	Password    string
@@ -90,6 +96,12 @@ func NameOption(name string) Option {
 func EndpointOption(endpoint string) Option {
 	return func(opts *Options) {
 		opts.Endpoint = endpoint
+	}
+}
+
+func PrefixOption(prefix string) Option {
+	return func(opts *Options) {
+		opts.Prefix = prefix
 	}
 }
 
@@ -157,6 +169,25 @@ func RecordModeOption(mode string) Option {
 	return func(opts *Options) {
 		opts.RecordMode = mode
 	}
+}
+
+// entrypointHost returns the public host label for the tunnel URL:
+// the server-negotiated bind host once bound, else the requested prefix,
+// else the md5 hash. Pre-bind the rtcp listener address is a bare label
+// (SplitHostPort fails); post-bind it is "host:port".
+func entrypointHost(hash, prefix string, forward service.Service) string {
+	host := hash
+	if prefix != "" {
+		host = prefix
+	}
+	if forward != nil {
+		if addr := forward.Addr(); addr != nil {
+			if h, _, err := net.SplitHostPort(addr.String()); err == nil && h != "" {
+				host = h
+			}
+		}
+	}
+	return host
 }
 
 // ServiceStatus is implemented by services that expose a Status method.
@@ -326,6 +357,7 @@ func RestartRunning() {
 			ID:          p.opts.ID,
 			Name:        p.opts.Name,
 			Endpoint:    p.opts.Endpoint,
+			Prefix:      p.opts.Prefix,
 			Hostname:    p.opts.Hostname,
 			Username:    p.opts.Username,
 			Password:    p.opts.Password,
@@ -408,6 +440,7 @@ func LoadConfig() {
 			ID:          cfg.ID,
 			Name:        cfg.Name,
 			Endpoint:    cfg.Endpoint,
+			Prefix:      cfg.Prefix,
 			Hostname:    cfg.Hostname,
 			Username:    cfg.Username,
 			Password:    cfg.Password,
@@ -452,6 +485,7 @@ func SaveConfig() error {
 			Name:      tun.Name(),
 			Type:      tun.Type(),
 			Endpoint:  tun.Endpoint(),
+			Prefix:    opts.Prefix,
 			Hostname:  opts.Hostname,
 			Username:  opts.Username,
 			Password:  opts.Password,
@@ -481,6 +515,7 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		IDOption(opts.ID),
 		NameOption(opts.Name),
 		EndpointOption(opts.Endpoint),
+		PrefixOption(opts.Prefix),
 		HostnameOption(opts.Hostname),
 		UsernameOption(opts.Username),
 		PasswordOption(opts.Password),

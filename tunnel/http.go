@@ -83,7 +83,7 @@ func (s *httpTunnel) Type() string     { return HTTPTunnel }
 func (s *httpTunnel) Name() string     { return s.opts.Name }
 func (s *httpTunnel) Endpoint() string { return s.opts.Endpoint }
 func (s *httpTunnel) Entrypoint() string {
-	return fmt.Sprintf("https://%s.%s", s.endpoint, GetEndpointAddr())
+	return fmt.Sprintf("https://%s.%s", entrypointHost(s.endpoint, s.opts.Prefix, s.forward), GetEndpointAddr())
 }
 func (s *httpTunnel) Options() Options { return s.opts }
 func (s *httpTunnel) Favorite(b bool)  { s.favorite.Store(b) }
@@ -116,7 +116,7 @@ func (s *httpTunnel) init() error {
 
 	rtcpSvc := &config.ServiceConfig{
 		Name: s.opts.Name,
-		Addr: "",
+		Addr: s.opts.Prefix,
 		Handler: &config.HandlerConfig{
 			Type: "rtcp",
 			Metadata: map[string]any{
@@ -234,6 +234,18 @@ func (s *httpTunnel) Run() (err error) {
 		}
 		s.setErr(serveErr)
 	}()
+
+	// Wait for the initial relay bind so the entrypoint URL reflects the
+	// server-assigned address (not the requested prefix). The rtcp listener's
+	// Addr() returns "host:port" only after the first Accept calls Router.Bind.
+	for range 100 {
+		if addr := s.forward.Addr(); addr != nil {
+			if _, _, err := net.SplitHostPort(addr.String()); err == nil {
+				break
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	return nil
 }

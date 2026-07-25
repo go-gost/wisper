@@ -45,6 +45,7 @@ export interface ItemStats {
 // ─── Tunnel ──────────────────────────────────────────────────────────────────
 
 export interface TunnelOptions {
+  prefix?: string;
   hostname: string;
   username: string;
   password: string;
@@ -75,6 +76,7 @@ export interface TunnelCreateRequest {
   name: string;
   type: TunnelType;
   endpoint: string;
+  prefix?: string;
   hostname?: string;
   username?: string;
   password?: string;

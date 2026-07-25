@@ -152,6 +152,7 @@ type Tunnel struct {
 	Name        string
 	Type        string
 	Endpoint    string
+	Prefix      string `yaml:",omitempty"`
 	Hostname    string `yaml:",omitempty"`
 	Username    string `yaml:",omitempty"`
 	Password    string `yaml:",omitempty"`

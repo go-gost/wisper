@@ -548,3 +548,113 @@ func TestConfigSetNil(t *testing.T) {
 		t.Error("Set(nil) should store an empty Config, not nil")
 	}
 }
+
+func TestValidatePrefix(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"", "", false},
+		{"MyApp-Name1", "myapp-name1", false},
+		{"  padded8x  ", "padded8x", false},
+		{"exactly8", "exactly8", false},
+		{"a23456789012345678901234567890123456789012345678901234567890123", "a23456789012345678901234567890123456789012345678901234567890123", false}, // 63 chars
+		{"short", "", true},
+		{"a234567890123456789012345678901234567890123456789012345678901234", "", true}, // 64 chars
+		{"-leading1", "", true},
+		{"trailing1-", "", true},
+		{"bad_char1", "", true},
+		{"has.dot12", "", true},
+	}
+	for _, tt := range tests {
+		got, err := normalizePrefix(tt.in)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("normalizePrefix(%q): expected error, got %q", tt.in, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("normalizePrefix(%q): unexpected error: %v", tt.in, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("normalizePrefix(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestCreateTunnelInvalidPrefix(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	for _, prefix := range []string{"bad!", "short"} {
+		resp, body := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
+			"name": "test", "type": "http", "endpoint": "localhost:8080",
+			"prefix": prefix,
+		})
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("prefix %q: expected 400, got %d: %v", prefix, resp.StatusCode, body)
+		}
+	}
+}
+
+func TestUpdateTunnelInvalidPrefix(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	tun := preRegisterTunnel(t, tunnel.HTTPTunnel, "Test", "localhost:8080")
+
+	resp, body := putJSON(t, srv.URL+"/api/tunnels/"+tun.ID(), map[string]any{
+		"name": "Test", "type": "http", "endpoint": "localhost:8080",
+		"prefix": "bad!",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %v", resp.StatusCode, body)
+	}
+	// Original tunnel must be untouched.
+	if got := tunnel.Get(tun.ID()); got == nil {
+		t.Error("original tunnel was removed on failed update")
+	}
+}
+
+func TestGetTunnelWithPrefix(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	tun := tunnel.NewHTTPTunnel(
+		tunnel.NameOption("Prefixed"),
+		tunnel.EndpointOption("localhost:8080"),
+		tunnel.PrefixOption("myprefix1"),
+	)
+	tun.Close()
+	tunnel.Add(tun)
+
+	resp, body := getJSON(t, srv.URL+"/api/tunnels/"+tun.ID())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
+	}
+	opts, ok := body["options"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected options object, got %v", body["options"])
+	}
+	if opts["prefix"] != "myprefix1" {
+		t.Errorf("expected prefix=myprefix1, got %v", opts["prefix"])
+	}
+	// Optimistic entrypoint: prefix shown before any bind (forward is nil).
+	if body["entrypoint"] != "https://myprefix1.gost.run" {
+		t.Errorf("expected entrypoint=https://myprefix1.gost.run, got %v", body["entrypoint"])
+	}
+
+	// Without a prefix the md5-hash endpoint is used.
+	plain := preRegisterTunnel(t, tunnel.HTTPTunnel, "Plain", "localhost:8080")
+	_, pbody := getJSON(t, srv.URL+"/api/tunnels/"+plain.ID())
+	ep, _ := pbody["entrypoint"].(string)
+	if ep == "" || ep == "https://.gost.run" {
+		t.Errorf("expected md5-hash entrypoint, got %q", ep)
+	}
+	if ep == "https://myprefix1.gost.run" {
+		t.Error("plain tunnel must not reuse the prefixed entrypoint")
+	}
+}

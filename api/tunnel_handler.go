@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
@@ -25,6 +27,7 @@ type tunnelResponse struct {
 }
 
 type tunnelOptionsResp struct {
+	Prefix      string `json:"prefix,omitempty"`
 	Hostname    string `json:"hostname,omitempty"`
 	Username    string `json:"username,omitempty"`
 	Password    string `json:"password,omitempty"`
@@ -89,6 +92,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		CreatedAt:  opts.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 		Error:      errMsg,
 		Options: tunnelOptionsResp{
+			Prefix:      opts.Prefix,
 			Hostname:    opts.Hostname,
 			Username:    opts.Username,
 			Password:    opts.Password,
@@ -125,6 +129,7 @@ type tunnelCreateRequest struct {
 	Name        string `json:"name"`
 	Type        string `json:"type"`
 	Endpoint    string `json:"endpoint"`
+	Prefix      string `json:"prefix,omitempty"`
 	Hostname    string `json:"hostname,omitempty"`
 	Username    string `json:"username,omitempty"`
 	Password    string `json:"password,omitempty"`
@@ -138,6 +143,7 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 	return []tunnel.Option{
 		tunnel.NameOption(r.Name),
 		tunnel.EndpointOption(r.Endpoint),
+		tunnel.PrefixOption(r.Prefix),
 		tunnel.HostnameOption(r.Hostname),
 		tunnel.UsernameOption(r.Username),
 		tunnel.PasswordOption(r.Password),
@@ -146,6 +152,27 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.FileUploadOption(r.FileUpload),
 		tunnel.RecordModeOption(r.RecordMode),
 	}
+}
+
+// prefixRe matches a DNS label: lowercase letters, digits and hyphens,
+// not starting or ending with a hyphen.
+var prefixRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+// normalizePrefix trims and lowercases the URL host prefix and validates it.
+// An empty prefix is valid (feature off). The 8-character minimum mirrors the
+// production ingress requirement.
+func normalizePrefix(p string) (string, error) {
+	p = strings.ToLower(strings.TrimSpace(p))
+	if p == "" {
+		return "", nil
+	}
+	if len(p) < 8 || len(p) > 63 {
+		return "", fmt.Errorf("prefix must be 8-63 characters")
+	}
+	if !prefixRe.MatchString(p) {
+		return "", fmt.Errorf("prefix may contain only lowercase letters, digits and hyphens, and must not start or end with a hyphen")
+	}
+	return p, nil
 }
 
 func handleListTunnels(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +198,13 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 	if req.Type == "" {
 		writeError(w, http.StatusBadRequest, "type is required")
 		return
+	}
+
+	if p, err := normalizePrefix(req.Prefix); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	} else {
+		req.Prefix = p
 	}
 
 	var t tunnel.Tunnel
@@ -222,6 +256,13 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	var req tunnelCreateRequest
 	if !readJSON(w, r, &req) {
 		return
+	}
+
+	if p, err := normalizePrefix(req.Prefix); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	} else {
+		req.Prefix = p
 	}
 
 	// Use the type from request; default to old type if empty.
@@ -313,6 +354,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnel.IDOption(opts.ID),
 		tunnel.NameOption(opts.Name),
 		tunnel.EndpointOption(opts.Endpoint),
+		tunnel.PrefixOption(opts.Prefix),
 		tunnel.HostnameOption(opts.Hostname),
 		tunnel.UsernameOption(opts.Username),
 		tunnel.PasswordOption(opts.Password),

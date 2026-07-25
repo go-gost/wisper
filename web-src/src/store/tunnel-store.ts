@@ -108,7 +108,7 @@ export async function toggleFavorite(id: string): Promise<void> {
 export function applyStats(statsList: Tunnel[]): void {
   for (const s of statsList) {
     tunnels = tunnels.map(t =>
-      t.id === s.id ? { ...t, stats: s.stats, status: s.status, error: s.error } : t,
+      t.id === s.id ? { ...t, entrypoint: s.entrypoint, stats: s.stats, status: s.status, error: s.error } : t,
     );
   }
   notify();

@@ -58,6 +58,8 @@ const en: Record<string, string> = {
   // Switches
   switchBasicAuth: 'Basic Auth',
   fieldHostname: 'Hostname',
+  fieldPrefix: 'URL Prefix',
+  fieldPrefixHint: 'Custom URL host, 8-63 chars: a-z, 0-9, hyphens. Falls back to a random host if taken.',
   switchRewriteHost: 'Rewrite Host',
   switchEnableTLS: 'Enable TLS',
   switchFileUpload: 'File Upload',
@@ -100,6 +102,7 @@ const en: Record<string, string> = {
   favoriteAdded: 'Added to favorites',
   favoriteRemoved: 'Removed from favorites',
   requiredField: 'This field is required',
+  invalidPrefix: 'Invalid prefix: 8-63 lowercase letters, digits or hyphens; cannot start or end with a hyphen',
 
   // Stats interval
   settingsStatsInterval: 'Stats update frequency',

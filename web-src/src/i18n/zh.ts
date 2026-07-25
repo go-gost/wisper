@@ -58,6 +58,8 @@ const zh: Record<string, string> = {
   // Switches
   switchBasicAuth: '基本认证',
   fieldHostname: '主机名',
+  fieldPrefix: 'URL 前缀',
+  fieldPrefixHint: '自定义 URL 主机名，8-63 个字符：小写字母、数字、连字符。被占用时回退为随机主机名。',
   switchRewriteHost: '重写主机头',
   switchEnableTLS: '启用 TLS',
   switchFileUpload: '文件上传',
@@ -100,6 +102,7 @@ const zh: Record<string, string> = {
   favoriteAdded: '已添加到收藏',
   favoriteRemoved: '已从收藏移除',
   requiredField: '此字段为必填项',
+  invalidPrefix: '前缀无效：需 8-63 个小写字母、数字或连字符，且不能以连字符开头或结尾',
 
   // Stats interval
   settingsStatsInterval: '统计更新频率',
