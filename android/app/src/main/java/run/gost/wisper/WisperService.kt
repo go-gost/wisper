@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.os.PowerManager
 import android.util.Log
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -27,11 +26,6 @@ class WisperService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val POLL_INTERVAL_MS = 2000L
     }
-
-    // ---------------------------------------------------------------
-    // WakeLock
-    // ---------------------------------------------------------------
-    private var wakeLock: PowerManager.WakeLock? = null
 
     // ---------------------------------------------------------------
     // Stats polling (background thread to avoid NetworkOnMainThreadException)
@@ -76,8 +70,6 @@ class WisperService : Service() {
         }
         isBackendReady = true
 
-        acquireWakeLock()
-
         try {
             val notification = buildNotification(
                 getString(R.string.app_name),
@@ -110,7 +102,6 @@ class WisperService : Service() {
         Log.i(TAG, "onDestroy")
         pollHandler.removeCallbacks(pollRunnable)
         pollThread.quitSafely()
-        releaseWakeLock()
         WisperJNI.stop()
         super.onDestroy()
     }
@@ -123,7 +114,7 @@ class WisperService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = getString(R.string.notification_channel_description)
                 setShowBadge(false)
@@ -255,25 +246,5 @@ class WisperService : Service() {
         } else {
             String.format("%.2f %s", value, units[unitIdx])
         }
-    }
-
-    // ---------------------------------------------------------------
-    // WakeLock
-    // ---------------------------------------------------------------
-    private fun acquireWakeLock() {
-        val pm = getSystemService(PowerManager::class.java)
-        wakeLock = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "run.gost.wisper:WakeLock"
-        ).apply {
-            acquire(10 * 60 * 1000L)
-        }
-    }
-
-    private fun releaseWakeLock() {
-        wakeLock?.let {
-            if (it.isHeld) it.release()
-        }
-        wakeLock = null
     }
 }
