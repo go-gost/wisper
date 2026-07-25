@@ -161,7 +161,7 @@ type Tunnel struct {
 	Keepalive   bool   `yaml:",omitempty"`
 	TTL         int    `yaml:"ttl,omitempty"`
 
-	// RecordMode controls traffic recording: "" (full), "headers", "off".
+	// RecordMode controls traffic recording: "full", "headers", "off".
 	RecordMode string `yaml:"record_mode,omitempty"`
 
 	Stats         ServiceStats

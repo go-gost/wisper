@@ -208,16 +208,17 @@ export class TunnelConnection {
     req.addFeature(FeatureNetwork, NetworkTCP);
 
     // MetadataFeature — record.mode controls traffic recording privacy.
-    // Valid values: "" (full), "headers" (headers only), "off" (disabled).
+    // Valid values: "full" (full), "headers" (headers only), "off" (disabled).
+    // "" is the relay protocol value for full recording (translated from "full").
     // Defaults to "off". The server-side handler propagates this to the
     // RecorderObject so no request/response data is captured unless the
     // user explicitly opts in.
-    // NOTE: "" is the protocol value for full recording — do NOT use || 'off'
-    // here; empty string is falsy in JS and would collapse full → off.
-    const VALID_RECORD_MODES = new Set(['', 'headers', 'off']);
-    const recordMode = VALID_RECORD_MODES.has(this._config.recordMode)
+    const VALID_RECORD_MODES = new Set(['', 'full', 'headers', 'off']);
+    let recordMode = VALID_RECORD_MODES.has(this._config.recordMode)
       ? this._config.recordMode
       : 'off';
+    // Map "full" → "" for relay protocol compatibility ("" means full recording).
+    if (recordMode === 'full') recordMode = '';
     req.addFeature(FeatureMetadata, { 'record.mode': recordMode });
 
     this._ws.send(req.encode().buffer);

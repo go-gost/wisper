@@ -15,7 +15,7 @@ type PageMode = 'view' | 'edit' | 'create';
 const RECORD_MODE_OPTIONS: { value: string; labelKey: string }[] = [
   { value: 'off', labelKey: 'settingsRecordOff' },
   { value: 'headers', labelKey: 'settingsRecordHeaders' },
-  { value: '', labelKey: 'settingsRecordFull' },
+  { value: 'full', labelKey: 'settingsRecordFull' },
 ];
 
 @customElement('tunnel-detail-page')

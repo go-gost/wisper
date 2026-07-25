@@ -172,7 +172,7 @@ function updateI18nElements() {
 const RECORD_OPTIONS = [
   { value: 'off', label: 'recordOff' },
   { value: 'headers', label: 'recordHeaders' },
-  { value: '', label: 'recordFull' },
+  { value: 'full', label: 'recordFull' },
 ];
 
 // ── Theme ────────────────────────────────────────────────────────────

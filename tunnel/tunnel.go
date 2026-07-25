@@ -366,7 +366,7 @@ func ChainConfig(id string, name string, recordMode string) *xconfig.ChainConfig
 
 	rm := recordMode
 	if rm == "" {
-		rm = "off"
+		rm = "off" // Not set — privacy-preserving default.
 	}
 	md := map[string]any{"tunnel.id": id, "record.mode": rm}
 
