@@ -251,6 +251,10 @@ export class HomePage extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      overflow-anchor: none;
+    }
+    .expand-panel * {
+      overflow-anchor: none;
     }
 
     .expand-row {
@@ -270,6 +274,7 @@ export class HomePage extends LitElement {
 
     .expand-actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin-top: 4px;
     }
@@ -781,7 +786,7 @@ export class HomePage extends LitElement {
                   const isExpanded = this._expandedId === item.data.id;
 
                   return html`
-                    <div>
+                    <div data-item-id="${item.data.id}">
                       <tunnel-card
                         .name=${item.data.name}
                         .typeLabel=${this._typeLabel(item)}

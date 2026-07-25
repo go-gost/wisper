@@ -48,6 +48,10 @@ export class AppScaffold extends LitElement {
       flex: 1;
       display: flex;
       flex-direction: column;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
     }
 
     .fab-slot {
