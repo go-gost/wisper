@@ -3,8 +3,8 @@ module github.com/go-gost/wisper
 go 1.26.4
 
 require (
-	github.com/go-gost/core v0.5.4
-	github.com/go-gost/x v0.13.16
+	github.com/go-gost/core v0.5.5
+	github.com/go-gost/x v0.13.18
 	github.com/google/uuid v1.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
