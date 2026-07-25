@@ -195,13 +195,13 @@ class WisperService : Service() {
 
             val rateText = String.format(
                 "↑ %s/s  ↓ %s/s",
-                formatBytes(combinedOutRate),
-                formatBytes(combinedInRate)
+                formatBytes(combinedInRate),
+                formatBytes(combinedOutRate)
             )
             val totalText = String.format(
                 "↑ %s  ↓ %s",
-                formatBytes(combinedOutBytes),
-                formatBytes(combinedInBytes)
+                formatBytes(combinedInBytes),
+                formatBytes(combinedOutBytes)
             )
 
             updateNotification(rateText, totalText)
