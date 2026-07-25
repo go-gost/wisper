@@ -24,6 +24,7 @@ export class TunnelConnection {
    * @param {object} [config.auth] — { username, password }
    * @param {string} [config.relayUrl] — defaults to wss://wisper.gost.run:443
    * @param {string} [config.entrypointUrl] — pre-computed public URL, e.g. "https://abc123.gost.run"
+   * @param {string} [config.prefix] — custom URL host prefix for the bind address
    */
   constructor(config) {
     this._config = config;
@@ -80,6 +81,22 @@ export class TunnelConnection {
             // Extract connector ID
             const tunnelFeat = findFeature(resp.features, FeatureTunnel);
             this._connectorId = tunnelFeat ? tunnelFeat.value : null;
+
+            // Extract bound address from the relay response. The server
+            // returns the actual entrypoint host — the requested prefix if
+            // accepted, or the MD5 hash fallback if the prefix was taken or
+            // no prefix was requested. Update bindAddr so the entrypoint
+            // URL reflects the negotiated host.
+            const addrFeat = findFeature(resp.features, FeatureAddr);
+            if (addrFeat && addrFeat.value && addrFeat.value.host) {
+              const host = addrFeat.value.host;
+              if (host !== '0.0.0.0' && host !== '::' && this._bindAddr) {
+                const dot = this._bindAddr.indexOf('.');
+                if (dot !== -1) {
+                  this._bindAddr = `https://${host}${this._bindAddr.substring(dot)}`;
+                }
+              }
+            }
 
             // Initialize SMUX server
             this._smux = new SmuxServer({
@@ -202,7 +219,11 @@ export class TunnelConnection {
     req.addFeature(FeatureAddr, [host, port]);
 
     // AddrFeature for destination
-    req.addFeature(FeatureAddr, ['0.0.0.0', port]);
+    // When a custom prefix is set, use it as the bind host instead of 0.0.0.0
+    // so the relay binds to the requested hostname. Falls back to 0.0.0.0
+    // (default MD5-hash-based address) when no prefix is configured.
+    const bindHost = ((this._config.prefix || '').trim().toLowerCase()) || '0.0.0.0';
+    req.addFeature(FeatureAddr, [bindHost, port]);
 
     // NetworkFeature (TCP)
     req.addFeature(FeatureNetwork, NetworkTCP);

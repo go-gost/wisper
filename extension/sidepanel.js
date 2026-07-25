@@ -13,6 +13,9 @@ const TRANSLATIONS = {
     fieldName: 'Name',
     fieldTarget: 'Target',
     fieldHostname: 'Hostname',
+    fieldPrefix: 'URL Prefix',
+    fieldPrefixHint: 'Custom URL host, 8-63 chars: a-z, 0-9, hyphens. Falls back to a random host if taken.',
+    invalidPrefix: 'Invalid prefix: 8-63 lowercase letters, digits or hyphens; cannot start or end with a hyphen',
     fieldAuth: 'Basic Auth',
     fieldUsername: 'Username',
     fieldPassword: 'Password',
@@ -82,6 +85,9 @@ const TRANSLATIONS = {
     fieldName: '名称',
     fieldTarget: '目标地址',
     fieldHostname: '主机名',
+    fieldPrefix: 'URL 前缀',
+    fieldPrefixHint: '自定义 URL 主机名，8-63 个字符：小写字母、数字、连字符。被占用时回退为随机主机名。',
+    invalidPrefix: '前缀无效：需 8-63 个小写字母、数字或连字符，且不能以连字符开头或结尾',
     fieldAuth: '基本认证',
     fieldUsername: '用户名',
     fieldPassword: '密码',
@@ -206,6 +212,7 @@ let expandedMap = {};
 let deletingId = null;
 let resettingId = null;
 let _formRecordMode = 'off';
+let _formPrefix = '';
 
 // ── Record mode ───────────────────────────────────────────────────────
 function _cycleRecordMode() {
@@ -268,6 +275,7 @@ function loadTunnels() {
       entrypoint: t.entrypoint || null,
       createdAt: t.createdAt || new Date().toISOString(),
       hostname: t.hostname || '',
+      prefix: t.prefix || '',
       stats: t.stats || null,
       recordMode: t.recordMode != null ? t.recordMode : 'off',
     }));
@@ -305,6 +313,7 @@ function persistTunnels() {
     entrypoint: t.entrypoint,
     createdAt: t.createdAt,
     hostname: t.hostname,
+    prefix: t.prefix,
     stats: t.stats,
       recordMode: t.recordMode != null ? t.recordMode : 'off',
   })) });
@@ -334,6 +343,7 @@ function createTunnel(data) {
     entrypoint: null,
     createdAt: new Date().toISOString(),
     hostname: data.hostname || '',
+    prefix: data.prefix || '',
     stats: null,
     recordMode: data.recordMode != null ? data.recordMode : 'off',
   };
@@ -360,6 +370,7 @@ function startTunnel(tunnelId) {
       localEndpoint: tun.localEndpoint,
       auth: tun.auth,
       hostname: tun.hostname || undefined,
+        prefix: tun.prefix || undefined,
         recordMode: tun.recordMode != null ? tun.recordMode : 'off',
     },
   });
@@ -401,6 +412,7 @@ function updateTunnelStatus(tunnelId, status, error, entrypoint) {
           entrypoint: fromStorage.entrypoint || null,
           createdAt: fromStorage.createdAt || new Date().toISOString(),
           hostname: fromStorage.hostname || '',
+          prefix: fromStorage.prefix || '',
           stats: fromStorage.stats || null,
           recordMode: fromStorage.recordMode != null ? fromStorage.recordMode : 'off',
         });
@@ -472,6 +484,14 @@ function saveForm() {
 
   try {
     const hostname = document.getElementById('fHostname').value;
+    const prefix = document.getElementById('fPrefix').value.trim().toLowerCase();
+    if (prefix && (prefix.length < 8 || prefix.length > 63 || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(prefix))) {
+      showToast(t('invalidPrefix'));
+      formSaving = false;
+      saveBtn.disabled = false;
+      return;
+    }
+    _formPrefix = prefix;
     const hasAuth = document.getElementById('fAuth').classList.contains('on');
     const username = hasAuth ? document.getElementById('fUsername').value : '';
     const password = hasAuth ? document.getElementById('fPassword').value : '';
@@ -480,6 +500,7 @@ function saveForm() {
       name: name.trim() || undefined,
       endpoint: endpoint.trim(),
       hostname: hostname.trim() || undefined,
+      prefix: _formPrefix || undefined,
       username: username.trim() || undefined,
       password: password || undefined,
       recordMode: _formRecordMode,
@@ -492,6 +513,7 @@ function saveForm() {
         oldTunnel.name = formData.name || oldTunnel.name;
         oldTunnel.localEndpoint = formData.endpoint;
         oldTunnel.hostname = formData.hostname;
+        oldTunnel.prefix = formData.prefix;
         oldTunnel.auth = formData.username
           ? { username: formData.username, password: formData.password || '' }
           : undefined;
@@ -865,6 +887,10 @@ function buildCard(tun) {
     detailCard.appendChild(expandDetailRow(t('detailHostRewrite'), tun.hostname, false));
   }
 
+  if (tun.prefix) {
+    detailCard.appendChild(expandDetailRow(t('fieldPrefix'), tun.prefix, false));
+  }
+
   if (tun.error) {
     const errRow = document.createElement('div');
     errRow.className = 'detail-row error';
@@ -1010,11 +1036,13 @@ function openNewForm() {
   document.getElementById('fName').value = '';
   document.getElementById('fEndpoint').value = '';
   document.getElementById('fHostname').value = '';
+  document.getElementById('fPrefix').value = '';
   document.getElementById('fAuth').classList.remove('on');
   document.getElementById('authFields').style.display = 'none';
   document.getElementById('fUsername').value = '';
   document.getElementById('fPassword').value = '';
   _formRecordMode = 'off';
+  _formPrefix = '';
   _refreshRecordModeValue();
   switchView('form');
 }
@@ -1029,6 +1057,8 @@ function openEditForm(tunnelId) {
   document.getElementById('fName').value = tun.name || '';
   document.getElementById('fEndpoint').value = tun.localEndpoint || '';
   document.getElementById('fHostname').value = tun.hostname || '';
+  document.getElementById('fPrefix').value = tun.prefix || '';
+  _formPrefix = tun.prefix || '';
 
   const hasAuth = !!(tun.auth && tun.auth.username);
   if (hasAuth) {
@@ -1210,7 +1240,7 @@ function bindEvents() {
   }
 
   // Enter key in form inputs
-  const formInputs = ['fName', 'fEndpoint', 'fHostname', 'fUsername', 'fPassword'];
+  const formInputs = ['fName', 'fEndpoint', 'fHostname', 'fPrefix', 'fUsername', 'fPassword'];
   formInputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('keydown', (e) => {
