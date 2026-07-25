@@ -157,8 +157,11 @@ const en: Record<string, string> = {
   // Recording
   settingsRecordMode: 'Recording',
   settingsRecordFull: 'Full',
+  settingsRecordFullDesc: 'Request/response headers and body are recorded for debugging. User data will be transmitted to and stored on the Wisper server.',
   settingsRecordHeaders: 'Headers only',
+  settingsRecordHeadersDesc: 'Only request/response metadata (method, URL, status, headers) is recorded. Body content is excluded. Metadata is transmitted to the Wisper server.',
   settingsRecordOff: 'Off',
+  settingsRecordOffDesc: 'No traffic data is captured. Only aggregate byte/connection counts are collected.',
 };
 
 export default en;

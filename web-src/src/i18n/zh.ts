@@ -157,8 +157,11 @@ const zh: Record<string, string> = {
   // Recording
   settingsRecordMode: '记录',
   settingsRecordFull: '完整',
+  settingsRecordFullDesc: '记录请求/响应的头信息和正文内容，用于调试。用户数据将被传输到 Wisper 服务器保存。',
   settingsRecordHeaders: '仅头信息',
+  settingsRecordHeadersDesc: '仅记录请求/响应元数据（方法、URL、状态码、头信息），不含正文。元数据将传输到 Wisper 服务器。',
   settingsRecordOff: '关闭',
+  settingsRecordOffDesc: '不捕获任何流量数据，仅收集聚合的字节数和连接数统计。',
 };
 
 export default zh;

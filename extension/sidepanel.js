@@ -63,6 +63,9 @@ const TRANSLATIONS = {
     recordOff: 'Off',
     recordHeaders: 'Headers only',
     recordFull: 'Full',
+    recordFullDesc: 'Request/response headers and body are recorded for debugging. User data will be transmitted to and stored on the Wisper server.',
+    recordHeadersDesc: 'Only request/response metadata (method, URL, status, headers) is recorded. Metadata is transmitted to the Wisper server.',
+    recordOffDesc: 'No traffic data is captured. Only aggregate byte/connection counts are collected.',
     dialogResetTitle: 'Reset Stats',
     dialogResetMsg: 'Reset traffic counters for this tunnel? This cannot be undone.',
     btnResetConfirm: 'Reset',
@@ -129,6 +132,9 @@ const TRANSLATIONS = {
     recordOff: '关闭',
     recordHeaders: '仅头信息',
     recordFull: '完整',
+    recordFullDesc: '记录请求/响应的头信息和正文内容，用于调试。用户数据将被传输到 Wisper 服务器保存。',
+    recordHeadersDesc: '仅记录请求/响应元数据（方法、URL、状态码、头信息），不含正文。元数据将传输到 Wisper 服务器。',
+    recordOffDesc: '不捕获任何流量数据，仅收集聚合的字节数和连接数统计。',
     dialogResetTitle: '重置计数',
     dialogResetMsg: '确定要重置该隧道的流量计数吗？此操作不可撤销。',
     btnResetConfirm: '重置',
@@ -170,9 +176,9 @@ function updateI18nElements() {
 
 // ── Record mode options ───────────────────────────────────────────
 const RECORD_OPTIONS = [
-  { value: 'off', label: 'recordOff' },
-  { value: 'headers', label: 'recordHeaders' },
-  { value: 'full', label: 'recordFull' },
+  { value: 'off', label: 'recordOff', desc: 'recordOffDesc', warn: false },
+  { value: 'headers', label: 'recordHeaders', desc: 'recordHeadersDesc', warn: true },
+  { value: 'full', label: 'recordFull', desc: 'recordFullDesc', warn: true },
 ];
 
 // ── Theme ────────────────────────────────────────────────────────────
@@ -213,6 +219,22 @@ function _refreshRecordModeValue() {
   if (!el) return;
   const opt = RECORD_OPTIONS.find(o => o.value === _formRecordMode);
   el.textContent = opt ? t(opt.label) : t('recordOff');
+
+  // Update description text with warning for headers/full
+  const descEl = document.getElementById('fRecordModeDesc');
+  if (!descEl) return;
+  if (opt && opt.desc) {
+    descEl.textContent = t(opt.desc);
+    descEl.style.display = 'block';
+    // Red warning for modes that record user data (headers/full)
+    if (opt.warn) {
+      descEl.style.color = 'var(--red, #e74c3c)';
+    } else {
+      descEl.style.color = 'var(--text-muted)';
+    }
+  } else {
+    descEl.style.display = 'none';
+  }
 }
 
 // ── Init ───────────────────────────────────────────────────────────────

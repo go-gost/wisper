@@ -12,11 +12,15 @@ import '../components/app-scaffold';
 
 type PageMode = 'view' | 'edit' | 'create';
 
-const RECORD_MODE_OPTIONS: { value: string; labelKey: string }[] = [
-  { value: 'off', labelKey: 'settingsRecordOff' },
-  { value: 'headers', labelKey: 'settingsRecordHeaders' },
-  { value: 'full', labelKey: 'settingsRecordFull' },
+const RECORD_MODE_OPTIONS: { value: string; labelKey: string; descKey: string; warn?: boolean }[] = [
+  { value: 'off', labelKey: 'settingsRecordOff', descKey: 'settingsRecordOffDesc' },
+  { value: 'headers', labelKey: 'settingsRecordHeaders', descKey: 'settingsRecordHeadersDesc', warn: true },
+  { value: 'full', labelKey: 'settingsRecordFull', descKey: 'settingsRecordFullDesc', warn: true },
 ];
+
+function recordOption(mode: string) {
+  return RECORD_MODE_OPTIONS.find(o => o.value === mode) ?? RECORD_MODE_OPTIONS[2];
+}
 
 @customElement('tunnel-detail-page')
 export class TunnelDetailPage extends LitElement {
@@ -277,7 +281,6 @@ export class TunnelDetailPage extends LitElement {
   private _setRecordMode(mode: string) {
     this._recordMode = mode;
     this.requestUpdate();
-    this._showSnackbar('✓ ' + t(RECORD_MODE_OPTIONS.find(o => o.value === mode)?.labelKey ?? 'settingsRecordFull'));
   }
 
   // ── Styles ───────────────────────────────────────────────────────────
@@ -440,6 +443,10 @@ export class TunnelDetailPage extends LitElement {
 
     .info-value.uuid {
       font-size: var(--font-sm);
+    }
+
+    .record-warn {
+      color: var(--red) !important;
     }
 
     .copy-btn-mini {
@@ -869,6 +876,12 @@ export class TunnelDetailPage extends LitElement {
                   <span class="info-label">Recording</span>
                   <span class="info-value text">${t(RECORD_MODE_OPTIONS.find(o => o.value === this._recordMode)?.labelKey ?? 'settingsRecordFull')}</span>
                 </div>
+                <div class="info-row" style="margin-top:-8px;">
+                  <span class="info-label"></span>
+                  <span class="info-value text ${this._recordMode !== 'off' ? 'record-warn' : ''}" style="font-size:var(--font-xs);line-height:1.5;">
+                    ${t(recordOption(this._recordMode).descKey)}
+                  </span>
+                </div>
                 <div class="info-row">
                   <span class="info-label">ID</span>
                   <span class="info-value uuid">${t2.id}</span>
@@ -1008,6 +1021,10 @@ export class TunnelDetailPage extends LitElement {
                     ${t(RECORD_MODE_OPTIONS.find(o => o.value === this._recordMode)?.labelKey ?? 'settingsRecordFull')}
                     ${icon('chevron-right')}
                   </span>
+                </div>
+                <div class="record-desc ${this._recordMode !== 'off' ? 'record-warn' : ''}"
+                  style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding:0 16px 14px;">
+                  ${t(recordOption(this._recordMode).descKey)}
                 </div>
 
                 <!-- Auth section (HTTP/File) -->
