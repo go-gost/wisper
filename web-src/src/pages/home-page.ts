@@ -245,7 +245,7 @@ export class HomePage extends LitElement {
 
     /* ── Expand panel ── */
     .expand-panel {
-      padding: 12px 16px 12px 30px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
       display: flex;
@@ -349,7 +349,7 @@ export class HomePage extends LitElement {
     }
     .detail-row .dval {
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      font-size: var(--font-md);
+      font-size: var(--font-sm);
       color: var(--text);
       display: flex;
       align-items: center;
