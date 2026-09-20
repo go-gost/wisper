@@ -24,17 +24,12 @@ import {
 
 export async function handleRequest(stream, req, config) {
   try {
-    // HTTP basic auth guards the public endpoint. It uses the PROXY credential
-    // (Proxy-Authorization / 407 + Proxy-Authenticate), not the origin
-    // credential (Authorization / 401), mirroring Go's sniffer_http.go. The two
-    // header fields are separate so a client can authenticate to the tunnel and
-    // to the backend independently — reading Authorization here would swallow
-    // the credentials meant for a backend that also uses Basic auth.
-    // Enforced client-side because the relay only pipes bytes — the tunnel
-    // operator (this forwarder) is where auth must happen. Proxy-Authorization
-    // is hop-by-hop, so it never reaches the backend (see isHopByHopHeader).
+    // HTTP basic auth guards the public endpoint (matches Go's sniffer_http.go:
+    // it checks req.BasicAuth() and returns 401 + WWW-Authenticate before ever
+    // reaching the backend). Enforced client-side because the relay only pipes
+    // bytes — the tunnel operator (this forwarder) is where auth must happen.
     if (!isAuthorized(req.headers, config.auth)) {
-      await writeProxyAuthRequired(stream);
+      await writeUnauthorized(stream);
       return;
     }
     if (isWebSocketUpgrade(req.headers)) {
@@ -80,18 +75,16 @@ export function headerHasToken(headers, name, token) {
 // ── HTTP basic auth ────────────────────────────────────────────────────
 
 /**
- * Validate the visitor's `Proxy-Authorization: Basic` header against the
- * tunnel's configured credentials. Returns true when auth is not configured
- * (no username) or when the supplied credentials match exactly.
+ * Validate the visitor's `Authorization: Basic` header against the tunnel's
+ * configured credentials. Returns true when auth is not configured (no
+ * username) or when the supplied credentials match exactly.
  *
- * Mirrors Go's sniffer_http.go node auth: the tunnel credential is the proxy
- * credential, so `Authorization` stays free for the proxied backend's own auth.
- * base64-decode the token, split the "username:password" on the FIRST colon
- * (passwords may contain colons).
+ * Mirrors Go's http.Request.BasicAuth(): base64-decode the token, split the
+ * "username:password" on the FIRST colon (passwords may contain colons).
  */
 export function isAuthorized(headers, auth) {
   if (!auth || !auth.username) return true; // auth not configured → open
-  const header = firstHeader(headers, 'proxy-authorization');
+  const header = firstHeader(headers, 'authorization');
   if (!header) return false;
   const m = /^basic\s+(\S+)$/i.exec(header.trim());
   if (!m) return false;
@@ -115,12 +108,12 @@ function decodeBase64Utf8(b64) {
   return new TextDecoder().decode(bytes);
 }
 
-/** Write a 407 with Proxy-Authenticate: Basic and close the stream. */
-async function writeProxyAuthRequired(stream) {
-  const body = 'Proxy Authentication Required';
+/** Write a 401 with WWW-Authenticate: Basic and close the stream. */
+async function writeUnauthorized(stream) {
+  const body = 'Unauthorized';
   const head =
-    'HTTP/1.1 407 Proxy Authentication Required\r\n' +
-    'Proxy-Authenticate: Basic\r\n' +
+    'HTTP/1.1 401 Unauthorized\r\n' +
+    'WWW-Authenticate: Basic\r\n' +
     'Content-Type: text/plain\r\n' +
     `Content-Length: ${body.length}\r\n` +
     '\r\n';
