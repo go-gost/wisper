@@ -273,7 +273,9 @@ describe('Bug 5: chunked request body decoding', () => {
 // ── HTTP basic auth (public-endpoint guard) ────────────────────────────
 
 const b64 = (s) => Buffer.from(s).toString('base64');
-const authHeader = (v) => ({ authorization: [v] });
+// Tunnel auth is the PROXY credential (Proxy-Authorization), leaving
+// Authorization free for the proxied backend's own Basic auth.
+const authHeader = (v) => ({ 'proxy-authorization': [v] });
 
 describe('HTTP basic auth: isAuthorized', () => {
   const auth = { username: 'admin', password: 'p:ss' }; // password with a colon
@@ -313,7 +315,7 @@ describe('HTTP basic auth: isAuthorized', () => {
   });
 });
 
-describe('HTTP basic auth: handleRequest 401', () => {
+describe('HTTP basic auth: handleRequest 407', () => {
   function mockStream() {
     const writes = [];
     return {
@@ -332,8 +334,8 @@ describe('HTTP basic auth: handleRequest 401', () => {
     // short-circuit must fire first, so no fetch and a clean close.
     await handleRequest(stream, req, { localEndpoint: '127.0.0.1:1', auth: { username: 'admin', password: 'x' } });
     const out = stream.text();
-    assert.match(out, /^HTTP\/1\.1 401 Unauthorized\r\n/);
-    assert.match(out, /WWW-Authenticate: Basic\r\n/);
+    assert.match(out, /^HTTP\/1\.1 407 Proxy Authentication Required\r\n/);
+    assert.match(out, /Proxy-Authenticate: Basic\r\n/);
     assert.equal(stream.closed, true);
   });
 });
