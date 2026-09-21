@@ -8,15 +8,16 @@
 //
 // Runs:
 //
-//	R0  addressing as-is: the local handler appends ":0" to the peer key,
-//	    which parsePeerKey rejects, so the tunnel dial fails before data flows.
-//	R1  addressing shim only: the in-process provider's conn carries no
-//	    datagram framing (the gRPC plugin's does), so the outlet's frame
-//	    parser never sees a frame.
-//	R2  addressing + framing shims: the baseline datagram path.
-//	R3  two concurrent clients on R2: the second dial replaces the channel's
-//	    local edge (last-dial-wins) and frames carry no client identity, so an
-//	    in-flight reply is cross-delivered.
+//	R0  provider as shipped: the in-process conn carries no datagram framing
+//	    (the gRPC plugin's does), so the outlet's frame parser never sees a
+//	    frame. The addressing hypothesis this run was meant to probe did NOT
+//	    reproduce: the chain route dials node.Addr, the clean key, and the
+//	    local handler's ":0" suffix lands only on the target address, which the
+//	    forward connector ignores.
+//	R2  with a framing shim: the baseline datagram path.
+//	R3  two concurrent clients on R2 (keepalive=true): the second dial replaces
+//	    the channel's local edge (last-dial-wins) and frames carry no client
+//	    identity, so an in-flight reply is cross-delivered.
 //
 // Run:
 //
@@ -215,7 +216,7 @@ func startDerper(t *testing.T) string {
 // first datagram while its peer edge is attached.
 func TestP2PUDPFramedBaseline(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
-		return framedProvider{inner: stripPortProvider{inner: pr}}
+		return framedProvider{inner: pr}
 	}, 0, false)
 
 	c := udpClient(t, entry)
@@ -252,20 +253,6 @@ func startUDPEcho(t *testing.T, d time.Duration) string {
 		}
 	}()
 	return pc.LocalAddr().String()
-}
-
-// stripPortProvider drops a ":port" suffix from the peer before the tunnel is
-// opened. Test-local: it stands in for the addressing fix the entrypoint shape
-// needs (the local handler appends ":0" to a key-shaped node addr).
-type stripPortProvider struct{ inner xp2p.TunnelProvider }
-
-func (p stripPortProvider) Close() error { return p.inner.Close() }
-
-func (p stripPortProvider) OpenTunnelStream(ctx context.Context, network, peer string) (net.Conn, error) {
-	if host, _, err := net.SplitHostPort(peer); err == nil {
-		peer = host
-	}
-	return p.inner.OpenTunnelStream(ctx, network, peer)
 }
 
 // framedProvider adapts the in-process provider's raw conn to the datagram
@@ -442,42 +429,26 @@ func udpRetryRoundTrip(t *testing.T, c net.Conn, payload string, budget time.Dur
 	}
 }
 
-// TestP2PUDPEntrypointAddressing is R0: the entrypoint shape as shipped cannot
-// address the peer. The local handler appends ":0" to a key-shaped node addr
-// (x/handler/forward/local) and p2p's parsePeerKey wants the whole string to be
-// the base64 key, so the dial fails before any data flows. When the addressing
-// is fixed this test should be inverted (it will then behave like R1).
-func TestP2PUDPEntrypointAddressing(t *testing.T) {
+// TestP2PUDPRawConnNoFraming is R0, the provider as shipped: the in-process
+// conn carries no datagram framing while the outlet parses 2-byte
+// length-prefixed frames, so it reads the payload's first two bytes as a
+// length and waits for bytes that never come. Three sends cover the channel
+// bring-up loss: with correct framing the second or third would round-trip
+// (R2), so a persistent silence is the framing gap. When the framing is fixed
+// this test should be inverted.
+//
+// The addressing hypothesis this run was originally meant to probe did not
+// reproduce (measured): the chain route dials node.Addr — the clean key — and
+// the local handler's ":0" suffix lands only on the target address, which the
+// forward connector ignores. The tunnel dial succeeds and the channel comes up.
+func TestP2PUDPRawConnNoFraming(t *testing.T) {
 	entry := startUDPEntrypoint(t, nil, 0, false)
 
 	c := udpClient(t, entry)
-	udpSend(t, c, "ping-r0")
-	got, err := udpRead(t, c, 3*time.Second)
-	if err == nil {
-		t.Fatalf("round trip succeeded (echo=%q): the entrypoint addressing seam appears fixed", got)
-	}
-	t.Logf("R0 signature: no reply (%v)", err)
-}
-
-// TestP2PUDPRawProviderNoFraming is R1: with the addressing fixed but the
-// provider as shipped, the in-process conn carries no datagram framing while
-// the outlet parses 2-byte length-prefixed frames: it reads the payload's
-// first two bytes as a length and waits for bytes that never come. The warm-up
-// send takes the channel bring-up loss out of the picture, so the measured
-// datagram is lost to framing alone. When the framing is fixed this test
-// should be inverted.
-func TestP2PUDPRawProviderNoFraming(t *testing.T) {
-	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
-		return stripPortProvider{inner: pr}
-	}, 0, false)
-
-	c := udpClient(t, entry)
-	// Three sends cover the bring-up loss: with correct framing the second or
-	// third would round-trip (R2), so a persistent silence is the framing gap.
 	var got string
 	var err error
 	for i := 0; i < 3; i++ {
-		udpSend(t, c, "ping-r1")
+		udpSend(t, c, "ping-r0")
 		got, err = udpRead(t, c, time.Second)
 		if err == nil {
 			break
@@ -486,5 +457,5 @@ func TestP2PUDPRawProviderNoFraming(t *testing.T) {
 	if err == nil {
 		t.Fatalf("round trip succeeded (echo=%q): the in-process framing gap appears fixed", got)
 	}
-	t.Logf("R1 signature: no reply after 3 sends (%v)", err)
+	t.Logf("R0 signature: no reply after 3 sends (%v)", err)
 }
