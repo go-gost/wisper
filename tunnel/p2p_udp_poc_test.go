@@ -441,3 +441,20 @@ func udpRetryRoundTrip(t *testing.T, c net.Conn, payload string, budget time.Dur
 		}
 	}
 }
+
+// TestP2PUDPEntrypointAddressing is R0: the entrypoint shape as shipped cannot
+// address the peer. The local handler appends ":0" to a key-shaped node addr
+// (x/handler/forward/local) and p2p's parsePeerKey wants the whole string to be
+// the base64 key, so the dial fails before any data flows. When the addressing
+// is fixed this test should be inverted (it will then behave like R1).
+func TestP2PUDPEntrypointAddressing(t *testing.T) {
+	entry := startUDPEntrypoint(t, nil, 0, false)
+
+	c := udpClient(t, entry)
+	udpSend(t, c, "ping-r0")
+	got, err := udpRead(t, c, 3*time.Second)
+	if err == nil {
+		t.Fatalf("round trip succeeded (echo=%q): the entrypoint addressing seam appears fixed", got)
+	}
+	t.Logf("R0 signature: no reply (%v)", err)
+}
