@@ -27,12 +27,14 @@
 package tunnel_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"net"
 	"os"
@@ -41,6 +43,28 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-gost/core/chain"
+	"github.com/go-gost/core/handler"
+	"github.com/go-gost/core/listener"
+	clogger "github.com/go-gost/core/logger"
+	"github.com/go-gost/p2p"
+	"github.com/go-gost/plugin/p2p/proto"
+	xchain "github.com/go-gost/x/chain"
+	xconfig "github.com/go-gost/x/config"
+	chain_parser "github.com/go-gost/x/config/parsing/chain"
+	_ "github.com/go-gost/x/connector/forward" // register the transparent connector
+	_ "github.com/go-gost/x/dialer/udp"        // register the datagram dialer
+	"github.com/go-gost/x/handler/forward/local"
+	"github.com/go-gost/x/hop"
+	xudp "github.com/go-gost/x/listener/udp"
+	mdx "github.com/go-gost/x/metadata"
+	xp2p "github.com/go-gost/x/p2p"
+	"github.com/go-gost/x/p2p/streamconn"
+	"github.com/go-gost/x/registry"
+	xservice "github.com/go-gost/x/service"
+
+	wtunnel "github.com/go-gost/wisper/tunnel"
 )
 
 const p2pUDPProvider = "p2p-udp-poc"
@@ -183,4 +207,237 @@ func startDerper(t *testing.T) string {
 		time.Sleep(200 * time.Millisecond)
 	}
 	return "wss://" + addr + "/derp"
+}
+
+// TestP2PUDPFramedBaseline is R2: with the addressing and framing shims the
+// datagram path is correct — the baseline that proves R1's failure is framing,
+// not the harness. The send is retried because the channel drops the session's
+// first datagram while its peer edge is attached.
+func TestP2PUDPFramedBaseline(t *testing.T) {
+	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
+		return framedProvider{inner: stripPortProvider{inner: pr}}
+	}, 0, false)
+
+	c := udpClient(t, entry)
+	got, sends := udpRetryRoundTrip(t, c, "ping-r2", 5*time.Second)
+	if got != "ping-r2" {
+		t.Fatalf("round trip through the udp entrypoint: got %q after %d send(s)", got, sends)
+	}
+	t.Logf("R2 signature: reply after %d send(s) (the session's first datagram is dropped during channel bring-up)", sends)
+}
+
+// startUDPEcho starts a UDP echo server; replies are delayed by d (R3 uses the
+// delay to engineer the overlap).
+func startUDPEcho(t *testing.T, d time.Duration) string {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pc.Close() })
+	go func() {
+		buf := make([]byte, 2048)
+		for {
+			n, addr, err := pc.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			p := append([]byte(nil), buf[:n]...)
+			go func() {
+				if d > 0 {
+					time.Sleep(d)
+				}
+				_, _ = pc.WriteTo(p, addr)
+			}()
+		}
+	}()
+	return pc.LocalAddr().String()
+}
+
+// stripPortProvider drops a ":port" suffix from the peer before the tunnel is
+// opened. Test-local: it stands in for the addressing fix the entrypoint shape
+// needs (the local handler appends ":0" to a key-shaped node addr).
+type stripPortProvider struct{ inner xp2p.TunnelProvider }
+
+func (p stripPortProvider) Close() error { return p.inner.Close() }
+
+func (p stripPortProvider) OpenTunnelStream(ctx context.Context, network, peer string) (net.Conn, error) {
+	if host, _, err := net.SplitHostPort(peer); err == nil {
+		peer = host
+	}
+	return p.inner.OpenTunnelStream(ctx, network, peer)
+}
+
+// framedProvider adapts the in-process provider's raw conn to the datagram
+// framing the gRPC plugin path gets from x/p2p/streamconn. Test-local: it
+// stands in for the missing production wrapper.
+type framedProvider struct{ inner xp2p.TunnelProvider }
+
+func (p framedProvider) Close() error { return p.inner.Close() }
+
+func (p framedProvider) OpenTunnelStream(ctx context.Context, network, peer string) (net.Conn, error) {
+	c, err := p.inner.OpenTunnelStream(ctx, network, peer)
+	if err != nil || network != "udp" {
+		return c, err
+	}
+	return streamconn.New(connStream{c: c}, func() { c.Close() }, "udp", c.LocalAddr(), c.RemoteAddr()), nil
+}
+
+// connStream presents a net.Conn as a streamconn.Stream.
+type connStream struct{ c net.Conn }
+
+func (s connStream) Send(ch *proto.Chunk) error {
+	_, err := s.c.Write(ch.GetData())
+	return err
+}
+
+func (s connStream) Recv() (*proto.Chunk, error) {
+	b := make([]byte, 32*1024)
+	n, err := s.c.Read(b)
+	if n > 0 {
+		return &proto.Chunk{Data: b[:n]}, nil
+	}
+	return nil, err
+}
+
+func (s connStream) Context() context.Context { return context.Background() }
+
+// startUDPEntrypoint runs the whole shape and returns the entrypoint's local
+// udp address. wrap adapts the registered provider (nil = as shipped);
+// keepalive mirrors the entrypoint's listener option (wisper's default false).
+func startUDPEntrypoint(t *testing.T, wrap func(xp2p.TunnelProvider) xp2p.TunnelProvider, echoDelay time.Duration, keepalive bool) string {
+	t.Helper()
+	derp := startDerper(t)
+	echo := startUDPEcho(t, echoDelay)
+
+	direct, secure := false, false
+	newHost := func(keyHex string, targets []string) *p2p.Host {
+		h, err := p2p.New(&p2p.Config{
+			Derp:    derp,
+			KeyHex:  keyHex,
+			Direct:  &direct,
+			TLS:     &p2p.TLSConfig{Secure: &secure},
+			Targets: targets,
+		}, p2p.WithLogger(slog.Default()))
+		if err != nil {
+			t.Fatalf("new p2p host: %v", err)
+		}
+		t.Cleanup(func() { _ = h.Close() })
+		if err := h.Connect(); err != nil {
+			t.Fatalf("p2p connect to derper: %v", err)
+		}
+		return h
+	}
+	// B holds the udp target outlet; A dials out through the tunnel.
+	outlet := newHost(strings.Repeat("11", 32), []string{"udp://" + echo})
+	dialer := newHost(strings.Repeat("22", 32), nil)
+
+	var pr xp2p.TunnelProvider = dialer.Provider()
+	if wrap != nil {
+		pr = wrap(pr)
+	}
+	if err := registry.P2PRegistry().Register(p2pUDPProvider, pr); err != nil {
+		t.Fatalf("register provider: %v", err)
+	}
+	t.Cleanup(func() { registry.P2PRegistry().Unregister(p2pUDPProvider) })
+
+	// Mirror tunnel/entrypoint/udp.go Run(): patch the chain node onto the p2p
+	// peer, then wire the udp listener + local handler + router + hop.
+	chCfg := wtunnel.ChainConfig("p2p-udp-poc", "p2p-udp-poc", "off")
+	node := chCfg.Hops[0].Nodes[0]
+	node.Addr = outlet.PublicKey()
+	node.Connector = &xconfig.ConnectorConfig{Type: "forward"}
+	node.Dialer = &xconfig.DialerConfig{Type: "udp"}
+	node.Metadata = map[string]any{"p2p": p2pUDPProvider}
+
+	log := clogger.Default().WithFields(map[string]any{"kind": "service", "service": "p2p-udp-poc"})
+	ch, err := chain_parser.ParseChain(chCfg, log)
+	if err != nil {
+		t.Fatalf("parse chain: %v", err)
+	}
+
+	ln := xudp.NewListener(
+		listener.AddrOption("127.0.0.1:0"),
+		listener.LoggerOption(log),
+	)
+	if err := ln.Init(mdx.NewMetadata(map[string]any{"keepalive": keepalive})); err != nil {
+		t.Fatalf("listener init: %v", err)
+	}
+
+	h := local.NewHandler(
+		handler.RouterOption(xchain.NewRouter(
+			chain.ChainRouterOption(ch),
+			chain.LoggerRouterOption(log),
+		)),
+		handler.LoggerOption(log),
+	)
+	if err := h.Init(mdx.NewMetadata(nil)); err != nil {
+		t.Fatalf("handler init: %v", err)
+	}
+	h.(handler.Forwarder).Forward(hop.NewHop(
+		hop.NodeOption(chain.NewNode("p2p-udp-poc", outlet.PublicKey())),
+		hop.LoggerOption(log),
+	))
+
+	svc := xservice.NewService("p2p-udp-poc", ln, h, xservice.LoggerOption(log))
+	go func() { _ = svc.Serve() }()
+	t.Cleanup(func() { _ = svc.Close() })
+
+	return ln.Addr().String()
+}
+
+// udpClient dials the entrypoint with a distinct source port.
+func udpClient(t *testing.T, entry string) net.Conn {
+	t.Helper()
+	c, err := net.Dial("udp", entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return c
+}
+
+// udpSend sends one datagram.
+func udpSend(t *testing.T, c net.Conn, payload string) {
+	t.Helper()
+	if err := c.SetWriteDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Write([]byte(payload)); err != nil {
+		t.Fatalf("send %q: %v", payload, err)
+	}
+}
+
+// udpRead waits for one datagram.
+func udpRead(t *testing.T, c net.Conn, timeout time.Duration) (string, error) {
+	t.Helper()
+	if err := c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 2048)
+	n, err := c.Read(buf)
+	if err != nil {
+		return "", err
+	}
+	return string(buf[:n]), nil
+}
+
+// udpRetryRoundTrip sends payload until a reply arrives or the budget runs
+// out, returning the reply and the number of sends it took. The channel drops
+// the session's first datagram while its peer edge is attached, and with
+// keepalive=false each reply also closes the session, so the retry opens a
+// fresh session — the loop absorbs both outcomes of that race.
+func udpRetryRoundTrip(t *testing.T, c net.Conn, payload string, budget time.Duration) (string, int) {
+	t.Helper()
+	deadline := time.Now().Add(budget)
+	for sends := 1; ; sends++ {
+		udpSend(t, c, payload)
+		got, err := udpRead(t, c, time.Second)
+		if err == nil {
+			return got, sends
+		}
+		if time.Now().After(deadline) {
+			return "", sends
+		}
+	}
 }
