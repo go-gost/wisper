@@ -275,25 +275,19 @@ git commit -m "test(tunnel): run derper from the local image for the p2p udp har
 ```go
 // TestP2PUDPFramedBaseline is R2: with the addressing and framing shims the
 // datagram path is correct — the baseline that proves R1's failure is framing,
-// not the harness. The warm-up send absorbs the session's first datagram, which
-// the channel drops while its peer edge is still being attached.
+// not the harness. The send is retried because the channel drops the session's
+// first datagram while its peer edge is attached.
 func TestP2PUDPFramedBaseline(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
 		return framedProvider{inner: stripPortProvider{inner: pr}}
-	}, 0)
+	}, 0, false)
 
 	c := udpClient(t, entry)
-	warm := udpWarmup(t, c)
-	t.Logf("R2 warm-up datagram round-tripped: %v (false = dropped during channel bring-up)", warm)
-
-	udpSend(t, c, "ping-r2")
-	got, err := udpRead(t, c, 5*time.Second)
-	if err != nil {
-		t.Fatalf("round trip through the udp entrypoint: %v", err)
-	}
+	got, sends := udpRetryRoundTrip(t, c, "ping-r2", 5*time.Second)
 	if got != "ping-r2" {
-		t.Fatalf("echo = %q, want ping-r2", got)
+		t.Fatalf("round trip through the udp entrypoint: got %q after %d send(s)", got, sends)
 	}
+	t.Logf("R2 signature: reply after %d send(s) (the session's first datagram is dropped during channel bring-up)", sends)
 }
 ```
 
@@ -384,8 +378,9 @@ func (s connStream) Recv() (*proto.Chunk, error) {
 func (s connStream) Context() context.Context { return context.Background() }
 
 // startUDPEntrypoint runs the whole shape and returns the entrypoint's local
-// udp address. wrap adapts the registered provider (nil = as shipped).
-func startUDPEntrypoint(t *testing.T, wrap func(xp2p.TunnelProvider) xp2p.TunnelProvider, echoDelay time.Duration) string {
+// udp address. wrap adapts the registered provider (nil = as shipped);
+// keepalive mirrors the entrypoint's listener option (wisper's default false).
+func startUDPEntrypoint(t *testing.T, wrap func(xp2p.TunnelProvider) xp2p.TunnelProvider, echoDelay time.Duration, keepalive bool) string {
 	t.Helper()
 	derp := startDerper(t)
 	echo := startUDPEcho(t, echoDelay)
@@ -440,7 +435,7 @@ func startUDPEntrypoint(t *testing.T, wrap func(xp2p.TunnelProvider) xp2p.Tunnel
 		listener.AddrOption("127.0.0.1:0"),
 		listener.LoggerOption(log),
 	)
-	if err := ln.Init(mdx.NewMetadata(nil)); err != nil {
+	if err := ln.Init(mdx.NewMetadata(map[string]any{"keepalive": keepalive})); err != nil {
 		t.Fatalf("listener init: %v", err)
 	}
 
@@ -502,15 +497,24 @@ func udpRead(t *testing.T, c net.Conn, timeout time.Duration) (string, error) {
 	return string(buf[:n]), nil
 }
 
-// udpWarmup sends one datagram to bring the session's tunnel up and reports
-// whether that datagram round-tripped. The channel drops bytes until its peer
-// edge is attached, so the first datagram (the one that triggers the dial) is
-// lost by design; later datagrams in the same session round-trip.
-func udpWarmup(t *testing.T, c net.Conn) bool {
+// udpRetryRoundTrip sends payload until a reply arrives or the budget runs
+// out, returning the reply and the number of sends it took. The channel drops
+// the session's first datagram while its peer edge is attached, and with
+// keepalive=false each reply also closes the session, so the retry opens a
+// fresh session — the loop absorbs both outcomes of that race.
+func udpRetryRoundTrip(t *testing.T, c net.Conn, payload string, budget time.Duration) (string, int) {
 	t.Helper()
-	udpSend(t, c, "warmup")
-	_, err := udpRead(t, c, 300*time.Millisecond)
-	return err == nil
+	deadline := time.Now().Add(budget)
+	for sends := 1; ; sends++ {
+		udpSend(t, c, payload)
+		got, err := udpRead(t, c, time.Second)
+		if err == nil {
+			return got, sends
+		}
+		if time.Now().After(deadline) {
+			return "", sends
+		}
+	}
 }
 ```
 
@@ -544,7 +548,7 @@ git commit -m "test(tunnel): in-process udp entrypoint harness over a real derpe
 // the base64 key, so the dial fails before any data flows. When the addressing
 // is fixed this test should be inverted (it will then behave like R1).
 func TestP2PUDPEntrypointAddressing(t *testing.T) {
-	entry := startUDPEntrypoint(t, nil, 0)
+	entry := startUDPEntrypoint(t, nil, 0, false)
 
 	c := udpClient(t, entry)
 	udpSend(t, c, "ping-r0")
@@ -591,23 +595,31 @@ git commit -m "test(tunnel): pin the p2p udp entrypoint addressing failure (R0)"
 func TestP2PUDPRawProviderNoFraming(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
 		return stripPortProvider{inner: pr}
-	}, 0)
+	}, 0, false)
 
 	c := udpClient(t, entry)
-	udpWarmup(t, c) // channel bring-up: the first datagram is dropped either way
-	udpSend(t, c, "ping-r1")
-	got, err := udpRead(t, c, 3*time.Second)
+	// Three sends cover the bring-up loss: with correct framing the second or
+	// third would round-trip (R2), so a persistent silence is the framing gap.
+	var got string
+	var err error
+	for i := 0; i < 3; i++ {
+		udpSend(t, c, "ping-r1")
+		got, err = udpRead(t, c, time.Second)
+		if err == nil {
+			break
+		}
+	}
 	if err == nil {
 		t.Fatalf("round trip succeeded (echo=%q): the in-process framing gap appears fixed", got)
 	}
-	t.Logf("R1 signature: no reply (%v)", err)
+	t.Logf("R1 signature: no reply after 3 sends (%v)", err)
 }
 ```
 
 - [ ] **Step 2: 跑测试并记录实测签名**
 
 Run: `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDPRawProviderNoFraming -v ./tunnel/ 2>&1 | tee /config/tmp/r1.log`
-Expected: PASS，日志含 `R1 signature: no reply (...)`；应能看到 tunnel/channel 建立（与 R0 的 dial 失败区分开），且 warm-up 后 channel 已通（R2 已证）。若实测**通了**：framing 假设被证伪 → 改断言记录实际行为，并在 Task 6 文档写明（可能 framing 由其他层补上）。
+Expected: PASS，日志含 `R1 signature: no reply after 3 sends (...)`；应能看到 tunnel/channel 建立（与 R0 的 dial 失败区分开），而 R2 已证同形态下 3 次内必有回复。若实测**通了**：framing 假设被证伪 → 改断言记录实际行为，并在 Task 6 文档写明（可能 framing 由其他层补上）。
 
 - [ ] **Step 3: 提交**
 
@@ -629,20 +641,25 @@ git commit -m "test(tunnel): pin the in-process provider framing gap (R1)"
 
 ```go
 // TestP2PUDPTwoClientsCollide is R3: two concurrent clients on the framed
-// baseline. The second dial replaces the channel's local edge (last-dial-wins)
-// and the frames carry no client identity, so the first client's in-flight
-// reply is cross-delivered to the second. The echo delay engineers the overlap.
+// baseline, with keepalive=true so the session (and the tunnel) survives its
+// first reply — under the default keepalive=false every reply tears the tunnel
+// down and there is no state to collide over. The second dial replaces the
+// channel's local edge (last-dial-wins) and the frames carry no client
+// identity, so the first client's in-flight reply is cross-delivered. The echo
+// delay engineers the overlap.
 func TestP2PUDPTwoClientsCollide(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
 		return framedProvider{inner: stripPortProvider{inner: pr}}
-	}, 500*time.Millisecond)
+	}, 500*time.Millisecond, true)
 
 	c1 := udpClient(t, entry)
 	c2 := udpClient(t, entry)
 
-	// c1's session is live after the warm-up (the reply to the measured send is
-	// still 500ms away when c2 arrives).
-	udpWarmup(t, c1)
+	// Warm c1: the first datagram is dropped during bring-up, the retry gets a
+	// reply, and keepalive keeps the session — and with it the tunnel — alive.
+	if got, sends := udpRetryRoundTrip(t, c1, "warm-c1", 5*time.Second); got != "warm-c1" {
+		t.Fatalf("client 1 warm-up: got %q after %d send(s)", got, sends)
+	}
 	udpSend(t, c1, "from-c1")
 
 	time.Sleep(100 * time.Millisecond) // c1's request is at the outlet, reply pending
