@@ -458,3 +458,33 @@ func TestP2PUDPEntrypointAddressing(t *testing.T) {
 	}
 	t.Logf("R0 signature: no reply (%v)", err)
 }
+
+// TestP2PUDPRawProviderNoFraming is R1: with the addressing fixed but the
+// provider as shipped, the in-process conn carries no datagram framing while
+// the outlet parses 2-byte length-prefixed frames: it reads the payload's
+// first two bytes as a length and waits for bytes that never come. The warm-up
+// send takes the channel bring-up loss out of the picture, so the measured
+// datagram is lost to framing alone. When the framing is fixed this test
+// should be inverted.
+func TestP2PUDPRawProviderNoFraming(t *testing.T) {
+	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
+		return stripPortProvider{inner: pr}
+	}, 0, false)
+
+	c := udpClient(t, entry)
+	// Three sends cover the bring-up loss: with correct framing the second or
+	// third would round-trip (R2), so a persistent silence is the framing gap.
+	var got string
+	var err error
+	for i := 0; i < 3; i++ {
+		udpSend(t, c, "ping-r1")
+		got, err = udpRead(t, c, time.Second)
+		if err == nil {
+			break
+		}
+	}
+	if err == nil {
+		t.Fatalf("round trip succeeded (echo=%q): the in-process framing gap appears fixed", got)
+	}
+	t.Logf("R1 signature: no reply after 3 sends (%v)", err)
+}
