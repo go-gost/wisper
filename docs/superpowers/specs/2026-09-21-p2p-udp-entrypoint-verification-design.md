@@ -64,6 +64,26 @@ wisper 的下一步（p2p entrypoint / 私有 p2p 模式）都建立在「udp �
 
 判定规则：R2 若也不通，说明 shim 假设错误 → 停止、回到静态分析重新定位（不硬写断言）。
 
+## 第一次实测修订（2026-09-21，Task 2 执行中发现）
+
+R2 基线首跑失败（4/4 复现）。按判定规则回到静态分析，定位到 harness 假设之外的真实行为，
+矩阵据此修订：
+
+- **会话首个数据报必丢**：tunnel 拨号由会话首包触发，而 channel 的 peer edge 是异步挂载的，
+  `pumpLocal` 在对端 edge 缺席时静默丢字节（[p2p/udp.go](https://github.com/go-gost/p2p/blob/v0.4.0/udp.go)
+  的「Bytes are dropped while the opposite edge is absent」）。实测：首发丢失；同会话第二次
+  发送即回环成功（channel 已挂上）。
+- **keepalive=false（入口点默认）下每个请求-响应后会话即关**：udp listener 写出回复后
+  `if !c.keepalive { defer c.Close() }`
+  （[x/internal/net/udp](https://github.com/go-gost/x/blob/v0.17.2/internal/net/udp/listener.go)）
+  → 会话关 → 隧道拆 → **每请求一条新隧道**（channel refs 归零即拆）。
+- 修订后矩阵：
+  - **R2 基线** = warm-up 首包（记录其丢失）+ 测量包回环成功；
+  - **R1** = warm-up 后测量包仍无回复（channel 已通，归因 framing）；
+  - **R3** = c1 warm-up 后在途请求（echo 延迟 500ms）+ c2 首包顶替 local edge →
+    c2 收到 **c1 的在途回复**（帧无客户端身份，串投）与自己的回复，c1 无回复。
+- keepalive=true 的形态（会话/隧道常驻）本轮不测，记为后续可选扩展。
+
 ## 产出
 
 - 可复跑测试：R0/R1/R3 断言**实测签名**并注明「修复落地后应反转」；R2 断言基线通过。

@@ -275,13 +275,17 @@ git commit -m "test(tunnel): run derper from the local image for the p2p udp har
 ```go
 // TestP2PUDPFramedBaseline is R2: with the addressing and framing shims the
 // datagram path is correct — the baseline that proves R1's failure is framing,
-// not the harness.
+// not the harness. The warm-up send absorbs the session's first datagram, which
+// the channel drops while its peer edge is still being attached.
 func TestP2PUDPFramedBaseline(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
 		return framedProvider{inner: stripPortProvider{inner: pr}}
 	}, 0)
 
 	c := udpClient(t, entry)
+	warm := udpWarmup(t, c)
+	t.Logf("R2 warm-up datagram round-tripped: %v (false = dropped during channel bring-up)", warm)
+
 	udpSend(t, c, "ping-r2")
 	got, err := udpRead(t, c, 5*time.Second)
 	if err != nil {
@@ -497,12 +501,23 @@ func udpRead(t *testing.T, c net.Conn, timeout time.Duration) (string, error) {
 	}
 	return string(buf[:n]), nil
 }
+
+// udpWarmup sends one datagram to bring the session's tunnel up and reports
+// whether that datagram round-tripped. The channel drops bytes until its peer
+// edge is attached, so the first datagram (the one that triggers the dial) is
+// lost by design; later datagrams in the same session round-trip.
+func udpWarmup(t *testing.T, c net.Conn) bool {
+	t.Helper()
+	udpSend(t, c, "warmup")
+	_, err := udpRead(t, c, 300*time.Millisecond)
+	return err == nil
+}
 ```
 
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDPFramedBaseline -v ./tunnel/`
-Expected: PASS（~5s）。若 FAIL：先看 p2p host 日志（slog 输出）确认 tunnel/channel 是否建立；仍不通则**停止**，按 spec 判定规则回到静态分析（不要硬改断言）。
+Expected: PASS（~5s），日志含 `R2 warm-up datagram round-tripped: false`（首包在建链窗口被丢，见 spec 的「第一次实测修订」）。若 FAIL：先看 p2p host 日志（slog 输出）确认 tunnel/channel 是否建立；仍不通则**停止**，按 spec 判定规则回到静态分析（不要硬改断言）。
 
 - [ ] **Step 5: 提交**
 
@@ -569,14 +584,17 @@ git commit -m "test(tunnel): pin the p2p udp entrypoint addressing failure (R0)"
 // TestP2PUDPRawProviderNoFraming is R1: with the addressing fixed but the
 // provider as shipped, the in-process conn carries no datagram framing while
 // the outlet parses 2-byte length-prefixed frames: it reads the payload's
-// first two bytes as a length and waits for bytes that never come. When the
-// framing is fixed this test should be inverted.
+// first two bytes as a length and waits for bytes that never come. The warm-up
+// send takes the channel bring-up loss out of the picture, so the measured
+// datagram is lost to framing alone. When the framing is fixed this test
+// should be inverted.
 func TestP2PUDPRawProviderNoFraming(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
 		return stripPortProvider{inner: pr}
 	}, 0)
 
 	c := udpClient(t, entry)
+	udpWarmup(t, c) // channel bring-up: the first datagram is dropped either way
 	udpSend(t, c, "ping-r1")
 	got, err := udpRead(t, c, 3*time.Second)
 	if err == nil {
@@ -589,7 +607,7 @@ func TestP2PUDPRawProviderNoFraming(t *testing.T) {
 - [ ] **Step 2: 跑测试并记录实测签名**
 
 Run: `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDPRawProviderNoFraming -v ./tunnel/ 2>&1 | tee /config/tmp/r1.log`
-Expected: PASS，日志含 `R1 signature: no reply (...)`；应能看到 tunnel/channel 建立（与 R0 的 dial 失败区分开）。若实测**通了**：framing 假设被证伪 → 改断言记录实际行为，并在 Task 6 文档写明（可能 framing 由其他层补上）。
+Expected: PASS，日志含 `R1 signature: no reply (...)`；应能看到 tunnel/channel 建立（与 R0 的 dial 失败区分开），且 warm-up 后 channel 已通（R2 已证）。若实测**通了**：framing 假设被证伪 → 改断言记录实际行为，并在 Task 6 文档写明（可能 framing 由其他层补上）。
 
 - [ ] **Step 3: 提交**
 
@@ -622,13 +640,20 @@ func TestP2PUDPTwoClientsCollide(t *testing.T) {
 	c1 := udpClient(t, entry)
 	c2 := udpClient(t, entry)
 
-	udpSend(t, c1, "from-c1") // its reply is pending for 500ms
+	// c1's session is live after the warm-up (the reply to the measured send is
+	// still 500ms away when c2 arrives).
+	udpWarmup(t, c1)
+	udpSend(t, c1, "from-c1")
 
-	time.Sleep(100 * time.Millisecond) // let the datagram reach the outlet
-	udpSend(t, c2, "from-c2")          // replaces c1's local edge
+	time.Sleep(100 * time.Millisecond) // c1's request is at the outlet, reply pending
 
-	// The second client receives both replies: its own, and the in-flight one
-	// that now belongs to the current edge.
+	// c2's datagram triggers its dial, which replaces the channel's local edge
+	// (last-dial-wins). The peer edge is already up (c1's tunnel kept the
+	// channel alive), so this datagram is forwarded too.
+	udpSend(t, c2, "from-c2")
+
+	// The frames carry no client identity: both replies land on the current
+	// edge, so c2 receives c1's in-flight reply as well as its own.
 	first, err := udpRead(t, c2, 5*time.Second)
 	if err != nil {
 		t.Fatalf("client 2 read: %v", err)
@@ -642,12 +667,13 @@ func TestP2PUDPTwoClientsCollide(t *testing.T) {
 		t.Fatalf("client 2 received %q + %q, want the cross-delivered from-c1 and its own from-c2", first, second)
 	}
 
-	// The first client's reply went to the other edge: it gets nothing.
+	// c1's edge was replaced: its reply went to the other client and it gets
+	// nothing of its own.
 	reply, err := udpRead(t, c1, 1*time.Second)
 	if err == nil {
 		t.Fatalf("client 1 received %q; the edge replacement did not drop its reply", reply)
 	}
-	t.Logf("R3 signature: client 2 received %q + %q; client 1 got no reply (%v)", first, second, err)
+	t.Logf("R3 signature: client 2 received %q then %q (cross-delivery); client 1 got no reply (%v)", first, second, err)
 }
 ```
 
