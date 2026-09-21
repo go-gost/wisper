@@ -459,3 +459,56 @@ func TestP2PUDPRawConnNoFraming(t *testing.T) {
 	}
 	t.Logf("R0 signature: no reply after 3 sends (%v)", err)
 }
+
+// TestP2PUDPTwoClientsCollide is R3: two concurrent clients on the framed
+// baseline, with keepalive=true so the session (and the tunnel) survives its
+// first reply — under the default keepalive=false every reply tears the tunnel
+// down and there is no state to collide over. The second dial replaces the
+// channel's local edge (last-dial-wins) and the frames carry no client
+// identity, so the first client's in-flight reply is cross-delivered. The echo
+// delay engineers the overlap.
+func TestP2PUDPTwoClientsCollide(t *testing.T) {
+	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
+		return framedProvider{inner: pr}
+	}, 500*time.Millisecond, true)
+
+	c1 := udpClient(t, entry)
+	c2 := udpClient(t, entry)
+
+	// Warm c1: the first datagram is dropped during bring-up, the retry gets a
+	// reply, and keepalive keeps the session — and with it the tunnel — alive.
+	if got, sends := udpRetryRoundTrip(t, c1, "warm-c1", 5*time.Second); got != "warm-c1" {
+		t.Fatalf("client 1 warm-up: got %q after %d send(s)", got, sends)
+	}
+	udpSend(t, c1, "from-c1")
+
+	time.Sleep(100 * time.Millisecond) // c1's request is at the outlet, reply pending
+
+	// c2's datagram triggers its dial, which replaces the channel's local edge
+	// (last-dial-wins). The peer edge is already up (c1's tunnel kept the
+	// channel alive), so this datagram is forwarded too.
+	udpSend(t, c2, "from-c2")
+
+	// The frames carry no client identity: both replies land on the current
+	// edge, so c2 receives c1's in-flight reply as well as its own.
+	first, err := udpRead(t, c2, 5*time.Second)
+	if err != nil {
+		t.Fatalf("client 2 read: %v", err)
+	}
+	second, err := udpRead(t, c2, 5*time.Second)
+	if err != nil {
+		t.Fatalf("client 2 second read: %v (got %q first)", err, first)
+	}
+	seen := map[string]bool{first: true, second: true}
+	if !seen["from-c1"] || !seen["from-c2"] {
+		t.Fatalf("client 2 received %q + %q, want the cross-delivered from-c1 and its own from-c2", first, second)
+	}
+
+	// c1's edge was replaced: its reply went to the other client and it gets
+	// nothing of its own.
+	reply, err := udpRead(t, c1, 1*time.Second)
+	if err == nil {
+		t.Fatalf("client 1 received %q; the edge replacement did not drop its reply", reply)
+	}
+	t.Logf("R3 signature: client 2 received %q then %q (cross-delivery); client 1 got no reply (%v)", first, second, err)
+}
