@@ -521,7 +521,7 @@ func udpRetryRoundTrip(t *testing.T, c net.Conn, payload string, budget time.Dur
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDPFramedBaseline -v ./tunnel/`
-Expected: PASS（~5s），日志含 `R2 warm-up datagram round-tripped: false`（首包在建链窗口被丢，见 spec 的「第一次实测修订」）。若 FAIL：先看 p2p host 日志（slog 输出）确认 tunnel/channel 是否建立；仍不通则**停止**，按 spec 判定规则回到静态分析（不要硬改断言）。
+Expected: PASS（~5s），日志含 `R2 signature: reply after 1-2 send(s)`（首包在建链窗口被丢，见 spec 的两次实测修订）。若 FAIL：先看 p2p host 日志（slog 输出）确认 tunnel/channel 是否建立；仍不通则**停止**，按 spec 判定规则回到静态分析（不要硬改断言）。
 
 - [ ] **Step 5: 提交**
 
