@@ -3,7 +3,8 @@
 2026-09-21 可行性评估。结论：可集成，但 p2p 只能当**链节点底层传输**，
 不能替代 wisper 反向隧道的公网 ingress/rendezvous。
 
-> 状态：评估已完成，进程内 POC 通过；p2p 已发布 `v0.4.0` 并成为 wisper 的直接依赖。
+> 状态：评估已完成，进程内 POC 通过；p2p 已发布 `v0.4.0` 并成为 wisper 的直接依赖；
+> UDP 入口点限制已 e2e 实测（2026-09-21，见「已知限制」）。
 
 ## 接缝
 
@@ -41,8 +42,38 @@
 
 ## 已知限制
 
-- UDP 是每 peer 一个 channel、last-dial-wins（`p2p/udp.go` 的 `attachLocal`），
-  为 tun/outlet 设计；多并发 UDP 流的入口点会互踩，需 e2e 验证。
+入口点形态（本地 udp listener → local handler → chain node(p2p udp 隧道) → 对端 outlet）的
+**进程内 e2e 实测结论**（`tunnel/p2p_udp_poc_test.go`，build tag `p2ppoc`：真 derper + 两个
+进程内 p2p host + 与 `tunnel/entrypoint/udp.go` `Run()` 同构的栈；跑法
+`cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDP -v ./tunnel/`）：
+
+1. **进程内 provider 缺 datagram framing（R0）**：gRPC plugin 路径的 conn 由 `x/p2p/streamconn`
+   按 udp 模式加 2 字节 BE 长度前缀，进程内 `Provider` 返回的是 p2p 自己的 raw conn →
+   outlet 侧帧解析永远等不到完整帧。实测：隧道拨号成功、channel 正常建立（`channel up`），
+   连发 3 个数据报**全部无回复**。这是 udp 入口点在进程内路径上不可用的**首要**原因。
+2. **会话首个数据报必丢（R2）**：拨号由会话首包触发，而 channel 的 peer edge 异步挂载，
+   建链窗口内 `pumpLocal` 静默丢字节（p2p 设计如此：「Bytes are dropped while the opposite
+   edge is absent」）。实测（加 framing shim 后）：首发丢失、同会话第二次发送即回环成功——
+   50 次运行中 48 次需第 2 发、2 次第 1 发即回。
+3. **keepalive=false（入口点默认）下每请求一条隧道**：udp listener 写出回复后即关会话
+   （`x/internal/net/udp` 的 `if !c.keepalive { defer c.Close() }`）→ 会话关 → 隧道拆，
+   每个请求-响应都重建一次隧道。
+4. **多客户端互踩（R3，keepalive=true）**：每客户端一次 Dial → 同 peer 一个 channel、
+   `attachLocal` last-dial-wins；channel 本身保持 up，只换 local edge（日志实测：c2 建连与
+   c1 会话被取消在同一毫秒）。且帧里没有客户端身份 → 实测签名：**c2 收到 c1 的在途回复
+   （串投）后再收到自己的回复，c1 什么都收不到**。
+
+> 已证伪、勿重复排查：入口点 node addr 的 `:0` 补端口**不会**打到 p2p 的 `parsePeerKey`——
+> `x/chain/route.go` 拨的是 `node.Addr`（干净 base64 key），`:0` 只补在 *target* 地址上，
+> 而 `x/connector/forward` 忽略该地址。入口点形态在 p2p 下**寻址正常**。
+
+修复方向（产品改动，另立任务）：
+① **x 侧按 network 把 provider conn 包成 framed**（与 plugin 路径对齐）——任何 udp 进程内
+路径的前置；② 多客户端：per-client channel，或 GOST 侧 session 多路复用（对齐 relay 协议的
+udp session id 思路）；③ 首包丢失 / 每请求重建隧道：入口点默认打开 keepalive，或 p2p 侧在
+peer edge 就绪前缓冲 local edge 的字节（权衡内存与语义）。
+
+tun 形态（p2p e2e 的 `udp-tun`/`udp-outlet`）不受上述影响：那些场景两端都走 plugin 路径且单流。
 
 ## 进程内 POC
 
@@ -57,6 +88,8 @@
   `TestP2PUnregisteredFailsClosed`（未注册 provider → ParseChain 报错，无静默旁路）。
 - 注册约定：`registry.P2PRegistry().Register(name, host.Provider())`；
   可加 `var _ xp2p.TunnelProvider = (*p2p.Provider)(nil)` 做编译期断言。
+- UDP 入口点形态另有实测 harness：`tunnel/p2p_udp_poc_test.go`（同 tag，需 docker 提取 derper），
+  跑法 `TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDP -v ./tunnel/`；结论见「已知限制」。
 
 ## 实施注意
 
