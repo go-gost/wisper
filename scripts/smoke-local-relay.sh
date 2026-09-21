@@ -51,6 +51,7 @@ UUID_UDP=55555555-5555-5555-5555-555555555555
 # bound by a peer. The check adds one /etc/hosts line and runs a second gost as
 # that peer, which is why it is opt-in.
 EP_ID=22222222-2222-2222-2222-222222222222
+EP_UDP_ID=66666666-6666-6666-6666-666666666666
 EP_HASH=$(printf '%s' "$EP_ID" | md5sum | cut -c1-16)
 EP_BLOCK="entrypoints: []"
 HOSTS_ADDED=0
@@ -140,7 +141,8 @@ EOF
 
 if [ "${SMOKE_ENTRYPOINT:-0}" = "1" ]; then
 	EP_BLOCK="entrypoints:
-  - {id: \"$EP_ID\", name: ep-0, type: tcp, endpoint: \"127.0.0.1:19000\"}"
+  - {id: \"$EP_ID\", name: ep-0, type: tcp, endpoint: \"127.0.0.1:19000\"}
+  - {id: \"$EP_UDP_ID\", name: ep-udp-0, type: udp, endpoint: \"127.0.0.1:19001\"}"
 	grep -q "$EP_HASH.wisper.test" /etc/hosts || { printf '%s.wisper.test 127.0.0.1\n' "$EP_HASH" >>/etc/hosts; HOSTS_ADDED=1; }
 fi
 
@@ -199,6 +201,12 @@ if [ "${SMOKE_ENTRYPOINT:-0}" = "1" ]; then
 	sleep 3
 	eout=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/19000; printf ping-ep >&3; timeout 3 head -c 7 <&3' 2>/dev/null)
 	[ "$eout" = "ping-ep" ] && ok entrypoint-tcp || no "entrypoint-tcp (got '$eout')"
+
+	"$W/gost" -L "rudp://:0/127.0.0.1:18082" \
+		-F "tunnel+wss://127.0.0.1:443?tunnel.id=$EP_UDP_ID&secure=false" >"$W/gost-ep-udp.log" 2>&1 &
+	sleep 3
+	ueout=$(bash -c 'exec 3<>/dev/udp/127.0.0.1/19001; printf ping-uep >&3; timeout 3 head -c 13 <&3' 2>/dev/null)
+	[ "$ueout" = "ECHO:ping-uep" ] && ok entrypoint-udp || no "entrypoint-udp (got '$ueout')"
 fi
 
 echo "== summary: pass=$pass fail=$fail =="
