@@ -132,7 +132,7 @@ func derperBin(t *testing.T) string {
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("derper unavailable: no DERPER_BIN, no cached binary, no docker")
 	}
-	root := filepath.Dir(filepath.Dir(filepath.Dir(cache))) // .../derper-root
+	root := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(cache)))) // .../derper-root
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Skipf("derper cache dir: %v", err)
 	}
