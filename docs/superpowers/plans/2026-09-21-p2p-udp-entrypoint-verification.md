@@ -279,7 +279,7 @@ git commit -m "test(tunnel): run derper from the local image for the p2p udp har
 // first datagram while its peer edge is attached.
 func TestP2PUDPFramedBaseline(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
-		return framedProvider{inner: stripPortProvider{inner: pr}}
+		return framedProvider{inner: pr}
 	}, 0, false)
 
 	c := udpClient(t, entry)
@@ -327,20 +327,6 @@ func startUDPEcho(t *testing.T, d time.Duration) string {
 		}
 	}()
 	return pc.LocalAddr().String()
-}
-
-// stripPortProvider drops a ":port" suffix from the peer before the tunnel is
-// opened. Test-local: it stands in for the addressing fix the entrypoint shape
-// needs (the local handler appends ":0" to a key-shaped node addr).
-type stripPortProvider struct{ inner xp2p.TunnelProvider }
-
-func (p stripPortProvider) Close() error { return p.inner.Close() }
-
-func (p stripPortProvider) OpenTunnelStream(ctx context.Context, network, peer string) (net.Conn, error) {
-	if host, _, err := net.SplitHostPort(peer); err == nil {
-		peer = host
-	}
-	return p.inner.OpenTunnelStream(ctx, network, peer)
 }
 
 // framedProvider adapts the in-process provider's raw conn to the datagram
@@ -532,78 +518,39 @@ git commit -m "test(tunnel): in-process udp entrypoint harness over a real derpe
 
 ---
 
-### Task 3: R0 — 入口点寻址（无 shim）
+### Task 3: R0 — provider 原样（framing 缺失）+ R1 退休
+
+> **第三次实测修订（2026-09-21）**：原 R0 的「寻址不通」假设**未复现**。实测日志显示
+> `dial <key>:0/udp` 成功、`channel up` 建立：`x/chain/route.go` 拨的是 `node.Addr`（干净 key），
+> `:0` 只落在 *target* 地址上，而 `x/connector/forward` 忽略该地址。因此原 R0 与原 R1
+> 机制完全相同，合并为一个 run；`stripPortProvider` 一并删除（它从未改变任何行为）。
 
 **Files:**
 - Modify: `tunnel/p2p_udp_poc_test.go`
 
-- [ ] **Step 1: 写 R0 测试**
-
-追加：
+- [ ] **Step 1: 写 R0 测试（原样 provider，无 shim）**
 
 ```go
-// TestP2PUDPEntrypointAddressing is R0: the entrypoint shape as shipped cannot
-// address the peer. The local handler appends ":0" to a key-shaped node addr
-// (x/handler/forward/local) and p2p's parsePeerKey wants the whole string to be
-// the base64 key, so the dial fails before any data flows. When the addressing
-// is fixed this test should be inverted (it will then behave like R1).
-func TestP2PUDPEntrypointAddressing(t *testing.T) {
+// TestP2PUDPRawConnNoFraming is R0, the provider as shipped: the in-process
+// conn carries no datagram framing while the outlet parses 2-byte
+// length-prefixed frames, so it reads the payload's first two bytes as a
+// length and waits for bytes that never come. Three sends cover the channel
+// bring-up loss: with correct framing the second or third would round-trip
+// (R2), so a persistent silence is the framing gap. When the framing is fixed
+// this test should be inverted.
+//
+// The addressing hypothesis this run was originally meant to probe did not
+// reproduce (measured): the chain route dials node.Addr — the clean key — and
+// the local handler's ":0" suffix lands only on the target address, which the
+// forward connector ignores. The tunnel dial succeeds and the channel comes up.
+func TestP2PUDPRawConnNoFraming(t *testing.T) {
 	entry := startUDPEntrypoint(t, nil, 0, false)
 
 	c := udpClient(t, entry)
-	udpSend(t, c, "ping-r0")
-	got, err := udpRead(t, c, 3*time.Second)
-	if err == nil {
-		t.Fatalf("round trip succeeded (echo=%q): the entrypoint addressing seam appears fixed", got)
-	}
-	t.Logf("R0 signature: no reply (%v)", err)
-}
-```
-
-- [ ] **Step 2: 跑测试并记录实测签名**
-
-Run: `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDPEntrypointAddressing -v ./tunnel/ 2>&1 | tee /config/tmp/r0.log`
-Expected: PASS，日志含 `R0 signature: no reply (...)`。
-同时**记录**日志中 handler 的 dial 报错文本（应含 `is not a valid base64 key` 或 `invalid peer "<key>:0"`）。若实测**通了**（意外）：说明补端口未发生，把测试改为记录实际行为并在 Task 6 文档中写明（不要保留会误报的断言）。
-
-- [ ] **Step 3: 提交**
-
-```bash
-git add tunnel/p2p_udp_poc_test.go
-git commit -m "test(tunnel): pin the p2p udp entrypoint addressing failure (R0)"
-```
-
----
-
-### Task 4: R1 — 进程内 provider 的 framing（仅寻址 shim）
-
-**Files:**
-- Modify: `tunnel/p2p_udp_poc_test.go`
-
-- [ ] **Step 1: 写 R1 测试**
-
-追加：
-
-```go
-// TestP2PUDPRawProviderNoFraming is R1: with the addressing fixed but the
-// provider as shipped, the in-process conn carries no datagram framing while
-// the outlet parses 2-byte length-prefixed frames: it reads the payload's
-// first two bytes as a length and waits for bytes that never come. The warm-up
-// send takes the channel bring-up loss out of the picture, so the measured
-// datagram is lost to framing alone. When the framing is fixed this test
-// should be inverted.
-func TestP2PUDPRawProviderNoFraming(t *testing.T) {
-	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
-		return stripPortProvider{inner: pr}
-	}, 0, false)
-
-	c := udpClient(t, entry)
-	// Three sends cover the bring-up loss: with correct framing the second or
-	// third would round-trip (R2), so a persistent silence is the framing gap.
 	var got string
 	var err error
 	for i := 0; i < 3; i++ {
-		udpSend(t, c, "ping-r1")
+		udpSend(t, c, "ping-r0")
 		got, err = udpRead(t, c, time.Second)
 		if err == nil {
 			break
@@ -612,25 +559,28 @@ func TestP2PUDPRawProviderNoFraming(t *testing.T) {
 	if err == nil {
 		t.Fatalf("round trip succeeded (echo=%q): the in-process framing gap appears fixed", got)
 	}
-	t.Logf("R1 signature: no reply after 3 sends (%v)", err)
+	t.Logf("R0 signature: no reply after 3 sends (%v)", err)
 }
 ```
 
 - [ ] **Step 2: 跑测试并记录实测签名**
 
-Run: `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDPRawProviderNoFraming -v ./tunnel/ 2>&1 | tee /config/tmp/r1.log`
-Expected: PASS，日志含 `R1 signature: no reply after 3 sends (...)`；应能看到 tunnel/channel 建立（与 R0 的 dial 失败区分开），而 R2 已证同形态下 3 次内必有回复。若实测**通了**：framing 假设被证伪 → 改断言记录实际行为，并在 Task 6 文档写明（可能 framing 由其他层补上）。
+Run: `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDPRawConnNoFraming -v ./tunnel/ 2>&1 | tee /config/tmp/r0.log`
+Expected: PASS，日志含 `R0 signature: no reply after 3 sends (...)`，且能看到 `channel up` / `datagram channel up`
+（证明是 framing 缺失而非拨号失败）。若实测**通了**：framing 假设被证伪 → 改断言记录实际行为并在 Task 6 写明。
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 3: 删除 `stripPortProvider` 与重复的 R1 测试，R2 的 wrap 改为 `framedProvider{inner: pr}`**
+
+- [ ] **Step 4: 提交**
 
 ```bash
 git add tunnel/p2p_udp_poc_test.go
-git commit -m "test(tunnel): pin the in-process provider framing gap (R1)"
+git commit -m "test(tunnel): pin the as-shipped framing gap (R0); drop the no-op addressing shim"
 ```
 
 ---
 
-### Task 5: R3 — 两并发客户端的碰撞（寻址 + framing shim）
+### Task 5: R3 — 两并发客户端的碰撞（framing shim + keepalive=true）
 
 **Files:**
 - Modify: `tunnel/p2p_udp_poc_test.go`
@@ -649,7 +599,7 @@ git commit -m "test(tunnel): pin the in-process provider framing gap (R1)"
 // delay engineers the overlap.
 func TestP2PUDPTwoClientsCollide(t *testing.T) {
 	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
-		return framedProvider{inner: stripPortProvider{inner: pr}}
+		return framedProvider{inner: pr}
 	}, 500*time.Millisecond, true)
 
 	c1 := udpClient(t, entry)

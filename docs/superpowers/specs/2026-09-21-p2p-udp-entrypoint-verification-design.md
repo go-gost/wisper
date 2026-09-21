@@ -9,7 +9,7 @@
 wisper 的下一步（p2p entrypoint / 私有 p2p 模式）都建立在「udp 隧道能否承载入口点形态」之上。
 静态读代码已得到三个候选缺陷，本设计用 e2e 证实/证伪：
 
-0. **入口点形态的寻址接缝不通**：`local` handler 对非 host:port 的 node addr 补 `:0`
+0. ~~**入口点形态的寻址接缝不通**~~（**已证伪**，见第三次修订）：`local` handler 对非 host:port 的 node addr 补 `:0`
    （[x/handler/forward/local](https://github.com/go-gost/x/blob/v0.17.2/handler/forward/local/forward.go)），
    而 p2p 的 `parsePeerKey` 要求整个 peer 字符串就是 base64 key
    （[p2p/engine.go](https://github.com/go-gost/p2p/blob/v0.4.0/engine.go)）→ 裸 pubkey 变 `<pubkey>:0`，
@@ -57,9 +57,9 @@ wisper 的下一步（p2p entrypoint / 私有 p2p 模式）都建立在「udp �
 
 | Run | 配置 | 观测点 |
 |---|---|---|
-| R0 | 入口点栈原样（hop node addr = pubkey，无 shim），1 客户端 | 隧道拨号是否在 `parsePeerKey` 处失败（`:0` 后缀）→ 证实/证伪寻址缺陷 |
-| R1 | 加**寻址 shim**（测试内 provider 包装：peer 去掉端口后缀），1 客户端 | 是否通；回包是否带 2 字节前缀；outlet/p2p host 日志中的解析错误 → 证实/证伪 framing 缺陷 |
-| R2 | 加**寻址 + framing shim**（后者用 `x/p2p/streamconn.New` 把 provider conn 包成 udp framed，模拟插件路径的 conn），1 客户端 | 数据面正确基线；证明 R1 的失败归因于 framing 而非其他 |
+| R0 | provider 原样（无 shim），1 客户端 | 拨号成功、channel 建立，但无回复 → framing 缺失（寻址假设已证伪，见第三次修订） |
+| ~~R1~~ | 已退休：与 R0 机制相同（寻址 shim 是 no-op），合并进 R0 | — |
+| R2 | 加 **framing shim**（用 `x/p2p/streamconn.New` 把 provider conn 包成 udp framed，模拟插件路径的 conn），1 客户端 | 数据面正确基线；证明 R0 的失败归因于 framing 而非其他 |
 | R3 | 同 R2，2 个并发客户端（不同源端口、不同 payload；echo 延迟 500ms 制造重叠） | last-dial-wins 签名：client 1 在途回复是否被顶掉、是否错投给 client 2（帧无客户端身份） |
 
 判定规则：R2 若也不通，说明 shim 假设错误 → 停止、回到静态分析重新定位（不硬写断言）。
@@ -95,17 +95,27 @@ warm-up + 单次测量包仍 ~1.4% 抖动（145 次 2 败）：当 warm-up 首�
   keepalive=true 是入口点暴露的合法 listener 选项（API `keepalive`），碰撞因此可干净测量。
   默认形态下的碰撞表现为「每次新请求重建隧道并顶掉对方」（由 R2 的分布与 host 日志佐证）。
 
+## 第三次实测修订（2026-09-21，R0 寻址假设）
+
+R0 首跑**未复现**寻址缺陷：日志显示 `dial <key>:0/udp` 成功、`channel up` 建立、仅无回复。
+源码定位：`x/chain/route.go` 解析并拨的是 **`node.Addr`**（干净的 base64 key），
+`x/handler/forward/local` 的 `:0` 只补在 *target* 地址上，而 `x/connector/forward` 完全忽略该地址
+（`Connect` 只记日志、原样返回 conn）。结论：
+
+- 入口点形态在 p2p 下**寻址没问题**（与 tun 形态一致）；原候选缺陷 0 撤回。
+- 原 R0 与原 R1 机制相同 → 合并为 R0（provider 原样）；`stripPortProvider` 删除（从未改变行为）。
+- 文档（Task 6）须写明这是一条**被证伪**的假设，避免后人重复排查。
+
 ## 产出
 
-- 可复跑测试：R0/R1/R3 断言**实测签名**并注明「修复落地后应反转」；R2 断言基线通过。
+- 可复跑测试：R0/R3 断言**实测签名**并注明「修复落地后应反转」；R2 断言基线通过。
 - [p2p-integration.md](../../../docs/p2p-integration.md) 「已知限制」一节改写：实测签名 +
-  修复方向（① 寻址：修 `:0` 补端口或让 dialer 从 metadata 取 peer；② x 侧把 provider conn
-  按 network 包 framed；③ 多客户端需 per-client channel 或 GOST 侧 session 多路复用，
-  对齐 relay 协议的 udp session id 思路）。
+  修复方向（① x 侧把 provider conn 按 network 包 framed；② 多客户端需 per-client channel
+  或 GOST 侧 session 多路复用，对齐 relay 协议的 udp session id 思路；寻址无需改动，见第三次修订）。
 - 产品代码零改动。
 
 ## 风险
 
 - derper 在本地跑高位端口依赖 docker 提取二进制；无 docker 的机器上测试 skip（与 p2p e2e 同策略）。
 - R3 的碰撞签名可能有多态（顶掉 / 错投 / 部分可用），测试按实测记录，不预设单一形态。
-- R0 的失败点可能在 handler 补端口、`parsePeerKey`、或 dial 超时三处之一，以日志定位为准。
+- R0 的失败点已定位为 framing（`channel up` 已建立、无回复），不再是未知项。
