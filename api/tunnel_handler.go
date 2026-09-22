@@ -217,6 +217,8 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 		t = tunnel.NewTCPTunnel(req.toOptions()...)
 	case tunnel.UDPTunnel:
 		t = tunnel.NewUDPTunnel(req.toOptions()...)
+	case tunnel.P2PTunnel:
+		t = tunnel.NewP2PTunnel(req.toOptions()...)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown tunnel type: %s", req.Type))
 		return
@@ -287,13 +289,15 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		t = tunnel.NewTCPTunnel(opts...)
 	case tunnel.UDPTunnel:
 		t = tunnel.NewUDPTunnel(opts...)
+	case tunnel.P2PTunnel:
+		t = tunnel.NewP2PTunnel(opts...)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown tunnel type: %s", tunnelType))
 		return
 	}
 
 	t.SetStats(old.Stats())
-		t.SetStatsBaseline(old.StatsBaseline())
+	t.SetStatsBaseline(old.StatsBaseline())
 	t.Favorite(old.IsFavorite())
 
 	if err := t.Run(); err != nil {
@@ -375,13 +379,15 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 		newT = tunnel.NewTCPTunnel(optsSlice...)
 	case tunnel.UDPTunnel:
 		newT = tunnel.NewUDPTunnel(optsSlice...)
+	case tunnel.P2PTunnel:
+		newT = tunnel.NewP2PTunnel(optsSlice...)
 	default:
 		writeError(w, http.StatusInternalServerError, "unknown tunnel type")
 		return
 	}
 
 	newT.SetStats(t.Stats())
-		newT.SetStatsBaseline(t.StatsBaseline())
+	newT.SetStatsBaseline(t.StatsBaseline())
 	newT.Favorite(t.IsFavorite())
 
 	if err := newT.Run(); err != nil {
@@ -441,10 +447,10 @@ func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
 		bl.TotalErrs = s.TotalErrs
 	default:
 		bl = config.ServiceStats{
-			TotalConns: s.TotalConns,
-			InputBytes: s.InputBytes,
+			TotalConns:  s.TotalConns,
+			InputBytes:  s.InputBytes,
 			OutputBytes: s.OutputBytes,
-			TotalErrs:  s.TotalErrs,
+			TotalErrs:   s.TotalErrs,
 		}
 	}
 	t.SetStatsBaseline(bl)

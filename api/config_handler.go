@@ -15,13 +15,22 @@ import (
 
 // configResponse is the JSON representation of app settings.
 type configResponse struct {
-	Server        string `json:"server"`
-	Entrypoint    string `json:"entrypoint"`
-	Insecure      bool   `json:"insecure"`
-	Lang          string `json:"lang"`
-	Theme         string `json:"theme"`
-	StatsInterval int    `json:"stats_interval"`
-	InspectorURL  string `json:"inspector_url"`
+	Server        string           `json:"server"`
+	Entrypoint    string           `json:"entrypoint"`
+	Insecure      bool             `json:"insecure"`
+	Lang          string           `json:"lang"`
+	Theme         string           `json:"theme"`
+	StatsInterval int              `json:"stats_interval"`
+	InspectorURL  string           `json:"inspector_url"`
+	P2P           *P2PSettingsResp `json:"p2p,omitempty"`
+}
+
+// P2PSettingsResp mirrors config.P2PSettings (secure is a pointer so an
+// omitted value keeps the "verify" default).
+type P2PSettingsResp struct {
+	Derp   string `json:"derp"`
+	Secure *bool  `json:"secure,omitempty"`
+	CAFile string `json:"ca_file,omitempty"`
 }
 
 func handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +45,16 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		statsInterval = 1
 	}
 
+	// Omitted (nil) when unset, so the UI can show the default placeholder.
+	var p2p *P2PSettingsResp
+	if settings.P2P != nil {
+		p2p = &P2PSettingsResp{
+			Derp:   settings.P2P.Derp,
+			Secure: settings.P2P.Secure,
+			CAFile: settings.P2P.CAFile,
+		}
+	}
+
 	writeJSON(w, http.StatusOK, configResponse{
 		Server:        settings.Server,
 		Entrypoint:    settings.Entrypoint,
@@ -44,18 +63,20 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		Theme:         settings.Theme,
 		StatsInterval: statsInterval,
 		InspectorURL:  settings.InspectorURL,
+		P2P:           p2p,
 	})
 }
 
 // configUpdateRequest is the JSON body for updating settings.
 type configUpdateRequest struct {
-	Server        *string `json:"server,omitempty"`
-	Entrypoint    *string `json:"entrypoint,omitempty"`
-	Insecure      *bool   `json:"insecure,omitempty"`
-	Lang          *string `json:"lang,omitempty"`
-	Theme         *string `json:"theme,omitempty"`
-	StatsInterval *int    `json:"stats_interval,omitempty"`
-	InspectorURL  *string `json:"inspector_url,omitempty"`
+	Server        *string          `json:"server,omitempty"`
+	Entrypoint    *string          `json:"entrypoint,omitempty"`
+	Insecure      *bool            `json:"insecure,omitempty"`
+	Lang          *string          `json:"lang,omitempty"`
+	Theme         *string          `json:"theme,omitempty"`
+	StatsInterval *int             `json:"stats_interval,omitempty"`
+	InspectorURL  *string          `json:"inspector_url,omitempty"`
+	P2P           *P2PSettingsResp `json:"p2p,omitempty"`
 }
 
 func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +94,15 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	entrypointChanged := req.Entrypoint != nil && *req.Entrypoint != cfg.Settings.Entrypoint
 	insecureChanged := req.Insecure != nil && *req.Insecure != cfg.Settings.Insecure
 	intervalChanged := req.StatsInterval != nil && *req.StatsInterval != cfg.Settings.StatsInterval
+
+	var p2pChanged bool
+	if req.P2P != nil {
+		prev := cfg.Settings.P2P
+		p2pChanged = prev == nil ||
+			prev.Derp != req.P2P.Derp ||
+			prev.CAFile != req.P2P.CAFile ||
+			!boolPtrEqual(prev.Secure, req.P2P.Secure)
+	}
 
 	if req.Server != nil {
 		cfg.Settings.Server = *req.Server
@@ -95,6 +125,15 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if req.InspectorURL != nil {
 		cfg.Settings.InspectorURL = *req.InspectorURL
 	}
+	if req.P2P != nil {
+		// Settings is shallow-copied into cfg, so never mutate the previous
+		// struct through its pointer — assign a whole new one.
+		cfg.Settings.P2P = &config.P2PSettings{
+			Derp:   req.P2P.Derp,
+			Secure: req.P2P.Secure,
+			CAFile: req.P2P.CAFile,
+		}
+	}
 
 	config.Set(cfg)
 	if err := cfg.Write(); err != nil {
@@ -102,8 +141,8 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Restart all running tunnels/entrypoints so they reconnect with the
-	// new server, entrypoint domain, TLS, or recording settings.
-	if serverChanged || entrypointChanged || insecureChanged {
+	// new server, entrypoint domain, TLS, p2p relay, or recording settings.
+	if serverChanged || entrypointChanged || insecureChanged || p2pChanged {
 		tunnel.RestartRunning()
 		entrypoint.RestartRunning()
 	}
@@ -121,4 +160,13 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handleGetConfig(w, r)
+}
+
+// boolPtrEqual reports whether two optional bools hold the same value:
+// two nils are equal, nil vs. non-nil is not.
+func boolPtrEqual(a, b *bool) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
