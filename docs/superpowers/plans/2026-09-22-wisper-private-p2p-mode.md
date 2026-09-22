@@ -713,6 +713,6 @@ git commit -m "docs: private p2p mode (reverse side) usage and boundaries"
 ## Self-Review 记录
 
 - **Spec 覆盖**：组件表五个单元 → Task 1/2/3/5；安全边界 → Task 5（提示）+ Task 6（文档）；测试（单测/e2e/UI 手动）→ Task 2/4/5；交付物与版本说明 → Task 6。
-- **占位符扫描**：Task 4 Step 1 显式标注"伪代码骨架，按注意项展开"，避免照抄错误 API；其余为完整代码。`xservice` import、logger 用法的两处不确定性已在 Task 2 注明（实现者按现有文件选择）。
+- **占位符扫描**：全部为完整代码；Task 2 的两处实现选择（`xservice` import、logger 获取方式）已注明按所在文件既有写法就近选择。
 - **类型一致性**：`P2PTunnel`/`NewP2PTunnel`/`P2PKeyPath`/`RemoveP2PKey`/`P2PSettings{Derp,Secure,CAFile}` 在 Task 1–4 用法一致；`Entrypoint()` 复用 API 的 `entrypoint` 字段（不加新字段）。
 - **已知取舍**：不做 logger 桥接（p2p host 日志走 slog 默认 → stderr；wisper 日志走自有 logger）——Task 2 的实现注意里给了二选一，选 logger 则此项消失。
