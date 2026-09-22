@@ -118,12 +118,10 @@ func TestP2PTunnelKeyLifecycle(t *testing.T) {
 	}
 
 	// A restarted tunnel keeps the same identity.
-	Delete("test-p2p-id") // the old entry, so the restarted one can be added again
-	tn2 := NewP2PTunnel(IDOption("test-p2p-id"), EndpointOption("127.0.0.1:9"))
+	Set(tn2 := NewP2PTunnel(IDOption("test-p2p-id"), EndpointOption("127.0.0.1:9"))...)
 	if err := tn2.Run(); err != nil {
 		t.Fatalf("Run after restart: %v", err)
 	}
-	Add(tn2)
 	if got := tn2.Entrypoint(); got != key1 {
 		t.Fatalf("pubkey changed across restart: %q -> %q", key1, got)
 	}
@@ -135,15 +133,19 @@ func TestP2PTunnelKeyLifecycle(t *testing.T) {
 	}
 }
 
-// TestP2PTunnelRequiresDerp: without settings.p2p.derp the tunnel fails loudly
-// instead of silently exposing nothing.
-func TestP2PTunnelRequiresDerp(t *testing.T) {
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{}})
-	tn := NewP2PTunnel(IDOption("no-derp"))
-	if err := tn.Run(); err == nil {
-		t.Fatal("Run without a DERP URL = nil error, want a failure")
+// TestP2PDerpDefault: an empty settings.p2p resolves to the public gost.run
+// relay (never a hard failure).
+func TestP2PDerpDefault(t *testing.T) {
+	if got := p2pDerpURL(nil); got != defaultP2PDerp {
+		t.Fatalf("p2pDerpURL(nil) = %q, want %q", got, defaultP2PDerp)
 	}
-	_ = tn.Close()
+	if got := p2pDerpURL(&cfg.Settings{}); got != defaultP2PDerp {
+		t.Fatalf("p2pDerpURL(empty) = %q, want %q", got, defaultP2PDerp)
+	}
+	want := "wss://relay.example/derp"
+	if got := p2pDerpURL(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: want}}); got != want {
+		t.Fatalf("p2pDerpURL(configured) = %q, want %q", got, want)
+	}
 }
 ```
 
@@ -240,6 +242,15 @@ func (s *p2pTunnel) Entrypoint() string {
 // listener+handler pair, so there is no service status to report.
 func (s *p2pTunnel) Status() *xservice.Status { return nil }
 
+// p2pDerpURL returns the configured DERP relay, falling back to the public
+// gost.run relay — the same read-time-default pattern as GetServerName.
+func p2pDerpURL(s *cfg.Settings) string {
+	if s != nil && s.P2P != nil && s.P2P.Derp != "" {
+		return s.P2P.Derp
+	}
+	return defaultP2PDerp
+}
+
 // P2PKeyPath is the per-tunnel key file: <UserConfigDir>/wisper/p2p/<id>.key
 // (hex, 0600, created by the p2p library on first use).
 func P2PKeyPath(id string) (string, error) {
@@ -274,10 +285,6 @@ func (s *p2pTunnel) Run() (err error) {
 	}()
 
 	settings := cfg.Get().Settings
-	if settings == nil || settings.P2P == nil || settings.P2P.Derp == "" {
-		err = errors.New("p2p tunnel requires a DERP relay URL (settings → p2p)")
-		return
-	}
 	keyPath, err := P2PKeyPath(s.opts.ID)
 	if err != nil {
 		return
@@ -285,7 +292,7 @@ func (s *p2pTunnel) Run() (err error) {
 
 	direct := false
 	host, err := p2p.New(&p2p.Config{
-		Derp:    settings.P2P.Derp,
+		Derp:    p2pDerpURL(settings),
 		Key:     keyPath,
 		Targets: []string{"tcp://" + s.opts.Endpoint},
 		Direct:  &direct,
@@ -358,7 +365,12 @@ func (s *p2pTunnel) setErr(err error) {
 
 - [ ] **Step 4: 接线 `tunnel/tunnel.go`**
 
-1. 常量块加 `P2PTunnel = "p2p"`。
+1. 常量块加 `P2PTunnel = "p2p"`，并在 `defaultServerName` 旁加：
+
+```go
+// defaultP2PDerp is the DERP relay used when settings.p2p.derp is empty.
+const defaultP2PDerp = "wss://derp.gost.run/derp"
+```
 2. `createTunnel`（`tunnel/tunnel.go:513`）的 switch 加：
 
 ```go
@@ -620,7 +632,8 @@ ${this.tunnelType === 'p2p'
 
 - [ ] **Step 3: 设置页三项**
 
-`settings-page.ts`：仿 `_server/_entrypoint/_insecure` 加 `_p2pDerp`、`_p2pSecure`、`_p2pCaFile`（加载/Save 同步），在服务器区块后加一个 "P2P" 区块（三个输入：DERP URL、secure 开关、CA 文件路径），保存时带上 `p2p: { derp, secure, ca_file }`。
+`settings-page.ts`：仿 `_server/_entrypoint/_insecure` 加 `_p2pDerp`、`_p2pSecure`、`_p2pCaFile`（加载/Save 同步），在服务器区块后加一个 "P2P" 区块（三个输入：DERP URL、secure 开关、CA 文件路径）；
+DERP 输入框的 placeholder 用 `wss://derp.gost.run/derp`（空值即默认，与 server 字段的处理方式一致），保存时带上 `p2p: { derp, secure, ca_file }`。
 
 - [ ] **Step 4: i18n**
 
@@ -670,8 +683,9 @@ git commit -m "feat(ui): private p2p tunnel type, settings and peer-key hint"
 wisper 新增隧道类型 `p2p`：内嵌 p2p host，把 **Endpoint**（本地后端地址）通过 DERP 暴露给
 持有其 **base64 pubkey** 的对端。无需 gost.run，也不经公网入口。
 
-配置：设置页（或 `config.yml` 的 `settings.p2p`）填 `derp`（`wss://host/derp`）、
-`secure`、`caFile`；然后新建 type=`p2p` 的隧道，Endpoint = 本地服务地址。
+配置：`derp` 默认 `wss://derp.gost.run/derp`（gost.run 公共 relay），可在设置页或
+`config.yml` 的 `settings.p2p` 改为自建 relay；另有 `secure`、`caFile`。
+然后新建 type=`p2p` 的隧道，Endpoint = 本地服务地址。
 
 对端接入（gost）：
 
