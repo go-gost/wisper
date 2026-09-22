@@ -3,7 +3,7 @@
 > 2026-09-22。承接 [p2p-integration.md](../../../docs/p2p-integration.md) 的「边界与定位」：
 > 第一增量 = **反向侧**——wisper 内嵌 p2p host，`target` 指向本地服务，对端按 base64 key 拨入，
 > 不经 gost.run。全套含 UI。前提：p2p 库化 + 进程内 Provider + framing 修复
-> （p2p 本地 main `204e2d5`；**未发布**，当前用 go.work 模式开发，发布与 bump 待定）。
+> （已随 p2p **`v0.4.1`** 发布，wisper 已 bump）。
 
 ## Context（背景）
 
@@ -102,4 +102,4 @@ p2ps:
 - 测试：`tunnel/p2p_test.go` + `tunnel/p2p_e2e_test.go`（tag `p2ppoc`）。
 - 文档：`docs/p2p-integration.md` 增「私有 p2p 模式（反向侧）」一节（配置步骤 + 对端接入示例 +
   安全边界 + 未发布版本说明）。
-- 版本：开发期用 go.work（本地 p2p `204e2d5`）；p2p `v0.4.1` 发布与 wisper bump 待定。
+- 版本：p2p `v0.4.1` 已发布（`204e2d5`），wisper 已 bump；两种构建模式一致。

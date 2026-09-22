@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-22-wisper-private-p2p-mode-design.md`
 
-**运行前置：** 开发用 **go.work 模式**（本地 p2p `204e2d5` 含 framing 修复）；`GOWORK=off` 仍是 pinned `v0.4.0`（旧行为），发布与 bump 待定。所有 `go test` 带 `TMPDIR=/config/tmp`。
+**运行前置：** p2p framing 修复已随 **`v0.4.1`** 发布，wisper 已 bump；go.work 与 `GOWORK=off` 均可。所有 `go test` 带 `TMPDIR=/config/tmp`。
 
 ---
 

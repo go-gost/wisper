@@ -26,7 +26,7 @@
   `scripts/smoke-local-relay.sh`。
 - p2p 已完成库化（根包 `package p2p` + `cmd/p2p`，见
   [p2p 库化重构计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-21-p2p-package-extraction.md)），
-  并发布 `v0.4.0`；wisper `go.mod` 已直接依赖 `github.com/go-gost/p2p v0.4.0`。
+  当前发布 `v0.4.1`（含进程内 udp framing 修复）；wisper `go.mod` 依赖 `github.com/go-gost/p2p v0.4.1`。
 
 ## 边界与定位
 
@@ -51,8 +51,7 @@
    进程内 `Provider` 现在对 `network=udp` 的 conn 自行加 2 字节 BE 长度前缀（复用 p2p
    `frame.go` 的 `appendFrame`/`frameAt`），与 plugin 路径的 conn 形状一致。实测：修复前
    隧道拨号成功、channel 正常建立但连发 3 包全无回复；修复后同一 harness 回环成功。
-   注意：需 `go.work` 模式（本地 p2p）；wisper 仍 pin `v0.4.0`，`GOWORK=off` 下是旧行为，
-   待发布 `v0.4.1` 后 bump。
+   已随 p2p **`v0.4.1`** 发布并 bump；go.work 与 `GOWORK=off` 两种模式行为一致。
 2. **会话首个数据报必丢（R2）**：拨号由会话首包触发，而 channel 的 peer edge 异步挂载，
    建链窗口内 `pumpLocal` 静默丢字节（p2p 设计如此：「Bytes are dropped while the opposite
    edge is absent」）。实测（加 framing shim 后）：首发丢失、同会话第二次发送即回环成功——
@@ -128,8 +127,8 @@ chains:
 **安全边界**：pubkey 即准入——持有 key 且可达 relay 的任何人能访问该本地服务；p2p 没有
 admission。建议 relay 侧 `-verify-clients=true`，并在本地服务上另加鉴权。详情页有固定提示。
 
-**依赖版本**：framing 修复（p2p 本地 main `204e2d5`）**未发布**——当前开发用 go.work 模式；
-发布 `v0.4.1` 并 bump wisper 之前，`GOWORK=off` 构建仍是 pinned `v0.4.0`。
+**依赖版本**：framing 修复已随 p2p **`v0.4.1`**（`204e2d5`）发布，wisper `go.mod` 已 bump；
+go.work 与 `GOWORK=off` 两种模式行为一致。
 
 **验证**：`tunnel/p2p_test.go`（key 生命周期/TLS 配置/默认 relay，无网络）；e2e
 `tunnel/p2p_e2e_test.go`（tag `p2ppoc`：真 derper + 对端按 key 拨入回环，跑法
