@@ -16,6 +16,7 @@ import (
 	"github.com/go-gost/core/metadata"
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/p2p"
+	"github.com/go-gost/p2p/endpoint"
 	cfg "github.com/go-gost/wisper/config"
 	xstats "github.com/go-gost/x/observer/stats"
 	stats_wrapper "github.com/go-gost/x/observer/stats/wrapper"
@@ -40,7 +41,7 @@ func P2PHostKeyPath() (string, error) {
 // accept loop, and the peer-key → tunnel routes.
 type p2pHostManager struct {
 	mu     sync.Mutex
-	host   *p2p.Host
+	host   *endpoint.Endpoint
 	ln     net.Listener
 	routes map[string]*peerListener
 	refs   int
@@ -52,7 +53,7 @@ var p2pHost = &p2pHostManager{routes: make(map[string]*peerListener)}
 // (key + relay + accept loop), and takes a reference on it. Every
 // AcquireP2PHost must be matched by exactly one ReleaseP2PHost, or the host
 // never shuts down.
-func AcquireP2PHost() (*p2p.Host, error) { return p2pHost.acquire() }
+func AcquireP2PHost() (*endpoint.Endpoint, error) { return p2pHost.acquire() }
 
 // ReleaseP2PHost gives one reference back; the last one stops the host, its
 // accept loop and every peer route. Releasing without a matching acquire
@@ -100,7 +101,7 @@ func (m *p2pHostManager) ensurePublicKey() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	host, err := p2p.New(&p2p.Config{
+	host, err := endpoint.New(&p2p.Config{
 		Derp: P2PDerpURL(cfg.Get().Settings),
 		Key:  keyPath,
 	})
@@ -115,7 +116,7 @@ func (m *p2pHostManager) ensurePublicKey() (string, error) {
 // acquire starts the host on first use (key + relay + Listen + accept loop) and
 // takes a reference. A failed relay connection is not fatal: the engine retries
 // in the background, so it is logged, never returned.
-func (m *p2pHostManager) acquire() (*p2p.Host, error) {
+func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.host == nil {
@@ -131,11 +132,11 @@ func (m *p2pHostManager) acquire() (*p2p.Host, error) {
 			Direct: &direct,
 		}
 		conf.TLS = P2PTLSConfig(settings)
-		host, err := p2p.New(conf)
+		host, err := endpoint.New(conf)
 		if err != nil {
 			return nil, fmt.Errorf("p2p host: %w", err)
 		}
-		ln, err := host.Tunnel().Listen()
+		ln, err := host.Listen()
 		if err != nil {
 			_ = host.Close()
 			return nil, err
@@ -388,7 +389,7 @@ func TestP2PRelay(derp string, secure *bool, caFile string) (string, time.Durati
 		return derp, 0, err
 	}
 	direct := false
-	host, err := p2p.New(&p2p.Config{
+	host, err := endpoint.New(&p2p.Config{
 		Derp:   derp,
 		KeyHex: hex.EncodeToString(key[:]),
 		Direct: &direct,

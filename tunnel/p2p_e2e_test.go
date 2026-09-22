@@ -19,6 +19,7 @@ import (
 	clogger "github.com/go-gost/core/logger"
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/p2p"
+	"github.com/go-gost/p2p/endpoint"
 	xconfig "github.com/go-gost/x/config"
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
 	_ "github.com/go-gost/x/connector/forward"
@@ -31,10 +32,10 @@ import (
 
 // newDialingHost starts an in-process p2p host with a fixed key, connected to
 // the DERP relay — the dialing side of a tunnel.
-func newDialingHost(t *testing.T, derp, keyHex string) *p2p.Host {
+func newDialingHost(t *testing.T, derp, keyHex string) *endpoint.Endpoint {
 	t.Helper()
 	direct, secure := false, false
-	h, err := p2p.New(&p2p.Config{
+	h, err := endpoint.New(&p2p.Config{
 		Derp: derp, KeyHex: keyHex,
 		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
 	})
@@ -78,9 +79,9 @@ func runTunnel(t *testing.T, id, echo string, peers ...string) wtunnel.Tunnel {
 
 // registerProvider publishes an in-process host's Tunnel the way an entrypoint
 // does, and drops it again at teardown.
-func registerProvider(t *testing.T, name string, h *p2p.Host) {
+func registerProvider(t *testing.T, name string, h *endpoint.Endpoint) {
 	t.Helper()
-	if err := registry.P2PRegistry().Register(name, h.Tunnel()); err != nil {
+	if err := registry.P2PRegistry().Register(name, h); err != nil {
 		t.Fatalf("register provider %s: %v", name, err)
 	}
 	t.Cleanup(func() { registry.P2PRegistry().Unregister(name) })

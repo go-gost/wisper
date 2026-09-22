@@ -49,6 +49,7 @@ import (
 	"github.com/go-gost/core/listener"
 	clogger "github.com/go-gost/core/logger"
 	"github.com/go-gost/p2p"
+	"github.com/go-gost/p2p/endpoint"
 	xchain "github.com/go-gost/x/chain"
 	xconfig "github.com/go-gost/x/config"
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
@@ -244,14 +245,14 @@ func startUDPEntrypoint(t *testing.T, wrap func(xp2p.Tunnel) xp2p.Tunnel, echoDe
 	echo := startUDPEcho(t, echoDelay)
 
 	direct, secure := false, false
-	newHost := func(keyHex string, targets []string) *p2p.Host {
-		h, err := p2p.New(&p2p.Config{
+	newHost := func(keyHex string, targets []string) *endpoint.Endpoint {
+		h, err := endpoint.New(&p2p.Config{
 			Derp:    derp,
 			KeyHex:  keyHex,
 			Direct:  &direct,
 			TLS:     &p2p.TLSConfig{Secure: &secure},
 			Targets: targets,
-		}, p2p.WithLogger(slog.Default()))
+		}, endpoint.WithLogger(slog.Default()))
 		if err != nil {
 			t.Fatalf("new p2p host: %v", err)
 		}
@@ -265,7 +266,7 @@ func startUDPEntrypoint(t *testing.T, wrap func(xp2p.Tunnel) xp2p.Tunnel, echoDe
 	outlet := newHost(strings.Repeat("11", 32), []string{"udp://" + echo})
 	dialer := newHost(strings.Repeat("22", 32), nil)
 
-	var pr xp2p.Tunnel = dialer.Tunnel()
+	var pr xp2p.Tunnel = dialer
 	if wrap != nil {
 		pr = wrap(pr)
 	}

@@ -188,7 +188,7 @@ func (s *p2pEntryPoint) Run() (err error) {
 	// metadata.p2p by name at parse time. The Unregister clears a stale
 	// registration left by a previous Run in this process.
 	registry.P2PRegistry().Unregister(s.provider)
-	if err = registry.P2PRegistry().Register(s.provider, host.Tunnel()); err != nil {
+	if err = registry.P2PRegistry().Register(s.provider, host); err != nil {
 		return
 	}
 

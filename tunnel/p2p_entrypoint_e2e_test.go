@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-gost/p2p"
+	"github.com/go-gost/p2p/endpoint"
 
 	cfg "github.com/go-gost/wisper/config"
 	wtunnel "github.com/go-gost/wisper/tunnel"
@@ -35,7 +36,7 @@ func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
 	}})
 
 	// The peer side: an in-process host holding the echo as its target.
-	peer, err := p2p.New(&p2p.Config{
+	peer, err := endpoint.New(&p2p.Config{
 		Derp: derp, KeyHex: strings.Repeat("44", 32),
 		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
 		Targets: []string{"tcp://" + echo},

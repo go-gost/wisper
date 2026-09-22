@@ -27,6 +27,7 @@ import (
 
 	clogger "github.com/go-gost/core/logger"
 	"github.com/go-gost/p2p"
+	"github.com/go-gost/p2p/endpoint"
 	xconfig "github.com/go-gost/x/config"
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
 	_ "github.com/go-gost/x/connector/forward" // register the transparent connector
@@ -52,7 +53,7 @@ func init() {
 // The chain parser looks providers up through this interface; asserting the
 // library's Tunnel against it here fails the build, not a runtime dial, if
 // the two ever drift.
-var _ xp2p.Tunnel = (*p2p.Tunnel)(nil)
+var _ xp2p.Tunnel = (*endpoint.Endpoint)(nil)
 
 // p2pChainConfig builds a wisper ChainConfig whose single node is transported
 // over the named p2p provider, with the peer at addr.
@@ -88,12 +89,12 @@ func TestP2PChainCarriesTCP(t *testing.T) {
 	//    plain host:port the node points at. Register its Tunnel the way
 	//    wisper must (programmatically, not via x/config/loader) so the chain
 	//    parser can resolve metadata.p2p.
-	host, err := p2p.New(&p2p.Config{})
+	host, err := endpoint.New(&p2p.Config{})
 	if err != nil {
 		t.Fatalf("new p2p host: %v", err)
 	}
 	t.Cleanup(func() { _ = host.Close() })
-	if err := registry.P2PRegistry().Register(p2pProviderName, host.Tunnel()); err != nil {
+	if err := registry.P2PRegistry().Register(p2pProviderName, host); err != nil {
 		t.Fatalf("register p2p provider: %v", err)
 	}
 	t.Cleanup(func() { registry.P2PRegistry().Unregister(p2pProviderName) })
