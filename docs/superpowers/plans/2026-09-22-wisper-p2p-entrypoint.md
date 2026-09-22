@@ -236,7 +236,8 @@ git commit -m "feat(entrypoint): p2p entrypoint type (dial out to a peer key)"
 	case entrypoint.P2PEntryPoint:
 		ep = entrypoint.NewP2PEntryPoint(...)   // 按各处变量风格：req.toOptions() / opts / optsSlice
 ```
-create/update 的请求结构加 `Peer string \`json:"peer,omitempty"\``（或复用现有 options 结构，按文件实际情况），并让 `toOptions()` 带上 `tunnel.PeerOption(req.Peer)`；响应 options 结构（`entrypointOptionsResp` 或同名）加 `Peer string \`json:"peer,omitempty"\``，赋值处从 `t.Options().Peer` 取。
+create/update 的请求结构加 `Peer string \`json:"peer,omitempty"\``，并让 `toOptions()` 带上 `tunnel.PeerOption(req.Peer)`；**`handleStartEntrypoint` 的 `optsSlice` 也必须带 `tunnel.PeerOption(opts.Peer)`**——否则 stop→start 会静默丢 peer key（实测发现）。
+响应：wisper 的 options JSON 是**隧道/入口点共用**的 `tunnelOptionsResp`（在 `api/tunnel_handler.go`），所以 `Peer string \`json:"peer,omitempty"\`` 与 `Peer: opts.Peer` 加在那里，而不是单独给入口点加一个结构。
 
 - [ ] **Step 2: 删除路径清 key**
 
@@ -296,8 +297,9 @@ import (
 )
 
 func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
-	echo := startEchoServer(t) // p2p_poc_test.go (same package + tag)
-	derp := startDerper(t)     // p2p_udp_poc_test.go (same package + tag)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir()) // keep the key out of the real config dir
+	echo := startEchoServer(t)               // p2p_poc_test.go (same package + tag)
+	derp := startDerper(t)                   // p2p_udp_poc_test.go (same package + tag)
 
 	secure := false
 	direct := false
@@ -319,16 +321,19 @@ func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
 		t.Fatalf("peer connect: %v", err)
 	}
 
-	// The entrypoint listens locally and dials the peer by key.
+	// The entrypoint listens locally and dials the peer by key. Bind a concrete
+	// port: Entrypoint() returns the *configured* address (the tcp/udp
+	// entrypoint convention), so ":0" is not dialable.
 	ep := wep.NewP2PEntryPoint(
 		wtunnel.IDOption("e2e-p2p-ep"),
-		wtunnel.EndpointOption("127.0.0.1:0"),
+		wtunnel.EndpointOption(fmt.Sprintf("127.0.0.1:%d", freePort(t))),
 		wtunnel.PeerOption(peer.PublicKey()),
 	)
 	if err := ep.Run(); err != nil {
 		t.Fatalf("run p2p entrypoint: %v", err)
 	}
 	t.Cleanup(func() { _ = ep.Close() })
+	t.Cleanup(func() { _ = wtunnel.RemoveP2PKey("e2e-p2p-ep") })
 
 	addr := ep.Entrypoint() // the local listen address
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
@@ -354,7 +359,7 @@ func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
 }
 ```
 
-（`strings` 加进 import；`registry` 仅在需要时保留——若本文件未用到就删掉该 import。）
+（`strings` 与 `fmt` 加进 import；`registry` 仅在需要时保留。另：`tunnel/p2p_e2e_test.go` 也加同一行 `t.Setenv("XDG_CONFIG_HOME", t.TempDir())`，让两个 e2e 都不碰真实配置目录。）
 
 **判定规则：** 若拨号/回环失败，**不要**改弱断言；抓两侧日志（`-v` 会打出 p2p host 的 slog）并报 BLOCKED——那是发现，不是噪声。
 
@@ -454,3 +459,4 @@ git commit -m "docs: p2p entrypoint (out-dial side) usage"
 - **占位符**：Go 侧均为完整代码（p2p.go 给出结构与差异点，实现者镜像 tcp.go 的样板）；UI 为锚点式指令（与上一个计划同法）。注册表 `Get` 的签名等不确定处已注明按实际调整。
 - **类型一致性**：`P2PEntryPoint`/`NewP2PEntryPoint`/`PeerOption`/`P2PDerpURL`/`P2PTLSConfig`/`P2PKeyPath`/`provider = "p2p-ep-"+ID` 在 Task 1–4 一致；`Endpoint()`=peer key、`Entrypoint()`=本地监听 与既有约定一致。
 - **已知取舍**：e2e 放 `tunnel/` 目录以复用 `startDerper`（测试辅助不可跨包），文件内 import `tunnel/entrypoint` ✓。
+- **实测修正（2026-09-22 执行中）**：Task 3 的 start 分支必须带 `PeerOption`（否则重启丢 peer）；options JSON 是隧道/入口点共用的 `tunnelOptionsResp`；Task 4 的监听地址用 `freePort(t)`（`Entrypoint()` 返回配置值，`:0` 不可拨），并用 `XDG_CONFIG_HOME` 隔离 + `RemoveP2PKey` 清理。
