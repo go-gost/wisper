@@ -130,6 +130,7 @@ const en: Record<string, string> = {
   settingsP2PDerp: 'DERP relay URL',
   settingsP2PSecure: 'Verify relay certificate',
   settingsP2PSecureDesc: 'Verify the relay TLS certificate. Disable only for a self-signed relay on a trusted network.',
+  settingsP2PCAFileHint: 'PEM CA file to trust the relay\'s self-signed certificate. Empty uses the system roots.',
   settingsP2PCAFile: 'Relay CA file',
   p2pHint: 'Anyone holding this key who can reach the relay can access the local service. No further authentication is applied by p2p.',
   entrypointPeerKey: 'Peer public key',

@@ -130,6 +130,7 @@ const zh: Record<string, string> = {
   settingsP2PDerp: 'DERP 中继地址',
   settingsP2PSecure: '验证中继证书',
   settingsP2PSecureDesc: '验证中继的 TLS 证书；仅当使用自签证书的可信中继时才关闭。',
+  settingsP2PCAFileHint: '用于信任中继自签证书的 PEM CA 文件；留空则使用系统根证书。',
   settingsP2PCAFile: '中继 CA 证书文件',
   p2pHint: '持有此公钥且可访问中继的任何人，都能访问该本地服务；p2p 不再进行额外认证。',
   entrypointPeerKey: '对端公钥',

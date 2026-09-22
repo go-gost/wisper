@@ -560,7 +560,9 @@ export class SettingsPage extends LitElement {
               <div class="form-group" style="margin-top:18px;">
                 <label class="form-label">${t('settingsP2PCAFile')}</label>
                 <input class="form-input" .value=${this._p2pCaFile}
+                  placeholder="/path/to/ca.pem"
                   @input=${(e: Event) => { this._p2pCaFile = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
+                <p class="hint">${t('settingsP2PCAFileHint')}</p>
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}
