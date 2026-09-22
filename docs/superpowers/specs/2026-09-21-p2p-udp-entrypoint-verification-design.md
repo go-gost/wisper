@@ -15,7 +15,7 @@ wisper 的下一步（p2p entrypoint / 私有 p2p 模式）都建立在「udp �
    （[p2p/engine.go](https://github.com/go-gost/p2p/blob/v0.4.0/engine.go)）→ 裸 pubkey 变 `<pubkey>:0`，
    隧道拨号在 `parsePeerKey` 处失败。入口点要在 p2p 下寻址，需要修 handler 的补端口、
    或让 tunnel dialer 从 metadata 取 peer（而非 addr）。
-1. **进程内 provider 的 udp conn 缺 framing**：gRPC plugin 路径返回
+1. ~~**进程内 provider 的 udp conn 缺 framing**~~（**已修复**，见第四次修订）：gRPC plugin 路径返回
    [x/p2p/streamconn](https://github.com/go-gost/x/blob/v0.17.2/p2p/streamconn/conn.go)（`network=="udp"` 时自动 framed，
    2 字节 BE 长度前缀），而进程内 `p2p.Provider` 返回 p2p 自己的 raw `streamConn`
    （[p2p/provider.go](https://github.com/go-gost/p2p/blob/v0.4.0/provider.go)），无 framing。
@@ -105,6 +105,18 @@ R0 首跑**未复现**寻址缺陷：日志显示 `dial <key>:0/udp` 成功、`c
 - 入口点形态在 p2p 下**寻址没问题**（与 tun 形态一致）；原候选缺陷 0 撤回。
 - 原 R0 与原 R1 机制相同 → 合并为 R0（provider 原样）；`stripPortProvider` 删除（从未改变行为）。
 - 文档（Task 6）须写明这是一条**被证伪**的假设，避免后人重复排查。
+
+## 第四次修订（2026-09-21，framing 修复落地）
+
+候选缺陷 1 已在 p2p 侧修复（本地 main `204e2d5`，未发布）：`Provider` 对 `network=udp` 的 conn
+自行 framing（复用 `frame.go` 的 `appendFrame`/`frameAt`），与 plugin 路径对齐。矩阵据此收敛：
+
+- 原 R0（原样）与原 R2（framing shim）合并为**唯一 baseline**（`TestP2PUDPBaseline`，`wrap=nil`）：
+  修复前 R0 无回复、R2 靠 shim 回环；修复后二者等价（实测 3× 通过，回复需 2 发）。
+- `framedProvider` shim 删除——它会与 Provider 的 framing 叠加成双层（echo 原样回显下自抵消，
+  真实后端会多收到 2 字节内层前缀）。
+- R3 改为 `wrap=nil`（keepalive=true 不变），签名不变：c2 收到 c1 的在途回复 + 自己的，c1 无回复。
+- 版本策略：先用 `go.work` 模式开发；`v0.4.1` tag 与 wisper bump 待定。
 
 ## 产出
 

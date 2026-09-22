@@ -47,10 +47,12 @@
 进程内 p2p host + 与 `tunnel/entrypoint/udp.go` `Run()` 同构的栈；跑法
 `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDP -v ./tunnel/`）：
 
-1. **进程内 provider 缺 datagram framing（R0）**：gRPC plugin 路径的 conn 由 `x/p2p/streamconn`
-   按 udp 模式加 2 字节 BE 长度前缀，进程内 `Provider` 返回的是 p2p 自己的 raw conn →
-   outlet 侧帧解析永远等不到完整帧。实测：隧道拨号成功、channel 正常建立（`channel up`），
-   连发 3 个数据报**全部无回复**。这是 udp 入口点在进程内路径上不可用的**首要**原因。
+1. ~~**进程内 provider 缺 datagram framing**~~ —— **已修复**（p2p 本地 main `204e2d5`，未发布）：
+   进程内 `Provider` 现在对 `network=udp` 的 conn 自行加 2 字节 BE 长度前缀（复用 p2p
+   `frame.go` 的 `appendFrame`/`frameAt`），与 plugin 路径的 conn 形状一致。实测：修复前
+   隧道拨号成功、channel 正常建立但连发 3 包全无回复；修复后同一 harness 回环成功。
+   注意：需 `go.work` 模式（本地 p2p）；wisper 仍 pin `v0.4.0`，`GOWORK=off` 下是旧行为，
+   待发布 `v0.4.1` 后 bump。
 2. **会话首个数据报必丢（R2）**：拨号由会话首包触发，而 channel 的 peer edge 异步挂载，
    建链窗口内 `pumpLocal` 静默丢字节（p2p 设计如此：「Bytes are dropped while the opposite
    edge is absent」）。实测（加 framing shim 后）：首发丢失、同会话第二次发送即回环成功——
@@ -67,11 +69,11 @@
 > `x/chain/route.go` 拨的是 `node.Addr`（干净 base64 key），`:0` 只补在 *target* 地址上，
 > 而 `x/connector/forward` 忽略该地址。入口点形态在 p2p 下**寻址正常**。
 
-修复方向（产品改动，另立任务）：
-① **x 侧按 network 把 provider conn 包成 framed**（与 plugin 路径对齐）——任何 udp 进程内
-路径的前置；② 多客户端：per-client channel，或 GOST 侧 session 多路复用（对齐 relay 协议的
-udp session id 思路）；③ 首包丢失 / 每请求重建隧道：入口点默认打开 keepalive，或 p2p 侧在
-peer edge 就绪前缓冲 local edge 的字节（权衡内存与语义）。
+修复方向（产品改动）：
+① ~~provider conn 按 network 包 framed~~ —— **已做，落在 p2p Provider 侧**（见上，比 x 侧包
+更小：不触碰 x、不会与 plugin 路径叠加成双层 framing）；② 多客户端：per-client channel，或
+GOST 侧 session 多路复用（对齐 relay 协议的 udp session id 思路）；③ 首包丢失 / 每请求重建隧道：
+入口点默认打开 keepalive，或 p2p 侧在 peer edge 就绪前缓冲 local edge 的字节（权衡内存与语义）。
 
 tun 形态（p2p e2e 的 `udp-tun`/`udp-outlet`）不受上述影响：那些场景两端都走 plugin 路径且单流。
 

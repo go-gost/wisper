@@ -8,16 +8,16 @@
 //
 // Runs:
 //
-//	R0  provider as shipped: the in-process conn carries no datagram framing
-//	    (the gRPC plugin's does), so the outlet's frame parser never sees a
-//	    frame. The addressing hypothesis this run was meant to probe did NOT
-//	    reproduce: the chain route dials node.Addr, the clean key, and the
-//	    local handler's ":0" suffix lands only on the target address, which the
-//	    forward connector ignores.
-//	R2  with a framing shim: the baseline datagram path.
-//	R3  two concurrent clients on R2 (keepalive=true): the second dial replaces
-//	    the channel's local edge (last-dial-wins) and frames carry no client
-//	    identity, so an in-flight reply is cross-delivered.
+//	baseline  the provider as shipped: it frames udp conns (p2p 204e2d5), so a
+//	          datagram round-trips once the channel comes up.
+//	R3        two concurrent clients (keepalive=true): the second dial replaces
+//	          the channel's local edge (last-dial-wins) and frames carry no
+//	          client identity, so an in-flight reply is cross-delivered.
+//
+// The addressing hypothesis (the local handler's ":0" suffix reaching
+// parsePeerKey) did NOT reproduce: the chain route dials node.Addr, the clean
+// key, and the suffix lands only on the target address, which the forward
+// connector ignores.
 //
 // Run:
 //
@@ -28,7 +28,6 @@
 package tunnel_test
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -50,7 +49,6 @@ import (
 	"github.com/go-gost/core/listener"
 	clogger "github.com/go-gost/core/logger"
 	"github.com/go-gost/p2p"
-	"github.com/go-gost/plugin/p2p/proto"
 	xchain "github.com/go-gost/x/chain"
 	xconfig "github.com/go-gost/x/config"
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
@@ -61,7 +59,6 @@ import (
 	xudp "github.com/go-gost/x/listener/udp"
 	mdx "github.com/go-gost/x/metadata"
 	xp2p "github.com/go-gost/x/p2p"
-	"github.com/go-gost/x/p2p/streamconn"
 	"github.com/go-gost/x/registry"
 	xservice "github.com/go-gost/x/service"
 
@@ -210,23 +207,6 @@ func startDerper(t *testing.T) string {
 	return "wss://" + addr + "/derp"
 }
 
-// TestP2PUDPFramedBaseline is R2: with the addressing and framing shims the
-// datagram path is correct — the baseline that proves R1's failure is framing,
-// not the harness. The send is retried because the channel drops the session's
-// first datagram while its peer edge is attached.
-func TestP2PUDPFramedBaseline(t *testing.T) {
-	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
-		return framedProvider{inner: pr}
-	}, 0, false)
-
-	c := udpClient(t, entry)
-	got, sends := udpRetryRoundTrip(t, c, "ping-r2", 5*time.Second)
-	if got != "ping-r2" {
-		t.Fatalf("round trip through the udp entrypoint: got %q after %d send(s)", got, sends)
-	}
-	t.Logf("R2 signature: reply after %d send(s) (the session's first datagram is dropped during channel bring-up)", sends)
-}
-
 // startUDPEcho starts a UDP echo server; replies are delayed by d (R3 uses the
 // delay to engineer the overlap).
 func startUDPEcho(t *testing.T, d time.Duration) string {
@@ -254,40 +234,6 @@ func startUDPEcho(t *testing.T, d time.Duration) string {
 	}()
 	return pc.LocalAddr().String()
 }
-
-// framedProvider adapts the in-process provider's raw conn to the datagram
-// framing the gRPC plugin path gets from x/p2p/streamconn. Test-local: it
-// stands in for the missing production wrapper.
-type framedProvider struct{ inner xp2p.TunnelProvider }
-
-func (p framedProvider) Close() error { return p.inner.Close() }
-
-func (p framedProvider) OpenTunnelStream(ctx context.Context, network, peer string) (net.Conn, error) {
-	c, err := p.inner.OpenTunnelStream(ctx, network, peer)
-	if err != nil || network != "udp" {
-		return c, err
-	}
-	return streamconn.New(connStream{c: c}, func() { c.Close() }, "udp", c.LocalAddr(), c.RemoteAddr()), nil
-}
-
-// connStream presents a net.Conn as a streamconn.Stream.
-type connStream struct{ c net.Conn }
-
-func (s connStream) Send(ch *proto.Chunk) error {
-	_, err := s.c.Write(ch.GetData())
-	return err
-}
-
-func (s connStream) Recv() (*proto.Chunk, error) {
-	b := make([]byte, 32*1024)
-	n, err := s.c.Read(b)
-	if n > 0 {
-		return &proto.Chunk{Data: b[:n]}, nil
-	}
-	return nil, err
-}
-
-func (s connStream) Context() context.Context { return context.Background() }
 
 // startUDPEntrypoint runs the whole shape and returns the entrypoint's local
 // udp address. wrap adapts the registered provider (nil = as shipped);
@@ -429,48 +375,30 @@ func udpRetryRoundTrip(t *testing.T, c net.Conn, payload string, budget time.Dur
 	}
 }
 
-// TestP2PUDPRawConnNoFraming is R0, the provider as shipped: the in-process
-// conn carries no datagram framing while the outlet parses 2-byte
-// length-prefixed frames, so it reads the payload's first two bytes as a
-// length and waits for bytes that never come. Three sends cover the channel
-// bring-up loss: with correct framing the second or third would round-trip
-// (R2), so a persistent silence is the framing gap. When the framing is fixed
-// this test should be inverted.
-//
-// The addressing hypothesis this run was originally meant to probe did not
-// reproduce (measured): the chain route dials node.Addr — the clean key — and
-// the local handler's ":0" suffix lands only on the target address, which the
-// forward connector ignores. The tunnel dial succeeds and the channel comes up.
-func TestP2PUDPRawConnNoFraming(t *testing.T) {
+// TestP2PUDPBaseline is the as-shipped baseline: the in-process provider frames
+// udp conns itself (p2p's frameConn, so both carriers hand the inner dialer the
+// same conn shape), and a datagram round-trips. The send is retried because the
+// channel drops the session's first datagram while its peer edge is attached.
+func TestP2PUDPBaseline(t *testing.T) {
 	entry := startUDPEntrypoint(t, nil, 0, false)
 
 	c := udpClient(t, entry)
-	var got string
-	var err error
-	for i := 0; i < 3; i++ {
-		udpSend(t, c, "ping-r0")
-		got, err = udpRead(t, c, time.Second)
-		if err == nil {
-			break
-		}
+	got, sends := udpRetryRoundTrip(t, c, "ping-baseline", 5*time.Second)
+	if got != "ping-baseline" {
+		t.Fatalf("round trip through the udp entrypoint: got %q after %d send(s)", got, sends)
 	}
-	if err == nil {
-		t.Fatalf("round trip succeeded (echo=%q): the in-process framing gap appears fixed", got)
-	}
-	t.Logf("R0 signature: no reply after 3 sends (%v)", err)
+	t.Logf("baseline signature: reply after %d send(s) (the session's first datagram is dropped during channel bring-up)", sends)
 }
 
-// TestP2PUDPTwoClientsCollide is R3: two concurrent clients on the framed
-// baseline, with keepalive=true so the session (and the tunnel) survives its
+// TestP2PUDPTwoClientsCollide is R3: two concurrent clients on the baseline,
+// with keepalive=true so the session (and the tunnel) survives its
 // first reply — under the default keepalive=false every reply tears the tunnel
 // down and there is no state to collide over. The second dial replaces the
 // channel's local edge (last-dial-wins) and the frames carry no client
 // identity, so the first client's in-flight reply is cross-delivered. The echo
 // delay engineers the overlap.
 func TestP2PUDPTwoClientsCollide(t *testing.T) {
-	entry := startUDPEntrypoint(t, func(pr xp2p.TunnelProvider) xp2p.TunnelProvider {
-		return framedProvider{inner: pr}
-	}, 500*time.Millisecond, true)
+	entry := startUDPEntrypoint(t, nil, 500*time.Millisecond, true)
 
 	c1 := udpClient(t, entry)
 	c2 := udpClient(t, entry)
