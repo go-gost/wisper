@@ -6,7 +6,7 @@ import { getTunnels, refresh, remove, start, stop, subscribe, resetStats } from 
 import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKeyList } from '../utils/format';
+import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import type { Tunnel, TunnelType, TunnelCreateRequest } from '../api/types';
 import '../components/app-scaffold';
 
@@ -151,7 +151,25 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = t.options.file_upload ?? false;
     this._showAuth = !!(t.options.username || t.options.basic_auth);
     this._recordMode = t.options.record_mode || 'off';
-    this._peers = (t.options.peers ?? []).join('\n');
+    // One peer per line: "<key> <alias>", the alias optional.
+    this._peers = (t.options.peers ?? [])
+      .map(p => (p.alias ? `${p.key} ${p.alias}` : p.key))
+      .join('\n');
+  }
+
+  /** _peerLabels renders the allowlist for display: each peer's alias by
+   *  default — the key is a credential — and the key itself once revealed. */
+  private _peerLabels(): string {
+    return (this._tunnel?.options.peers ?? [])
+      .map(p => (this._showPeers ? p.key : p.alias || maskKey(p.key)))
+      .join(', ');
+  }
+
+  /** _peerLabelOf names one connected peer key. */
+  private _peerLabelOf(key: string): string {
+    if (this._showPeers) return key;
+    const p = (this._tunnel?.options.peers ?? []).find(x => x.key === key);
+    return p?.alias || maskKey(key);
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -206,7 +224,15 @@ export class TunnelDetailPage extends LitElement {
         record_mode: this._recordMode,
       };
       if (this.tunnelType === 'p2p') {
-        body.peers = this._peers.split('\n').map(s => s.trim()).filter(Boolean);
+        body.peers = this._peers
+          .split('\n')
+          .map(s => s.trim())
+          .filter(Boolean)
+          .map(line => {
+            const [key, ...rest] = line.split(/\s+/);
+            const alias = rest.join(' ');
+            return alias ? { key, alias } : { key };
+          });
       }
       if (this._showAuth) {
         body.username = this._username.trim() || undefined;
@@ -863,23 +889,38 @@ export class TunnelDetailPage extends LitElement {
                   <span class="info-label">Target</span>
                   <span class="info-value">${t2.endpoint}</span>
                 </div>
-                <!-- For p2p this IS the inbound allowlist (joined); the host's
-                     own identity lives in Settings. -->
-                <div class="info-row">
-                  <span class="info-label">${this.tunnelType === 'p2p' ? t('p2pPeers') : 'Entrypoint'}</span>
-                  ${t2.entrypoint
+                <!-- p2p: the inbound allowlist, shown by alias (the keys behind
+                     the eye toggle); the host's own identity lives in Settings.
+                     Other types: the public entrypoint URL, which is not secret. -->
+                ${this.tunnelType === 'p2p'
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">${t('p2pPeers')}</span>
+                      ${t2.entrypoint
+                        ? html`
+                          <span class="info-value">${this._showPeers ? t2.entrypoint : this._peerLabels()}</span>
+                          <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
+                            ${icon('copy')}
+                          </button>
+                          <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
+                            @click=${() => { this._showPeers = !this._showPeers; }}>
+                            ${icon(this._showPeers ? 'eye-off' : 'eye')}
+                          </button>
+                        `
+                        : html`<span class="info-value empty">${t('p2pPeersEmpty')}</span>`}
+                    </div>
+                  `
+                  : t2.entrypoint
                     ? html`
-                      <span class="info-value">${this._showPeers ? t2.entrypoint : maskKeyList(t2.entrypoint)}</span>
-                      <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
-                        ${icon('copy')}
-                      </button>
-                      <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
-                        @click=${() => { this._showPeers = !this._showPeers; }}>
-                        ${icon(this._showPeers ? 'eye-off' : 'eye')}
-                      </button>
+                      <div class="info-row">
+                        <span class="info-label">Entrypoint</span>
+                        <span class="info-value">${t2.entrypoint}</span>
+                        <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
+                          ${icon('copy')}
+                        </button>
+                      </div>
                     `
-                    : html`<span class="info-value empty">${t('p2pPeersEmpty')}</span>`}
-                </div>
+                    : nothing}
                 ${this.tunnelType === 'p2p'
                   ? html`<div class="p2p-hint">${t('p2pHint')}</div>`
                   : nothing}
@@ -892,7 +933,7 @@ export class TunnelDetailPage extends LitElement {
                       ${activePeers.length
                         ? html`
                           <span class="info-value">
-                            ${this._showPeers ? activePeers.join(', ') : maskKeyList(activePeers.join(', '))}
+                            ${activePeers.map(k => this._peerLabelOf(k)).join(', ')}
                           </span>
                           <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
                             @click=${() => { this._showPeers = !this._showPeers; }}>
@@ -1069,7 +1110,7 @@ export class TunnelDetailPage extends LitElement {
                   ? html`
                     <div class="form-group">
                       <label class="form-label">${t('p2pPeers')}</label>
-                      <textarea class="form-input" rows="3" placeholder="Base64 public key per line"
+                      <textarea class="form-input" rows="3" placeholder="<public key> [alias]"
                         .value=${this._peers}
                         @input=${(e: Event) => { this._peers = (e.target as HTMLTextAreaElement).value; }}></textarea>
                       <div style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding-top:4px;">

@@ -29,6 +29,14 @@ type tunnelResponse struct {
 	ActivePeers []string `json:"active_peers,omitempty"`
 }
 
+// peerJSON is one allowlist entry: the key is the credential, the alias its
+// display name. The alias is optional on the way in (it is generated when
+// omitted) and always present on the way out.
+type peerJSON struct {
+	Key   string `json:"key"`
+	Alias string `json:"alias,omitempty"`
+}
+
 type tunnelOptionsResp struct {
 	Prefix      string `json:"prefix,omitempty"`
 	Hostname    string `json:"hostname,omitempty"`
@@ -43,9 +51,9 @@ type tunnelOptionsResp struct {
 	RecordMode  string `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
-	// Peers is a p2p tunnel's inbound allowlist (base64 public keys). Empty is
-	// valid: the tunnel runs and routes nothing.
-	Peers []string `json:"peers,omitempty"`
+	// Peers is a p2p tunnel's inbound allowlist. Empty is valid: the tunnel
+	// runs and routes nothing.
+	Peers []peerJSON `json:"peers,omitempty"`
 }
 
 type statsResponse struct {
@@ -57,6 +65,22 @@ type statsResponse struct {
 	OutputBytes     uint64  `json:"output_bytes"`
 	InputRateBytes  uint64  `json:"input_rate_bytes"`
 	OutputRateBytes uint64  `json:"output_rate_bytes"`
+}
+
+// peersJSON pairs each allowlisted key with its display alias. A key without
+// one (a config older than aliases) is normalized on the way out, so the UI
+// always has a name to show.
+func peersJSON(peers []string, aliases map[string]string) []peerJSON {
+	normalized := tunnel.NormalizePeerAliases(peers, aliases)
+	out := make([]peerJSON, 0, len(peers))
+	seen := make(map[string]bool, len(peers))
+	for _, k := range peers {
+		if a, ok := normalized[k]; ok && !seen[k] {
+			seen[k] = true
+			out = append(out, peerJSON{Key: k, Alias: a})
+		}
+	}
+	return out
 }
 
 // safeSub returns a - b, or 0 if b > a (underflow guard for baseline subtraction).
@@ -112,7 +136,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			TTL:         opts.TTL,
 			RecordMode:  opts.RecordMode,
 			Peer:        opts.Peer,
-			Peers:       opts.Peers,
+			Peers:       peersJSON(opts.Peers, opts.PeerAliases),
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
@@ -153,11 +177,22 @@ type tunnelCreateRequest struct {
 	RecordMode  string `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
-	// Peers is a p2p tunnel's inbound allowlist (base64 public keys).
-	Peers []string `json:"peers,omitempty"`
+	// Peers is a p2p tunnel's inbound allowlist; an entry's alias is optional
+	// and generated when omitted.
+	Peers []peerJSON `json:"peers,omitempty"`
 }
 
 func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
+	peers := make([]string, 0, len(r.Peers))
+	aliases := make(map[string]string, len(r.Peers))
+	for _, p := range r.Peers {
+		peers = append(peers, p.Key)
+		if p.Alias != "" {
+			aliases[p.Key] = p.Alias
+		}
+	}
+	aliases = tunnel.NormalizePeerAliases(peers, aliases)
+
 	return []tunnel.Option{
 		tunnel.NameOption(r.Name),
 		tunnel.EndpointOption(r.Endpoint),
@@ -170,7 +205,8 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.FileUploadOption(r.FileUpload),
 		tunnel.RecordModeOption(r.RecordMode),
 		tunnel.PeerOption(r.Peer),
-		tunnel.PeersOption(r.Peers...),
+		tunnel.PeersOption(peers...),
+		tunnel.PeerAliasesOption(aliases),
 	}
 }
 
@@ -293,6 +329,14 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnelType = old.Type()
 	}
 
+	// A p2p tunnel cannot be replaced while it lives: the process-wide host
+	// routes each peer key to exactly one tunnel, so the old one must give its
+	// routes up first (everything else binds its own socket and swaps after the
+	// replacement runs).
+	if old.Type() == tunnel.P2PTunnel {
+		old.Close()
+	}
+
 	// Create replacement with same ID first (before deleting old).
 	opts := append([]tunnel.Option{
 		tunnel.IDOption(id),
@@ -396,6 +440,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnel.RecordModeOption(opts.RecordMode),
 		tunnel.CreatedAtOption(opts.CreatedAt),
 		tunnel.PeersOption(opts.Peers...),
+		tunnel.PeerAliasesOption(opts.PeerAliases),
 	}
 
 	var newT tunnel.Tunnel

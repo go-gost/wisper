@@ -82,7 +82,10 @@ type Options struct {
 	// Peers is a p2p tunnel's inbound allowlist: the base64 public keys of the
 	// peers whose streams are routed to it. Empty is valid — the tunnel runs,
 	// it just receives nothing (there is no catch-all route).
-	Peers         []string
+	Peers []string
+	// PeerAliases is the display name of each allowlisted key (key → alias),
+	// so pages show a short label instead of the key itself.
+	PeerAliases   map[string]string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -193,6 +196,13 @@ func PeerOption(peer string) Option {
 func PeersOption(peers ...string) Option {
 	return func(opts *Options) {
 		opts.Peers = peers
+	}
+}
+
+// PeerAliasesOption sets the allowlist's display names (key → alias).
+func PeerAliasesOption(aliases map[string]string) Option {
+	return func(opts *Options) {
+		opts.PeerAliases = aliases
 	}
 }
 
@@ -393,6 +403,7 @@ func RestartRunning() {
 			FileUpload:  p.opts.FileUpload,
 			RecordMode:  p.opts.RecordMode,
 			Peers:       p.opts.Peers,
+			PeerAliases: p.opts.PeerAliases,
 			CreatedAt:   p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -478,6 +489,7 @@ func LoadConfig() {
 			RecordMode:    cfg.RecordMode,
 			Peer:          cfg.Peer,
 			Peers:         cfg.Peers,
+			PeerAliases:   NormalizePeerAliases(cfg.Peers, cfg.PeerAliases),
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -525,6 +537,7 @@ func SaveConfig() error {
 			RecordMode:    opts.RecordMode,
 			Peer:          opts.Peer,
 			Peers:         opts.Peers,
+			PeerAliases:   opts.PeerAliases,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -557,6 +570,7 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		FileUploadOption(opts.FileUpload),
 		RecordModeOption(opts.RecordMode),
 		PeersOption(opts.Peers...),
+		PeerAliasesOption(opts.PeerAliases),
 	}
 
 	switch st {

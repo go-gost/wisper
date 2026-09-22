@@ -187,6 +187,11 @@ type Tunnel struct {
 	// runs but is unreachable).
 	Peers []string `yaml:"peers,omitempty" json:"peers,omitempty"`
 
+	// PeerAliases labels each allowlisted key for display (key → alias), so
+	// the UI shows a short name instead of the key itself. Entries are
+	// generated on demand — see NormalizePeerAliases.
+	PeerAliases map[string]string `yaml:"peer_aliases,omitempty" json:"peer_aliases,omitempty"`
+
 	Stats         ServiceStats
 	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
 	Favorite      bool

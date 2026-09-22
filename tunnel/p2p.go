@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"io"
+	"math/rand/v2"
 	"net"
 	"os"
 	"path/filepath"
@@ -255,6 +256,50 @@ func (s *p2pTunnel) Run() (err error) {
 	}()
 
 	return nil
+}
+
+// normalizePeerAliases fills in a display name for every allowlisted key:
+// known aliases are kept, a key without one gets a random one, and aliases of
+// keys no longer listed are dropped. Nil means no peers, hence no aliases.
+func NormalizePeerAliases(peers []string, known map[string]string) map[string]string {
+	if len(peers) == 0 {
+		return nil
+	}
+
+	used := make(map[string]bool, len(peers))
+	aliases := make(map[string]string, len(peers))
+	for _, p := range peers {
+		if a := known[p]; a != "" {
+			aliases[p] = a
+			used[a] = true
+		}
+	}
+	for _, p := range peers {
+		if aliases[p] != "" {
+			continue
+		}
+		a := randomPeerAlias(used)
+		aliases[p] = a
+		used[a] = true
+	}
+	return aliases
+}
+
+// peerAliasAlphabet keeps aliases typeable: lowercase letters and digits.
+const peerAliasAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+// randomPeerAlias returns a short "peer-xxxx" label no name in used repeats.
+func randomPeerAlias(used map[string]bool) string {
+	for {
+		b := make([]byte, 4)
+		for i := range b {
+			b[i] = peerAliasAlphabet[rand.IntN(len(peerAliasAlphabet))]
+		}
+		a := "peer-" + string(b)
+		if !used[a] {
+			return a
+		}
+	}
 }
 
 // ActivePeers reports the peer keys with a live stream right now (sorted), so

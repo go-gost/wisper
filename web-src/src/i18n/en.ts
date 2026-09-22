@@ -145,7 +145,7 @@ const en: Record<string, string> = {
   p2pKeyWarning: 'Treat this key as a password: whoever obtains it can impersonate this host, and any peer that allow-lists this host will accept them. Never share it on public channels.',
   p2pIdentityIdle: 'Relay not connected — start a p2p tunnel or entrypoint so peers can dial in.',
   p2pPeers: 'Allowed peers',
-  p2pPeersHint: 'One peer public key per line. Empty means no inbound traffic is routed to this tunnel.',
+  p2pPeersHint: 'One peer public key per line, optionally followed by an alias (generated when omitted). Empty means no inbound traffic is routed to this tunnel.',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
   p2pConnected: 'Connected',
   p2pConnectedEmpty: 'No peer connected right now.',

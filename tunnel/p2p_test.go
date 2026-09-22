@@ -231,6 +231,39 @@ func TestP2PTunnelDuplicatePeerKey(t *testing.T) {
 
 // TestP2PDerpDefault: an empty settings.p2p resolves to the public gost.run
 // relay (never a hard failure).
+// TestNormalizePeerAliases: every listed key ends up with a display name —
+// a known alias is kept, a new key gets a distinct random one, and a key no
+// longer listed loses its alias.
+func TestNormalizePeerAliases(t *testing.T) {
+	if got := NormalizePeerAliases(nil, nil); got != nil {
+		t.Fatalf("NormalizePeerAliases(nil) = %v, want nil", got)
+	}
+
+	known := map[string]string{"k1": "home-laptop", "k9": "old-peer"}
+	got := NormalizePeerAliases([]string{"k1", "k2", "k3"}, known)
+
+	if got["k1"] != "home-laptop" {
+		t.Errorf("k1 alias = %q, want the existing one kept", got["k1"])
+	}
+	if _, ok := got["k9"]; ok {
+		t.Error("a key no longer listed kept its alias")
+	}
+	for _, k := range []string{"k2", "k3"} {
+		if len(got[k]) != len("peer-")+4 {
+			t.Errorf("generated alias for %s = %q, want a peer-xxxx name", k, got[k])
+		}
+	}
+	if got["k2"] == got["k3"] {
+		t.Errorf("two peers share the alias %q", got["k2"])
+	}
+
+	// Stable: a second pass keeps what the first generated.
+	again := NormalizePeerAliases([]string{"k1", "k2", "k3"}, got)
+	if again["k2"] != got["k2"] || again["k3"] != got["k3"] {
+		t.Fatalf("aliases changed on a second pass: %v -> %v", got, again)
+	}
+}
+
 func TestP2PDerpDefault(t *testing.T) {
 	if got := P2PDerpURL(nil); got != defaultP2PDerp {
 		t.Fatalf("P2PDerpURL(nil) = %q, want %q", got, defaultP2PDerp)

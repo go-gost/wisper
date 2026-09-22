@@ -658,3 +658,106 @@ func TestGetTunnelWithPrefix(t *testing.T) {
 		t.Error("plain tunnel must not reuse the prefixed entrypoint")
 	}
 }
+
+// TestPeerAliasesFlow: the allowlist carries display aliases end to end — a
+// submitted alias is kept, an omitted one is generated, and a legacy tunnel
+// (keys stored before aliases existed) gets names on the way out.
+func TestPeerAliasesFlow(t *testing.T) {
+	req := tunnelCreateRequest{
+		Name:  "Private",
+		Type:  tunnel.P2PTunnel,
+		Peers: []peerJSON{{Key: "k1"}, {Key: "k2", Alias: "laptop"}},
+	}
+	var opts tunnel.Options
+	for _, opt := range req.toOptions() {
+		opt(&opts)
+	}
+
+	if len(opts.Peers) != 2 || opts.Peers[0] != "k1" || opts.Peers[1] != "k2" {
+		t.Fatalf("allowlist = %v, want [k1 k2] in order", opts.Peers)
+	}
+	if opts.PeerAliases["k2"] != "laptop" {
+		t.Errorf("k2 alias = %q, want the submitted one kept", opts.PeerAliases["k2"])
+	}
+	if a := opts.PeerAliases["k1"]; len(a) != len("peer-")+4 {
+		t.Errorf("k1 alias = %q, want a generated peer-xxxx name", a)
+	}
+
+	out := peersJSON(opts.Peers, opts.PeerAliases)
+	if len(out) != 2 || out[0].Alias != opts.PeerAliases["k1"] || out[1].Alias != "laptop" {
+		t.Errorf("response peers = %+v, want both aliases", out)
+	}
+
+	// No stored aliases (a tunnel saved before aliases existed): still named.
+	legacy := peersJSON([]string{"k1", "k2"}, nil)
+	for _, p := range legacy {
+		if len(p.Alias) != len("peer-")+4 {
+			t.Errorf("legacy peer %s alias = %q, want a generated name", p.Key, p.Alias)
+		}
+	}
+	if legacy[0].Alias == legacy[1].Alias {
+		t.Error("legacy peers share one alias")
+	}
+	if peersJSON(nil, nil) != nil {
+		// An empty allowlist must stay absent from the JSON, not become [].
+		if got := peersJSON(nil, nil); len(got) != 0 {
+			t.Errorf("peersJSON() = %v, want empty", got)
+		}
+	}
+}
+
+// TestUpdateP2PTunnel: a p2p tunnel must be replaceable. Its peers live as
+// routes on the shared host, so the old tunnel has to release them before the
+// replacement claims them — otherwise every edit answered 500 "peer ... is
+// already used by another p2p tunnel".
+func TestUpdateP2PTunnel(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	// An unreachable relay: the connect is non-fatal, the host routes anyway.
+	secure := false
+	config.Set(&config.Config{Settings: &config.Settings{
+		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure},
+	}})
+
+	resp, created := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
+		"name": "Private", "type": "p2p", "endpoint": "127.0.0.1:9",
+		"peers": []map[string]any{{"key": "k1"}, {"key": "k2", "alias": "laptop"}},
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create p2p tunnel = %d: %v", resp.StatusCode, created)
+	}
+	id, _ := created["id"].(string)
+	defer tunnel.Delete(id)
+
+	peers, _ := created["options"].(map[string]any)["peers"].([]any)
+	if len(peers) != 2 {
+		t.Fatalf("created peers = %v, want two entries", peers)
+	}
+	first, _ := peers[0].(map[string]any)
+	generated, _ := first["alias"].(string)
+	if generated == "" {
+		t.Fatal("the created allowlist entry has no generated alias")
+	}
+
+	resp, updated := putJSON(t, srv.URL+"/api/tunnels/"+id, map[string]any{
+		"name": "Private", "type": "p2p", "endpoint": "127.0.0.1:9",
+		"peers": []map[string]any{
+			{"key": "k1", "alias": "renamed"},
+			{"key": "k2", "alias": "laptop"},
+		},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update p2p tunnel = %d: %v", resp.StatusCode, updated)
+	}
+	upeers, _ := updated["options"].(map[string]any)["peers"].([]any)
+	if len(upeers) != 2 {
+		t.Fatalf("updated peers = %v, want two entries", upeers)
+	}
+	if got, _ := upeers[0].(map[string]any)["alias"].(string); got != "renamed" {
+		t.Errorf("k1 alias after update = %q, want the submitted one", got)
+	}
+	if got, _ := upeers[1].(map[string]any)["alias"].(string); got != "laptop" {
+		t.Errorf("k2 alias after update = %q, want it kept", got)
+	}
+}
