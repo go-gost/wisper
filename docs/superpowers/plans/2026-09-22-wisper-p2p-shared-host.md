@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go（`github.com/go-gost/p2p` v0.4.2 的 `Host.Listen()`、x 的 local handler/router/service）、Lit + TS、tag `p2ppoc` 的 e2e。
 
-**Spec:** `docs/superpowers/specs/2026-09-22-p2p-inbound-listen-redesign.md`（依赖 Plan `2026-09-22-p2p-host-listen.md` 的 p2p `v0.4.2`）
+**Spec:** `docs/superpowers/specs/2026-09-22-p2p-inbound-listen-redesign.md`（依赖 p2p 仓的 [Host.Listen 计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-22-p2p-host-listen.md) → `v0.4.2`）
 
 **运行前置：** p2p `v0.4.2` 已发布并 bump；`TMPDIR=/config/tmp`；e2e 需 docker（derper 已缓存）。
 
