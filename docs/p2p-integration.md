@@ -93,6 +93,50 @@ tun 形态（p2p e2e 的 `udp-tun`/`udp-outlet`）不受上述影响：那些场
 - UDP 入口点形态另有实测 harness：`tunnel/p2p_udp_poc_test.go`（同 tag，需 docker 提取 derper），
   跑法 `TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDP -v ./tunnel/`；结论见「已知限制」。
 
+## 私有 p2p 模式（反向侧，已实现 2026-09-22）
+
+wisper 新增隧道类型 `p2p`：进程内嵌一个 p2p host，把 **Endpoint**（本地后端地址）通过 DERP
+暴露给持有其 **base64 pubkey** 的对端。不经 gost.run，也没有公网入口——定位是"私有 peer-to-peer"。
+
+**用法**：设置页（或 `config.yml` 的 `settings.p2p`）配置 `derp`（默认
+`wss://derp.gost.run/derp`，可改为自建 relay）、`secure`、`caFile`；然后新建 type=`p2p`
+的隧道，Endpoint = 本地服务地址，运行后详情页显示 **pubkey**（对端寻址用它）。
+
+**对端接入**（gost；`p2ps` 可用 gRPC 插件，也可进程内注册 provider）：
+
+```yaml
+p2ps:
+  - name: p2p
+    plugin: {type: grpc, addr: 127.0.0.1:8003}
+chains:
+  - name: chain-0
+    hops:
+      - nodes:
+          - addr: <详情页显示的 pubkey>
+            dialer: {type: tcp}
+            connector: {type: forward}
+            metadata: {p2p: p2p}
+```
+
+**生命周期与语义**：
+- 一隧道一 host（target 池按流 round-robin，共享 host 会让不同 peer 的流串到别的服务）。
+- relay 连不上不致命：状态保持 running，engine 每 5s 重连（与 p2p CLI 一致）。
+- key 文件 `~/.config/wisper/p2p/<id>.key`（0600）：`stop/start` 与**更新隧道**都复用同一身份；
+  只有**删除隧道**才移除（API 的 delete 路径负责）。key 不进 config.yml。
+- 无 per-tunnel 流量统计（host 不暴露），详情页显示 "—"。
+
+**安全边界**：pubkey 即准入——持有 key 且可达 relay 的任何人能访问该本地服务；p2p 没有
+admission。建议 relay 侧 `-verify-clients=true`，并在本地服务上另加鉴权。详情页有固定提示。
+
+**依赖版本**：framing 修复（p2p 本地 main `204e2d5`）**未发布**——当前开发用 go.work 模式；
+发布 `v0.4.1` 并 bump wisper 之前，`GOWORK=off` 构建仍是 pinned `v0.4.0`。
+
+**验证**：`tunnel/p2p_test.go`（key 生命周期/TLS 配置/默认 relay，无网络）；e2e
+`tunnel/p2p_e2e_test.go`（tag `p2ppoc`：真 derper + 对端按 key 拨入回环，跑法
+`TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；API 级
+（curl）已验证 create/list/delete + settings 往返 + key 文件 0600/清理；**浏览器内的
+UI 视觉与交互尚未人工过一遍**（类型卡片/设置项/详情页提示）。
+
 ## 实施注意
 
 - 进程内 tunnel conn 的 `LocalAddr/RemoteAddr` 必须非 nil：gost 的 forward
