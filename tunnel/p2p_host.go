@@ -9,8 +9,10 @@ import (
 
 	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/metadata"
+	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/p2p"
 	cfg "github.com/go-gost/wisper/config"
+	stats_wrapper "github.com/go-gost/x/observer/stats/wrapper"
 )
 
 // p2pBacklog bounds each peer route's undelivered inbound streams; overflow is
@@ -190,7 +192,15 @@ type peerListener struct {
 	ch     chan net.Conn
 	closed chan struct{}
 	once   sync.Once
+
+	// stats is the service's stats object; accepted conns count into it, the
+	// way x listeners count via stats.WrapListener.
+	stats stats.Stats
 }
+
+// setStats attaches the serving service's stats to the route. It must be
+// called before the service starts accepting; nil leaves conns unwrapped.
+func (l *peerListener) setStats(s stats.Stats) { l.stats = s }
 
 func newPeerListener(peer string) *peerListener {
 	return &peerListener{peer: peer, ch: make(chan net.Conn, p2pBacklog), closed: make(chan struct{})}
@@ -212,7 +222,7 @@ func (l *peerListener) deliver(conn net.Conn) {
 func (l *peerListener) Accept() (net.Conn, error) {
 	select {
 	case c := <-l.ch:
-		return c, nil
+		return stats_wrapper.WrapConn(c, l.stats), nil
 	case <-l.closed:
 		return nil, net.ErrClosed
 	}

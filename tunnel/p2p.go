@@ -220,6 +220,9 @@ func (s *p2pTunnel) Run() (err error) {
 		pStats.Add(stats.KindTotalConns, int64(prev.TotalConns))
 		pStats.Add(stats.KindTotalErrs, int64(prev.TotalErrs))
 	}
+	// The route is a plain listener, not an x listener, so it does not wrap
+	// accepted conns itself: hand it the stats the service reports.
+	peerLn.setStats(pStats)
 
 	// Every inbound stream is forwarded straight to the backend endpoint: no
 	// chain, the peer's stream is the whole path (the entrypoint wiring minus
