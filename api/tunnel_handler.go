@@ -38,7 +38,7 @@ type tunnelOptionsResp struct {
 	Keepalive   bool   `json:"keepalive,omitempty"`
 	TTL         int    `json:"ttl,omitempty"`
 	RecordMode  string `json:"record_mode,omitempty"`
-	// Peer is the remote peer's base64 public key (p2p entrypoints).
+	// Peer is the remote peer's base64 public key (p2p tunnels and entrypoints).
 	Peer string `json:"peer,omitempty"`
 }
 
@@ -140,6 +140,8 @@ type tunnelCreateRequest struct {
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
 	FileUpload  bool   `json:"file_upload,omitempty"`
 	RecordMode  string `json:"record_mode,omitempty"`
+	// Peer is the remote peer's base64 public key (p2p tunnels).
+	Peer string `json:"peer,omitempty"`
 }
 
 func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
@@ -154,6 +156,7 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.RewriteHostOption(r.RewriteHost),
 		tunnel.FileUploadOption(r.FileUpload),
 		tunnel.RecordModeOption(r.RecordMode),
+		tunnel.PeerOption(r.Peer),
 	}
 }
 
