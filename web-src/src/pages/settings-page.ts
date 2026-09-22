@@ -547,7 +547,7 @@ export class SettingsPage extends LitElement {
               ${this._p2pTest && !this._p2pTest.ok
                 ? html`<p class="p2p-warning">${this._p2pTest.error ?? ''}</p>`
                 : ''}
-              <div class="switch-row">
+              <div class="switch-row" style="padding-bottom:18px;">
                 <div>
                   <div class="switch-label">${t('settingsP2PSecure')}</div>
                   <div class="switch-desc">${t('settingsP2PSecureDesc')}</div>
@@ -557,7 +557,7 @@ export class SettingsPage extends LitElement {
                   <div class="switch-knob"></div>
                 </div>
               </div>
-              <div class="form-group">
+              <div class="form-group" style="margin-top:18px;">
                 <label class="form-label">${t('settingsP2PCAFile')}</label>
                 <input class="form-input" .value=${this._p2pCaFile}
                   @input=${(e: Event) => { this._p2pCaFile = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
