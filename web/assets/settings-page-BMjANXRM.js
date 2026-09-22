@@ -1,4 +1,4 @@
-import{a as f,G as y,o as _,h as m,y as x,j as e,z as p,b as h,i as w,t as k}from"./index-DlxCGyZp.js";import{e as $,r as n}from"./format-B7il8fZf.js";import{i as r}from"./app-scaffold-BTGpmsrN.js";import{c as P}from"./clipboard-C3x8_sid.js";var S=Object.defineProperty,I=Object.getOwnPropertyDescriptor,a=(t,s,l,c)=>{for(var o=c>1?void 0:c?I(s,l):s,d=t.length-1,v;d>=0;d--)(v=t[d])&&(o=(c?v(s,l,o):v(o))||o);return c&&o&&S(s,l,o),o};const u=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],g=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],b=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];let i=class extends f{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._p2pDerp="",this._p2pSecure=!0,this._p2pCaFile="",this._showP2PKey=!1,this._p2pPublicKey="",this._p2pRunning=!1,this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._inspectorTested=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new y,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=_();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._p2pDerp=t.p2p?.derp||"",this._p2pSecure=t.p2p?.secure??!0,this._p2pCaFile=t.p2p?.ca_file||"",this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(m(()=>{const s=_();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._p2pDerp=s.p2p?.derp||"",this._p2pSecure=s.p2p?.secure??!0,this._p2pCaFile=s.p2p?.ca_file||"",this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate(),this._fetchP2PIdentity()}),x(()=>this.requestUpdate())),this._fetchVersion(),this._fetchP2PIdentity()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}async _fetchP2PIdentity(){try{const t=await this._backend.getP2PIdentity();this._p2pPublicKey=t.public_key,this._p2pRunning=t.running}catch{this._p2pPublicKey="",this._p2pRunning=!1}}async _copyP2PKey(){await P(this._p2pPublicKey),this._showSnackbar(e("copiedToClipboard"))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await p({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure,p2p:{derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile}}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await p({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(g.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await p({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e(b.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await p({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1,this._inspectorTested=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok,this._inspectorTested=!0}catch{this._inspectorConnected=!1,this._inspectorTested=!0}this.requestUpdate()}async _saveInspectorUrl(){try{await p({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const l=s.indexOf(t);return s[(l+1)%s.length]}render(){return h`
+import{a as f,G as y,o as b,h as m,y as x,j as e,z as l,b as d,i as w,t as k}from"./index-BHxiD2fs.js";import{e as $,r as n}from"./format-nJyJvPcv.js";import{i as r}from"./app-scaffold-D4Bda-R3.js";import{c as P}from"./clipboard-C3x8_sid.js";var T=Object.defineProperty,S=Object.getOwnPropertyDescriptor,a=(t,s,p,c)=>{for(var o=c>1?void 0:c?S(s,p):s,h=t.length-1,v;h>=0;h--)(v=t[h])&&(o=(c?v(s,p,o):v(o))||o);return c&&o&&T(s,p,o),o};const u=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],g=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],_=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];let i=class extends f{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._p2pDerp="",this._p2pSecure=!0,this._p2pCaFile="",this._showP2PKey=!1,this._p2pTesting=!1,this._p2pTest=null,this._p2pPublicKey="",this._p2pRunning=!1,this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._inspectorTested=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new y,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=b();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._p2pDerp=t.p2p?.derp||"",this._p2pSecure=t.p2p?.secure??!0,this._p2pCaFile=t.p2p?.ca_file||"",this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(m(()=>{const s=b();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._p2pDerp=s.p2p?.derp||"",this._p2pSecure=s.p2p?.secure??!0,this._p2pCaFile=s.p2p?.ca_file||"",this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate(),this._fetchP2PIdentity()}),x(()=>this.requestUpdate())),this._fetchVersion(),this._fetchP2PIdentity()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}async _fetchP2PIdentity(){try{const t=await this._backend.getP2PIdentity();this._p2pPublicKey=t.public_key,this._p2pRunning=t.running}catch{this._p2pPublicKey="",this._p2pRunning=!1}}async _testP2P(){this._p2pTesting=!0,this._p2pTest=null;try{const t=await this._backend.testP2PRelay({derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile});this._p2pTest={ok:t.ok,latency:t.latency_ms,error:t.error}}catch(t){this._p2pTest={ok:!1,error:String(t)}}this._p2pTesting=!1}async _copyP2PKey(){await P(this._p2pPublicKey),this._showSnackbar(e("copiedToClipboard"))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await l({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure,p2p:{derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile}}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await l({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(g.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await l({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e(_.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await l({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1,this._inspectorTested=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok,this._inspectorTested=!0}catch{this._inspectorConnected=!1,this._inspectorTested=!0}this.requestUpdate()}async _saveInspectorUrl(){try{await l({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const p=s.indexOf(t);return s[(p+1)%s.length]}render(){return d`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -85,13 +85,21 @@ import{a as f,G as y,o as _,h as m,y as x,j as e,z as p,b as h,i as w,t as k}fro
                 </div>
                 <p class="hint">${e("p2pIdentityHint")}</p>
                 <p class="p2p-warning">${e("p2pKeyWarning")}</p>
-                ${this._p2pRunning?"":h`<p class="hint">${e("p2pIdentityIdle")}</p>`}
+                ${this._p2pRunning?"":d`<p class="hint">${e("p2pIdentityIdle")}</p>`}
               </div>
               <div class="form-group">
                 <label class="form-label">${e("settingsP2PDerp")}</label>
                 <input class="form-input" .value=${this._p2pDerp}
                   placeholder="wss://derp.gost.run/derp"
-                  @input=${t=>{this._p2pDerp=t.target.value}}>
+                  @input=${t=>{this._p2pDerp=t.target.value,this._p2pTest=null}}>
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+                <button class="save-btn" ?disabled=${this._p2pTesting} @click=${this._testP2P}>
+                  ${this._p2pTesting?e("p2pTesting"):e("p2pTest")}
+                </button>
+                ${this._p2pTest?d`<span class="${this._p2pTest.ok?"test-ok":"p2p-warning"}">
+                      ${this._p2pTest.ok?`${e("p2pTestOk")} · ${this._p2pTest.latency} ms`:`${e("p2pTestFailed")}: ${this._p2pTest.error??""}`}
+                    </span>`:""}
               </div>
               <div class="switch-row">
                 <div>
@@ -99,14 +107,14 @@ import{a as f,G as y,o as _,h as m,y as x,j as e,z as p,b as h,i as w,t as k}fro
                   <div class="switch-desc">${e("settingsP2PSecureDesc")}</div>
                 </div>
                 <div class="switch ${this._p2pSecure?"on":""}"
-                  @click=${()=>{this._p2pSecure=!this._p2pSecure}}>
+                  @click=${()=>{this._p2pSecure=!this._p2pSecure,this._p2pTest=null}}>
                   <div class="switch-knob"></div>
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label">${e("settingsP2PCAFile")}</label>
                 <input class="form-input" .value=${this._p2pCaFile}
-                  @input=${t=>{this._p2pCaFile=t.target.value}}>
+                  @input=${t=>{this._p2pCaFile=t.target.value,this._p2pTest=null}}>
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${r("check")} ${e("btnSave")}
@@ -163,17 +171,17 @@ import{a as f,G as y,o as _,h as m,y as x,j as e,z as p,b as h,i as w,t as k}fro
                 ${r("chevron-right")}
               </span>
             </div>
-            <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,b.map(t=>t.value)))}>
+            <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,_.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsStatsInterval")}</span>
               <span class="selector-value">
-                ${e(b.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
+                ${e(_.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
                 ${r("chevron-right")}
               </span>
             </div>
           </div>
         </div>
 
-        ${this._snackbar?h`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?d`<div class="toast">${this._snackbar}</div>`:""}
       </app-scaffold>
     `}};i.styles=w`
     /* ── Back nav ── */
@@ -283,6 +291,10 @@ import{a as f,G as y,o as _,h as m,y as x,j as e,z as p,b as h,i as w,t as k}fro
     }
 
     /* ── P2P identity ── */
+    .test-ok {
+      color: var(--accent);
+      font-size: var(--font-xs);
+    }
     .p2p-warning {
       color: var(--red);
       font-size: var(--font-xs);
@@ -369,4 +381,4 @@ import{a as f,G as y,o as _,h as m,y as x,j as e,z as p,b as h,i as w,t as k}fro
       from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-  `;a([n()],i.prototype,"_server",2);a([n()],i.prototype,"_entrypoint",2);a([n()],i.prototype,"_insecure",2);a([n()],i.prototype,"_p2pDerp",2);a([n()],i.prototype,"_p2pSecure",2);a([n()],i.prototype,"_p2pCaFile",2);a([n()],i.prototype,"_showP2PKey",2);a([n()],i.prototype,"_p2pPublicKey",2);a([n()],i.prototype,"_p2pRunning",2);a([n()],i.prototype,"_theme",2);a([n()],i.prototype,"_lang",2);a([n()],i.prototype,"_statsInterval",2);a([n()],i.prototype,"_inspectorUrl",2);a([n()],i.prototype,"_inspectorConnected",2);a([n()],i.prototype,"_inspectorTested",2);a([n()],i.prototype,"_snackbar",2);a([n()],i.prototype,"_saving",2);a([n()],i.prototype,"_version",2);i=a([k("settings-page")],i);export{i as SettingsPage};
+  `;a([n()],i.prototype,"_server",2);a([n()],i.prototype,"_entrypoint",2);a([n()],i.prototype,"_insecure",2);a([n()],i.prototype,"_p2pDerp",2);a([n()],i.prototype,"_p2pSecure",2);a([n()],i.prototype,"_p2pCaFile",2);a([n()],i.prototype,"_showP2PKey",2);a([n()],i.prototype,"_p2pTesting",2);a([n()],i.prototype,"_p2pTest",2);a([n()],i.prototype,"_p2pPublicKey",2);a([n()],i.prototype,"_p2pRunning",2);a([n()],i.prototype,"_theme",2);a([n()],i.prototype,"_lang",2);a([n()],i.prototype,"_statsInterval",2);a([n()],i.prototype,"_inspectorUrl",2);a([n()],i.prototype,"_inspectorConnected",2);a([n()],i.prototype,"_inspectorTested",2);a([n()],i.prototype,"_snackbar",2);a([n()],i.prototype,"_saving",2);a([n()],i.prototype,"_version",2);i=a([k("settings-page")],i);export{i as SettingsPage};

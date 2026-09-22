@@ -162,4 +162,15 @@ export class GoBackend {
   getP2PIdentity(): Promise<{ public_key: string; running: boolean }> {
     return this.request<{ public_key: string; running: boolean }>('GET', '/api/p2p');
   }
+
+  /** Probe the relay from the wisper process (its real network path and TLS
+   *  options), so the result also covers a self-signed relay. */
+  testP2PRelay(req: { derp: string; secure?: boolean; ca_file?: string }): Promise<{
+    ok: boolean;
+    derp?: string;
+    latency_ms?: number;
+    error?: string;
+  }> {
+    return this.request('POST', '/api/p2p/test', req);
+  }
 }

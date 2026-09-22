@@ -38,6 +38,8 @@ export class SettingsPage extends LitElement {
   @state() private _p2pSecure = true;
   @state() private _p2pCaFile = '';
   @state() private _showP2PKey = false;
+  @state() private _p2pTesting = false;
+  @state() private _p2pTest: { ok: boolean; latency?: number; error?: string } | null = null;
   @state() private _p2pPublicKey = '';
   @state() private _p2pRunning = false;
   @state() private _theme: ThemePreference = 'system';
@@ -108,6 +110,22 @@ export class SettingsPage extends LitElement {
       this._p2pPublicKey = '';
       this._p2pRunning = false;
     }
+  }
+
+  private async _testP2P() {
+    this._p2pTesting = true;
+    this._p2pTest = null;
+    try {
+      const res = await this._backend.testP2PRelay({
+        derp: this._p2pDerp,
+        secure: this._p2pSecure,
+        ca_file: this._p2pCaFile,
+      });
+      this._p2pTest = { ok: res.ok, latency: res.latency_ms, error: res.error };
+    } catch (e) {
+      this._p2pTest = { ok: false, error: String(e) };
+    }
+    this._p2pTesting = false;
   }
 
   private async _copyP2PKey() {
@@ -330,6 +348,10 @@ export class SettingsPage extends LitElement {
     }
 
     /* ── P2P identity ── */
+    .test-ok {
+      color: var(--accent);
+      font-size: var(--font-xs);
+    }
     .p2p-warning {
       color: var(--red);
       font-size: var(--font-xs);
@@ -512,7 +534,19 @@ export class SettingsPage extends LitElement {
                 <label class="form-label">${t('settingsP2PDerp')}</label>
                 <input class="form-input" .value=${this._p2pDerp}
                   placeholder="wss://derp.gost.run/derp"
-                  @input=${(e: Event) => { this._p2pDerp = (e.target as HTMLInputElement).value; }}>
+                  @input=${(e: Event) => { this._p2pDerp = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+                <button class="save-btn" ?disabled=${this._p2pTesting} @click=${this._testP2P}>
+                  ${this._p2pTesting ? t('p2pTesting') : t('p2pTest')}
+                </button>
+                ${this._p2pTest
+                  ? html`<span class="${this._p2pTest.ok ? 'test-ok' : 'p2p-warning'}">
+                      ${this._p2pTest.ok
+                        ? `${t('p2pTestOk')} · ${this._p2pTest.latency} ms`
+                        : `${t('p2pTestFailed')}: ${this._p2pTest.error ?? ''}`}
+                    </span>`
+                  : ''}
               </div>
               <div class="switch-row">
                 <div>
@@ -520,14 +554,14 @@ export class SettingsPage extends LitElement {
                   <div class="switch-desc">${t('settingsP2PSecureDesc')}</div>
                 </div>
                 <div class="switch ${this._p2pSecure ? 'on' : ''}"
-                  @click=${() => { this._p2pSecure = !this._p2pSecure; }}>
+                  @click=${() => { this._p2pSecure = !this._p2pSecure; this._p2pTest = null; }}>
                   <div class="switch-knob"></div>
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label">${t('settingsP2PCAFile')}</label>
                 <input class="form-input" .value=${this._p2pCaFile}
-                  @input=${(e: Event) => { this._p2pCaFile = (e.target as HTMLInputElement).value; }}>
+                  @input=${(e: Event) => { this._p2pCaFile = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}

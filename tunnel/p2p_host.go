@@ -1,12 +1,16 @@
 package tunnel
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/metadata"
@@ -326,3 +330,40 @@ type peerRouteAddr string
 
 func (a peerRouteAddr) Network() string { return "p2p" }
 func (a peerRouteAddr) String() string  { return string(a) }
+
+// TestP2PRelay dials the relay the way a host would, so the settings page can
+// verify connectivity before saving. An empty derp tests the configured relay,
+// falling back to the public default; secure/caFile mirror Config.TLS. The key
+// is ephemeral: a probe must not touch (or depend on) the host identity. It
+// returns the resolved relay URL and how long the connection took.
+func TestP2PRelay(derp string, secure *bool, caFile string) (string, time.Duration, error) {
+	settings := cfg.Get().Settings
+	if derp == "" {
+		derp = P2PDerpURL(settings)
+	}
+	if derp == "" {
+		return "", 0, errors.New("no relay configured")
+	}
+
+	var key [32]byte
+	if _, err := rand.Read(key[:]); err != nil {
+		return derp, 0, err
+	}
+	direct := false
+	host, err := p2p.New(&p2p.Config{
+		Derp:   derp,
+		KeyHex: hex.EncodeToString(key[:]),
+		Direct: &direct,
+		TLS:    &p2p.TLSConfig{Secure: secure, CAFile: caFile},
+	})
+	if err != nil {
+		return derp, 0, err
+	}
+	defer func() { _ = host.Close() }()
+
+	start := time.Now()
+	if err := host.Connect(); err != nil {
+		return derp, 0, err
+	}
+	return derp, time.Since(start), nil
+}
