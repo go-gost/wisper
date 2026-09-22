@@ -252,6 +252,18 @@ func p2pDerpURL(s *cfg.Settings) string {
 	return defaultP2PDerp
 }
 
+// p2pTLSConfig returns the relay TLS options, or nil to keep p2p's defaults
+// (verify against the system roots) when settings.p2p is unset.
+func p2pTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
+	if s == nil || s.P2P == nil {
+		return nil
+	}
+	if s.P2P.Secure == nil && s.P2P.CAFile == "" {
+		return nil
+	}
+	return &p2p.TLSConfig{Secure: s.P2P.Secure, CAFile: s.P2P.CAFile}
+}
+
 // P2PKeyPath is the per-tunnel key file: <UserConfigDir>/wisper/p2p/<id>.key
 // (hex, 0600, created by the p2p library on first use).
 func P2PKeyPath(id string) (string, error) {
@@ -262,8 +274,9 @@ func P2PKeyPath(id string) (string, error) {
 	return filepath.Join(dir, "wisper", "p2p", id+".key"), nil
 }
 
-// RemoveP2PKey deletes a tunnel's key file; called when the tunnel is deleted
-// (Close keeps it so stop/start reuses the identity).
+// RemoveP2PKey deletes a tunnel's key file. The API's explicit delete path
+// calls it; tunnel.Delete deliberately does not, so an update/replace keeps
+// the identity (and Close keeps it too, so stop/start reuses it).
 func RemoveP2PKey(id string) error {
 	path, err := P2PKeyPath(id)
 	if err != nil {
@@ -292,13 +305,16 @@ func (s *p2pTunnel) Run() (err error) {
 	}
 
 	direct := false
-	host, err := p2p.New(&p2p.Config{
+	conf := &p2p.Config{
 		Derp:    p2pDerpURL(settings),
 		Key:     keyPath,
 		Targets: []string{"tcp://" + s.opts.Endpoint},
 		Direct:  &direct,
-		TLS:     &p2p.TLSConfig{Secure: settings.P2P.Secure, CAFile: settings.P2P.CAFile},
-	})
+	}
+	// settings may be nil (fresh install) and Settings.P2P unset — never
+	// dereference it directly.
+	conf.TLS = p2pTLSConfig(settings)
+	host, err := p2p.New(conf)
 	if err != nil {
 		err = fmt.Errorf("p2p host: %w", err)
 		return
@@ -379,17 +395,9 @@ const defaultP2PDerp = "wss://derp.gost.run/derp"
 		t = NewP2PTunnel(options...)
 ```
 
-3. `Delete`（`tunnel/tunnel.go:310`）在 `s.Close()` 之后、从列表移除之前加 key 清理：
+3. **不要**在 `Delete` 里清理 key 文件（update 流程会复用它）：key 文件的清理由 API 的显式删除路径负责（见 Task 3 Step 1b）。`Delete` 保持原样。
 
-```go
-		if s.Type() == P2PTunnel {
-			if err := RemoveP2PKey(s.ID()); err != nil {
-				slog.Error("remove p2p key", "id", s.ID(), "err", err)
-			}
-		}
-```
 
-（`slog` 若未在该文件引入，用文件里已有的日志方式。）
 
 - [ ] **Step 5: 跑测试确认通过**
 
@@ -420,6 +428,22 @@ git commit -m "feat(tunnel): private p2p tunnel type (embedded host, per-tunnel 
 ```
 
 （三个 switch 的变量名不同，按所在处既有形态补；`peer_key` 不需要新字段——`entrypoint` 字段已是 pubkey，`toTunnelResponse` 无需改动。）
+
+- [ ] **Step 1b: 删除路径清理 key**
+
+`handleDeleteTunnel` 在 `tunnel.Delete(id)` 之前加：
+
+```go
+	if t := tunnel.Get(id); t != nil && t.Type() == tunnel.P2PTunnel {
+		// The key file is the tunnel's identity. Removing it here (not in
+		// tunnel.Delete) keeps an update/replace from rotating the pubkey.
+		if err := tunnel.RemoveP2PKey(id); err != nil {
+			slog.Error("remove p2p key", "id", id, "err", err)
+		}
+	}
+```
+
+（用该 handler 已有的查找方式；`tunnel.Get` 若不存在则按 `handleUpdateTunnel` 的取法。）
 
 - [ ] **Step 2: 设置 API 增 p2p**
 
