@@ -13,6 +13,7 @@ import (
 const (
 	TCPEntryPoint = "tcp"
 	UDPEntryPoint = "udp"
+	P2PEntryPoint = "p2p"
 )
 
 var (
@@ -266,6 +267,8 @@ func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
 		ep = NewTCPEntryPoint(options...)
 	case UDPEntryPoint:
 		ep = NewUDPEntryPoint(options...)
+	case P2PEntryPoint:
+		ep = NewP2PEntryPoint(options...)
 	default:
 		return nil
 	}
