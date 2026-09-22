@@ -6,9 +6,9 @@
 
 **Architecture:** `tunnel/p2p_host.go` 的 manager（引用计数 + 路由 + per-peer 队列 listener）；`p2pTunnel` 与 `p2pEntryPoint` 都 `acquire/release`；隧道用 `peerListener + local handler → 后端` 的 service（stats/auth 免费）。
 
-**Tech Stack:** Go（`github.com/go-gost/p2p` v0.4.2 的 `Provider.Listen()`/`Dial`、x 的 local handler/router/service）、Lit + TS、tag `p2ppoc` 的 e2e。
+**Tech Stack:** Go（`github.com/go-gost/p2p` v0.4.2 的 `Tunnel.Listen()`/`Dial`、x 的 local handler/router/service）、Lit + TS、tag `p2ppoc` 的 e2e。
 
-**Spec:** `docs/superpowers/specs/2026-09-22-p2p-inbound-listen-redesign.md`（依赖 p2p 仓的 [Provider.Listen 计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-22-p2p-host-listen.md) → `v0.4.2`）
+**Spec:** `docs/superpowers/specs/2026-09-22-p2p-inbound-listen-redesign.md`（依赖 p2p 仓的 [Tunnel.Listen 计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-22-p2p-host-listen.md) → `v0.4.2`）
 
 **运行前置：** p2p `v0.4.2` 已发布并 bump；`TMPDIR=/config/tmp`；e2e 需 docker（derper 已缓存）。
 
@@ -102,7 +102,7 @@ func (m *p2pHostManager) acquire() (*p2p.Host, error) {
 		if err != nil {
 			return nil, fmt.Errorf("p2p host: %w", err)
 		}
-		ln, err := host.Provider().Listen()
+		ln, err := host.Tunnel().Listen()
 		if err != nil {
 			_ = host.Close()
 			return nil, err
@@ -336,7 +336,7 @@ git commit -m "feat(tunnel): p2p tunnel serves via the shared host and peer rout
 - [ ] **Step 1: 迁移**
 
 - `Run()`：删掉自己的 `p2p.New(...)`/`host` 字段；改为 `host, err := tunnel.P2PManager().acquire()`（manager 需在 `tunnel` 包导出一个获取入口，如 `func AcquireP2PHost() (*p2p.Host, error)` / `func ReleaseP2PHost()` / `func P2PPublicKey() string`——按实现时的取舍命名，保持最小导出面）。
-- provider 注册改用 `host.Provider()`；`Close()` 里 `release()`；key 文件（per-entrypoint）不再创建（`P2PKeyPath` 对入口点不再使用；删除入口点时对遗留 key 的清理逻辑可保留）。
+- provider 注册改用 `host.Tunnel()`；`Close()` 里 `release()`；key 文件（per-entrypoint）不再创建（`P2PKeyPath` 对入口点不再使用；删除入口点时对遗留 key 的清理逻辑可保留）。
 - 其余（chain 打补丁、ParseChain、service 接线）不变。
 
 - [ ] **Step 2: 更新单测**：`TestP2PEntryPointLifecycle` 改为断言共享 host 的 refs 与 provider 注册/注销；`host.key` 0600；不再断言 per-entrypoint key。
