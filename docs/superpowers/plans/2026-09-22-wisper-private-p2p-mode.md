@@ -118,10 +118,11 @@ func TestP2PTunnelKeyLifecycle(t *testing.T) {
 	}
 
 	// A restarted tunnel keeps the same identity.
-	Set(tn2 := NewP2PTunnel(IDOption("test-p2p-id"), EndpointOption("127.0.0.1:9"))...)
+	tn2 := NewP2PTunnel(IDOption("test-p2p-id"), EndpointOption("127.0.0.1:9"))
 	if err := tn2.Run(); err != nil {
 		t.Fatalf("Run after restart: %v", err)
 	}
+	Set(tn2) // replaces the old entry without touching the key file
 	if got := tn2.Entrypoint(); got != key1 {
 		t.Fatalf("pubkey changed across restart: %q -> %q", key1, got)
 	}
