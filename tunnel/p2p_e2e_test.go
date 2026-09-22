@@ -1,8 +1,9 @@
 //go:build p2ppoc
 
 // TestP2PTunnelAcceptsPeerByKey is the acceptance test for the private p2p
-// mode: a wisper p2p tunnel exposing a local echo, and a peer that dials in by
-// the tunnel's public key through a real derper.
+// mode in its peer-routed shape: a wisper p2p tunnel exposing a local echo on
+// the process-wide host, a named peer dialing in by the host's key through a
+// real derper, and the tunnel's stats counting what crossed.
 package tunnel_test
 
 import (
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	clogger "github.com/go-gost/core/logger"
+	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/p2p"
 	xconfig "github.com/go-gost/x/config"
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
@@ -25,8 +27,8 @@ import (
 )
 
 func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
-	// The tunnel's key resolves through os.UserConfigDir(); keep the test out
-	// of the real ~/.config/wisper/p2p/.
+	// The host key resolves through os.UserConfigDir(); keep the test out of
+	// the real ~/.config/wisper/p2p/.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	echo := startEchoServer(t) // from p2p_poc_test.go (same package + tag)
@@ -37,7 +39,33 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure},
 	}})
 
-	tn := wtunnel.NewP2PTunnel(wtunnel.IDOption("e2e-p2p"), wtunnel.EndpointOption(echo))
+	// The dialing side: an in-process host with a fixed key. Its public key is
+	// the credential the tunnel admits (PeerOption); its Tunnel() is the
+	// provider whose dial opens the tunnel to the wisper host's key.
+	direct := false
+	peer, err := p2p.New(&p2p.Config{
+		Derp: derp, KeyHex: strings.Repeat("44", 32),
+		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
+	})
+	if err != nil {
+		t.Fatalf("new peer host: %v", err)
+	}
+	t.Cleanup(func() { _ = peer.Close() })
+	if err := peer.Connect(); err != nil {
+		t.Fatalf("peer connect: %v", err)
+	}
+	peerKey := peer.PublicKey()
+	if peerKey == "" {
+		t.Fatal("peer PublicKey() = empty, want its base64 key")
+	}
+
+	// The wisper side: the peer route key is this tunnel's peer, so an inbound
+	// stream from exactly this key is delivered to the tunnel's service.
+	tn := wtunnel.NewP2PTunnel(
+		wtunnel.IDOption("e2e-p2p"),
+		wtunnel.EndpointOption(echo),
+		wtunnel.PeerOption(peerKey),
+	)
 	if err := tn.Run(); err != nil {
 		t.Fatalf("run p2p tunnel: %v", err)
 	}
@@ -51,25 +79,13 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 		}
 	})
 
-	key := tn.Entrypoint()
+	// Run started the process-wide host: its key is what the peer dials.
+	key := wtunnel.P2PHostPublicKey()
 	if key == "" {
-		t.Fatal("tunnel Entrypoint() = empty, want its public key")
+		t.Fatal("P2PHostPublicKey() = empty after Run, want the host's base64 key")
 	}
 
-	// The peer side: an in-process host registered as the chain's provider.
-	direct := false
-	peer, err := p2p.New(&p2p.Config{
-		Derp: derp, KeyHex: strings.Repeat("33", 32),
-		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
-	})
-	if err != nil {
-		t.Fatalf("new peer host: %v", err)
-	}
-	t.Cleanup(func() { _ = peer.Close() })
-	if err := peer.Connect(); err != nil {
-		t.Fatalf("peer connect: %v", err)
-	}
-	if err := registry.P2PRegistry().Register("e2e-peer", peer.Provider()); err != nil {
+	if err := registry.P2PRegistry().Register("e2e-peer", peer.Tunnel()); err != nil {
 		t.Fatalf("register provider: %v", err)
 	}
 	t.Cleanup(func() { registry.P2PRegistry().Unregister("e2e-peer") })
@@ -110,5 +126,26 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	}
 	if string(buf) != string(msg) {
 		t.Fatalf("echo = %q, want %q", buf, msg)
+	}
+
+	// The tunnel serves its peer route with a standard gost service, so the
+	// round trip above must show up in the service's live stats — the same
+	// numbers runner/task/stats.go copies into Tunnel.Stats() in production.
+	status := tn.Status()
+	if status == nil {
+		t.Fatal("tunnel Status() = nil, want the service status")
+	}
+	s := status.Stats()
+	if s == nil {
+		t.Fatal("service status has no stats")
+	}
+	if got := s.Get(stats.KindTotalConns); got < 1 {
+		t.Errorf("stats TotalConns = %d, want >= 1", got)
+	}
+	if got := s.Get(stats.KindInputBytes); got < uint64(len(msg)) {
+		t.Errorf("stats InputBytes = %d, want >= %d", got, len(msg))
+	}
+	if got := s.Get(stats.KindOutputBytes); got < uint64(len(msg)) {
+		t.Errorf("stats OutputBytes = %d, want >= %d", got, len(msg))
 	}
 }
