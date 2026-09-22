@@ -48,7 +48,8 @@
   字段，卡片按现有样式展示）；`Endpoint()` 仍是本地后端地址。`IsClosed()`/`Close()` 沿用
   close-once 模式；`Close` **保留** key 文件
   （stop→start 复用同一身份）；**删除隧道**时由 API 层清理 key 文件。
-- 缺 `settings.p2p.derp` → `Run` 直接报错（error 状态，提示去设置页），不建 host。
+- `settings.p2p.derp` 为空时用默认 relay **`wss://derp.gost.run/derp`**（gost.run 公共 relay；
+  与 `GetServerName` 同款"读时默认"，不写入配置、不报错）。
 
 ### 数据流
 
@@ -73,7 +74,7 @@ p2ps:
 
 ### 错误处理
 
-- 缺 derp → error 状态 + 明确文案。
+- derp 为空 → 用默认 relay（见上），不是错误。
 - key 不可写/损坏 → error 状态 + 日志。
 - `Connect` 失败 → 保持 running，`err` 里带原因（engine 自愈）。
 
