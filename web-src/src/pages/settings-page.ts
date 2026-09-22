@@ -348,10 +348,6 @@ export class SettingsPage extends LitElement {
     }
 
     /* ── P2P identity ── */
-    .test-ok {
-      color: var(--accent);
-      font-size: var(--font-xs);
-    }
     .p2p-warning {
       color: var(--red);
       font-size: var(--font-xs);
@@ -536,18 +532,21 @@ export class SettingsPage extends LitElement {
                   placeholder="wss://derp.gost.run/derp"
                   @input=${(e: Event) => { this._p2pDerp = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
               </div>
-              <div class="form-group" style="display:flex;align-items:center;gap:10px;">
-                <button class="save-btn" ?disabled=${this._p2pTesting} @click=${this._testP2P}>
+              <div style="display:flex;align-items:center;justify-content:space-between;font-size:var(--font-sm);padding-top:8px;">
+                <span style="display:flex;align-items:center;gap:6px;color:var(--text-muted);">
+                  <span style="width:8px;height:8px;border-radius:50%;background:${this._p2pTest ? (this._p2pTest.ok ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)'};display:inline-block;"></span>
+                  ${this._p2pTest
+                    ? (this._p2pTest.ok ? `${t('p2pTestOk')} · ${this._p2pTest.latency} ms` : t('p2pTestFailed'))
+                    : t('p2pUntested')}
+                </span>
+                <button class="save-btn" style="width:auto;padding:6px 16px;margin:0;"
+                  ?disabled=${this._p2pTesting} @click=${this._testP2P}>
                   ${this._p2pTesting ? t('p2pTesting') : t('p2pTest')}
                 </button>
-                ${this._p2pTest
-                  ? html`<span class="${this._p2pTest.ok ? 'test-ok' : 'p2p-warning'}">
-                      ${this._p2pTest.ok
-                        ? `${t('p2pTestOk')} · ${this._p2pTest.latency} ms`
-                        : `${t('p2pTestFailed')}: ${this._p2pTest.error ?? ''}`}
-                    </span>`
-                  : ''}
               </div>
+              ${this._p2pTest && !this._p2pTest.ok
+                ? html`<p class="hint">${this._p2pTest.error ?? ''}</p>`
+                : ''}
               <div class="switch-row">
                 <div>
                   <div class="switch-label">${t('settingsP2PSecure')}</div>

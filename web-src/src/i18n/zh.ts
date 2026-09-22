@@ -136,6 +136,7 @@ const zh: Record<string, string> = {
   p2pEntryHint: '本地客户端连接监听地址；流量经 p2p 隧道到对端公钥，明文（内层 tcp）。',
   p2pIdentity: 'P2P 身份',
   p2pIdentityHint: '将此公钥分享给对端：他们的 p2p 入口点用它拨号到本机。',
+  p2pUntested: '未测试',
   p2pTest: '测试',
   p2pTesting: '测试中…',
   p2pTestOk: '已连通',

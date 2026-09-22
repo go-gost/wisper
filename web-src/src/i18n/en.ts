@@ -136,6 +136,7 @@ const en: Record<string, string> = {
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (tcp inner).',
   p2pIdentity: 'P2P Identity',
   p2pIdentityHint: 'Share this key with peers: their p2p entrypoint dials this host by it.',
+  p2pUntested: 'Not tested',
   p2pTest: 'Test',
   p2pTesting: 'Testing…',
   p2pTestOk: 'Connected',
