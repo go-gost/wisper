@@ -1,14 +1,17 @@
 //go:build p2ppoc
 
-// TestP2PTunnelAcceptsPeerByKey is the acceptance test for the private p2p
-// mode in its peer-routed shape: a wisper p2p tunnel exposing a local echo on
-// the process-wide host, a named peer dialing in by the host's key through a
-// real derper, and the tunnel's stats counting what crossed.
+// The acceptance tests for the private p2p mode in its peer-routed shape: a
+// wisper p2p tunnel exposing a local echo on the process-wide host, named
+// peers dialing in by the host's key through a real derper, and the tunnel's
+// stats counting what crossed. TestP2PTunnelRefusesUnlistedPeer pins the
+// allowlist: a host whose key is not listed gets no reply, while a listed one
+// still does (the in-test control).
 package tunnel_test
 
 import (
 	"context"
 	"io"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +29,102 @@ import (
 	wtunnel "github.com/go-gost/wisper/tunnel"
 )
 
+// newDialingHost starts an in-process p2p host with a fixed key, connected to
+// the DERP relay — the dialing side of a tunnel.
+func newDialingHost(t *testing.T, derp, keyHex string) *p2p.Host {
+	t.Helper()
+	direct, secure := false, false
+	h, err := p2p.New(&p2p.Config{
+		Derp: derp, KeyHex: keyHex,
+		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
+	})
+	if err != nil {
+		t.Fatalf("new p2p host: %v", err)
+	}
+	t.Cleanup(func() { _ = h.Close() })
+	if err := h.Connect(); err != nil {
+		t.Fatalf("p2p connect to derper: %v", err)
+	}
+	if h.PublicKey() == "" {
+		t.Fatal("host PublicKey() = empty, want its base64 key")
+	}
+	return h
+}
+
+// runTunnel starts the wisper-side p2p tunnel with the given allowlist and
+// registers it for teardown.
+func runTunnel(t *testing.T, id, echo string, peers ...string) wtunnel.Tunnel {
+	t.Helper()
+	tn := wtunnel.NewP2PTunnel(
+		wtunnel.IDOption(id),
+		wtunnel.EndpointOption(echo),
+		wtunnel.PeersOption(peers...),
+	)
+	if err := tn.Run(); err != nil {
+		t.Fatalf("run p2p tunnel: %v", err)
+	}
+	wtunnel.Add(tn)
+	t.Cleanup(func() {
+		// Delete closes the tunnel, releasing its manager reference.
+		wtunnel.Delete(id)
+		// Delete keeps the key file (an update must keep the identity), so the
+		// transient test tunnel removes it explicitly.
+		if err := wtunnel.RemoveP2PKey(id); err != nil {
+			t.Errorf("remove p2p key: %v", err)
+		}
+	})
+	return tn
+}
+
+// registerProvider publishes an in-process host's Tunnel the way an entrypoint
+// does, and drops it again at teardown.
+func registerProvider(t *testing.T, name string, h *p2p.Host) {
+	t.Helper()
+	if err := registry.P2PRegistry().Register(name, h.Tunnel()); err != nil {
+		t.Fatalf("register provider %s: %v", name, err)
+	}
+	t.Cleanup(func() { registry.P2PRegistry().Unregister(name) })
+}
+
+// dialHost opens one stream from provider to the wisper host addressed by
+// hostKey — the chain an entrypoint builds, minus the entrypoint.
+func dialHost(t *testing.T, ctx context.Context, provider, hostKey string) (net.Conn, error) {
+	t.Helper()
+	chCfg := wtunnel.ChainConfig("e2e-peer-chain", "e2e-peer-chain", "off")
+	node := chCfg.Hops[0].Nodes[0]
+	node.Addr = hostKey
+	node.Connector = &xconfig.ConnectorConfig{Type: "forward"}
+	node.Dialer = &xconfig.DialerConfig{Type: "tcp"}
+	node.Metadata = map[string]any{"p2p": provider}
+	ch, err := chain_parser.ParseChain(chCfg, clogger.Default())
+	if err != nil {
+		t.Fatalf("parse chain: %v", err)
+	}
+	rt := ch.Route(ctx, "tcp", hostKey)
+	if rt == nil {
+		t.Fatal("chain returned a nil route")
+	}
+	return rt.Dial(ctx, "tcp", hostKey)
+}
+
+// mustEcho writes msg and requires exactly msg back within the deadline.
+func mustEcho(t *testing.T, conn net.Conn, msg []byte) {
+	t.Helper()
+	if _, err := conn.Write(msg); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, len(msg))
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(buf) != string(msg) {
+		t.Fatalf("echo = %q, want %q", buf, msg)
+	}
+}
+
 func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	// The host key resolves through os.UserConfigDir(); keep the test out of
 	// the real ~/.config/wisper/p2p/.
@@ -40,44 +139,15 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	}})
 
 	// The dialing side: an in-process host with a fixed key. Its public key is
-	// the credential the tunnel admits (PeerOption); its Tunnel() is the
+	// the credential the tunnel admits (PeersOption); its Tunnel() is the
 	// provider whose dial opens the tunnel to the wisper host's key.
-	direct := false
-	peer, err := p2p.New(&p2p.Config{
-		Derp: derp, KeyHex: strings.Repeat("44", 32),
-		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
-	})
-	if err != nil {
-		t.Fatalf("new peer host: %v", err)
-	}
-	t.Cleanup(func() { _ = peer.Close() })
-	if err := peer.Connect(); err != nil {
-		t.Fatalf("peer connect: %v", err)
-	}
+	peer := newDialingHost(t, derp, strings.Repeat("44", 32))
 	peerKey := peer.PublicKey()
-	if peerKey == "" {
-		t.Fatal("peer PublicKey() = empty, want its base64 key")
-	}
 
-	// The wisper side: the peer route key is this tunnel's peer, so an inbound
-	// stream from exactly this key is delivered to the tunnel's service.
-	tn := wtunnel.NewP2PTunnel(
-		wtunnel.IDOption("e2e-p2p"),
-		wtunnel.EndpointOption(echo),
-		wtunnel.PeerOption(peerKey),
-	)
-	if err := tn.Run(); err != nil {
-		t.Fatalf("run p2p tunnel: %v", err)
-	}
-	wtunnel.Add(tn)
-	t.Cleanup(func() {
-		wtunnel.Delete("e2e-p2p")
-		// Delete keeps the key file (an update must keep the identity), so the
-		// transient test tunnel removes it explicitly.
-		if err := wtunnel.RemoveP2PKey("e2e-p2p"); err != nil {
-			t.Errorf("remove p2p key: %v", err)
-		}
-	})
+	// The wisper side: the peer route key is this tunnel's allowlist entry, so
+	// an inbound stream from exactly this key is delivered to the tunnel's
+	// service.
+	tn := runTunnel(t, "e2e-p2p", echo, peerKey)
 
 	// Run started the process-wide host: its key is what the peer dials.
 	key := wtunnel.P2PHostPublicKey()
@@ -85,48 +155,18 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 		t.Fatal("P2PHostPublicKey() = empty after Run, want the host's base64 key")
 	}
 
-	if err := registry.P2PRegistry().Register("e2e-peer", peer.Tunnel()); err != nil {
-		t.Fatalf("register provider: %v", err)
-	}
-	t.Cleanup(func() { registry.P2PRegistry().Unregister("e2e-peer") })
-
-	chCfg := wtunnel.ChainConfig("e2e-peer-chain", "e2e-peer-chain", "off")
-	node := chCfg.Hops[0].Nodes[0]
-	node.Addr = key
-	node.Connector = &xconfig.ConnectorConfig{Type: "forward"}
-	node.Dialer = &xconfig.DialerConfig{Type: "tcp"}
-	node.Metadata = map[string]any{"p2p": "e2e-peer"}
-	ch, err := chain_parser.ParseChain(chCfg, clogger.Default())
-	if err != nil {
-		t.Fatalf("parse chain: %v", err)
-	}
+	registerProvider(t, "e2e-peer", peer)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	rt := ch.Route(ctx, "tcp", key)
-	if rt == nil {
-		t.Fatal("chain returned a nil route")
-	}
-	conn, err := rt.Dial(ctx, "tcp", key)
+	conn, err := dialHost(t, ctx, "e2e-peer", key)
 	if err != nil {
 		t.Fatalf("dial through the p2p tunnel: %v", err)
 	}
 	defer conn.Close()
 
 	msg := []byte("hello-private-p2p")
-	if _, err := conn.Write(msg); err != nil {
-		t.Fatal(err)
-	}
-	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	buf := make([]byte, len(msg))
-	if _, err := io.ReadFull(conn, buf); err != nil {
-		t.Fatalf("read: %v", err)
-	}
-	if string(buf) != string(msg) {
-		t.Fatalf("echo = %q, want %q", buf, msg)
-	}
+	mustEcho(t, conn, msg)
 
 	// The tunnel serves its peer route with a standard gost service, so the
 	// round trip above must show up in the service's live stats — the same
@@ -148,4 +188,68 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	if got := s.Get(stats.KindOutputBytes); got < uint64(len(msg)) {
 		t.Errorf("stats OutputBytes = %d, want >= %d", got, len(msg))
 	}
+}
+
+// TestP2PTunnelRefusesUnlistedPeer is the negative case: the allowlist admits
+// one key, and a host outside it gets nothing — no reply, and in practice a
+// closed stream, since the host's dispatch drops unregistered peers.
+func TestP2PTunnelRefusesUnlistedPeer(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	echo := startEchoServer(t)
+	derp := startDerper(t)
+
+	secure := false
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure},
+	}})
+
+	listed := newDialingHost(t, derp, strings.Repeat("44", 32))
+	intruder := newDialingHost(t, derp, strings.Repeat("55", 32))
+
+	// Only the listed key is in the allowlist.
+	runTunnel(t, "e2e-p2p-refuse", echo, listed.PublicKey())
+
+	key := wtunnel.P2PHostPublicKey()
+	if key == "" {
+		t.Fatal("P2PHostPublicKey() = empty after Run, want the host's base64 key")
+	}
+
+	registerProvider(t, "e2e-listed", listed)
+	registerProvider(t, "e2e-intruder", intruder)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Control: the listed peer still reaches the backend, so a refusal below
+	// cannot pass merely because the relay or the tunnel is broken wholesale.
+	control, err := dialHost(t, ctx, "e2e-listed", key)
+	if err != nil {
+		t.Fatalf("dial as listed peer: %v", err)
+	}
+	defer control.Close()
+	mustEcho(t, control, []byte("hello-listed-peer"))
+
+	// The unlisted peer: the stream must yield nothing. Any of the three
+	// refusals counts — dial rejected, write rejected, or the stream closed
+	// under the read; a reply is the failure.
+	conn, err := dialHost(t, ctx, "e2e-intruder", key)
+	if err != nil {
+		t.Logf("unlisted peer refused at dial: %v", err)
+		return
+	}
+	defer conn.Close()
+	if _, err := conn.Write([]byte("hello-unlisted-peer")); err != nil {
+		t.Logf("unlisted peer refused at write: %v", err)
+		return
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 32)
+	n, err := conn.Read(buf)
+	if err == nil {
+		t.Fatalf("unlisted peer got a reply %q, want a closed stream", buf[:n])
+	}
+	t.Logf("unlisted peer refused at read: %v", err)
 }

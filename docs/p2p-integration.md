@@ -101,17 +101,26 @@ wisper 新增隧道类型 `p2p`：**进程级 p2p host** 持有一份身份，�
 
 **本机身份（进程级，一份）**：首个 p2p 隧道或 p2p 入口点启动时创建
 `~/.config/wisper/p2p/host.key`（0600），之后所有 p2p 隧道/入口点共用这一份身份；设置页
-"P2P Identity" 显示其 base64 公钥（`GET /api/p2p`，host 未运行时空串）。host 以引用计数
-存活：最后一个使用者关闭时 host 停止，key 文件保留（stop/start、更新对象都保持同一身份）。
+"P2P Identity" 显示其 base64 公钥（`GET /api/p2p`）。**身份按需物化**：即使没有任何
+p2p 隧道/入口点在运行，该接口也会即时创建 `host.key` 并返回公钥（不连 relay），响应里的
+`running` 字段才表示 host 是否真的启动（`running:false` + 非空 key = 已持有身份但空闲）。
+因此双方**可以先把各自的本机公钥读出来再互配**——不存在"A 要先拿到 B 的 key、B 也要先拿到
+A 的 key"的死结。host 以引用计数存活：最后一个使用者关闭时 host 停止，key 文件保留
+（stop/start、更新对象都保持同一身份）。
 
 **用法**：设置页（或 `config.yml` 的 `settings.p2p`）配置 `derp`（默认
 `wss://derp.gost.run/derp`，可改为自建 relay）、`secure`、`caFile`；然后新建 type=`p2p`
-的隧道，填「对端公钥」（Peer public key，允许拨入的对端，必填）与 Endpoint = 本地服务地址。
-详情页 `entrypoint` 行显示的就是该对端公钥（本机身份在设置页，不在这里）。
+的隧道，填「允许的对端」（Allowed peers，每行一个 base64 公钥，**可留空**）与
+Endpoint = 本地服务地址。对端数量不限：**N 个对端公钥 → 同一条隧道、同一个本地后端**。
+详情页 `entrypoint` 行显示的就是这份列表（逗号连接；为空时显示未配置提示）——本机身份在
+设置页，不在这里。
 
-**准入即白名单**：每条隧道在 host 上注册一条 peer 路由，与隧道 1:1（同一对端公钥不能属于
-两条隧道）；入站流按 RemoteAddr（对端 base64 公钥）查表投递，**未登记 peer 的入站流直接
-关闭**——没有 fallback，也没有"默认隧道"。对端按本机身份公钥拨入：
+**准入即白名单**：隧道的白名单决定哪些入站流会被路由到它。白名单里的每个 key 在 host 上
+注册一条路由，同一条隧道内 key 去重、且一个 key 不能出现在两条 p2p 隧道（重复即配置错误）；
+入站流按 RemoteAddr（对端 base64 公钥）精确查表投递，**未登记 peer 的入站流直接关闭**——
+没有 catch-all，也没有"默认隧道"。**白名单为空是合法状态**：隧道照常启动、正常出现在
+列表里，但任何入站流都会被关闭（即"运行但不可达"），适合先把身份与后端配置好、之后再补
+对端。对端按本机身份公钥拨入：
 
 **对端接入**（gost；`p2ps` 可用 gRPC 插件，也可进程内注册 provider）：
 
@@ -150,19 +159,28 @@ p2p host。本侧身份同样是进程级 `host.key`（不再有 per-entrypoint 
   `RemoveP2PKey`）。
 
 **安全边界**：pubkey 即地址——DERP 只在对端 key 之间转发，peer 只能按 base64 pubkey 寻址
-（无名称发现）；准入即白名单——隧道只服务其「对端公钥」的入站流，其余直接关闭。因此持有对端
-key 的人就是这条隧道的对端本身（可信方），p2p 层没有按连接的 auth。建议 relay 侧
-`-verify-clients=true`，并在本地服务上另加鉴权。
+（无名称发现）；准入即白名单——隧道只服务其白名单列表内的对端 key 的入站流，其余直接关闭
+（列表为空则没有任何入站流被服务）。因此持有**白名单内**对端 key 的人就是这条隧道的对端本身
+（可信方），p2p 层没有按连接的 auth。建议 relay 侧 `-verify-clients=true`，并在本地服务上
+另加鉴权。
 
 **依赖版本**：p2p `v0.4.2`（`Tunnel.Listen()`/`Dial` API、进程内 udp framing 修复）与
 x `v0.18.0`，wisper `go.mod` 已 bump；go.work 与 `GOWORK=off` 两种模式行为一致。
 
-**验证**：`tunnel/p2p_test.go`（Peer 必填/生命周期/TLS 配置/默认 relay，无网络）与
-`tunnel/p2p_host_test.go`（引用计数、路由 1:1、未登记 peer 关闭）；e2e
-`tunnel/p2p_e2e_test.go`（tag `p2ppoc`：真 derper + 对端按身份公钥拨入回环，并断言服务的
-实时计数非零；跑法 `TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；
-API 级（curl）已验证 create/list/delete + `/api/p2p` 身份往返 + `host.key` 0600；**浏览器内的
-UI 视觉与交互尚未人工过一遍**（类型卡片/设置项/详情页提示）。
+**API 与 UI**：隧道 create/update 请求与响应都带 `peers`（`[]string`，响应来自
+`Options.Peers`）；`GET /api/p2p` → `{"public_key": "...", "running": bool}`。详情页
+p2p 隧道用「允许的对端」多行输入（每行一个 key），未配置时显示"没有入站流量能到达"的提示；
+设置页身份区以 `running` 区分"空闲（已持有身份）"与"运行中（显示 key）"。
+
+**验证**：`tunnel/p2p_test.go`（空白名单运行、生命周期、白名单 1/N 条、跨隧道重复 key、
+TLS 配置/默认 relay，无网络）、
+`tunnel/p2p_host_test.go`（引用计数、路由 1:1 与白名单批量注册、未登记 peer 关闭）与
+`tunnel/p2p_e2e_test.go`（tag `p2ppoc`：真 derper；`TestP2PTunnelAcceptsPeerByKey` 白名单
+内的对端按身份公钥拨入回环并断言服务实时计数非零；`TestP2PTunnelRefusesUnlistedPeer` 同场
+对照——白名单内的对端可回环，白名单外的 host 拨入拿不到任何回复/被关闭；跑法
+`TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；API 级（curl）
+已验证 create/list/delete + `/api/p2p` 身份与 `running` 往返 + `peers` 回显 + `host.key`
+0600；**浏览器内的 UI 视觉与交互尚未人工过一遍**（多行对端输入/设置页空闲态/详情页列表）。
 
 ## 实施注意
 
