@@ -21,6 +21,10 @@ import (
 )
 
 func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
+	// The entrypoint's key resolves through os.UserConfigDir(); keep the test
+	// out of the real ~/.config/wisper/p2p/.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
 	echo := startEchoServer(t) // p2p_poc_test.go (same package + tag)
 	derp := startDerper(t)     // p2p_udp_poc_test.go (same package + tag)
 
@@ -55,6 +59,7 @@ func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
 	if err := ep.Run(); err != nil {
 		t.Fatalf("run p2p entrypoint: %v", err)
 	}
+	t.Cleanup(func() { _ = wtunnel.RemoveP2PKey("e2e-p2p-ep") })
 	t.Cleanup(func() { _ = ep.Close() })
 
 	addr := ep.Entrypoint() // the local listen address

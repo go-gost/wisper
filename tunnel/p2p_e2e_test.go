@@ -25,6 +25,10 @@ import (
 )
 
 func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
+	// The tunnel's key resolves through os.UserConfigDir(); keep the test out
+	// of the real ~/.config/wisper/p2p/.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
 	echo := startEchoServer(t) // from p2p_poc_test.go (same package + tag)
 	derp := startDerper(t)     // from p2p_udp_poc_test.go (same package + tag)
 

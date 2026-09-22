@@ -133,7 +133,7 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ep.SetStats(old.Stats())
-		ep.SetStatsBaseline(old.StatsBaseline())
+	ep.SetStatsBaseline(old.StatsBaseline())
 	ep.Favorite(old.IsFavorite())
 
 	if err := ep.Run(); err != nil {
@@ -161,7 +161,7 @@ func handleDeleteEntrypoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ep != nil && ep.Type() == entrypoint.P2PEntryPoint {
+	if ep.Type() == entrypoint.P2PEntryPoint {
 		// The key file is the entrypoint's identity: removed only on explicit
 		// delete, so stop/start and update keep the same key.
 		if err := tunnel.RemoveP2PKey(id); err != nil {
@@ -223,7 +223,7 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newEP.SetStats(ep.Stats())
-		newEP.SetStatsBaseline(ep.StatsBaseline())
+	newEP.SetStatsBaseline(ep.StatsBaseline())
 	newEP.Favorite(ep.IsFavorite())
 
 	if err := newEP.Run(); err != nil {
@@ -283,10 +283,10 @@ func handleResetEntrypointStats(w http.ResponseWriter, r *http.Request) {
 		bl.TotalErrs = s.TotalErrs
 	default:
 		bl = config.ServiceStats{
-			TotalConns: s.TotalConns,
-			InputBytes: s.InputBytes,
+			TotalConns:  s.TotalConns,
+			InputBytes:  s.InputBytes,
 			OutputBytes: s.OutputBytes,
-			TotalErrs:  s.TotalErrs,
+			TotalErrs:   s.TotalErrs,
 		}
 	}
 	ep.SetStatsBaseline(bl)
