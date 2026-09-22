@@ -6,34 +6,75 @@ import (
 	"testing"
 
 	cfg "github.com/go-gost/wisper/config"
+	xservice "github.com/go-gost/x/service"
 )
 
-// TestP2PTunnelKeyLifecycle covers the key file: created on Run with 0600,
-// reused across stop/start and across Delete/replace (same identity), and
-// removed by RemoveP2PKey — the call the API's delete handler makes.
-func TestP2PTunnelKeyLifecycle(t *testing.T) {
+const testPeerKey = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+
+// TestP2PTunnelRequiresPeer: Peer is the route key (who may dial in), so Run
+// without one fails loudly and leaves the manager untouched.
+func TestP2PTunnelRequiresPeer(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{}})
 
 	tn := NewP2PTunnel(IDOption("test-p2p-id"), EndpointOption("127.0.0.1:9"))
+	if err := tn.Run(); err == nil {
+		t.Fatal("Run without a peer key = nil error, want a failure")
+	}
+	if p2pHost.refs != 0 || p2pHost.host != nil {
+		t.Fatalf("failed Run touched the manager: refs %d host %v", p2pHost.refs, p2pHost.host)
+	}
+	if err := tn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+// TestP2PTunnelLifecycle: Run joins the shared host through a peer route (a
+// broken relay is non-fatal), Close is idempotent and gives the reference
+// back; the shared identity file outlives the tunnel.
+func TestP2PTunnelLifecycle(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	if p2pHost.refs != 0 {
+		t.Fatal("manager is not idle: a previous test leaked a reference")
+	}
+	defer func() {
+		for p2pHost.refs > 0 {
+			p2pHost.release()
+		}
+	}()
+
+	tn := NewP2PTunnel(
+		IDOption("test-p2p-id"),
+		EndpointOption("127.0.0.1:9"),
+		PeerOption(testPeerKey),
+	)
 	if err := tn.Run(); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	// Connect to an unreachable relay is non-fatal (the engine retries), so Run
-	// succeeds and the host still reports its pubkey.
-	Add(tn) // Delete() only sees tunnels in the global list
-	key1 := tn.Entrypoint()
-	if key1 == "" {
-		t.Fatal("Entrypoint() = empty, want the base64 public key")
+	// Entrypoint() is the link's other end: the peer key the route is keyed on.
+	if got := tn.Entrypoint(); got != testPeerKey {
+		t.Fatalf("Entrypoint() = %q, want the peer key", got)
+	}
+	if p2pHost.refs != 1 {
+		t.Fatalf("refs after Run = %d, want 1", p2pHost.refs)
+	}
+	st := tn.Status()
+	if st == nil || st.State() == xservice.StateClosed {
+		t.Fatalf("Status() = %v, want the running service's status", st)
 	}
 
-	keyPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "wisper", "p2p", "test-p2p-id.key")
+	// The identity is process-wide: <config>/wisper/p2p/host.key, 0600.
+	keyPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "wisper", "p2p", "host.key")
 	fi, err := os.Stat(keyPath)
 	if err != nil {
-		t.Fatalf("key file: %v", err)
+		t.Fatalf("host.key: %v", err)
 	}
 	if perm := fi.Mode().Perm(); perm != 0o600 {
-		t.Fatalf("key file mode = %o, want 600", perm)
+		t.Fatalf("host.key mode = %o, want 600", perm)
+	}
+	if pub := p2pHost.PublicKey(); pub == "" {
+		t.Fatal("host PublicKey() = empty, want the shared host's key")
 	}
 
 	if err := tn.Close(); err != nil {
@@ -42,32 +83,11 @@ func TestP2PTunnelKeyLifecycle(t *testing.T) {
 	if err := tn.Close(); err != nil {
 		t.Fatalf("second Close: %v (must be idempotent)", err)
 	}
+	if p2pHost.refs != 0 || p2pHost.host != nil {
+		t.Fatalf("after Close: refs %d host %v, want the manager idle", p2pHost.refs, p2pHost.host)
+	}
 	if _, err := os.Stat(keyPath); err != nil {
 		t.Fatalf("Close removed the key file: %v (stop/start must reuse the identity)", err)
-	}
-
-	// A restarted tunnel keeps the same identity.
-	tn2 := NewP2PTunnel(IDOption("test-p2p-id"), EndpointOption("127.0.0.1:9"))
-	if err := tn2.Run(); err != nil {
-		t.Fatalf("Run after restart: %v", err)
-	}
-	Set(tn2) // replaces the old entry in place, like an API update
-	if got := tn2.Entrypoint(); got != key1 {
-		t.Fatalf("pubkey changed across restart: %q -> %q", key1, got)
-	}
-	_ = tn2.Close()
-
-	Delete("test-p2p-id")
-	if _, err := os.Stat(keyPath); err != nil {
-		t.Fatalf("Delete removed the key file: %v (update/replace must keep the identity)", err)
-	}
-
-	// The API delete path removes the key separately.
-	if err := RemoveP2PKey("test-p2p-id"); err != nil {
-		t.Fatalf("RemoveP2PKey: %v", err)
-	}
-	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
-		t.Fatalf("RemoveP2PKey left the key file behind: %v", err)
 	}
 }
 

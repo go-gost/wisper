@@ -76,7 +76,9 @@ type Options struct {
 	Keepalive   bool
 	TTL         int
 	RecordMode  string
-	// Peer is the remote peer's base64 public key for p2p entrypoints.
+	// Peer is this link's other end: for a p2p entrypoint, the remote host's
+	// base64 public key to dial; for a p2p tunnel, the public key of the peer
+	// allowed to dial in (the route key — required).
 	Peer          string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats

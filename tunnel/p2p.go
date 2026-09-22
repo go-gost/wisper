@@ -1,31 +1,45 @@
 package tunnel
 
 import (
-	"fmt"
+	"errors"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/go-gost/core/chain"
+	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/core/observer/stats"
+	"github.com/go-gost/core/service"
 	"github.com/go-gost/p2p"
 	cfg "github.com/go-gost/wisper/config"
+	xchain "github.com/go-gost/x/chain"
+	"github.com/go-gost/x/handler/forward/local"
+	"github.com/go-gost/x/hop"
+	xlogger "github.com/go-gost/x/logger"
+	mdx "github.com/go-gost/x/metadata"
+	xstats "github.com/go-gost/x/observer/stats"
 	xservice "github.com/go-gost/x/service"
 	"github.com/google/uuid"
 )
 
-// p2pTunnel exposes a local service to peers over an embedded p2p host: the
-// peer addresses this host by its base64 public key and dials in through the
-// DERP relay (no gost.run endpoint, no admission — the key is the credential).
+// p2pTunnel exposes a local service to peers over the process-wide p2p host:
+// the peer dials the host by its base64 public key through the DERP relay, the
+// manager routes the inbound stream to this tunnel's peer route, and a
+// standard gost service serves it, so stats come from the service stack.
 type p2pTunnel struct {
 	opts          Options
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
 
-	host   *p2p.Host
-	cclose chan struct{}
+	forward service.Service
+	ln      net.Listener // the peer route, held for teardown
+	cclose  chan struct{}
 
 	err error
 	mu  sync.RWMutex
@@ -87,23 +101,36 @@ func (s *p2pTunnel) SetStatsBaseline(b cfg.ServiceStats) {
 	s.statsBaseline = b
 }
 
-// Entrypoint is the value peers need: the host's base64 public key. Empty
-// until Run has built the host.
-func (s *p2pTunnel) Entrypoint() string {
+// Entrypoint is the value the tunnel page shows: the peer's base64 public key
+// (the route key, "this link's other end"). This host's own identity is
+// process-wide — see P2PHostPublicKey and the settings page.
+func (s *p2pTunnel) Entrypoint() string { return s.opts.Peer }
+
+// Status is the underlying gost service's status (state and live stats).
+func (s *p2pTunnel) Status() *xservice.Status {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.host == nil {
-		return ""
+	forward := s.forward
+	s.mu.RUnlock()
+
+	if ss, _ := forward.(ServiceStatus); ss != nil {
+		return ss.Status()
 	}
-	return s.host.PublicKey()
+	return nil
 }
 
-// Status has no gost service behind it: the tunnel is a p2p host, not a
-// listener+handler pair, so there is no service status to report.
-func (s *p2pTunnel) Status() *xservice.Status { return nil }
+// p2pLog returns the process default logger, or a discarding one when none is
+// set (unit tests run without config.Init).
+func p2pLog() logger.Logger {
+	if log := logger.Default(); log != nil {
+		return log
+	}
+	return xlogger.NewLogger(xlogger.OutputOption(io.Discard))
+}
 
-// P2PKeyPath is the per-tunnel key file: <UserConfigDir>/wisper/p2p/<id>.key
-// (hex, 0600, created by the p2p library on first use).
+// P2PKeyPath is the legacy per-tunnel key file:
+// <UserConfigDir>/wisper/p2p/<id>.key (hex, 0600). The p2p identity is
+// process-wide now (P2PHostKeyPath); this only locates files left by older
+// versions so they can be cleaned up.
 func P2PKeyPath(id string) (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -112,9 +139,8 @@ func P2PKeyPath(id string) (string, error) {
 	return filepath.Join(dir, "wisper", "p2p", id+".key"), nil
 }
 
-// RemoveP2PKey deletes a tunnel's key file; called by the API's delete handler
-// only (not by tunnel.Delete/replace), so a tunnel update keeps its identity.
-// Close likewise keeps the file so stop/start reuses the identity.
+// RemoveP2PKey deletes a legacy per-tunnel key file; called by the API's
+// delete handlers so files left by older versions do not pile up.
 func RemoveP2PKey(id string) error {
 	path, err := P2PKeyPath(id)
 	if err != nil {
@@ -147,6 +173,8 @@ func P2PTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
 	return &p2p.TLSConfig{Secure: s.P2P.Secure, CAFile: s.P2P.CAFile}
 }
 
+// Run joins the process-wide p2p host, claims this tunnel's peer route on it
+// and serves that route with a standard gost service forwarding to Endpoint.
 func (s *p2pTunnel) Run() (err error) {
 	if s.IsClosed() {
 		return ErrTunnelClosed
@@ -157,44 +185,82 @@ func (s *p2pTunnel) Run() (err error) {
 		}
 	}()
 
-	settings := cfg.Get().Settings
-	keyPath, err := P2PKeyPath(s.opts.ID)
-	if err != nil {
+	// Peer is required: it is the route key — the only peer allowed to dial
+	// into this tunnel — and the value the tunnel page shows.
+	if s.opts.Peer == "" {
+		err = errors.New("p2p tunnel requires the peer public key")
 		return
 	}
 
-	direct := false
-	conf := &p2p.Config{
-		Derp:    P2PDerpURL(settings),
-		Key:     keyPath,
-		Targets: []string{"tcp://" + s.opts.Endpoint},
-		Direct:  &direct,
-	}
-	conf.TLS = P2PTLSConfig(settings)
-	host, err := p2p.New(conf)
-	if err != nil {
-		err = fmt.Errorf("p2p host: %w", err)
+	// The manager owns the host (identity, DERP connection, accept loop); this
+	// tunnel holds one reference and one route on it.
+	if _, err = p2pHost.acquire(); err != nil {
 		return
 	}
-	// A failed relay connection is not fatal: the engine retries in the
-	// background (the p2p CLI behaves the same), and the tunnel keeps running
-	// so its peer key stays visible.
-	if cerr := host.Connect(); cerr != nil {
-		// logger.Default() is nil until config.Init sets one (unit tests).
-		if log := logger.Default(); log != nil {
-			log.WithFields(map[string]any{
-				"kind":   "tunnel",
-				"tunnel": s.opts.Name,
-			}).Warnf("p2p derp connect: %v", cerr)
-		}
+	ln, err := p2pHost.register(s.opts.Peer)
+	if err != nil {
+		p2pHost.release()
+		return
 	}
+	// register hands the route back as a net.Listener; it is always a
+	// *peerListener, the gost listener the service needs.
+	peerLn := ln.(*peerListener)
+
+	log := p2pLog().WithFields(map[string]any{
+		"kind":    "service",
+		"service": s.opts.Name,
+	})
+
+	// Stats carry over across a restart, like the other tunnel types.
+	pStats := xstats.NewStats(false)
+	{
+		prev := s.Stats()
+		pStats.Add(stats.KindInputBytes, int64(prev.InputBytes))
+		pStats.Add(stats.KindOutputBytes, int64(prev.OutputBytes))
+		pStats.Add(stats.KindTotalConns, int64(prev.TotalConns))
+		pStats.Add(stats.KindTotalErrs, int64(prev.TotalErrs))
+	}
+
+	// Every inbound stream is forwarded straight to the backend endpoint: no
+	// chain, the peer's stream is the whole path (the entrypoint wiring minus
+	// the chain).
+	h := local.NewHandler(
+		handler.RouterOption(xchain.NewRouter(chain.LoggerRouterOption(log))),
+		handler.LoggerOption(log),
+	)
+	if err = h.Init(mdx.NewMetadata(nil)); err != nil {
+		p2pHost.unregister(s.opts.Peer, ln)
+		p2pHost.release()
+		return
+	}
+	if fwd, ok := h.(handler.Forwarder); ok {
+		fwd.Forward(hop.NewHop(
+			hop.NodeOption(chain.NewNode(s.opts.Name, s.opts.Endpoint)),
+			hop.LoggerOption(log),
+		))
+	}
+	forward := xservice.NewService(s.opts.Name, peerLn, h,
+		xservice.LoggerOption(log),
+		xservice.StatsOption(pStats),
+	)
 
 	s.mu.Lock()
-	s.host = host
+	s.forward, s.ln = forward, ln
 	s.mu.Unlock()
+
+	go func() {
+		serveErr := forward.Serve()
+		if serveErr != nil {
+			log.Error("p2p tunnel serve error", "err", serveErr)
+		}
+		s.setErr(serveErr)
+	}()
+
 	return nil
 }
 
+// Close stops the service, drops the peer route and gives the manager
+// reference back. It is idempotent; the shared identity file is kept.
 func (s *p2pTunnel) Close() error {
 	defer func() {
 		select {
@@ -205,13 +271,21 @@ func (s *p2pTunnel) Close() error {
 	}()
 
 	s.mu.Lock()
-	host := s.host
-	s.host = nil
+	forward, ln := s.forward, s.ln
+	s.forward, s.ln = nil, nil
 	s.mu.Unlock()
-	if host != nil {
-		return host.Close() // keeps the key file: the identity survives a restart
+
+	var err error
+	if forward != nil {
+		err = forward.Close()
 	}
-	return nil
+	// ln is set exactly when Run claimed the route, so a tunnel that never
+	// acquired (or rolled back a failed Run) releases nothing here.
+	if ln != nil {
+		p2pHost.unregister(s.opts.Peer, ln)
+		p2pHost.release()
+	}
+	return err
 }
 
 func (s *p2pTunnel) IsClosed() bool {

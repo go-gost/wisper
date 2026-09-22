@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/core/metadata"
 	"github.com/go-gost/p2p"
 	cfg "github.com/go-gost/wisper/config"
 )
@@ -201,6 +202,10 @@ func (l *peerListener) Accept() (net.Conn, error) {
 		return nil, net.ErrClosed
 	}
 }
+
+// Init implements the gost listener.Listener contract: a peer route is a
+// queue, not a socket, so there is nothing to configure.
+func (l *peerListener) Init(md metadata.Metadata) error { return nil }
 
 func (l *peerListener) close() {
 	l.once.Do(func() {
