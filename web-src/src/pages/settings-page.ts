@@ -479,28 +479,22 @@ export class SettingsPage extends LitElement {
           </div>
         </div>
 
-        <!-- P2P Identity -->
-        <div class="section">
-          <div class="section-title">${t('p2pIdentity')}</div>
-          <div class="card">
-            <div class="card-padded">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span class="identity-key">${this._p2pPublicKey}</span>
-                <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
-                  ${icon('copy')}
-                </button>
-              </div>
-              <p class="hint">${t('p2pIdentityHint')}</p>
-              ${this._p2pRunning ? '' : html`<p class="hint">${t('p2pIdentityIdle')}</p>`}
-            </div>
-          </div>
-        </div>
-
         <!-- P2P -->
         <div class="section">
           <div class="section-title">${t('settingsP2P')}</div>
           <div class="card">
             <div class="card-padded">
+              <div class="form-group">
+                <label class="form-label">${t('p2pIdentity')}</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="identity-key">${this._p2pPublicKey}</span>
+                  <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
+                    ${icon('copy')}
+                  </button>
+                </div>
+                <p class="hint">${t('p2pIdentityHint')}</p>
+                ${this._p2pRunning ? '' : html`<p class="hint">${t('p2pIdentityIdle')}</p>`}
+              </div>
               <div class="form-group">
                 <label class="form-label">${t('settingsP2PDerp')}</label>
                 <input class="form-input" .value=${this._p2pDerp}
@@ -510,6 +504,7 @@ export class SettingsPage extends LitElement {
               <div class="switch-row">
                 <div>
                   <div class="switch-label">${t('settingsP2PSecure')}</div>
+                  <div class="switch-desc">${t('settingsP2PSecureDesc')}</div>
                 </div>
                 <div class="switch ${this._p2pSecure ? 'on' : ''}"
                   @click=${() => { this._p2pSecure = !this._p2pSecure; }}>
