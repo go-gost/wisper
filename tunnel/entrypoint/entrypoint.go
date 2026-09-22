@@ -149,6 +149,7 @@ func RestartRunning() {
 			Keepalive:     p.opts.Keepalive,
 			TTL:           p.opts.TTL,
 			Peer:          p.opts.Peer,
+			Peers:         p.opts.Peers,
 			CreatedAt:     p.opts.CreatedAt,
 			StatsBaseline: p.statsBaseline,
 		})
@@ -191,6 +192,7 @@ func LoadConfig() {
 			Keepalive:     cfg.Keepalive,
 			TTL:           cfg.TTL,
 			Peer:          cfg.Peer,
+			Peers:         cfg.Peers,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -261,6 +263,7 @@ func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
 		tunnel.CreatedAtOption(opts.CreatedAt),
 		tunnel.StatsBaselineOption(opts.StatsBaseline),
 		tunnel.PeerOption(opts.Peer),
+		tunnel.PeersOption(opts.Peers...),
 	}
 	switch st {
 	case TCPEntryPoint:

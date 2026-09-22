@@ -1,11 +1,11 @@
 package tunnel
 
 import (
-	"errors"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -101,10 +101,10 @@ func (s *p2pTunnel) SetStatsBaseline(b cfg.ServiceStats) {
 	s.statsBaseline = b
 }
 
-// Entrypoint is the value the tunnel page shows: the peer's base64 public key
-// (the route key, "this link's other end"). This host's own identity is
-// process-wide — see P2PHostPublicKey and the settings page.
-func (s *p2pTunnel) Entrypoint() string { return s.opts.Peer }
+// Entrypoint is the value the tunnel page shows: the allowlist, "this link's
+// other ends" (comma-joined). This host's own identity is process-wide — see
+// EnsureP2PIdentity and the settings page.
+func (s *p2pTunnel) Entrypoint() string { return strings.Join(s.opts.Peers, ", ") }
 
 // Status is the underlying gost service's status (state and live stats).
 func (s *p2pTunnel) Status() *xservice.Status {
@@ -173,8 +173,10 @@ func P2PTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
 	return &p2p.TLSConfig{Secure: s.P2P.Secure, CAFile: s.P2P.CAFile}
 }
 
-// Run joins the process-wide p2p host, claims this tunnel's peer route on it
-// and serves that route with a standard gost service forwarding to Endpoint.
+// Run joins the process-wide p2p host, claims this tunnel's peer routes on it
+// and serves them with a standard gost service forwarding to Endpoint. Peers
+// is an allowlist, not a requirement: an empty list runs the tunnel, it just
+// never receives a stream.
 func (s *p2pTunnel) Run() (err error) {
 	if s.IsClosed() {
 		return ErrTunnelClosed
@@ -185,19 +187,12 @@ func (s *p2pTunnel) Run() (err error) {
 		}
 	}()
 
-	// Peer is required: it is the route key — the only peer allowed to dial
-	// into this tunnel — and the value the tunnel page shows.
-	if s.opts.Peer == "" {
-		err = errors.New("p2p tunnel requires the peer public key")
-		return
-	}
-
 	// The manager owns the host (identity, DERP connection, accept loop); this
-	// tunnel holds one reference and one route on it.
+	// tunnel holds one reference and its routes on it.
 	if _, err = p2pHost.acquire(); err != nil {
 		return
 	}
-	ln, err := p2pHost.register(s.opts.Peer)
+	ln, err := p2pHost.register(s.opts.Peers)
 	if err != nil {
 		p2pHost.release()
 		return
@@ -232,7 +227,7 @@ func (s *p2pTunnel) Run() (err error) {
 		handler.LoggerOption(log),
 	)
 	if err = h.Init(mdx.NewMetadata(nil)); err != nil {
-		p2pHost.unregister(s.opts.Peer, ln)
+		p2pHost.unregister(s.opts.Peers, ln)
 		p2pHost.release()
 		return
 	}
@@ -262,7 +257,7 @@ func (s *p2pTunnel) Run() (err error) {
 	return nil
 }
 
-// Close stops the service, drops the peer route and gives the manager
+// Close stops the service, drops the peer routes and gives the manager
 // reference back. It is idempotent; the shared identity file is kept.
 func (s *p2pTunnel) Close() error {
 	defer func() {
@@ -282,10 +277,10 @@ func (s *p2pTunnel) Close() error {
 	if forward != nil {
 		err = forward.Close()
 	}
-	// ln is set exactly when Run claimed the route, so a tunnel that never
+	// ln is set exactly when Run claimed the routes, so a tunnel that never
 	// acquired (or rolled back a failed Run) releases nothing here.
 	if ln != nil {
-		p2pHost.unregister(s.opts.Peer, ln)
+		p2pHost.unregister(s.opts.Peers, ln)
 		p2pHost.release()
 	}
 	return err

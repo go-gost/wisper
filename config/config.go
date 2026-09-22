@@ -182,6 +182,11 @@ type Tunnel struct {
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `yaml:",omitempty" json:"peer,omitempty"`
 
+	// Peers is a p2p tunnel's inbound allowlist: the base64 public keys whose
+	// streams are routed to it. Empty means no traffic is routed (the tunnel
+	// runs but is unreachable).
+	Peers []string `yaml:"peers,omitempty" json:"peers,omitempty"`
+
 	Stats         ServiceStats
 	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
 	Favorite      bool

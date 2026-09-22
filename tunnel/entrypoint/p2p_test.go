@@ -33,7 +33,7 @@ func TestP2PEntryPointLifecycle(t *testing.T) {
 	if !registry.P2PRegistry().IsRegistered("p2p-ep-test-p2p-ep") {
 		t.Fatal("provider not registered after Run")
 	}
-	if tp.P2PHostPublicKey() == "" {
+	if !tp.P2PHostRunning() {
 		t.Fatal("shared host is not running after Run")
 	}
 
@@ -43,7 +43,7 @@ func TestP2PEntryPointLifecycle(t *testing.T) {
 		t.Fatalf("AcquireP2PHost: %v", err)
 	}
 	tp.ReleaseP2PHost()
-	if tp.P2PHostPublicKey() == "" {
+	if !tp.P2PHostRunning() {
 		t.Fatal("host stopped while the entrypoint still held a reference")
 	}
 
@@ -66,7 +66,7 @@ func TestP2PEntryPointLifecycle(t *testing.T) {
 	if registry.P2PRegistry().IsRegistered("p2p-ep-test-p2p-ep") {
 		t.Fatal("provider still registered after Close")
 	}
-	if tp.P2PHostPublicKey() != "" {
+	if tp.P2PHostRunning() {
 		t.Fatal("shared host still running after the last reference went away")
 	}
 	if _, err := os.Stat(keyPath); err != nil {
@@ -83,7 +83,7 @@ func TestP2PEntryPointRequiresPeer(t *testing.T) {
 	if err := ep.Run(); err == nil {
 		t.Fatal("Run without a peer key = nil error, want a failure")
 	}
-	if tp.P2PHostPublicKey() != "" {
+	if tp.P2PHostRunning() {
 		t.Fatal("a failed Run started the shared host")
 	}
 	_ = ep.Close()

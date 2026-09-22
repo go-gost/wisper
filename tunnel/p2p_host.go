@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/go-gost/core/logger"
@@ -54,8 +55,57 @@ func AcquireP2PHost() (*p2p.Host, error) { return p2pHost.acquire() }
 func ReleaseP2PHost() { p2pHost.release() }
 
 // P2PHostPublicKey returns the shared host's base64 public key — the value a
-// peer's p2p entrypoint dials — or "" while the host is not running.
-func P2PHostPublicKey() string { return p2pHost.PublicKey() }
+// peer's p2p entrypoint dials — materializing the identity on demand so the
+// settings page can always show it. Errors are logged and reported as "".
+func P2PHostPublicKey() string {
+	pub, err := EnsureP2PIdentity()
+	if err != nil {
+		if log := logger.Default(); log != nil {
+			log.Warnf("p2p identity: %v", err)
+		}
+	}
+	return pub
+}
+
+// EnsureP2PIdentity returns the process-wide p2p public key, creating the
+// identity file on first use. It needs no running service: p2p.New performs no
+// network I/O (the DERP connect is deferred to Connect), so two sides can
+// exchange keys before either is configured.
+func EnsureP2PIdentity() (string, error) { return p2pHost.ensurePublicKey() }
+
+// P2PHostRunning reports whether the shared host is started (a p2p tunnel or
+// entrypoint holds a reference). The identity exists either way — see
+// EnsureP2PIdentity.
+func P2PHostRunning() bool {
+	p2pHost.mu.Lock()
+	defer p2pHost.mu.Unlock()
+	return p2pHost.host != nil
+}
+
+// ensurePublicKey returns the running host's key, or materializes the identity
+// reader-only when no host is running. The manager lock keeps a concurrent
+// acquire from racing the transient host on the same key file.
+func (m *p2pHostManager) ensurePublicKey() (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.host != nil {
+		return m.host.PublicKey(), nil
+	}
+	keyPath, err := P2PHostKeyPath()
+	if err != nil {
+		return "", err
+	}
+	host, err := p2p.New(&p2p.Config{
+		Derp: P2PDerpURL(cfg.Get().Settings),
+		Key:  keyPath,
+	})
+	if err != nil {
+		return "", fmt.Errorf("p2p identity: %w", err)
+	}
+	pub := host.PublicKey()
+	_ = host.Close()
+	return pub, nil
+}
 
 // acquire starts the host on first use (key + relay + Listen + accept loop) and
 // takes a reference. A failed relay connection is not fatal: the engine retries
@@ -118,30 +168,43 @@ func (m *p2pHostManager) release() {
 	}
 }
 
-// register routes inbound streams from peer to the returned listener. 1:1: a
-// peer key belongs to at most one tunnel.
-func (m *p2pHostManager) register(peer string) (net.Listener, error) {
+// register routes inbound streams from every peer in the list to the returned
+// listener. It is all-or-nothing: a peer key already claimed by another tunnel
+// (or listed twice) rolls back the peers this call added and fails naming the
+// peer. An empty list is valid — the listener accepts nothing.
+func (m *p2pHostManager) register(peers []string) (net.Listener, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.routes[peer]; ok {
-		return nil, fmt.Errorf("peer %s is already used by another p2p tunnel", peer)
+	pl := newPeerListener(peers)
+	var added []string
+	for _, peer := range peers {
+		if _, ok := m.routes[peer]; ok {
+			for _, p := range added {
+				delete(m.routes, p)
+			}
+			return nil, fmt.Errorf("peer %s is already used by another p2p tunnel", peer)
+		}
+		m.routes[peer] = pl
+		added = append(added, peer)
 	}
-	pl := newPeerListener(peer)
-	m.routes[peer] = pl
 	return pl, nil
 }
 
-// unregister drops peer's route if ln still owns it, so a stale unregister
-// from a replaced tunnel cannot remove the live route.
-func (m *p2pHostManager) unregister(peer string, ln net.Listener) {
+// unregister drops every peer route ln still owns, so a stale unregister (a
+// replaced tunnel's) cannot remove a live route. The listener is closed once,
+// when at least one route was removed.
+func (m *p2pHostManager) unregister(peers []string, ln net.Listener) {
 	m.mu.Lock()
-	pl, ok := m.routes[peer]
-	if ok && pl == ln {
-		delete(m.routes, peer)
+	owned := false
+	for _, peer := range peers {
+		if pl, ok := m.routes[peer]; ok && pl == ln {
+			delete(m.routes, peer)
+			owned = true
+		}
 	}
 	m.mu.Unlock()
-	if ok && pl == ln {
-		pl.close()
+	if owned {
+		_ = ln.Close()
 	}
 }
 
@@ -168,10 +231,7 @@ func (m *p2pHostManager) acceptLoop(ln net.Listener) {
 // dispatch routes one inbound conn by its remote address (the peer key); an
 // unregistered peer is closed (explicit allowlist, no fallback).
 func (m *p2pHostManager) dispatch(conn net.Conn) {
-	peer := ""
-	if a := conn.RemoteAddr(); a != nil {
-		peer = a.String()
-	}
+	peer := peerOf(conn)
 	m.mu.Lock()
 	pl := m.routes[peer]
 	m.mu.Unlock()
@@ -185,10 +245,20 @@ func (m *p2pHostManager) dispatch(conn net.Conn) {
 	pl.deliver(conn)
 }
 
-// peerListener is one peer's route, exposed as a net.Listener for a gost
-// service: a bounded queue, lossy on overflow.
+// peerOf reports the dialing peer's key: the p2p listener carries it in the
+// conn's remote address.
+func peerOf(conn net.Conn) string {
+	if a := conn.RemoteAddr(); a != nil {
+		return a.String()
+	}
+	return ""
+}
+
+// peerListener is one tunnel's route — a bounded queue shared by every peer in
+// the tunnel's allowlist, lossy on overflow — exposed as a net.Listener for a
+// gost service.
 type peerListener struct {
-	peer   string
+	peers  []string
 	ch     chan net.Conn
 	closed chan struct{}
 	once   sync.Once
@@ -202,8 +272,8 @@ type peerListener struct {
 // called before the service starts accepting; nil leaves conns unwrapped.
 func (l *peerListener) setStats(s stats.Stats) { l.stats = s }
 
-func newPeerListener(peer string) *peerListener {
-	return &peerListener{peer: peer, ch: make(chan net.Conn, p2pBacklog), closed: make(chan struct{})}
+func newPeerListener(peers []string) *peerListener {
+	return &peerListener{peers: peers, ch: make(chan net.Conn, p2pBacklog), closed: make(chan struct{})}
 }
 
 func (l *peerListener) deliver(conn net.Conn) {
@@ -213,7 +283,7 @@ func (l *peerListener) deliver(conn net.Conn) {
 		_ = conn.Close()
 	default:
 		if log := logger.Default(); log != nil {
-			log.Warnf("p2p inbound stream for peer %s dropped (backlog full)", l.peer)
+			log.Warnf("p2p inbound stream for peer %s dropped (backlog full)", peerOf(conn))
 		}
 		_ = conn.Close()
 	}
@@ -248,8 +318,9 @@ func (l *peerListener) close() {
 
 func (l *peerListener) Close() error { l.close(); return nil }
 
-// Addr is the peer's key: the route's identity, not a socket.
-func (l *peerListener) Addr() net.Addr { return peerRouteAddr(l.peer) }
+// Addr is the route's allowlist (comma-joined): the route's identity, not a
+// socket.
+func (l *peerListener) Addr() net.Addr { return peerRouteAddr(strings.Join(l.peers, ",")) }
 
 type peerRouteAddr string
 

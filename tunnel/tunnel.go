@@ -77,9 +77,12 @@ type Options struct {
 	TTL         int
 	RecordMode  string
 	// Peer is this link's other end: for a p2p entrypoint, the remote host's
-	// base64 public key to dial; for a p2p tunnel, the public key of the peer
-	// allowed to dial in (the route key — required).
-	Peer          string
+	// base64 public key to dial.
+	Peer string
+	// Peers is a p2p tunnel's inbound allowlist: the base64 public keys of the
+	// peers whose streams are routed to it. Empty is valid — the tunnel runs,
+	// it just receives nothing (there is no catch-all route).
+	Peers         []string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -182,6 +185,14 @@ func RecordModeOption(mode string) Option {
 func PeerOption(peer string) Option {
 	return func(opts *Options) {
 		opts.Peer = peer
+	}
+}
+
+// PeersOption sets a p2p tunnel's inbound allowlist (base64 public keys). An
+// empty list is valid: the tunnel runs and routes nothing.
+func PeersOption(peers ...string) Option {
+	return func(opts *Options) {
+		opts.Peers = peers
 	}
 }
 
@@ -381,6 +392,7 @@ func RestartRunning() {
 			RewriteHost: p.opts.RewriteHost,
 			FileUpload:  p.opts.FileUpload,
 			RecordMode:  p.opts.RecordMode,
+			Peers:       p.opts.Peers,
 			CreatedAt:   p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -465,6 +477,7 @@ func LoadConfig() {
 			FileUpload:    cfg.FileUpload,
 			RecordMode:    cfg.RecordMode,
 			Peer:          cfg.Peer,
+			Peers:         cfg.Peers,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -511,6 +524,7 @@ func SaveConfig() error {
 			FileUpload:    opts.FileUpload,
 			RecordMode:    opts.RecordMode,
 			Peer:          opts.Peer,
+			Peers:         opts.Peers,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -542,6 +556,7 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		RewriteHostOption(opts.RewriteHost),
 		FileUploadOption(opts.FileUpload),
 		RecordModeOption(opts.RecordMode),
+		PeersOption(opts.Peers...),
 	}
 
 	switch st {
