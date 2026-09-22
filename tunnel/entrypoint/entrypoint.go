@@ -110,11 +110,11 @@ func Delete(id string) {
 // server (same tunnel ID cannot be registered twice concurrently).
 func RestartRunning() {
 	type restartInfo struct {
-		index int
-		opts  tunnel.Options
-		fav   bool
-		stats          config.ServiceStats
-		statsBaseline  config.ServiceStats
+		index         int
+		opts          tunnel.Options
+		fav           bool
+		stats         config.ServiceStats
+		statsBaseline config.ServiceStats
 	}
 
 	var pending []restartInfo
@@ -126,9 +126,9 @@ func RestartRunning() {
 			continue
 		}
 		pending = append(pending, restartInfo{
-			index: i,
-			opts:  ep.Options(),
-			fav:   ep.IsFavorite(),
+			index:         i,
+			opts:          ep.Options(),
+			fav:           ep.IsFavorite(),
 			stats:         ep.Stats(),
 			statsBaseline: ep.StatsBaseline(),
 		})
@@ -138,15 +138,16 @@ func RestartRunning() {
 	// Phase 2: start new entrypoints with the updated config.
 	for _, p := range pending {
 		newEP := createEntryPoint(entryPoints.list[p.index].Type(), tunnel.Options{
-			ID:        p.opts.ID,
-			Name:      p.opts.Name,
-			Endpoint:  p.opts.Endpoint,
-			Hostname:  p.opts.Hostname,
-			Username:  p.opts.Username,
-			Password:  p.opts.Password,
-			EnableTLS: p.opts.EnableTLS,
-			Keepalive: p.opts.Keepalive,
-			TTL:       p.opts.TTL,
+			ID:            p.opts.ID,
+			Name:          p.opts.Name,
+			Endpoint:      p.opts.Endpoint,
+			Hostname:      p.opts.Hostname,
+			Username:      p.opts.Username,
+			Password:      p.opts.Password,
+			EnableTLS:     p.opts.EnableTLS,
+			Keepalive:     p.opts.Keepalive,
+			TTL:           p.opts.TTL,
+			Peer:          p.opts.Peer,
 			CreatedAt:     p.opts.CreatedAt,
 			StatsBaseline: p.statsBaseline,
 		})
@@ -179,16 +180,17 @@ func LoadConfig() {
 		}
 
 		ep := createEntryPoint(cfg.Type, tunnel.Options{
-			ID:        cfg.ID,
-			Name:      cfg.Name,
-			Endpoint:  cfg.Endpoint,
-			Hostname:  cfg.Hostname,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-			EnableTLS: cfg.EnableTLS,
-			Keepalive: cfg.Keepalive,
-			TTL:       cfg.TTL,
-			CreatedAt: cfg.CreatedAt,
+			ID:            cfg.ID,
+			Name:          cfg.Name,
+			Endpoint:      cfg.Endpoint,
+			Hostname:      cfg.Hostname,
+			Username:      cfg.Username,
+			Password:      cfg.Password,
+			EnableTLS:     cfg.EnableTLS,
+			Keepalive:     cfg.Keepalive,
+			TTL:           cfg.TTL,
+			Peer:          cfg.Peer,
+			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
 		})
@@ -221,17 +223,17 @@ func SaveConfig() error {
 		opts := ep.Options()
 
 		cfg.EntryPoints = append(cfg.EntryPoints, &config.Tunnel{
-			ID:        ep.ID(),
-			Name:      ep.Name(),
-			Type:      ep.Type(),
-			Endpoint:  ep.Entrypoint(),
-			Hostname:  opts.Hostname,
-			Username:  opts.Username,
-			Password:  opts.Password,
-			EnableTLS: opts.EnableTLS,
-			Favorite:  ep.IsFavorite(),
-			Closed:    ep.IsClosed(),
-			CreatedAt: opts.CreatedAt,
+			ID:            ep.ID(),
+			Name:          ep.Name(),
+			Type:          ep.Type(),
+			Endpoint:      ep.Entrypoint(),
+			Hostname:      opts.Hostname,
+			Username:      opts.Username,
+			Password:      opts.Password,
+			EnableTLS:     opts.EnableTLS,
+			Favorite:      ep.IsFavorite(),
+			Closed:        ep.IsClosed(),
+			CreatedAt:     opts.CreatedAt,
 			Stats:         ep.Stats(),
 			StatsBaseline: ep.StatsBaseline(),
 		})
@@ -257,6 +259,7 @@ func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
 		tunnel.EnableTLSOption(opts.EnableTLS),
 		tunnel.CreatedAtOption(opts.CreatedAt),
 		tunnel.StatsBaselineOption(opts.StatsBaseline),
+		tunnel.PeerOption(opts.Peer),
 	}
 	switch st {
 	case TCPEntryPoint:

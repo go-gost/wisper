@@ -126,18 +126,18 @@ func RemoveP2PKey(id string) error {
 	return nil
 }
 
-// p2pDerpURL returns the configured DERP relay, falling back to the public
+// P2PDerpURL returns the configured DERP relay, falling back to the public
 // gost.run relay — the same read-time-default pattern as GetServerName.
-func p2pDerpURL(s *cfg.Settings) string {
+func P2PDerpURL(s *cfg.Settings) string {
 	if s != nil && s.P2P != nil && s.P2P.Derp != "" {
 		return s.P2P.Derp
 	}
 	return defaultP2PDerp
 }
 
-// p2pTLSConfig returns the relay TLS options, or nil to keep p2p's defaults
+// P2PTLSConfig returns the relay TLS options, or nil to keep p2p's defaults
 // (verify against the system roots) when settings.p2p is unset.
-func p2pTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
+func P2PTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
 	if s == nil || s.P2P == nil {
 		return nil
 	}
@@ -165,12 +165,12 @@ func (s *p2pTunnel) Run() (err error) {
 
 	direct := false
 	conf := &p2p.Config{
-		Derp:    p2pDerpURL(settings),
+		Derp:    P2PDerpURL(settings),
 		Key:     keyPath,
 		Targets: []string{"tcp://" + s.opts.Endpoint},
 		Direct:  &direct,
 	}
-	conf.TLS = p2pTLSConfig(settings)
+	conf.TLS = P2PTLSConfig(settings)
 	host, err := p2p.New(conf)
 	if err != nil {
 		err = fmt.Errorf("p2p host: %w", err)

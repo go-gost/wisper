@@ -179,6 +179,9 @@ type Tunnel struct {
 	// RecordMode controls traffic recording: "full", "headers", "off".
 	RecordMode string `yaml:"record_mode,omitempty"`
 
+	// Peer is the remote peer's base64 public key (p2p entrypoints).
+	Peer string `yaml:",omitempty" json:"peer,omitempty"`
+
 	Stats         ServiceStats
 	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
 	Favorite      bool

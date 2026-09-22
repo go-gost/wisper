@@ -66,16 +66,18 @@ type Options struct {
 	// Prefix is the custom public URL host prefix (subdomain label) requested
 	// from the tunnel server. Distinct from Hostname, which for HTTP tunnels
 	// means backend Host-header rewrite.
-	Prefix        string
-	Hostname      string
-	Username      string
-	Password      string
-	EnableTLS     bool
-	RewriteHost   bool
-	FileUpload    bool
-	Keepalive     bool
-	TTL           int
-	RecordMode    string
+	Prefix      string
+	Hostname    string
+	Username    string
+	Password    string
+	EnableTLS   bool
+	RewriteHost bool
+	FileUpload  bool
+	Keepalive   bool
+	TTL         int
+	RecordMode  string
+	// Peer is the remote peer's base64 public key for p2p entrypoints.
+	Peer          string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -171,6 +173,13 @@ func StatsBaselineOption(baseline config.ServiceStats) Option {
 func RecordModeOption(mode string) Option {
 	return func(opts *Options) {
 		opts.RecordMode = mode
+	}
+}
+
+// PeerOption sets the remote peer's base64 public key (p2p entrypoints).
+func PeerOption(peer string) Option {
+	return func(opts *Options) {
+		opts.Peer = peer
 	}
 }
 
@@ -453,6 +462,7 @@ func LoadConfig() {
 			RewriteHost:   cfg.RewriteHost,
 			FileUpload:    cfg.FileUpload,
 			RecordMode:    cfg.RecordMode,
+			Peer:          cfg.Peer,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -498,6 +508,7 @@ func SaveConfig() error {
 			RewriteHost:   opts.RewriteHost,
 			FileUpload:    opts.FileUpload,
 			RecordMode:    opts.RecordMode,
+			Peer:          opts.Peer,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,

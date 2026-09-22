@@ -74,33 +74,33 @@ func TestP2PTunnelKeyLifecycle(t *testing.T) {
 // TestP2PDerpDefault: an empty settings.p2p resolves to the public gost.run
 // relay (never a hard failure).
 func TestP2PDerpDefault(t *testing.T) {
-	if got := p2pDerpURL(nil); got != defaultP2PDerp {
-		t.Fatalf("p2pDerpURL(nil) = %q, want %q", got, defaultP2PDerp)
+	if got := P2PDerpURL(nil); got != defaultP2PDerp {
+		t.Fatalf("P2PDerpURL(nil) = %q, want %q", got, defaultP2PDerp)
 	}
-	if got := p2pDerpURL(&cfg.Settings{}); got != defaultP2PDerp {
-		t.Fatalf("p2pDerpURL(empty) = %q, want %q", got, defaultP2PDerp)
+	if got := P2PDerpURL(&cfg.Settings{}); got != defaultP2PDerp {
+		t.Fatalf("P2PDerpURL(empty) = %q, want %q", got, defaultP2PDerp)
 	}
 	want := "wss://relay.example/derp"
-	if got := p2pDerpURL(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: want}}); got != want {
-		t.Fatalf("p2pDerpURL(configured) = %q, want %q", got, want)
+	if got := P2PDerpURL(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: want}}); got != want {
+		t.Fatalf("P2PDerpURL(configured) = %q, want %q", got, want)
 	}
 }
 
 // TestP2PTLSConfig: an unset settings.p2p must not panic and keeps p2p's
 // defaults; a configured one is passed through.
 func TestP2PTLSConfig(t *testing.T) {
-	if got := p2pTLSConfig(nil); got != nil {
-		t.Fatalf("p2pTLSConfig(nil) = %+v, want nil", got)
+	if got := P2PTLSConfig(nil); got != nil {
+		t.Fatalf("P2PTLSConfig(nil) = %+v, want nil", got)
 	}
-	if got := p2pTLSConfig(&cfg.Settings{}); got != nil {
-		t.Fatalf("p2pTLSConfig(empty) = %+v, want nil", got)
+	if got := P2PTLSConfig(&cfg.Settings{}); got != nil {
+		t.Fatalf("P2PTLSConfig(empty) = %+v, want nil", got)
 	}
-	if got := p2pTLSConfig(&cfg.Settings{P2P: &cfg.P2PSettings{}}); got != nil {
-		t.Fatalf("p2pTLSConfig(defaults) = %+v, want nil", got)
+	if got := P2PTLSConfig(&cfg.Settings{P2P: &cfg.P2PSettings{}}); got != nil {
+		t.Fatalf("P2PTLSConfig(defaults) = %+v, want nil", got)
 	}
 	no := false
-	got := p2pTLSConfig(&cfg.Settings{P2P: &cfg.P2PSettings{CAFile: "/tmp/ca.pem", Secure: &no}})
+	got := P2PTLSConfig(&cfg.Settings{P2P: &cfg.P2PSettings{CAFile: "/tmp/ca.pem", Secure: &no}})
 	if got == nil || got.CAFile != "/tmp/ca.pem" || got.Secure == nil || *got.Secure {
-		t.Fatalf("p2pTLSConfig(configured) = %+v, want the configured values", got)
+		t.Fatalf("P2PTLSConfig(configured) = %+v, want the configured values", got)
 	}
 }
