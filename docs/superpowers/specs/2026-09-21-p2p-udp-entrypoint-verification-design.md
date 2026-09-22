@@ -120,11 +120,12 @@ R0 首跑**未复现**寻址缺陷：日志显示 `dial <key>:0/udp` 成功、`c
 
 ## 产出
 
-- 可复跑测试：R0/R3 断言**实测签名**并注明「修复落地后应反转」；R2 断言基线通过。
+- 可复跑测试（第四次修订后的最终形态）：`TestP2PUDPBaseline`（基线，断言回环）+
+  `TestP2PUDPTwoClientsCollide`（R3，断言实测碰撞签名）。
 - [p2p-integration.md](../../../docs/p2p-integration.md) 「已知限制」一节改写：实测签名 +
-  修复方向（① x 侧把 provider conn 按 network 包 framed；② 多客户端需 per-client channel
+  修复方向（① framing —— **已做**，落在 p2p Provider 侧；② 多客户端需 per-client channel
   或 GOST 侧 session 多路复用，对齐 relay 协议的 udp session id 思路；寻址无需改动，见第三次修订）。
-- 产品代码零改动。
+- 产品代码改动：仅 p2p 的 framing 修复（`204e2d5`，未发布）；wisper 侧仅测试与文档。
 
 ## 风险
 
