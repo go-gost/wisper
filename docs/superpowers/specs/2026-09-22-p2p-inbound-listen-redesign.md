@@ -13,8 +13,8 @@
   wisper 用**进程级 host**（一份身份/一条 DERP 连接）+ 按 peer key 路由到各隧道；
   每条隧道一个标准 gost service（`Listen()` 作 listener + `local` handler → 后端）→
   **stats / auth / 录制免费**，与 entrypoint 完全对称。
-- 非目标：udp 入站流的 Listen（datagram framing 语义另议，留后续）；一条隧道多 peer；
-  一条隧道多后端；p2p 的 DERP/直连机制不变。
+- 非目标：udp 入站流的 Listen（datagram framing 语义另议，留后续）；一条隧道多后端；
+  p2p 的 DERP/直连机制不变。**一条隧道多 peer（白名单列表）已纳入范围**。
 
 ## p2p 侧 API（契约，发 `v0.4.2`）
 
@@ -46,10 +46,15 @@ func (t *Tunnel) Listen() (net.Listener, error)
 - 一个进程一份身份：key 文件 `<config>/wisper/p2p/host.key`（0600）；`Listen()` 的 accept 循环
   由 manager 独占消费。
 - **引用计数**：第一条 p2p 隧道 `Run()` 时启动（host + DERP 连接），最后一条 `Close()` 时关闭。
-- 对端身份路由：每条隧道声明 `Peer`（对端 pubkey）；入站 conn 的 `RemoteAddr()` → 查表 →
-  投递到该隧道的**内部 listener**（per-tunnel 队列实现 `net.Listener`，容量有界，满则丢 + 日志）；
-  未登记的 peer → 直接关闭 + 日志（显式白名单，无兜底）。
-- 重复登记同一 peer → `Run()` 报错（1:1）。
+- 对端身份路由：每条隧道声明 `Peers []string`（**入站白名单列表**）。入站 conn 的
+  `RemoteAddr()` → 查表 → 投递到该隧道的内部 listener（per-tunnel 队列，容量有界，满则丢 + 日志）。
+  - **空列表 = 不路由任何流量**（隧道可运行、身份照常展示，但没有入站流会被投递；不是兜底路由）。
+  - 未在白名单内的 peer → 直接关闭 + 日志。
+  - 同一 peer key 出现在两条隧道的白名单 → `Run()` 报错（每个 peer 只能属于一条路由）。
+  - 允许 N:1：多条 peer 共享同一后端。
+- **身份按需物化**：`GET /api/p2p` 在 host 未运行时用 `p2p.New(...)` + `PublicKey()` + `Close()`
+  **就地生成/读取 key 并返回 pubkey**（`New` 无网络 I/O，不建 DERP 连接）——双方先互换 key 再配置，
+  消除"配置 A 需要 B 的 key、配置 B 需要 A 的 key"的先后死结。
 - manager 暴露 `PublicKey()` 给 API/UI（设置页展示"本机 p2p 身份"）。
 
 ### 隧道（反向侧）改造
@@ -60,14 +65,14 @@ func (t *Tunnel) Listen() (net.Listener, error)
 - `Endpoint()` = 本地后端地址；`Entrypoint()` = **对端 pubkey**（隧道页展示"这条链路对端的地址"；
   本机身份 pubkey 上移到设置页）——与入口点的 `Endpoint()`=peer、`Entrypoint()`=本地监听 互为镜像。
 - 旧 per-tunnel key（`p2p/<tunnel-id>.key`）：不再使用；删除隧道时的清理逻辑保留（清遗留文件）。
-- 字段：`Options.Peer` 对反向侧隧道由"可选"变为**必填**（与入口点同字段，语义统一：
-  "这条链路对端的公钥"）。
+- 字段：反向侧隧道用 `Options.Peers []string`（白名单，可为空）；入口点保留 `Options.Peer string`
+  （必填，拨出目标）——两个字段语义不同，文档写清。
 
 ### API / UI
 
-- 设置页：新增"P2P 身份"区（host pubkey + 复制；说明这是分享给对端的地址）。
-- 隧道详情/表单：`Peer`（对端公钥）字段（p2p 类型）；移除"本机 pubkey 显示在隧道页"的旧行为
-  （`Endpoint()` 不再返回 pubkey → 详情页对 p2p 隧道展示 peer）。
+- 设置页：新增"P2P 身份"区（host pubkey + 复制；按需物化，永远可见）。
+- 隧道详情/表单：**Peers 白名单**（多行输入，每行一个 key；详情页列表展示）；列表为空时提示
+  "未配置对端，不会有流量进入"；移除"本机 pubkey 显示在隧道页"的旧行为。
 - entrypoint 侧不变（其 `peer` 字段语义本就一致）。
 
 ## 安全

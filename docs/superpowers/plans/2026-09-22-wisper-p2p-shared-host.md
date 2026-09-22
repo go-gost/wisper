@@ -470,6 +470,42 @@ git add docs/p2p-integration.md
 git commit -m "docs: the peer-routed reverse side (shared host identity)"
 ```
 
+
+---
+
+## 增量（2026-09-22 评审后）：白名单列表 + 身份按需物化
+
+首版实现用 `Options.Peer`（单 key、必填）做反向侧路由；评审结论改为**白名单列表 + 空列表不路由 +
+身份按需物化**（消除互配死结）。以下为对已落地 Tasks 2/3/4/5/6 的增量改动：
+
+### Task 8: Go 核心——`Peers` 列表 + 路由 + 身份物化
+
+**Files:** `tunnel/tunnel.go`、`config/config.go`、`tunnel/p2p_host.go`、`tunnel/p2p.go`、`tunnel/p2p_test.go`
+
+- `Options.Peers []string` + `PeersOption(peers ...string)`；`config.Tunnel.Peers []string`（`yaml:"peers,omitempty"`），并入 Load/Save/两处工厂透传。`Options.Peer` 保留给入口点。
+- manager：`register(peers []string, ...)` 语义改为**批量注册**——逐个 `routes[peer] = ln`，任一重复 → 全部回滚并返回错误；`unregister(peers, ln)` 逐条删除（仅删自己的）。内部辅助 `registerOne`/`unregisterOne` 保持单键逻辑。
+- `p2pTunnel.Run()`：不再要求 Peer；`ln, err := p2pHost.register(s.opts.Peers, s.opts.Name)`；空列表也照常建 service（隧道运行但不可达）；Close 用 `unregister(s.opts.Peers, ln)`。
+- 身份物化：新增 `tunnel.EnsureP2PIdentity() (string, error)`——host 在跑就直接返回 `PublicKey()`；否则 `p2p.New(&Config{Derp: P2PDerpURL(settings), Key: hostKeyPath})`（**不 Connect**）→ `PublicKey()` → `Close()` → 返回。`P2PHostPublicKey()` 改走它（设置页永远能看到 key）。
+- 测试：白名单（1 条 / N 条 / 空）、重复 key 跨隧道报错、空列表时隧道 running 但 `dispatch` 任何 peer 都关闭、`EnsureP2PIdentity` 在无任何服务时也能生成并返回 43 字符 key（且 host.key 0600）。
+
+```bash
+git commit -m "feat(tunnel): peer allowlist (Peers) and on-demand p2p identity"
+```
+
+### Task 9: API/UI/e2e/文档同步
+
+**Files:** `api/tunnel_handler.go`、`web-src/src/{api/types.ts,pages/tunnel-detail-page.ts,i18n/*}`、`tunnel/p2p_e2e_test.go`、`docs/p2p-integration.md`
+
+- API：create/update 请求与响应带 `peers`（`[]string`）；`toOptions()` 加 `tunnel.PeersOption(r.Peers...)`。
+- UI：隧道表单 p2p 类型下把单行 Peer 输入换成 **Peers 多行输入**（每行一个 key；提交时 split 去空行）；详情页列表展示；空列表显示 `t('p2pPeersEmpty')` 提示。
+- i18n：`p2pPeers: 'Allowed peers'`、`p2pPeersHint: 'One peer public key per line. Empty = no traffic is routed to this tunnel.'`、`p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.'`（zh 对应）。
+- e2e：隧道用 `PeersOption(dialingHost.PublicKey())`；**新增负例**：另一个未列入白名单的 host 拨入 → 拿不到 conn/回环失败（断言流被关闭）。
+- 文档：白名单语义（空 = 不可达）、N:1、身份在设置页按需可见。
+
+```bash
+git commit -m "feat(api,ui): tunnel peer allowlist; docs and e2e"
+```
+
 ---
 
 ## Self-Review 记录
