@@ -86,6 +86,7 @@ const en: Record<string, string> = {
   typeP2pDesc: 'Expose a local service to peers by public key (private p2p mode)',
   typeTcpEntryDesc: 'Expose a tunnel endpoint as a local TCP port',
   typeUdpEntryDesc: 'Expose a tunnel endpoint as a local UDP port',
+  typeP2pEntryDesc: 'Forward local traffic to a peer by public key (p2p entrypoint).',
 
   // Notifications
   copiedToClipboard: 'Copied to clipboard',
@@ -128,6 +129,8 @@ const en: Record<string, string> = {
   settingsP2PSecure: 'Verify relay certificate',
   settingsP2PCAFile: 'Relay CA file',
   p2pHint: 'Anyone holding this key who can reach the relay can access the local service. No further authentication is applied by p2p.',
+  entrypointPeerKey: 'Peer public key',
+  p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (tcp inner).',
 
   // Inspector
   qrCode: 'QR Code',

@@ -9,11 +9,13 @@ import '../components/app-scaffold';
 const TYPE_ICONS: Record<EntrypointType, string> = {
   tcp: 'link',
   udp: 'broadcast',
+  p2p: 'hub',
 };
 
 const TYPE_COLORS: Record<EntrypointType, { bg: string; fg: string }> = {
   tcp: { bg: '#fef2f2', fg: '#dc2626' },
   udp: { bg: '#fefce8', fg: '#d97706' },
+  p2p: { bg: '#f5f3ff', fg: '#7c3aed' },
 };
 
 @customElement('entrypoint-type-select-page')

@@ -1,7 +1,7 @@
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 export type TunnelType = 'file' | 'http' | 'tcp' | 'udp' | 'p2p';
-export type EntrypointType = 'tcp' | 'udp';
+export type EntrypointType = 'tcp' | 'udp' | 'p2p';
 export type ServiceStatus = 'running' | 'stopped' | 'error';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type LanguagePreference = 'en' | 'zh';
@@ -17,6 +17,7 @@ export const TUNNEL_TYPES: { value: TunnelType; label: string; desc: string }[] 
 export const ENTRYPOINT_TYPES: { value: EntrypointType; label: string; desc: string }[] = [
   { value: 'tcp', label: 'TCP', desc: '' },
   { value: 'udp', label: 'UDP', desc: '' },
+  { value: 'p2p', label: 'P2P', desc: '' },
 ];
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
@@ -92,6 +93,8 @@ export interface TunnelCreateRequest {
 export interface EntrypointOptions {
   keepalive: boolean;
   ttl: number;
+  /** Remote peer's base64 public key (p2p entrypoints). */
+  peer?: string;
 }
 
 export interface Entrypoint {
@@ -115,6 +118,8 @@ export interface EntrypointCreateRequest {
   tunnel_id?: string;
   keepalive?: boolean;
   ttl?: number;
+  /** Remote peer's base64 public key (p2p entrypoints). */
+  peer?: string;
 }
 
 // ─── Stats Snapshot ──────────────────────────────────────────────────────────

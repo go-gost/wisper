@@ -86,6 +86,7 @@ const zh: Record<string, string> = {
   typeP2pDesc: '按公钥将对端接入本地服务（私有 p2p 模式）',
   typeTcpEntryDesc: '将隧道端点暴露为本地 TCP 端口',
   typeUdpEntryDesc: '将隧道端点暴露为本地 UDP 端口',
+  typeP2pEntryDesc: '按公钥把本地流量转发到对端（p2p 入口点）。',
 
   // Notifications
   copiedToClipboard: '已复制到剪贴板',
@@ -128,6 +129,8 @@ const zh: Record<string, string> = {
   settingsP2PSecure: '验证中继证书',
   settingsP2PCAFile: '中继 CA 证书文件',
   p2pHint: '持有此公钥且可访问中继的任何人，都能访问该本地服务；p2p 不再进行额外认证。',
+  entrypointPeerKey: '对端公钥',
+  p2pEntryHint: '本地客户端连接监听地址；流量经 p2p 隧道到对端公钥，明文（内层 tcp）。',
 
   // Inspector
   qrCode: '二维码',

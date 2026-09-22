@@ -30,6 +30,7 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _name = '';
   @state() private _endpoint = '';
   @state() private _tunnelId = '';
+  @state() private _peer = '';
 
   private _unsubs: (() => void)[] = [];
 
@@ -86,12 +87,14 @@ export class EntrypointDetailPage extends LitElement {
     this._name = '';
     this._endpoint = '';
     this._tunnelId = '';
+    this._peer = '';
   }
 
   private _populateForm(ep: Entrypoint) {
     this._name = ep.name;
     this._endpoint = ep.entrypoint;
     this._tunnelId = ep.id ?? '';
+    this._peer = ep.options?.peer ?? '';
   }
 
   private _navigate(path: string) {
@@ -127,6 +130,7 @@ export class EntrypointDetailPage extends LitElement {
         type: this.entrypointType,
         endpoint: this._endpoint.trim(),
         id: this._tunnelId.trim() || undefined,
+        peer: this._peer.trim() || undefined,
       };
 
       if (this.mode === 'create') {
@@ -303,6 +307,13 @@ export class EntrypointDetailPage extends LitElement {
     }
     .copy-btn-mini:hover { background: var(--border-subtle); color: var(--text); }
 
+    .p2p-hint {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+      padding: 0 14px 10px;
+    }
+
     /* ── Stats grid ── */
     .stats-grid {
       display: grid;
@@ -457,6 +468,7 @@ export class EntrypointDetailPage extends LitElement {
     const ep = this._entrypoint;
     const stats = ep ? ep.stats : null;
     const typeLabel = this._typeLabel();
+    const peer = ep?.options?.peer ?? '';
 
     return html`
       <app-scaffold>
@@ -528,6 +540,20 @@ export class EntrypointDetailPage extends LitElement {
                   <span class="info-label">Bind Address</span>
                   <span class="info-value">${ep.entrypoint}</span>
                 </div>
+                ${this.entrypointType === 'p2p'
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">${t('entrypointPeerKey')}</span>
+                      <span class="info-value">${peer}</span>
+                      ${peer
+                        ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(peer)}>
+                          ${icon('copy')}
+                        </button>`
+                        : ''}
+                    </div>
+                    <div class="p2p-hint">${t('p2pEntryHint')}</div>
+                  `
+                  : ''}
               </div>
 
               <!-- Stats grid -->
@@ -596,6 +622,16 @@ export class EntrypointDetailPage extends LitElement {
                   <input class="form-input" .value=${this._endpoint} placeholder="0.0.0.0:9090"
                     @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
                 </div>
+
+                ${this.entrypointType === 'p2p'
+                  ? html`
+                    <div class="form-group">
+                      <label class="form-label">${t('entrypointPeerKey')}</label>
+                      <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
+                        @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
+                    </div>
+                  `
+                  : ''}
 
                 ${this.mode === 'edit'
                   ? html`
