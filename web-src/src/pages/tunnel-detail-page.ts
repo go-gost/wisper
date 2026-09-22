@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
@@ -459,6 +459,13 @@ export class TunnelDetailPage extends LitElement {
       color: var(--red) !important;
     }
 
+    .p2p-hint {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+      padding: 0 14px 10px;
+    }
+
     .copy-btn-mini {
       background: none;
       border: none;
@@ -850,6 +857,9 @@ export class TunnelDetailPage extends LitElement {
                     ${icon('copy')}
                   </button>
                 </div>
+                ${this.tunnelType === 'p2p'
+                  ? html`<div class="p2p-hint">${t('p2pHint')}</div>`
+                  : nothing}
                 ${t2.options.prefix
                   ? html`
                     <div class="info-row">

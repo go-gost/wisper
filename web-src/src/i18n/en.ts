@@ -78,10 +78,12 @@ const en: Record<string, string> = {
   typeHttp: 'HTTP',
   typeTcp: 'TCP',
   typeUdp: 'UDP',
+  typeP2p: 'P2P',
   typeFileDesc: 'Expose a local directory or file via HTTP',
   typeHttpDesc: 'Reverse proxy to a local HTTP service',
   typeTcpDesc: 'Forward TCP traffic to a local port',
   typeUdpDesc: 'Forward UDP traffic to a local port',
+  typeP2pDesc: 'Expose a local service to peers by public key (private p2p mode)',
   typeTcpEntryDesc: 'Expose a tunnel endpoint as a local TCP port',
   typeUdpEntryDesc: 'Expose a tunnel endpoint as a local UDP port',
 
@@ -121,6 +123,11 @@ const en: Record<string, string> = {
   settingsEntrypointHint: 'gost.run',
   settingsInsecure: 'Skip TLS Verify',
   settingsInsecureDesc: 'Skip certificate verification for tunnel connections',
+  settingsP2P: 'P2P',
+  settingsP2PDerp: 'DERP relay URL',
+  settingsP2PSecure: 'Verify relay certificate',
+  settingsP2PCAFile: 'Relay CA file',
+  p2pHint: 'Anyone holding this key who can reach the relay can access the local service. No further authentication is applied by p2p.',
 
   // Inspector
   qrCode: 'QR Code',

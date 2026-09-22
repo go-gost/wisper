@@ -73,6 +73,7 @@ export async function loadSettings(): Promise<void> {
       theme: cfg.theme || getStoredTheme(),
       stats_interval: cfg.stats_interval || 3,
       inspector_url: cfg.inspector_url || '',
+      p2p: cfg.p2p,
     };
   } catch {
     // Backend unavailable — use stored/local preferences.
@@ -110,6 +111,9 @@ export async function updateSettings(update: AppSettingsUpdate): Promise<void> {
   }
   if (update.inspector_url !== undefined) {
     settings.inspector_url = update.inspector_url;
+  }
+  if (update.p2p !== undefined) {
+    settings.p2p = update.p2p;
   }
 
   notify();

@@ -1,9 +1,9 @@
-import{a as _,G as m,o as b,h as x,y,z as l,j as e,b as f,i as w,t as k}from"./index-GMRgZrj8.js";import{r as n}from"./state-YL4uz3_a.js";import{i as c}from"./app-scaffold-CUyH1qWu.js";var $=Object.defineProperty,T=Object.getOwnPropertyDescriptor,a=(t,s,o,p)=>{for(var r=p>1?void 0:p?T(s,o):s,d=t.length-1,v;d>=0;d--)(v=t[d])&&(r=(p?v(s,o,r):v(r))||r);return p&&r&&$(s,o,r),r};const h=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],g=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],u=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];let i=class extends _{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._inspectorTested=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new m,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=b();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(x(()=>{const s=b();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate()}),y(()=>this.requestUpdate())),this._fetchVersion()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await l({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(h.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await l({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(g.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await l({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await l({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1,this._inspectorTested=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok,this._inspectorTested=!0}catch{this._inspectorConnected=!1,this._inspectorTested=!0}this.requestUpdate()}async _saveInspectorUrl(){try{await l({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const o=s.indexOf(t);return s[(o+1)%s.length]}render(){return f`
+import{a as f,G as m,o as b,h as y,y as x,z as c,j as e,b as _,i as w,t as k}from"./index-BL6TXL5M.js";import{r}from"./state-B52BexKL.js";import{i as o}from"./app-scaffold-U2bGL93r.js";var $=Object.defineProperty,S=Object.getOwnPropertyDescriptor,a=(t,s,l,p)=>{for(var n=p>1?void 0:p?S(s,l):s,d=t.length-1,v;d>=0;d--)(v=t[d])&&(n=(p?v(s,l,n):v(n))||n);return p&&n&&$(s,l,n),n};const h=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],u=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],g=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];let i=class extends f{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._p2pDerp="",this._p2pSecure=!0,this._p2pCaFile="",this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._inspectorTested=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new m,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=b();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._p2pDerp=t.p2p?.derp||"",this._p2pSecure=t.p2p?.secure??!0,this._p2pCaFile=t.p2p?.ca_file||"",this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(y(()=>{const s=b();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._p2pDerp=s.p2p?.derp||"",this._p2pSecure=s.p2p?.secure??!0,this._p2pCaFile=s.p2p?.ca_file||"",this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate()}),x(()=>this.requestUpdate())),this._fetchVersion()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}async _saveSettings(){this._saving=!0;try{await c({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure,p2p:{derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile}}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(h.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await c({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(u.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await c({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e(g.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await c({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1,this._inspectorTested=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok,this._inspectorTested=!0}catch{this._inspectorConnected=!1,this._inspectorTested=!0}this.requestUpdate()}async _saveInspectorUrl(){try{await c({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const l=s.indexOf(t);return s[(l+1)%s.length]}render(){return _`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
-            ${c("chevron-left")}
+            ${o("chevron-left")}
           </button>
           <span class="page-title">${e("settingsTitle")}</span>
         </div>
@@ -60,7 +60,39 @@ import{a as _,G as m,o as b,h as x,y,z as l,j as e,b as f,i as w,t as k}from"./i
                 </div>
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
-                ${c("check")} ${e("btnSave")}
+                ${o("check")} ${e("btnSave")}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- P2P -->
+        <div class="section">
+          <div class="section-title">${e("settingsP2P")}</div>
+          <div class="card">
+            <div class="card-padded">
+              <div class="form-group">
+                <label class="form-label">${e("settingsP2PDerp")}</label>
+                <input class="form-input" .value=${this._p2pDerp}
+                  placeholder="wss://derp.gost.run/derp"
+                  @input=${t=>{this._p2pDerp=t.target.value}}>
+              </div>
+              <div class="switch-row">
+                <div>
+                  <div class="switch-label">${e("settingsP2PSecure")}</div>
+                </div>
+                <div class="switch ${this._p2pSecure?"on":""}"
+                  @click=${()=>{this._p2pSecure=!this._p2pSecure}}>
+                  <div class="switch-knob"></div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">${e("settingsP2PCAFile")}</label>
+                <input class="form-input" .value=${this._p2pCaFile}
+                  @input=${t=>{this._p2pCaFile=t.target.value}}>
+              </div>
+              <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
+                ${o("check")} ${e("btnSave")}
               </button>
             </div>
           </div>
@@ -100,31 +132,31 @@ import{a as _,G as m,o as b,h as x,y,z as l,j as e,b as f,i as w,t as k}from"./i
         <div class="section">
           <div class="section-title">Preferences</div>
           <div class="card">
-            <div class="selector-row" @click=${()=>this._setLang(this._cycleOption(this._lang,g.map(t=>t.value)))}>
+            <div class="selector-row" @click=${()=>this._setLang(this._cycleOption(this._lang,u.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsLanguage")}</span>
               <span class="selector-value">
-                ${e(g.find(t=>t.value===this._lang)?.labelKey??"settingsLangEn")}
-                ${c("chevron-right")}
+                ${e(u.find(t=>t.value===this._lang)?.labelKey??"settingsLangEn")}
+                ${o("chevron-right")}
               </span>
             </div>
             <div class="selector-row" @click=${()=>this._setTheme(this._cycleOption(this._theme,h.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsTheme")}</span>
               <span class="selector-value">
                 ${e(h.find(t=>t.value===this._theme)?.labelKey??"settingsThemeSystem")}
-                ${c("chevron-right")}
+                ${o("chevron-right")}
               </span>
             </div>
-            <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,u.map(t=>t.value)))}>
+            <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,g.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsStatsInterval")}</span>
               <span class="selector-value">
-                ${e(u.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
-                ${c("chevron-right")}
+                ${e(g.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
+                ${o("chevron-right")}
               </span>
             </div>
           </div>
         </div>
 
-        ${this._snackbar?f`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?_`<div class="toast">${this._snackbar}</div>`:""}
       </app-scaffold>
     `}};i.styles=w`
     /* ── Back nav ── */
@@ -298,4 +330,4 @@ import{a as _,G as m,o as b,h as x,y,z as l,j as e,b as f,i as w,t as k}from"./i
       from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-  `;a([n()],i.prototype,"_server",2);a([n()],i.prototype,"_entrypoint",2);a([n()],i.prototype,"_insecure",2);a([n()],i.prototype,"_theme",2);a([n()],i.prototype,"_lang",2);a([n()],i.prototype,"_statsInterval",2);a([n()],i.prototype,"_inspectorUrl",2);a([n()],i.prototype,"_inspectorConnected",2);a([n()],i.prototype,"_inspectorTested",2);a([n()],i.prototype,"_snackbar",2);a([n()],i.prototype,"_saving",2);a([n()],i.prototype,"_version",2);i=a([k("settings-page")],i);export{i as SettingsPage};
+  `;a([r()],i.prototype,"_server",2);a([r()],i.prototype,"_entrypoint",2);a([r()],i.prototype,"_insecure",2);a([r()],i.prototype,"_p2pDerp",2);a([r()],i.prototype,"_p2pSecure",2);a([r()],i.prototype,"_p2pCaFile",2);a([r()],i.prototype,"_theme",2);a([r()],i.prototype,"_lang",2);a([r()],i.prototype,"_statsInterval",2);a([r()],i.prototype,"_inspectorUrl",2);a([r()],i.prototype,"_inspectorConnected",2);a([r()],i.prototype,"_inspectorTested",2);a([r()],i.prototype,"_snackbar",2);a([r()],i.prototype,"_saving",2);a([r()],i.prototype,"_version",2);i=a([k("settings-page")],i);export{i as SettingsPage};

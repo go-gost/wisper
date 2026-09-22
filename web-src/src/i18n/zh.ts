@@ -78,10 +78,12 @@ const zh: Record<string, string> = {
   typeHttp: 'HTTP',
   typeTcp: 'TCP',
   typeUdp: 'UDP',
+  typeP2p: 'P2P',
   typeFileDesc: '通过 HTTP 暴露本地目录或文件',
   typeHttpDesc: '反向代理到本地 HTTP 服务',
   typeTcpDesc: '转发 TCP 流量到本地端口',
   typeUdpDesc: '转发 UDP 流量到本地端口',
+  typeP2pDesc: '按公钥将对端接入本地服务（私有 p2p 模式）',
   typeTcpEntryDesc: '将隧道端点暴露为本地 TCP 端口',
   typeUdpEntryDesc: '将隧道端点暴露为本地 UDP 端口',
 
@@ -121,6 +123,11 @@ const zh: Record<string, string> = {
   settingsEntrypointHint: 'gost.run',
   settingsInsecure: '跳过 TLS 验证',
   settingsInsecureDesc: '跳过隧道连接的证书验证',
+  settingsP2P: 'P2P',
+  settingsP2PDerp: 'DERP 中继地址',
+  settingsP2PSecure: '验证中继证书',
+  settingsP2PCAFile: '中继 CA 证书文件',
+  p2pHint: '持有此公钥且可访问中继的任何人，都能访问该本地服务；p2p 不再进行额外认证。',
 
   // Inspector
   qrCode: '二维码',

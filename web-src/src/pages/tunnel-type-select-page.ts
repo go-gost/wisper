@@ -11,6 +11,7 @@ const TYPE_ICONS: Record<TunnelType, string> = {
   http: 'globe',
   tcp: 'link',
   udp: 'broadcast',
+  p2p: 'hub',
 };
 
 const TYPE_COLORS: Record<TunnelType, { bg: string; fg: string }> = {
@@ -18,6 +19,7 @@ const TYPE_COLORS: Record<TunnelType, { bg: string; fg: string }> = {
   http: { bg: '#eff6ff', fg: '#3b82f6' },
   tcp: { bg: '#fef2f2', fg: '#dc2626' },
   udp: { bg: '#fefce8', fg: '#d97706' },
+  p2p: { bg: '#f5f3ff', fg: '#7c3aed' },
 };
 
 @customElement('tunnel-type-select-page')

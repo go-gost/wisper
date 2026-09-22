@@ -1,6 +1,6 @@
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-export type TunnelType = 'file' | 'http' | 'tcp' | 'udp';
+export type TunnelType = 'file' | 'http' | 'tcp' | 'udp' | 'p2p';
 export type EntrypointType = 'tcp' | 'udp';
 export type ServiceStatus = 'running' | 'stopped' | 'error';
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -11,6 +11,7 @@ export const TUNNEL_TYPES: { value: TunnelType; label: string; desc: string }[] 
   { value: 'http', label: 'HTTP', desc: '' },
   { value: 'tcp', label: 'TCP', desc: '' },
   { value: 'udp', label: 'UDP', desc: '' },
+  { value: 'p2p', label: 'P2P', desc: '' },
 ];
 
 export const ENTRYPOINT_TYPES: { value: EntrypointType; label: string; desc: string }[] = [
@@ -125,6 +126,13 @@ export interface StatsSnapshot {
 
 // ─── App Settings ────────────────────────────────────────────────────────────
 
+/** Private p2p mode settings. Empty `derp` means the default public relay. */
+export interface P2PSettings {
+  derp: string;
+  secure?: boolean;
+  ca_file?: string;
+}
+
 export interface AppSettings {
   server: string;
   entrypoint: string;
@@ -133,6 +141,7 @@ export interface AppSettings {
   theme: ThemePreference;
   stats_interval: number;
   inspector_url?: string;
+  p2p?: P2PSettings;
 }
 
 export interface AppSettingsUpdate {
@@ -143,6 +152,7 @@ export interface AppSettingsUpdate {
   theme?: string;
   stats_interval?: number;
   inspector_url?: string;
+  p2p?: P2PSettings;
 }
 
 // ─── Inspector ───────────────────────────────────────────────────────────

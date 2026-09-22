@@ -32,6 +32,9 @@ export class SettingsPage extends LitElement {
   @state() private _server = '';
   @state() private _entrypoint = '';
   @state() private _insecure = false;
+  @state() private _p2pDerp = '';
+  @state() private _p2pSecure = true;
+  @state() private _p2pCaFile = '';
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 3;
@@ -51,6 +54,9 @@ export class SettingsPage extends LitElement {
     this._server = s.server;
     this._entrypoint = s.entrypoint;
     this._insecure = s.insecure;
+    this._p2pDerp = s.p2p?.derp || '';
+    this._p2pSecure = s.p2p?.secure ?? true;
+    this._p2pCaFile = s.p2p?.ca_file || '';
     this._theme = s.theme;
     this._lang = s.lang;
     this._statsInterval = s.stats_interval || 1;
@@ -62,6 +68,9 @@ export class SettingsPage extends LitElement {
         this._server = s2.server;
         this._entrypoint = s2.entrypoint;
         this._insecure = s2.insecure;
+        this._p2pDerp = s2.p2p?.derp || '';
+        this._p2pSecure = s2.p2p?.secure ?? true;
+        this._p2pCaFile = s2.p2p?.ca_file || '';
         this._theme = s2.theme;
         this._lang = s2.lang;
         this._statsInterval = s2.stats_interval || 1;
@@ -109,6 +118,7 @@ export class SettingsPage extends LitElement {
         server: this._server,
         entrypoint: this._entrypoint,
         insecure: this._insecure,
+        p2p: { derp: this._p2pDerp, secure: this._p2pSecure, ca_file: this._p2pCaFile },
       });
       this._showSnackbar('✓ ' + t('saved'));
     } catch {
@@ -424,6 +434,38 @@ export class SettingsPage extends LitElement {
                   @click=${() => { this._insecure = !this._insecure; }}>
                   <div class="switch-knob"></div>
                 </div>
+              </div>
+              <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
+                ${icon('check')} ${t('btnSave')}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- P2P -->
+        <div class="section">
+          <div class="section-title">${t('settingsP2P')}</div>
+          <div class="card">
+            <div class="card-padded">
+              <div class="form-group">
+                <label class="form-label">${t('settingsP2PDerp')}</label>
+                <input class="form-input" .value=${this._p2pDerp}
+                  placeholder="wss://derp.gost.run/derp"
+                  @input=${(e: Event) => { this._p2pDerp = (e.target as HTMLInputElement).value; }}>
+              </div>
+              <div class="switch-row">
+                <div>
+                  <div class="switch-label">${t('settingsP2PSecure')}</div>
+                </div>
+                <div class="switch ${this._p2pSecure ? 'on' : ''}"
+                  @click=${() => { this._p2pSecure = !this._p2pSecure; }}>
+                  <div class="switch-knob"></div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">${t('settingsP2PCAFile')}</label>
+                <input class="form-input" .value=${this._p2pCaFile}
+                  @input=${(e: Event) => { this._p2pCaFile = (e.target as HTMLInputElement).value; }}>
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}
