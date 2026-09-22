@@ -28,7 +28,7 @@ export async function handleRequest(stream, req, config) {
     // it checks req.BasicAuth() and returns 401 + WWW-Authenticate before ever
     // reaching the backend). Enforced client-side because the relay only pipes
     // bytes — the tunnel operator (this forwarder) is where auth must happen.
-    if (!isAuthorized(req.headers, config.auth)) {
+    if (!isAuthorized(req.headers, config.auth, config.enableTLS)) {
       await writeUnauthorized(stream);
       return;
     }
@@ -82,8 +82,12 @@ export function headerHasToken(headers, name, token) {
  * Mirrors Go's http.Request.BasicAuth(): base64-decode the token, split the
  * "username:password" on the FIRST colon (passwords may contain colons).
  */
-export function isAuthorized(headers, auth) {
+export function isAuthorized(headers, auth, enableTLS = true) {
   if (!auth || !auth.username) return true; // auth not configured → open
+  // Basic Auth sends credentials effectively in plaintext (base64 is not
+  // encryption). Without TLS on the wire, refuse to serve rather than let
+  // credentials leak in cleartext — force the tunnel owner to enable TLS.
+  if (!enableTLS) return false;
   const header = firstHeader(headers, 'authorization');
   if (!header) return false;
   const m = /^basic\s+(\S+)$/i.exec(header.trim());
