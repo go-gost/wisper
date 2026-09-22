@@ -147,6 +147,8 @@ const zh: Record<string, string> = {
   p2pPeers: '允许的对端',
   p2pPeersHint: '每行一个对端公钥；留空表示没有入站流量会路由到该隧道。',
   p2pPeersEmpty: '未配置对端——没有入站流量能到达该隧道。',
+  p2pConnected: '已连接',
+  p2pConnectedEmpty: '暂无对端连接。',
 
   // Inspector
   qrCode: '二维码',

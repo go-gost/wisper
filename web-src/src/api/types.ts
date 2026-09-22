@@ -76,6 +76,8 @@ export interface Tunnel {
   error: string;
   options: TunnelOptions;
   stats: ServiceStats;
+  /** p2p tunnels: peer keys with a live stream right now. */
+  active_peers?: string[];
 }
 
 export interface TunnelCreateRequest {

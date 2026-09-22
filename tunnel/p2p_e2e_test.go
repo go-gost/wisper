@@ -12,6 +12,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -168,6 +169,16 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	msg := []byte("hello-private-p2p")
 	mustEcho(t, conn, msg)
 
+	// The live view the tunnel page polls: the dialing peer's key is listed
+	// while its stream is open, and drops off once the stream ends.
+	stater, ok := tn.(interface{ ActivePeers() []string })
+	if !ok {
+		t.Fatalf("p2p tunnel %T has no ActivePeers", tn)
+	}
+	if got := stater.ActivePeers(); !slices.Equal(got, []string{peerKey}) {
+		t.Errorf("ActivePeers while connected = %v, want [%s]", got, peerKey)
+	}
+
 	// The tunnel serves its peer route with a standard gost service, so the
 	// round trip above must show up in the service's live stats — the same
 	// numbers runner/task/stats.go copies into Tunnel.Stats() in production.
@@ -187,6 +198,19 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	}
 	if got := s.Get(stats.KindOutputBytes); got < uint64(len(msg)) {
 		t.Errorf("stats OutputBytes = %d, want >= %d", got, len(msg))
+	}
+
+	// Stream ended: the live list goes back to empty. Teardown is async — the
+	// service closes its conn once the forwarding ends — so poll briefly.
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close stream: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for len(stater.ActivePeers()) > 0 && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if got := stater.ActivePeers(); len(got) != 0 {
+		t.Errorf("ActivePeers after the stream ended = %v, want none", got)
 	}
 }
 

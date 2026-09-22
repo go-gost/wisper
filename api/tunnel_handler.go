@@ -24,6 +24,9 @@ type tunnelResponse struct {
 	Error      string            `json:"error,omitempty"`
 	Options    tunnelOptionsResp `json:"options"`
 	Stats      statsResponse     `json:"stats"`
+	// ActivePeers lists the peer keys with a live stream right now (p2p
+	// tunnels only; absent for every other type).
+	ActivePeers []string `json:"active_peers,omitempty"`
 }
 
 type tunnelOptionsResp struct {
@@ -86,7 +89,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		errMsg = errStr(t.Err())
 	}
 
-	return tunnelResponse{
+	resp := tunnelResponse{
 		ID:         t.ID(),
 		Name:       t.Name(),
 		Type:       t.Type(),
@@ -122,6 +125,10 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			OutputRateBytes: s.OutputRateBytes,
 		},
 	}
+	if ps, ok := t.(interface{ ActivePeers() []string }); ok {
+		resp.ActivePeers = ps.ActivePeers()
+	}
+	return resp
 }
 
 func errStr(err error) string {

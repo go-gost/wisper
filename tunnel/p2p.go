@@ -257,6 +257,21 @@ func (s *p2pTunnel) Run() (err error) {
 	return nil
 }
 
+// ActivePeers reports the peer keys with a live stream right now (sorted), so
+// the tunnel page can show who is connected, not just how many. A stopped
+// tunnel has no route, hence no peers.
+func (s *p2pTunnel) ActivePeers() []string {
+	s.mu.RLock()
+	ln := s.ln
+	s.mu.RUnlock()
+
+	pl, _ := ln.(*peerListener)
+	if pl == nil {
+		return nil
+	}
+	return pl.ActivePeers()
+}
+
 // Close stops the service, drops the peer routes and gives the manager
 // reference back. It is idempotent; the shared identity file is kept.
 func (s *p2pTunnel) Close() error {

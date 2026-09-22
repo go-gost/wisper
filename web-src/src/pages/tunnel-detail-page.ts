@@ -801,6 +801,7 @@ export class TunnelDetailPage extends LitElement {
     const t2 = this._tunnel;
     const stats = t2 ? t2.stats : null;
     const typeLabel = this._typeLabel();
+    const activePeers = t2?.active_peers ?? [];
 
     return html`
       <app-scaffold>
@@ -881,6 +882,26 @@ export class TunnelDetailPage extends LitElement {
                 </div>
                 ${this.tunnelType === 'p2p'
                   ? html`<div class="p2p-hint">${t('p2pHint')}</div>`
+                  : nothing}
+                <!-- Live state, refreshed by the stats poll: which allowlisted
+                     peers actually hold a stream right now. -->
+                ${this.tunnelType === 'p2p'
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">${t('p2pConnected')}</span>
+                      ${activePeers.length
+                        ? html`
+                          <span class="info-value">
+                            ${this._showPeers ? activePeers.join(', ') : maskKeyList(activePeers.join(', '))}
+                          </span>
+                          <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
+                            @click=${() => { this._showPeers = !this._showPeers; }}>
+                            ${icon(this._showPeers ? 'eye-off' : 'eye')}
+                          </button>
+                        `
+                        : html`<span class="info-value empty">${t('p2pConnectedEmpty')}</span>`}
+                    </div>
+                  `
                   : nothing}
                 ${t2.options.prefix
                   ? html`

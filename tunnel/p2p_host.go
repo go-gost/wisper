@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -270,6 +271,59 @@ type peerListener struct {
 	// stats is the service's stats object; accepted conns count into it, the
 	// way x listeners count via stats.WrapListener.
 	stats stats.Stats
+
+	// active counts live streams per peer key, so the tunnel can report who is
+	// connected, not just how many conns are open.
+	mu     sync.Mutex
+	active map[string]int
+}
+
+// activeConn ties one delivered stream's lifetime to the route's live-peer
+// bookkeeping: closing it — by the service, or by the route's drain — retires
+// the peer from ActivePeers exactly once.
+type activeConn struct {
+	net.Conn
+	once sync.Once
+	done func()
+}
+
+func (c *activeConn) Close() error {
+	err := c.Conn.Close()
+	c.once.Do(c.done)
+	return err
+}
+
+// ActivePeers returns the peer keys with at least one live stream, sorted for
+// a stable display.
+func (l *peerListener) ActivePeers() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	peers := make([]string, 0, len(l.active))
+	for p := range l.active {
+		peers = append(peers, p)
+	}
+	slices.Sort(peers)
+	return peers
+}
+
+func (l *peerListener) track(peer string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.active == nil {
+		l.active = make(map[string]int)
+	}
+	l.active[peer]++
+}
+
+func (l *peerListener) untrack(peer string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.active[peer] > 1 {
+		l.active[peer]--
+	} else {
+		delete(l.active, peer)
+	}
 }
 
 // setStats attaches the serving service's stats to the route. It must be
@@ -281,15 +335,18 @@ func newPeerListener(peers []string) *peerListener {
 }
 
 func (l *peerListener) deliver(conn net.Conn) {
+	peer := peerOf(conn)
+	l.track(peer)
+	c := &activeConn{Conn: conn, done: func() { l.untrack(peer) }}
 	select {
-	case l.ch <- conn:
+	case l.ch <- c:
 	case <-l.closed:
-		_ = conn.Close()
+		_ = c.Close()
 	default:
 		if log := logger.Default(); log != nil {
-			log.Warnf("p2p inbound stream for peer %s dropped (backlog full)", peerOf(conn))
+			log.Warnf("p2p inbound stream for peer %s dropped (backlog full)", peer)
 		}
-		_ = conn.Close()
+		_ = c.Close()
 	}
 }
 

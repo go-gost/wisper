@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -176,6 +177,66 @@ func TestP2PHostManagerRoutes(t *testing.T) {
 	}
 	if _, err := local.Read(make([]byte, 1)); err == nil {
 		t.Fatal("Close left the queued conn open")
+	}
+}
+
+// TestPeerListenerActivePeers: the route tracks live streams per peer key, so
+// a tunnel can report who is connected right now, not just the conn count.
+func TestPeerListenerActivePeers(t *testing.T) {
+	m := &p2pHostManager{routes: make(map[string]*peerListener)}
+	ln, err := m.register([]string{"k1", "k2"})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	pl := ln.(*peerListener)
+
+	if got := pl.ActivePeers(); len(got) != 0 {
+		t.Fatalf("fresh route reports %v, want no peers", got)
+	}
+
+	in1, far1 := peerPipe("k1")
+	defer far1.Close()
+	in2, far2 := peerPipe("k2")
+	defer far2.Close()
+	in3, far3 := peerPipe("k1")
+	defer far3.Close()
+	m.dispatch(in1)
+	m.dispatch(in2)
+	m.dispatch(in3)
+
+	if got := pl.ActivePeers(); !slices.Equal(got, []string{"k1", "k2"}) {
+		t.Fatalf("ActivePeers = %v, want [k1 k2]", got)
+	}
+
+	// One of k1's two streams ending leaves the peer connected. The queue is
+	// FIFO: the first Accept is k1's, the second k2's.
+	c1, err := pl.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	if err := c1.Close(); err != nil {
+		t.Fatalf("Close accepted conn: %v", err)
+	}
+	if got := pl.ActivePeers(); !slices.Equal(got, []string{"k1", "k2"}) {
+		t.Fatalf("ActivePeers after one of k1's two streams = %v, want [k1 k2]", got)
+	}
+	c2, err := pl.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	if err := c2.Close(); err != nil {
+		t.Fatalf("Close accepted conn: %v", err)
+	}
+	if got := pl.ActivePeers(); !slices.Equal(got, []string{"k1"}) {
+		t.Fatalf("ActivePeers after k2's stream ended = %v, want [k1] (its second stream is still queued)", got)
+	}
+
+	// Close drains the queue and retires what is left.
+	if err := ln.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := pl.ActivePeers(); len(got) != 0 {
+		t.Fatalf("ActivePeers after Close = %v, want none", got)
 	}
 }
 

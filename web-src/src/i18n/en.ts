@@ -147,6 +147,8 @@ const en: Record<string, string> = {
   p2pPeers: 'Allowed peers',
   p2pPeersHint: 'One peer public key per line. Empty means no inbound traffic is routed to this tunnel.',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
+  p2pConnected: 'Connected',
+  p2pConnectedEmpty: 'No peer connected right now.',
 
   // Inspector
   qrCode: 'QR Code',
