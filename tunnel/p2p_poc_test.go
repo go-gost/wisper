@@ -13,9 +13,9 @@
 // (tunnel.ChainConfig) and swaps the node transport for p2p.
 //
 // Integration shape under test: the p2p host is imported as a library and its
-// in-process Provider is registered directly into x's registry. There is no
+// in-process Tunnel is registered directly into x's registry. There is no
 // subprocess, no loopback gRPC control plane, and no token — the same
-// x/p2p.TunnelProvider seam the gRPC plugin would have plugged into.
+// x/p2p.Tunnel seam the gRPC plugin would have plugged into.
 package tunnel_test
 
 import (
@@ -42,7 +42,7 @@ const p2pProviderName = "p2p-poc"
 
 // ParseChain dereferences the logger it is handed, and wisper hands it
 // clogger.Default(); set a real default so the test mirrors wisper's startup.
-// This is a chain-parsing requirement, not a p2p one: the in-process Provider
+// This is a chain-parsing requirement, not a p2p one: the in-process Tunnel
 // needs no global logger, unlike the gRPC plugin whose constructor called
 // logger.Default().WithFields and panicked on a nil default.
 func init() {
@@ -50,9 +50,9 @@ func init() {
 }
 
 // The chain parser looks providers up through this interface; asserting the
-// library's Provider against it here fails the build, not a runtime dial, if
+// library's Tunnel against it here fails the build, not a runtime dial, if
 // the two ever drift.
-var _ xp2p.TunnelProvider = (*p2p.Provider)(nil)
+var _ xp2p.Tunnel = (*p2p.Tunnel)(nil)
 
 // p2pChainConfig builds a wisper ChainConfig whose single node is transported
 // over the named p2p provider, with the peer at addr.
@@ -85,7 +85,7 @@ func TestP2PChainCarriesTCP(t *testing.T) {
 	echoAddr := startEchoServer(t)
 
 	// 1. The p2p host runs in process. Stub mode (no DERP): the peer is the
-	//    plain host:port the node points at. Register its Provider the way
+	//    plain host:port the node points at. Register its Tunnel the way
 	//    wisper must (programmatically, not via x/config/loader) so the chain
 	//    parser can resolve metadata.p2p.
 	host, err := p2p.New(&p2p.Config{})
@@ -93,7 +93,7 @@ func TestP2PChainCarriesTCP(t *testing.T) {
 		t.Fatalf("new p2p host: %v", err)
 	}
 	t.Cleanup(func() { _ = host.Close() })
-	if err := registry.P2PRegistry().Register(p2pProviderName, host.Provider()); err != nil {
+	if err := registry.P2PRegistry().Register(p2pProviderName, host.Tunnel()); err != nil {
 		t.Fatalf("register p2p provider: %v", err)
 	}
 	t.Cleanup(func() { registry.P2PRegistry().Unregister(p2pProviderName) })

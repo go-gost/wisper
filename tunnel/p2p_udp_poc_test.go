@@ -238,7 +238,7 @@ func startUDPEcho(t *testing.T, d time.Duration) string {
 // startUDPEntrypoint runs the whole shape and returns the entrypoint's local
 // udp address. wrap adapts the registered provider (nil = as shipped);
 // keepalive mirrors the entrypoint's listener option (wisper's default false).
-func startUDPEntrypoint(t *testing.T, wrap func(xp2p.TunnelProvider) xp2p.TunnelProvider, echoDelay time.Duration, keepalive bool) string {
+func startUDPEntrypoint(t *testing.T, wrap func(xp2p.Tunnel) xp2p.Tunnel, echoDelay time.Duration, keepalive bool) string {
 	t.Helper()
 	derp := startDerper(t)
 	echo := startUDPEcho(t, echoDelay)
@@ -265,7 +265,7 @@ func startUDPEntrypoint(t *testing.T, wrap func(xp2p.TunnelProvider) xp2p.Tunnel
 	outlet := newHost(strings.Repeat("11", 32), []string{"udp://" + echo})
 	dialer := newHost(strings.Repeat("22", 32), nil)
 
-	var pr xp2p.TunnelProvider = dialer.Provider()
+	var pr xp2p.Tunnel = dialer.Tunnel()
 	if wrap != nil {
 		pr = wrap(pr)
 	}
