@@ -78,6 +78,9 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("PUT /api/config", handleUpdateConfig)
 	mux.HandleFunc("GET /api/version", handleGetVersion)
 
+	// Process-wide p2p identity
+	mux.HandleFunc("GET /api/p2p", handleGetP2PIdentity)
+
 	// Serve embedded web UI for non-API requests.
 	if webHandler != nil {
 		mux.Handle("/", webHandler)
