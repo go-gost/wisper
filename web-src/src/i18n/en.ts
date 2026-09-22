@@ -35,6 +35,8 @@ const en: Record<string, string> = {
   btnEdit: 'Edit',
   btnDelete: 'Delete',
   btnCancel: 'Cancel',
+  revealKey: 'Reveal',
+  hideKey: 'Hide',
   btnCopy: 'Copy',
   btnClose: 'Close',
   btnResetStats: 'Reset',

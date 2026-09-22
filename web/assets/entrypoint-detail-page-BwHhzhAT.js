@@ -1,12 +1,12 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BtepnLAZ.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
-import{a as m,f as y,c as _,j as e,_ as u,v as x,w as $,l as w,n as k,x as S,u as D,b as i,i as z,t as E}from"./index-BtepnLAZ.js";import{n as g,r as p}from"./state-BN8QwFaQ.js";import{i as d}from"./app-scaffold-D2cib4iB.js";import{c as C}from"./clipboard-C3x8_sid.js";import{d as I,c as v,a as h,b as f}from"./format-BcWb47bn.js";var T=Object.defineProperty,R=Object.getOwnPropertyDescriptor,r=(t,a,o,l)=>{for(var s=l>1?void 0:l?R(a,o):a,c=t.length-1,b;c>=0;c--)(b=t[c])&&(s=(l?b(a,o,s):b(s))||s);return l&&s&&T(a,o,s),s};let n=class extends m{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(y(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const o=_().find(l=>l.id===t);o&&(this._entrypoint=o,a?(this.mode="edit",this._populateForm(o)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(o)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??"",this._peer=t.options?.peer??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-BtepnLAZ.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await u(()=>import("./index-BtepnLAZ.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await x())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await $(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await w(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await C(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=t?t.stats:null,o=this._typeLabel(),l=t?.options?.peer??"";return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DXPgV2kf.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
+import{a as m,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u as D,b as i,i as z,t as E}from"./index-DXPgV2kf.js";import{d as C,e as I,c as h,a as u,b as f,n as g,r as p}from"./format-CWn33lpA.js";import{i as d}from"./app-scaffold-VOOHaoxB.js";import{c as T}from"./clipboard-C3x8_sid.js";var R=Object.defineProperty,P=Object.getOwnPropertyDescriptor,o=(t,a,r,l)=>{for(var s=l>1?void 0:l?P(a,r):a,c=t.length-1,b;c>=0;c--)(b=t[c])&&(s=(l?b(a,r,s):b(s))||s);return l&&s&&R(a,r,s),s};let n=class extends m{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(y(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const r=_().find(l=>l.id===t);r&&(this._entrypoint=r,a?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??"",this._peer=t.options?.peer??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0};this.mode==="create"?(await v(()=>import("./index-DXPgV2kf.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await v(()=>import("./index-DXPgV2kf.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await x())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await $(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await w(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await T(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=t?t.stats:null,r=this._typeLabel(),l=t?.options?.peer??"";return i`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
             ${d("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${e("entrypointNewTitle")} — ${o}`:o+" Entrypoint"}
+            ${this.mode==="create"?`${e("entrypointNewTitle")} — ${r}`:r+" Entrypoint"}
           </span>
 
           ${this.mode==="view"&&t?i`
@@ -35,11 +35,11 @@ import{a as m,f as y,c as _,j as e,_ as u,v as x,w as $,l as w,n as k,x as S,u a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${o} Entrypoint</span>
+                  <span class="info-value text">${r} Entrypoint</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Created</span>
-                  <span class="info-value text">${I(t.created_at)}</span>
+                  <span class="info-value text">${C(t.created_at)}</span>
                 </div>
                 ${this.entrypointType==="p2p"?"":i`
                 <div class="info-row">
@@ -60,9 +60,13 @@ import{a as m,f as y,c as _,j as e,_ as u,v as x,w as $,l as w,n as k,x as S,u a
                 ${this.entrypointType==="p2p"?i`
                     <div class="info-row">
                       <span class="info-label">${e("entrypointPeerKey")}</span>
-                      <span class="info-value">${l}</span>
+                      <span class="info-value">${this._showPeer?l:I(l)}</span>
                       ${l?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
                           ${d("copy")}
+                        </button>
+                        <button class="copy-btn-mini" title="${this._showPeer?e("hideKey"):e("revealKey")}"
+                          @click=${()=>{this._showPeer=!this._showPeer}}>
+                          ${d(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
                     <div class="p2p-hint">${e("p2pEntryHint")}</div>
@@ -74,21 +78,21 @@ import{a as m,f as y,c as _,j as e,_ as u,v as x,w as $,l as w,n as k,x as S,u a
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(a.total_conns)}</div>
-                      <div class="stat-rate">${v(a.current_conns)} active · ${a.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-value">${h(a.total_conns)}</div>
+                      <div class="stat-rate">${h(a.current_conns)} active · ${a.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(a.total_errs)}</div>
+                      <div class="stat-value">${h(a.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${h(a.output_bytes)}</div>
+                      <div class="stat-value">${u(a.output_bytes)}</div>
                       <div class="stat-rate">${f(a.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${h(a.input_bytes)}</div>
+                      <div class="stat-value">${u(a.input_bytes)}</div>
                       <div class="stat-rate">${f(a.input_rate_bytes)}</div>
                     </div>
                   </div>
@@ -108,7 +112,7 @@ import{a as m,f as y,c as _,j as e,_ as u,v as x,w as $,l as w,n as k,x as S,u a
               <div class="card" style="padding:16px;">
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${o+" Entrypoint"}>
+                  <input class="form-input" readonly .value=${r+" Entrypoint"}>
                 </div>
 
                 <!-- A p2p entrypoint dials the peer directly: no tunnel id. -->
@@ -441,4 +445,4 @@ import{a as m,f as y,c as _,j as e,_ as u,v as x,w as $,l as w,n as k,x as S,u a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;r([g()],n.prototype,"entrypointType",2);r([g()],n.prototype,"entrypointId",2);r([p()],n.prototype,"mode",2);r([p()],n.prototype,"_entrypoint",2);r([p()],n.prototype,"_saving",2);r([p()],n.prototype,"_snackbar",2);r([p()],n.prototype,"_showDeleteDialog",2);r([p()],n.prototype,"_showResetDialog",2);r([p()],n.prototype,"_name",2);r([p()],n.prototype,"_endpoint",2);r([p()],n.prototype,"_tunnelId",2);r([p()],n.prototype,"_peer",2);n=r([E("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
+  `;o([g()],n.prototype,"entrypointType",2);o([g()],n.prototype,"entrypointId",2);o([p()],n.prototype,"mode",2);o([p()],n.prototype,"_entrypoint",2);o([p()],n.prototype,"_saving",2);o([p()],n.prototype,"_snackbar",2);o([p()],n.prototype,"_showDeleteDialog",2);o([p()],n.prototype,"_showResetDialog",2);o([p()],n.prototype,"_name",2);o([p()],n.prototype,"_endpoint",2);o([p()],n.prototype,"_tunnelId",2);o([p()],n.prototype,"_peer",2);o([p()],n.prototype,"_showPeer",2);n=o([E("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};

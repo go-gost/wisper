@@ -4,6 +4,7 @@ import { t, onLocaleChange } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getSettings, updateSettings, subscribe } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
+import { maskKey } from '../utils/format';
 import { GoBackend } from '../api/backend';
 import type { ThemePreference, LanguagePreference } from '../api/types';
 import '../components/app-scaffold';
@@ -36,6 +37,7 @@ export class SettingsPage extends LitElement {
   @state() private _p2pDerp = '';
   @state() private _p2pSecure = true;
   @state() private _p2pCaFile = '';
+  @state() private _showP2PKey = false;
   @state() private _p2pPublicKey = '';
   @state() private _p2pRunning = false;
   @state() private _theme: ThemePreference = 'system';
@@ -487,9 +489,13 @@ export class SettingsPage extends LitElement {
               <div class="form-group">
                 <label class="form-label">${t('p2pIdentity')}</label>
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <span class="identity-key">${this._p2pPublicKey}</span>
+                  <span class="identity-key">${this._showP2PKey ? this._p2pPublicKey : maskKey(this._p2pPublicKey)}</span>
                   <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
                     ${icon('copy')}
+                  </button>
+                  <button class="copy-btn-mini" title="${this._showP2PKey ? t('hideKey') : t('revealKey')}"
+                    @click=${() => { this._showP2PKey = !this._showP2PKey; }}>
+                    ${icon(this._showP2PKey ? 'eye-off' : 'eye')}
                   </button>
                 </div>
                 <p class="hint">${t('p2pIdentityHint')}</p>

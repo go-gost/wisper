@@ -6,7 +6,7 @@ import { getTunnels, refresh, remove, start, stop, subscribe, resetStats } from 
 import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber, formatTimestamp } from '../utils/format';
+import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKeyList } from '../utils/format';
 import type { Tunnel, TunnelType, TunnelCreateRequest } from '../api/types';
 import '../components/app-scaffold';
 
@@ -50,6 +50,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _showAuth = false;
   @state() private _showPassword = false;
   @state() private _recordMode = 'off';
+  @state() private _showPeers = false;
   @state() private _peers = ''; // p2p allowlist, one key per line
 
   // Native bridge detection
@@ -867,9 +868,13 @@ export class TunnelDetailPage extends LitElement {
                   <span class="info-label">${this.tunnelType === 'p2p' ? t('p2pPeers') : 'Entrypoint'}</span>
                   ${t2.entrypoint
                     ? html`
-                      <span class="info-value">${t2.entrypoint}</span>
+                      <span class="info-value">${this._showPeers ? t2.entrypoint : maskKeyList(t2.entrypoint)}</span>
                       <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
                         ${icon('copy')}
+                      </button>
+                      <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
+                        @click=${() => { this._showPeers = !this._showPeers; }}>
+                        ${icon(this._showPeers ? 'eye-off' : 'eye')}
                       </button>
                     `
                     : html`<span class="info-value empty">${t('p2pPeersEmpty')}</span>`}

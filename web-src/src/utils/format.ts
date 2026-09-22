@@ -91,3 +91,19 @@ export function formatHeaders(header: Record<string, string[]> | string): string
     .map(([k, vs]) => `${k}: ${Array.isArray(vs) ? vs.join(', ') : String(vs)}`)
     .join('\n');
 }
+
+/** maskKey renders a public key for display: its first six characters and an
+ *  ellipsis. p2p treats keys as credentials — holding one plus relay access
+ *  admits the holder — so every display site masks by default. */
+export function maskKey(k: string): string {
+  return k.length > 8 ? `${k.slice(0, 6)}…` : k;
+}
+
+/** maskKeyList masks each entry of a comma-separated key list. */
+export function maskKeyList(list: string): string {
+  return list
+    .split(',')
+    .map((k) => maskKey(k.trim()))
+    .filter(Boolean)
+    .join(', ');
+}

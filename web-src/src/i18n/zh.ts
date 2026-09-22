@@ -35,6 +35,8 @@ const zh: Record<string, string> = {
   btnEdit: '编辑',
   btnDelete: '删除',
   btnCancel: '取消',
+  revealKey: '显示',
+  hideKey: '隐藏',
   btnCopy: '复制',
   btnClose: '关闭',
   btnResetStats: '清零',

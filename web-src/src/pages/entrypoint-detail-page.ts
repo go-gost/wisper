@@ -5,7 +5,7 @@ import { icon } from '../utils/icons';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber, formatTimestamp } from '../utils/format';
+import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import type { Entrypoint, EntrypointType } from '../api/types';
 import '../components/app-scaffold';
 
@@ -31,6 +31,7 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _endpoint = '';
   @state() private _tunnelId = '';
   @state() private _peer = '';
+  @state() private _showPeer = false;
 
   private _unsubs: (() => void)[] = [];
 
@@ -547,10 +548,14 @@ export class EntrypointDetailPage extends LitElement {
                   ? html`
                     <div class="info-row">
                       <span class="info-label">${t('entrypointPeerKey')}</span>
-                      <span class="info-value">${peer}</span>
+                      <span class="info-value">${this._showPeer ? peer : maskKey(peer)}</span>
                       ${peer
                         ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(peer)}>
                           ${icon('copy')}
+                        </button>
+                        <button class="copy-btn-mini" title="${this._showPeer ? t('hideKey') : t('revealKey')}"
+                          @click=${() => { this._showPeer = !this._showPeer; }}>
+                          ${icon(this._showPeer ? 'eye-off' : 'eye')}
                         </button>`
                         : ''}
                     </div>

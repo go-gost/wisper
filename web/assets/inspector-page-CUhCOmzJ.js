@@ -1,4 +1,4 @@
-import{i as b,a as m,j as l,b as o,t as _,h as U,o as F,c as j,g as N}from"./index-BtepnLAZ.js";import{n as c,r as h}from"./state-BN8QwFaQ.js";import{i as q}from"./app-scaffold-D2cib4iB.js";import{e as z,d as W,a as R,g as H}from"./format-BcWb47bn.js";class A{constructor(t){this.baseUrl=t.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(t){const i=new URLSearchParams;i.set("client_id",t.client_id),t.type&&i.set("type",t.type),t.service&&i.set("service",t.service),t.sid&&i.set("sid",t.sid),t.start!==void 0&&i.set("start",String(t.start)),t.end!==void 0&&i.set("end",String(t.end)),t.before&&i.set("before",t.before),t.after&&i.set("after",t.after),t.limit!==void 0&&i.set("limit",String(t.limit));const r=await fetch(`${this.baseUrl}/api/records/query?${i.toString()}`);if(!r.ok)throw new Error(`Inspector query failed: ${r.status}`);return r.json()}connectTail(t){const i=new URLSearchParams;i.set("client_id",t.client_id),t.type&&i.set("type",t.type),t.service&&i.set("service",t.service),t.sid&&i.set("sid",t.sid);const r=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${r}/api/records/tail?${i.toString()}`)}async getRecord(t){const i=await fetch(`${this.baseUrl}/api/records/${encodeURIComponent(t)}`);if(!i.ok)throw new Error(`Inspector record detail failed: ${i.status}`);const r=await i.json();if(r.code!==0)throw new Error(r.msg||r.error||"Unknown error");return r.data}}function K(e){const t=atob(e),i=new Uint8Array(t.length);for(let r=0;r<t.length;r++)i[r]=t.charCodeAt(r);return i}var G=Object.defineProperty,J=Object.getOwnPropertyDescriptor,B=(e,t,i,r)=>{for(var s=r>1?void 0:r?J(t,i):t,n=e.length-1,a;n>=0;n--)(a=e[n])&&(s=(r?a(t,i,s):a(s))||s);return r&&s&&G(t,i,s),s};const X=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let I=class extends m{constructor(){super(...arguments),this.active="http"}render(){return o`
+import{i as b,a as m,j as l,b as o,t as _,h as U,o as F,c as j,g as N}from"./index-DXPgV2kf.js";import{n as c,r as h,g as q,d as W,a as R,h as H}from"./format-CWn33lpA.js";import{i as z}from"./app-scaffold-VOOHaoxB.js";class A{constructor(t){this.baseUrl=t.replace(/\/$/,"")}async liveness(){try{return(await fetch(`${this.baseUrl}/liveness`)).ok}catch{return!1}}async query(t){const i=new URLSearchParams;i.set("client_id",t.client_id),t.type&&i.set("type",t.type),t.service&&i.set("service",t.service),t.sid&&i.set("sid",t.sid),t.start!==void 0&&i.set("start",String(t.start)),t.end!==void 0&&i.set("end",String(t.end)),t.before&&i.set("before",t.before),t.after&&i.set("after",t.after),t.limit!==void 0&&i.set("limit",String(t.limit));const r=await fetch(`${this.baseUrl}/api/records/query?${i.toString()}`);if(!r.ok)throw new Error(`Inspector query failed: ${r.status}`);return r.json()}connectTail(t){const i=new URLSearchParams;i.set("client_id",t.client_id),t.type&&i.set("type",t.type),t.service&&i.set("service",t.service),t.sid&&i.set("sid",t.sid);const r=this.baseUrl.replace(/^http/,"ws");return new WebSocket(`${r}/api/records/tail?${i.toString()}`)}async getRecord(t){const i=await fetch(`${this.baseUrl}/api/records/${encodeURIComponent(t)}`);if(!i.ok)throw new Error(`Inspector record detail failed: ${i.status}`);const r=await i.json();if(r.code!==0)throw new Error(r.msg||r.error||"Unknown error");return r.data}}function K(e){const t=atob(e),i=new Uint8Array(t.length);for(let r=0;r<t.length;r++)i[r]=t.charCodeAt(r);return i}var G=Object.defineProperty,J=Object.getOwnPropertyDescriptor,B=(e,t,i,r)=>{for(var s=r>1?void 0:r?J(t,i):t,n=e.length-1,a;n>=0;n--)(a=e[n])&&(s=(r?a(t,i,s):a(s))||s);return r&&s&&G(t,i,s),s};const X=[{type:"http",labelKey:"inspectorProtocolHttp"},{type:"websocket",labelKey:"inspectorProtocolWs"}];let I=class extends m{constructor(){super(...arguments),this.active="http"}render(){return o`
       <div class="tabs">
         ${X.map(e=>o`
           <button class="tab ${this.active===e.type?"active":""}"
@@ -175,13 +175,13 @@ import{i as b,a as m,j as l,b as o,t as _,h as U,o as F,c as j,g as N}from"./ind
           ${e.http.request.header?o`
             <div class="section">
               <div class="section-title">${l("inspectorDetailHeaders")} — Request</div>
-              <pre>${z(e.http.request.header)}</pre>
+              <pre>${q(e.http.request.header)}</pre>
             </div>
           `:""}
           ${e.http.response.header?o`
             <div class="section">
               <div class="section-title">${l("inspectorDetailHeaders")} — Response</div>
-              <pre>${z(e.http.response.header)}</pre>
+              <pre>${q(e.http.response.header)}</pre>
             </div>
           `:""}
           ${e.http.request.body?o`
@@ -381,7 +381,7 @@ import{i as b,a as m,j as l,b as o,t as _,h as U,o as F,c as j,g as N}from"./ind
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate(t)}>
-            ${q("chevron-left")}
+            ${z("chevron-left")}
           </button>
           <span class="page-title">
             &larr; ${e||this.parentId} &middot; ${l("inspectorTitle")}
@@ -440,7 +440,7 @@ import{i as b,a as m,j as l,b as o,t as _,h as U,o as F,c as j,g as N}from"./ind
         <app-scaffold>
           <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
             <button class="back-btn" @click=${()=>this._navigate(t)}>
-              ${q("chevron-left")}
+              ${z("chevron-left")}
             </button>
             <span class="page-title">${l("inspectorTitle")}</span>
           </div>
