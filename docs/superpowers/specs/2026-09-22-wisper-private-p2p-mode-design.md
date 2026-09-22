@@ -1,5 +1,9 @@
 # Wisper 私有 p2p 模式（反向侧）设计
 
+> ⚠️ **部分被取代（2026-09-22）**：「一隧道一 host + Config.Targets」改为
+> [Host.Listen 入站交付设计](2026-09-22-p2p-inbound-listen-redesign.md)（进程级 host + peer 路由）；
+> 本文件其余内容（key 生命周期、安全边界、relay 语义）继续有效。
+>
 > 2026-09-22。承接 [p2p-integration.md](../../../docs/p2p-integration.md) 的「边界与定位」：
 > 第一增量 = **反向侧**——wisper 内嵌 p2p host，`target` 指向本地服务，对端按 base64 key 拨入，
 > 不经 gost.run。全套含 UI。前提：p2p 库化 + 进程内 Provider + framing 修复
