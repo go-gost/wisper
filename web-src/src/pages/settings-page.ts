@@ -545,7 +545,7 @@ export class SettingsPage extends LitElement {
                 </button>
               </div>
               ${this._p2pTest && !this._p2pTest.ok
-                ? html`<p class="hint">${this._p2pTest.error ?? ''}</p>`
+                ? html`<p class="p2p-warning">${this._p2pTest.error ?? ''}</p>`
                 : ''}
               <div class="switch-row">
                 <div>
