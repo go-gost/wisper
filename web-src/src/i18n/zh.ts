@@ -133,7 +133,7 @@ const zh: Record<string, string> = {
   p2pEntryHint: '本地客户端连接监听地址；流量经 p2p 隧道到对端公钥，明文（内层 tcp）。',
   p2pIdentity: 'P2P 身份',
   p2pIdentityHint: '将此公钥分享给对端：他们的 p2p 入口点用它拨号到本机。',
-  p2pIdentityIdle: '尚未运行——启动一条 p2p 隧道或入口点以创建身份。',
+  p2pIdentityIdle: '中继未连接——启动任一 p2p 隧道或入口点后，对端才能拨入。',
   p2pPeers: '允许的对端',
   p2pPeersHint: '每行一个对端公钥；留空表示没有入站流量会路由到该隧道。',
   p2pPeersEmpty: '未配置对端——没有入站流量能到达该隧道。',

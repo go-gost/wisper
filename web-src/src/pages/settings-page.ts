@@ -485,16 +485,13 @@ export class SettingsPage extends LitElement {
           <div class="card">
             <div class="card-padded">
               <div style="display:flex;align-items:center;gap:8px;">
-                <span class="identity-key ${this._p2pRunning ? '' : 'muted'}">
-                  ${this._p2pRunning ? this._p2pPublicKey : t('p2pIdentityIdle')}
-                </span>
-                ${this._p2pRunning
-                  ? html`<button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
-                    ${icon('copy')}
-                  </button>`
-                  : ''}
+                <span class="identity-key">${this._p2pPublicKey}</span>
+                <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
+                  ${icon('copy')}
+                </button>
               </div>
               <p class="hint">${t('p2pIdentityHint')}</p>
+              ${this._p2pRunning ? '' : html`<p class="hint">${t('p2pIdentityIdle')}</p>`}
             </div>
           </div>
         </div>
