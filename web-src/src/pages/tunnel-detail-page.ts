@@ -900,6 +900,11 @@ export class TunnelDetailPage extends LitElement {
                     </div>
                   `
                   : ''}
+                <!-- Recording is ineffective for p2p: the tunnel is an embedded
+                     host, not a gost listener+handler, so no recorder is wired. -->
+                ${this.tunnelType === 'p2p'
+                  ? ''
+                  : html`
                 <div class="info-row">
                   <span class="info-label">Recording</span>
                   <span class="info-value text">${t(RECORD_MODE_OPTIONS.find(o => o.value === this._recordMode)?.labelKey ?? 'settingsRecordFull')}</span>
@@ -909,7 +914,7 @@ export class TunnelDetailPage extends LitElement {
                   <span class="info-value text ${this._recordMode !== 'off' ? 'record-warn' : ''}" style="font-size:var(--font-xs);line-height:1.5;">
                     ${t(recordOption(this._recordMode).descKey)}
                   </span>
-                </div>
+                </div>`}
                 <div class="info-row">
                   <span class="info-label">ID</span>
                   <span class="info-value uuid">${t2.id}</span>
@@ -1054,7 +1059,10 @@ export class TunnelDetailPage extends LitElement {
                   `
                   : ''}
 
-                <!-- Recording mode -->
+                <!-- Recording mode: p2p has no recorder to attach it to. -->
+                ${this.tunnelType === 'p2p'
+                  ? ''
+                  : html`
                 <div class="switch-row" @click=${() => this._setRecordMode(
                   this._cycleOption(this._recordMode, RECORD_MODE_OPTIONS.map(o => o.value))
                 )}>
@@ -1067,7 +1075,7 @@ export class TunnelDetailPage extends LitElement {
                 <div class="record-desc ${this._recordMode !== 'off' ? 'record-warn' : ''}"
                   style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding:0 16px 14px;">
                   ${t(recordOption(this._recordMode).descKey)}
-                </div>
+                </div>`}
 
                 <!-- Auth section (HTTP/File) -->
                 ${this.tunnelType === 'http' || this.tunnelType === 'file'
