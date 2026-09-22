@@ -92,11 +92,12 @@ export function formatHeaders(header: Record<string, string[]> | string): string
     .join('\n');
 }
 
-/** maskKey renders a public key for display: its first six characters and an
- *  ellipsis. p2p treats keys as credentials — holding one plus relay access
- *  admits the holder — so every display site masks by default. */
+/** maskKey renders a public key for display as one dot per character, so the
+ *  line keeps the real key's width. p2p treats keys as credentials — holding
+ *  one plus relay access admits the holder — so every display site masks by
+ *  default and the user reveals on demand. */
 export function maskKey(k: string): string {
-  return k.length > 8 ? `${k.slice(0, 6)}…` : k;
+  return '•'.repeat(k.length);
 }
 
 /** maskKeyList masks each entry of a comma-separated key list. */
