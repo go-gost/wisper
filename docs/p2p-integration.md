@@ -117,6 +117,12 @@ chains:
             metadata: {p2p: p2p}
 ```
 
+**出站侧（p2p entrypoint）**：入口点类型 `p2p`——本地监听 + 对端 pubkey。本地客户端连
+监听地址，流量经内嵌 host 的隧道拨到对端 target（内层 `tcp`，**数据面明文**；跨公网建议后续用
+tls/ws 变体）。对端可以是 wisper 的反向侧 p2p 隧道，也可以是任意带 target 的 p2p host。
+本侧 key 在 `~/.config/wisper/p2p/<entrypoint-id>.key`（0600），stop/start 与更新复用，
+删除入口点时移除。API 语义：响应里 `endpoint` = 对端 pubkey、`entrypoint` = 本地监听地址。
+
 **生命周期与语义**：
 - 一隧道一 host（target 池按流 round-robin，共享 host 会让不同 peer 的流串到别的服务）。
 - relay 连不上不致命：状态保持 running，engine 每 5s 重连（与 p2p CLI 一致）。
