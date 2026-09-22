@@ -18,6 +18,8 @@ type entrypointCreateRequest struct {
 	Endpoint  string `json:"endpoint"`
 	Keepalive bool   `json:"keepalive,omitempty"`
 	TTL       int    `json:"ttl,omitempty"`
+	// Peer is the remote peer's base64 public key (p2p entrypoints).
+	Peer string `json:"peer,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
@@ -27,6 +29,7 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.EndpointOption(r.Endpoint),
 		tunnel.KeepaliveOption(r.Keepalive),
 		tunnel.TTLOption(r.TTL),
+		tunnel.PeerOption(r.Peer),
 	}
 }
 
@@ -61,6 +64,8 @@ func handleCreateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		ep = entrypoint.NewTCPEntryPoint(req.toOptions()...)
 	case entrypoint.UDPEntryPoint:
 		ep = entrypoint.NewUDPEntryPoint(req.toOptions()...)
+	case entrypoint.P2PEntryPoint:
+		ep = entrypoint.NewP2PEntryPoint(req.toOptions()...)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown entrypoint type: %s", req.Type))
 		return
@@ -120,6 +125,8 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		ep = entrypoint.NewTCPEntryPoint(opts...)
 	case entrypoint.UDPEntryPoint:
 		ep = entrypoint.NewUDPEntryPoint(opts...)
+	case entrypoint.P2PEntryPoint:
+		ep = entrypoint.NewP2PEntryPoint(opts...)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown entrypoint type: %s", epType))
 		return
@@ -152,6 +159,14 @@ func handleDeleteEntrypoint(w http.ResponseWriter, r *http.Request) {
 	if ep == nil {
 		writeError(w, http.StatusNotFound, "entrypoint not found")
 		return
+	}
+
+	if ep != nil && ep.Type() == entrypoint.P2PEntryPoint {
+		// The key file is the entrypoint's identity: removed only on explicit
+		// delete, so stop/start and update keep the same key.
+		if err := tunnel.RemoveP2PKey(id); err != nil {
+			slog.Error("remove p2p key", "id", id, "err", err)
+		}
 	}
 
 	entrypoint.Delete(id)
@@ -191,6 +206,7 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 		tunnel.KeepaliveOption(opts.Keepalive),
 		tunnel.TTLOption(opts.TTL),
 		tunnel.CreatedAtOption(opts.CreatedAt),
+		tunnel.PeerOption(opts.Peer),
 	}
 
 	var newEP entrypoint.EntryPoint
@@ -199,6 +215,8 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 		newEP = entrypoint.NewTCPEntryPoint(optsSlice...)
 	case entrypoint.UDPEntryPoint:
 		newEP = entrypoint.NewUDPEntryPoint(optsSlice...)
+	case entrypoint.P2PEntryPoint:
+		newEP = entrypoint.NewP2PEntryPoint(optsSlice...)
 	default:
 		writeError(w, http.StatusInternalServerError, "unknown entrypoint type")
 		return

@@ -38,6 +38,8 @@ type tunnelOptionsResp struct {
 	Keepalive   bool   `json:"keepalive,omitempty"`
 	TTL         int    `json:"ttl,omitempty"`
 	RecordMode  string `json:"record_mode,omitempty"`
+	// Peer is the remote peer's base64 public key (p2p entrypoints).
+	Peer string `json:"peer,omitempty"`
 }
 
 type statsResponse struct {
@@ -103,6 +105,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			Keepalive:   opts.Keepalive,
 			TTL:         opts.TTL,
 			RecordMode:  opts.RecordMode,
+			Peer:        opts.Peer,
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
