@@ -14,6 +14,24 @@
 
 ---
 
+### Task 0: 改名预修（先让包编译过）
+
+p2p `v0.4.2` 与 x `v0.18.0` 已 bump：`Provider`→`Tunnel`、`OpenTunnelStream`→`Dial`、x 侧接口 `TunnelProvider`→`Tunnel`。
+wisper 侧机械改名（不改行为）：
+
+- `tunnel/p2p_poc_test.go:55`：`var _ xp2p.Tunnel` + `(*p2p.Tunnel)(nil)`；`:96` 的 `host.Provider()` → `host.Tunnel()`。
+- `tunnel/p2p_udp_poc_test.go:241`：`wrap func(xp2p.Tunnel)`；`:268` 的 `xp2p.Tunnel` 与 `dialer.Provider()` → `dialer.Tunnel()`。
+- `tunnel/entrypoint/p2p.go:206`：`host.Provider()` → `host.Tunnel()`（Task 3 会把它换成共享 host；此步先修名）。
+
+验证：`go build ./... && TMPDIR=/config/tmp go test ./tunnel/... ./api/`。
+
+```bash
+git add tunnel/p2p_poc_test.go tunnel/p2p_udp_poc_test.go tunnel/entrypoint/p2p.go
+git commit -m "chore(tunnel): adopt the Tunnel/Dial API rename"
+```
+
+---
+
 ### Task 1: p2p host manager（引用计数 + peer 路由）
 
 **Files:**
