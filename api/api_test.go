@@ -740,6 +740,20 @@ func TestUpdateP2PTunnel(t *testing.T) {
 		t.Fatal("the created allowlist entry has no generated alias")
 	}
 
+	// Per-peer traffic: an entry per allowlisted peer, in allowlist order, with
+	// its alias and (nothing connected yet) zeroed counters.
+	pstats, _ := created["peer_stats"].([]any)
+	if len(pstats) != 2 {
+		t.Fatalf("created peer_stats = %v, want an entry per allowlisted peer", created["peer_stats"])
+	}
+	ps0, _ := pstats[0].(map[string]any)
+	if ps0["key"] != "k1" || ps0["alias"] != generated {
+		t.Errorf("peer_stats[0] = %v, want k1 under its generated alias", ps0)
+	}
+	if ps0["total_conns"] != float64(0) || ps0["input_bytes"] != float64(0) || ps0["current_conns"] != float64(0) {
+		t.Errorf("peer_stats[0] counters = %v, want zeros before any traffic", ps0)
+	}
+
 	resp, updated := putJSON(t, srv.URL+"/api/tunnels/"+id, map[string]any{
 		"name": "Private", "type": "p2p", "endpoint": "127.0.0.1:9",
 		"peers": []map[string]any{

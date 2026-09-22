@@ -149,6 +149,10 @@ const zh: Record<string, string> = {
   p2pPeersEmpty: '未配置对端——没有入站流量能到达该隧道。',
   p2pConnected: '已连接',
   p2pConnectedEmpty: '暂无对端连接。',
+  p2pColPeer: '对端',
+  p2pColConns: '连接',
+  p2pColDown: '下载',
+  p2pColUp: '上传',
 
   // Inspector
   qrCode: '二维码',

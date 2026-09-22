@@ -109,7 +109,15 @@ export function applyStats(statsList: Tunnel[]): void {
   for (const s of statsList) {
     tunnels = tunnels.map(t =>
       t.id === s.id
-        ? { ...t, entrypoint: s.entrypoint, stats: s.stats, status: s.status, error: s.error, active_peers: s.active_peers }
+        ? {
+            ...t,
+            entrypoint: s.entrypoint,
+            stats: s.stats,
+            status: s.status,
+            error: s.error,
+            active_peers: s.active_peers,
+            peer_stats: s.peer_stats,
+          }
         : t,
     );
   }

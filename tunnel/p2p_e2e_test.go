@@ -179,6 +179,22 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 		t.Errorf("ActivePeers while connected = %v, want [%s]", got, peerKey)
 	}
 
+	// ... and so is its traffic: the round trip above is that peer's, alone.
+	pstater, ok := tn.(interface{ PeerStats() []wtunnel.PeerStat })
+	if !ok {
+		t.Fatalf("p2p tunnel %T has no PeerStats", tn)
+	}
+	pstats := pstater.PeerStats()
+	if len(pstats) != 1 || pstats[0].Key != peerKey {
+		t.Fatalf("PeerStats = %+v, want one entry for the dialing peer", pstats)
+	}
+	if pstats[0].InputBytes < uint64(len(msg)) || pstats[0].OutputBytes < uint64(len(msg)) {
+		t.Errorf("peer bytes = %d in / %d out, want each >= %d", pstats[0].InputBytes, pstats[0].OutputBytes, len(msg))
+	}
+	if pstats[0].TotalConns < 1 || pstats[0].CurrentConns < 1 {
+		t.Errorf("peer conns = %d total / %d current, want its stream counted", pstats[0].TotalConns, pstats[0].CurrentConns)
+	}
+
 	// The tunnel serves its peer route with a standard gost service, so the
 	// round trip above must show up in the service's live stats — the same
 	// numbers runner/task/stats.go copies into Tunnel.Stats() in production.

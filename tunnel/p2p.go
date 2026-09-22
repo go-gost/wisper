@@ -302,6 +302,45 @@ func randomPeerAlias(used map[string]bool) string {
 	}
 }
 
+// PeerStat is one peer's traffic through a p2p tunnel, as the tunnel page
+// lists it. The counters cover the tunnel's current run — a restart starts
+// them over, unlike the tunnel-wide totals.
+type PeerStat struct {
+	Key          string
+	CurrentConns uint64
+	TotalConns   uint64
+	InputBytes   uint64
+	OutputBytes  uint64
+}
+
+// PeerStats reports each allowlisted peer's traffic, in allowlist order; a
+// peer that never connected reports zeros. Nil while the tunnel is not running
+// (there is no route to count on).
+func (s *p2pTunnel) PeerStats() []PeerStat {
+	s.mu.RLock()
+	ln := s.ln
+	s.mu.RUnlock()
+
+	pl, _ := ln.(*peerListener)
+	if pl == nil {
+		return nil
+	}
+
+	traffic := pl.peerTraffic()
+	out := make([]PeerStat, 0, len(s.opts.Peers))
+	for _, k := range s.opts.Peers {
+		st := PeerStat{Key: k}
+		if c := traffic[k]; c != nil {
+			st.CurrentConns = c.Get(stats.KindCurrentConns)
+			st.TotalConns = c.Get(stats.KindTotalConns)
+			st.InputBytes = c.Get(stats.KindInputBytes)
+			st.OutputBytes = c.Get(stats.KindOutputBytes)
+		}
+		out = append(out, st)
+	}
+	return out
+}
+
 // ActivePeers reports the peer keys with a live stream right now (sorted), so
 // the tunnel page can show who is connected, not just how many. A stopped
 // tunnel has no route, hence no peers.

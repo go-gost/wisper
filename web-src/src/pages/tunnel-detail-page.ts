@@ -518,6 +518,49 @@ export class TunnelDetailPage extends LitElement {
       color: var(--text);
     }
 
+    /* ── Per-peer traffic (p2p) ── */
+    .peer-table {
+      margin-top: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .peer-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 12px;
+      align-items: baseline;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: var(--font-sm);
+    }
+    .peer-row:last-child {
+      border-bottom: none;
+    }
+    .peer-row.head {
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .peer-row.head span:not(:first-child) {
+      justify-self: end;
+    }
+    .peer-name {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .peer-num {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: var(--text);
+      justify-self: end;
+      min-width: 56px;
+      text-align: right;
+    }
+
     /* ── Stats grid ── */
     .stats-grid {
       display: grid;
@@ -828,6 +871,7 @@ export class TunnelDetailPage extends LitElement {
     const stats = t2 ? t2.stats : null;
     const typeLabel = this._typeLabel();
     const activePeers = t2?.active_peers ?? [];
+    const peerStats = t2?.peer_stats ?? [];
 
     return html`
       <app-scaffold>
@@ -1034,6 +1078,29 @@ export class TunnelDetailPage extends LitElement {
                   </div>
                 `
                 : ''}
+
+              <!-- Per-peer traffic: this run's counters, one row per allowlisted
+                   peer (zeros included), refreshed by the stats poll. -->
+              ${this.tunnelType === 'p2p' && peerStats.length
+                ? html`
+                  <div class="peer-table">
+                    <div class="peer-row head">
+                      <span>${t('p2pColPeer')}</span>
+                      <span>${t('p2pColConns')}</span>
+                      <span>${t('p2pColDown')}</span>
+                      <span>${t('p2pColUp')}</span>
+                    </div>
+                    ${peerStats.map(p => html`
+                      <div class="peer-row">
+                        <span class="peer-name">${p.alias || maskKey(p.key)}</span>
+                        <span class="peer-num">${formatNumber(p.current_conns)}</span>
+                        <span class="peer-num">${formatBytes(p.output_bytes)}</span>
+                        <span class="peer-num">${formatBytes(p.input_bytes)}</span>
+                      </div>
+                    `)}
+                  </div>
+                `
+                : nothing}
             </div>
 
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth

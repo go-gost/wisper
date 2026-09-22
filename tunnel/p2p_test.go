@@ -231,6 +231,70 @@ func TestP2PTunnelDuplicatePeerKey(t *testing.T) {
 
 // TestP2PDerpDefault: an empty settings.p2p resolves to the public gost.run
 // relay (never a hard failure).
+// TestP2PTunnelPeerStats: traffic is counted per peer — each stream carries its
+// peer's counters — and reported in allowlist order, an idle peer as zeros.
+func TestP2PTunnelPeerStats(t *testing.T) {
+	pl := newPeerListener([]string{"k1", "k2"})
+	tn := &p2pTunnel{opts: Options{Peers: []string{"k1", "k2"}}, cclose: make(chan struct{})}
+
+	if got := tn.PeerStats(); got != nil {
+		t.Fatalf("PeerStats with no route = %v, want nil", got)
+	}
+	tn.ln = pl
+
+	in1, far1 := peerPipe("k1")
+	defer far1.Close()
+	in2, far2 := peerPipe("k2")
+	defer far2.Close()
+	pl.deliver(in1)
+	pl.deliver(in2)
+
+	c1, err := pl.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	c2, err := pl.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	defer c2.Close()
+
+	// In from k1, out to k1.
+	msg := []byte("hello-from-k1")
+	werr := make(chan error, 1)
+	go func() { _, err := far1.Write(msg); werr <- err }()
+	buf := make([]byte, len(msg))
+	if _, err := io.ReadFull(c1, buf); err != nil {
+		t.Fatalf("read peer-k1 stream: %v", err)
+	}
+	if err := <-werr; err != nil {
+		t.Fatalf("write peer-k1 stream: %v", err)
+	}
+	reply := []byte("hi")
+	go func() { _, err := c1.Write(reply); werr <- err }()
+	if _, err := io.ReadFull(far1, buf[:len(reply)]); err != nil {
+		t.Fatalf("read far end: %v", err)
+	}
+	if err := <-werr; err != nil {
+		t.Fatalf("write to peer: %v", err)
+	}
+	_ = c1.Close()
+
+	got := tn.PeerStats()
+	if len(got) != 2 || got[0].Key != "k1" || got[1].Key != "k2" {
+		t.Fatalf("PeerStats = %+v, want k1 then k2 (allowlist order)", got)
+	}
+	if got[0].InputBytes != uint64(len(msg)) || got[0].OutputBytes != uint64(len(reply)) {
+		t.Errorf("k1 bytes = %d in / %d out, want %d / %d", got[0].InputBytes, got[0].OutputBytes, len(msg), len(reply))
+	}
+	if got[0].TotalConns != 1 || got[0].CurrentConns != 0 {
+		t.Errorf("k1 conns = %d total / %d current, want 1 / 0 (the stream is closed)", got[0].TotalConns, got[0].CurrentConns)
+	}
+	if got[1] != (PeerStat{Key: "k2", CurrentConns: 1, TotalConns: 1}) {
+		t.Errorf("k2 stats = %+v, want its open stream counted and no bytes", got[1])
+	}
+}
+
 // TestNormalizePeerAliases: every listed key ends up with a display name —
 // a known alias is kept, a new key gets a distinct random one, and a key no
 // longer listed loses its alias.

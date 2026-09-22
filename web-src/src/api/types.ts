@@ -71,6 +71,16 @@ export interface TunnelOptions {
   peers?: Peer[];
 }
 
+/** One peer's traffic during the tunnel's current run. */
+export interface PeerStats {
+  key: string;
+  alias?: string;
+  current_conns: number;
+  total_conns: number;
+  input_bytes: number;
+  output_bytes: number;
+}
+
 export interface Tunnel {
   id: string;
   name: string;
@@ -85,6 +95,8 @@ export interface Tunnel {
   stats: ServiceStats;
   /** p2p tunnels: peer keys with a live stream right now. */
   active_peers?: string[];
+  /** p2p tunnels: per-peer traffic, allowlist order. */
+  peer_stats?: PeerStats[];
 }
 
 export interface TunnelCreateRequest {

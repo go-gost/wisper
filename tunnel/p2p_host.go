@@ -18,6 +18,7 @@ import (
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/p2p"
 	cfg "github.com/go-gost/wisper/config"
+	xstats "github.com/go-gost/x/observer/stats"
 	stats_wrapper "github.com/go-gost/x/observer/stats/wrapper"
 )
 
@@ -272,25 +273,10 @@ type peerListener struct {
 	// way x listeners count via stats.WrapListener.
 	stats stats.Stats
 
-	// active counts live streams per peer key, so the tunnel can report who is
-	// connected, not just how many conns are open.
-	mu     sync.Mutex
-	active map[string]int
-}
-
-// activeConn ties one delivered stream's lifetime to the route's live-peer
-// bookkeeping: closing it — by the service, or by the route's drain — retires
-// the peer from ActivePeers exactly once.
-type activeConn struct {
-	net.Conn
-	once sync.Once
-	done func()
-}
-
-func (c *activeConn) Close() error {
-	err := c.Conn.Close()
-	c.once.Do(c.done)
-	return err
+	// peers' counters, one stats object per peer key: who is connected and how
+	// much they moved, without the service-wide totals.
+	mu      sync.Mutex
+	traffic map[string]stats.Stats
 }
 
 // ActivePeers returns the peer keys with at least one live stream, sorted for
@@ -299,31 +285,42 @@ func (l *peerListener) ActivePeers() []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	peers := make([]string, 0, len(l.active))
-	for p := range l.active {
-		peers = append(peers, p)
+	peers := make([]string, 0, len(l.traffic))
+	for p, s := range l.traffic {
+		if s.Get(stats.KindCurrentConns) > 0 {
+			peers = append(peers, p)
+		}
 	}
 	slices.Sort(peers)
 	return peers
 }
 
-func (l *peerListener) track(peer string) {
+// peerStat returns the per-peer counters for a key, creating them on first use.
+func (l *peerListener) peerStat(peer string) stats.Stats {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.active == nil {
-		l.active = make(map[string]int)
+	if l.traffic == nil {
+		l.traffic = make(map[string]stats.Stats)
 	}
-	l.active[peer]++
+	s := l.traffic[peer]
+	if s == nil {
+		s = xstats.NewStats(false)
+		l.traffic[peer] = s
+	}
+	return s
 }
 
-func (l *peerListener) untrack(peer string) {
+// peerTraffic returns the per-peer counters; stats objects are safe to read
+// concurrently, so what is copied out lives on.
+func (l *peerListener) peerTraffic() map[string]stats.Stats {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.active[peer] > 1 {
-		l.active[peer]--
-	} else {
-		delete(l.active, peer)
+
+	out := make(map[string]stats.Stats, len(l.traffic))
+	for p, s := range l.traffic {
+		out[p] = s
 	}
+	return out
 }
 
 // setStats attaches the serving service's stats to the route. It must be
@@ -336,8 +333,9 @@ func newPeerListener(peers []string) *peerListener {
 
 func (l *peerListener) deliver(conn net.Conn) {
 	peer := peerOf(conn)
-	l.track(peer)
-	c := &activeConn{Conn: conn, done: func() { l.untrack(peer) }}
+	// Each stream carries its peer's counters: closing it — by the service, or
+	// by the route's drain — retires the peer exactly once.
+	c := stats_wrapper.WrapConn(conn, l.peerStat(peer))
 	select {
 	case l.ch <- c:
 	case <-l.closed:
