@@ -165,13 +165,6 @@ export class TunnelDetailPage extends LitElement {
       .join(', ');
   }
 
-  /** _peerLabelOf names one connected peer key. */
-  private _peerLabelOf(key: string): string {
-    if (this._showPeers) return key;
-    const p = (this._tunnel?.options.peers ?? []).find(x => x.key === key);
-    return p?.alias || maskKey(key);
-  }
-
   // ── Navigation ───────────────────────────────────────────────────────
 
   private _navigate(path: string) {
@@ -528,9 +521,9 @@ export class TunnelDetailPage extends LitElement {
     }
     .peer-row {
       display: grid;
-      grid-template-columns: 1fr auto auto auto;
+      grid-template-columns: minmax(0, 1fr) 52px 86px 86px;
       gap: 12px;
-      align-items: baseline;
+      align-items: start;
       padding: 8px 12px;
       border-bottom: 1px solid var(--border-subtle);
       font-size: var(--font-sm);
@@ -538,27 +531,30 @@ export class TunnelDetailPage extends LitElement {
     .peer-row:last-child {
       border-bottom: none;
     }
+    /* Header and body cells share one rule per column, so the labels sit over
+       the numbers instead of drifting with their own text widths. */
     .peer-row.head {
       color: var(--text-muted);
       font-size: var(--font-xs);
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      align-items: baseline;
     }
-    .peer-row.head span:not(:first-child) {
-      justify-self: end;
+    .peer-row > :not(:first-child) {
+      text-align: right;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
     }
     .peer-name {
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
       color: var(--text);
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .peer-num {
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      color: var(--text);
-      justify-self: end;
-      min-width: 56px;
-      text-align: right;
+    .peer-rate {
+      display: block;
+      font-size: var(--font-xs);
+      color: var(--green-text);
     }
 
     /* ── Stats grid ── */
@@ -870,7 +866,6 @@ export class TunnelDetailPage extends LitElement {
     const t2 = this._tunnel;
     const stats = t2 ? t2.stats : null;
     const typeLabel = this._typeLabel();
-    const activePeers = t2?.active_peers ?? [];
     const peerStats = t2?.peer_stats ?? [];
 
     return html`
@@ -967,26 +962,6 @@ export class TunnelDetailPage extends LitElement {
                     : nothing}
                 ${this.tunnelType === 'p2p'
                   ? html`<div class="p2p-hint">${t('p2pHint')}</div>`
-                  : nothing}
-                <!-- Live state, refreshed by the stats poll: which allowlisted
-                     peers actually hold a stream right now. -->
-                ${this.tunnelType === 'p2p'
-                  ? html`
-                    <div class="info-row">
-                      <span class="info-label">${t('p2pConnected')}</span>
-                      ${activePeers.length
-                        ? html`
-                          <span class="info-value">
-                            ${activePeers.map(k => this._peerLabelOf(k)).join(', ')}
-                          </span>
-                          <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
-                            @click=${() => { this._showPeers = !this._showPeers; }}>
-                            ${icon(this._showPeers ? 'eye-off' : 'eye')}
-                          </button>
-                        `
-                        : html`<span class="info-value empty">${t('p2pConnectedEmpty')}</span>`}
-                    </div>
-                  `
                   : nothing}
                 ${t2.options.prefix
                   ? html`
@@ -1093,9 +1068,15 @@ export class TunnelDetailPage extends LitElement {
                     ${peerStats.map(p => html`
                       <div class="peer-row">
                         <span class="peer-name">${p.alias || maskKey(p.key)}</span>
-                        <span class="peer-num">${formatNumber(p.current_conns)}</span>
-                        <span class="peer-num">${formatBytes(p.output_bytes)}</span>
-                        <span class="peer-num">${formatBytes(p.input_bytes)}</span>
+                        <span>${formatNumber(p.current_conns)}</span>
+                        <span>
+                          ${formatBytes(p.output_bytes)}
+                          <span class="peer-rate">${formatRate(p.output_rate_bytes)}</span>
+                        </span>
+                        <span>
+                          ${formatBytes(p.input_bytes)}
+                          <span class="peer-rate">${formatRate(p.input_rate_bytes)}</span>
+                        </span>
                       </div>
                     `)}
                   </div>

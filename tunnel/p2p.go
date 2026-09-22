@@ -28,6 +28,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// A p2p tunnel is exactly what the per-peer stats consumers look for.
+var (
+	_ PeerStatsReporter = (*p2pTunnel)(nil)
+	_ PeerStatsUpdater  = (*p2pTunnel)(nil)
+)
+
 // p2pTunnel exposes a local service to peers over the process-wide p2p host:
 // the peer dials the host by its base64 public key through the DERP relay, the
 // manager routes the inbound stream to this tunnel's peer route, and a
@@ -41,6 +47,11 @@ type p2pTunnel struct {
 	forward service.Service
 	ln      net.Listener // the peer route, held for teardown
 	cclose  chan struct{}
+
+	// peerStats is the last per-peer snapshot the stats task took, with rates;
+	// peerStatsAt times the window those rates average over.
+	peerStats   []PeerStat
+	peerStatsAt time.Time
 
 	err error
 	mu  sync.RWMutex
@@ -302,23 +313,38 @@ func randomPeerAlias(used map[string]bool) string {
 	}
 }
 
+// PeerStatsReporter is implemented by tunnels that account for traffic per
+// peer (the tunnel page and the API list what it returns).
+type PeerStatsReporter interface {
+	PeerStats() []PeerStat
+}
+
+// PeerStatsUpdater is implemented by tunnels whose per-peer counters need a
+// tick to turn into rates (the stats task calls it, like SetStats).
+type PeerStatsUpdater interface {
+	UpdatePeerStats()
+}
+
 // PeerStat is one peer's traffic through a p2p tunnel, as the tunnel page
 // lists it. The counters cover the tunnel's current run — a restart starts
 // them over, unlike the tunnel-wide totals.
 type PeerStat struct {
-	Key          string
-	CurrentConns uint64
-	TotalConns   uint64
-	InputBytes   uint64
-	OutputBytes  uint64
+	Key             string
+	CurrentConns    uint64
+	TotalConns      uint64
+	InputBytes      uint64
+	OutputBytes     uint64
+	InputRateBytes  uint64
+	OutputRateBytes uint64
 }
 
 // PeerStats reports each allowlisted peer's traffic, in allowlist order; a
-// peer that never connected reports zeros. Nil while the tunnel is not running
-// (there is no route to count on).
+// peer that never connected reports zeros. Counters are live, the rates are
+// the ones UpdatePeerStats derived for its last window (zero until it ticks).
+// Nil while the tunnel is not running (there is no route to count on).
 func (s *p2pTunnel) PeerStats() []PeerStat {
 	s.mu.RLock()
-	ln := s.ln
+	ln, snapshot := s.ln, s.peerStats
 	s.mu.RUnlock()
 
 	pl, _ := ln.(*peerListener)
@@ -326,6 +352,51 @@ func (s *p2pTunnel) PeerStats() []PeerStat {
 		return nil
 	}
 
+	out := s.peerCounters(pl)
+	for i := range out {
+		// The snapshot is in allowlist order too, so the rates line up by
+		// position.
+		if i < len(snapshot) {
+			out[i].InputRateBytes = snapshot[i].InputRateBytes
+			out[i].OutputRateBytes = snapshot[i].OutputRateBytes
+		}
+	}
+	return out
+}
+
+// UpdatePeerStats snapshots the live per-peer counters, deriving each rate
+// from the previous snapshot; the stats task calls it on every tick, the way
+// it refreshes the tunnel's own stats.
+func (s *p2pTunnel) UpdatePeerStats() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pl, _ := s.ln.(*peerListener)
+	if pl == nil {
+		s.peerStats, s.peerStatsAt = nil, time.Time{}
+		return
+	}
+
+	now := time.Now()
+	d := now.Sub(s.peerStatsAt)
+	prev := make(map[string]PeerStat, len(s.peerStats))
+	for _, p := range s.peerStats {
+		prev[p.Key] = p
+	}
+
+	snapshot := s.peerCounters(pl)
+	if d > 0 {
+		for i, p := range snapshot {
+			before := prev[p.Key]
+			snapshot[i].InputRateBytes = rate(p.InputBytes, before.InputBytes, d)
+			snapshot[i].OutputRateBytes = rate(p.OutputBytes, before.OutputBytes, d)
+		}
+	}
+	s.peerStats, s.peerStatsAt = snapshot, now
+}
+
+// peerCounters pairs every allowlisted peer with its live counters.
+func (s *p2pTunnel) peerCounters(pl *peerListener) []PeerStat {
 	traffic := pl.peerTraffic()
 	out := make([]PeerStat, 0, len(s.opts.Peers))
 	for _, k := range s.opts.Peers {
@@ -341,19 +412,13 @@ func (s *p2pTunnel) PeerStats() []PeerStat {
 	return out
 }
 
-// ActivePeers reports the peer keys with a live stream right now (sorted), so
-// the tunnel page can show who is connected, not just how many. A stopped
-// tunnel has no route, hence no peers.
-func (s *p2pTunnel) ActivePeers() []string {
-	s.mu.RLock()
-	ln := s.ln
-	s.mu.RUnlock()
-
-	pl, _ := ln.(*peerListener)
-	if pl == nil {
-		return nil
+// rate returns the per-second rate between two cumulative counters over d. A
+// counter that went backwards (a replaced route) reads as no traffic.
+func rate(current, previous uint64, d time.Duration) uint64 {
+	if current <= previous || d <= 0 {
+		return 0
 	}
-	return pl.ActivePeers()
+	return uint64(float64(current-previous) / d.Seconds())
 }
 
 // Close stops the service, drops the peer routes and gives the manager

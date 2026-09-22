@@ -24,9 +24,6 @@ type tunnelResponse struct {
 	Error      string            `json:"error,omitempty"`
 	Options    tunnelOptionsResp `json:"options"`
 	Stats      statsResponse     `json:"stats"`
-	// ActivePeers lists the peer keys with a live stream right now (p2p
-	// tunnels only; absent for every other type).
-	ActivePeers []string `json:"active_peers,omitempty"`
 	// PeerStats is every allowlisted peer's traffic, allowlist order (p2p
 	// tunnels only).
 	PeerStats []peerStatsJSON `json:"peer_stats,omitempty"`
@@ -34,12 +31,14 @@ type tunnelResponse struct {
 
 // peerStatsJSON is one peer's traffic in the tunnel's current run.
 type peerStatsJSON struct {
-	Key          string `json:"key"`
-	Alias        string `json:"alias,omitempty"`
-	CurrentConns uint64 `json:"current_conns"`
-	TotalConns   uint64 `json:"total_conns"`
-	InputBytes   uint64 `json:"input_bytes"`
-	OutputBytes  uint64 `json:"output_bytes"`
+	Key             string `json:"key"`
+	Alias           string `json:"alias,omitempty"`
+	CurrentConns    uint64 `json:"current_conns"`
+	TotalConns      uint64 `json:"total_conns"`
+	InputBytes      uint64 `json:"input_bytes"`
+	OutputBytes     uint64 `json:"output_bytes"`
+	InputRateBytes  uint64 `json:"input_rate_bytes"`
+	OutputRateBytes uint64 `json:"output_rate_bytes"`
 }
 
 // peerJSON is one allowlist entry: the key is the credential, the alias its
@@ -162,18 +161,17 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			OutputRateBytes: s.OutputRateBytes,
 		},
 	}
-	if ps, ok := t.(interface{ ActivePeers() []string }); ok {
-		resp.ActivePeers = ps.ActivePeers()
-	}
-	if ps, ok := t.(interface{ PeerStats() []tunnel.PeerStat }); ok {
+	if ps, ok := t.(tunnel.PeerStatsReporter); ok {
 		for _, p := range ps.PeerStats() {
 			resp.PeerStats = append(resp.PeerStats, peerStatsJSON{
-				Key:          p.Key,
-				Alias:        opts.PeerAliases[p.Key],
-				CurrentConns: p.CurrentConns,
-				TotalConns:   p.TotalConns,
-				InputBytes:   p.InputBytes,
-				OutputBytes:  p.OutputBytes,
+				Key:             p.Key,
+				Alias:           opts.PeerAliases[p.Key],
+				CurrentConns:    p.CurrentConns,
+				TotalConns:      p.TotalConns,
+				InputBytes:      p.InputBytes,
+				OutputBytes:     p.OutputBytes,
+				InputRateBytes:  p.InputRateBytes,
+				OutputRateBytes: p.OutputRateBytes,
 			})
 		}
 	}

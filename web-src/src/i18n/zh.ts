@@ -147,8 +147,6 @@ const zh: Record<string, string> = {
   p2pPeers: '允许的对端',
   p2pPeersHint: '每行一个对端公钥，可在空格后跟一个别名（不写则自动生成）；留空表示没有入站流量会路由到该隧道。',
   p2pPeersEmpty: '未配置对端——没有入站流量能到达该隧道。',
-  p2pConnected: '已连接',
-  p2pConnectedEmpty: '暂无对端连接。',
   p2pColPeer: '对端',
   p2pColConns: '连接',
   p2pColDown: '下载',

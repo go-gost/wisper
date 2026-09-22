@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -277,22 +276,6 @@ type peerListener struct {
 	// much they moved, without the service-wide totals.
 	mu      sync.Mutex
 	traffic map[string]stats.Stats
-}
-
-// ActivePeers returns the peer keys with at least one live stream, sorted for
-// a stable display.
-func (l *peerListener) ActivePeers() []string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	peers := make([]string, 0, len(l.traffic))
-	for p, s := range l.traffic {
-		if s.Get(stats.KindCurrentConns) > 0 {
-			peers = append(peers, p)
-		}
-	}
-	slices.Sort(peers)
-	return peers
 }
 
 // peerStat returns the per-peer counters for a key, creating them on first use.

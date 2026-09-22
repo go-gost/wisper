@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -232,7 +233,8 @@ func TestP2PTunnelDuplicatePeerKey(t *testing.T) {
 // TestP2PDerpDefault: an empty settings.p2p resolves to the public gost.run
 // relay (never a hard failure).
 // TestP2PTunnelPeerStats: traffic is counted per peer — each stream carries its
-// peer's counters — and reported in allowlist order, an idle peer as zeros.
+// peer's counters — reported in allowlist order, an idle peer as zeros, with
+// rates over the stats task's window, and given up when the route closes.
 func TestP2PTunnelPeerStats(t *testing.T) {
 	pl := newPeerListener([]string{"k1", "k2"})
 	tn := &p2pTunnel{opts: Options{Peers: []string{"k1", "k2"}}, cclose: make(chan struct{})}
@@ -261,23 +263,9 @@ func TestP2PTunnelPeerStats(t *testing.T) {
 
 	// In from k1, out to k1.
 	msg := []byte("hello-from-k1")
-	werr := make(chan error, 1)
-	go func() { _, err := far1.Write(msg); werr <- err }()
-	buf := make([]byte, len(msg))
-	if _, err := io.ReadFull(c1, buf); err != nil {
-		t.Fatalf("read peer-k1 stream: %v", err)
-	}
-	if err := <-werr; err != nil {
-		t.Fatalf("write peer-k1 stream: %v", err)
-	}
 	reply := []byte("hi")
-	go func() { _, err := c1.Write(reply); werr <- err }()
-	if _, err := io.ReadFull(far1, buf[:len(reply)]); err != nil {
-		t.Fatalf("read far end: %v", err)
-	}
-	if err := <-werr; err != nil {
-		t.Fatalf("write to peer: %v", err)
-	}
+	mustTransfer(t, far1, c1, msg)
+	mustTransfer(t, c1, far1, reply)
 	_ = c1.Close()
 
 	got := tn.PeerStats()
@@ -292,6 +280,60 @@ func TestP2PTunnelPeerStats(t *testing.T) {
 	}
 	if got[1] != (PeerStat{Key: "k2", CurrentConns: 1, TotalConns: 1}) {
 		t.Errorf("k2 stats = %+v, want its open stream counted and no bytes", got[1])
+	}
+
+	// Rates cover the tick window: k2's traffic moves through it, k1's does not.
+	tn.UpdatePeerStats() // baseline
+	time.Sleep(5 * time.Millisecond)
+	k2msg := []byte("k2 traffic")
+	mustTransfer(t, far2, c2, k2msg)
+	mustTransfer(t, c2, far2, []byte("k2 reply"))
+	tn.UpdatePeerStats()
+
+	got = tn.PeerStats()
+	if got[1].InputRateBytes == 0 || got[1].OutputRateBytes == 0 {
+		t.Errorf("k2 rates = %d in / %d out, want the bytes moved this window", got[1].InputRateBytes, got[1].OutputRateBytes)
+	}
+	if got[0].InputRateBytes != 0 || got[0].OutputRateBytes != 0 {
+		t.Errorf("k1 rates = %d in / %d out, want none (it moved nothing this window)", got[0].InputRateBytes, got[0].OutputRateBytes)
+	}
+	if got[1].InputBytes != uint64(len(k2msg)) {
+		t.Errorf("k2 input bytes = %d, want %d", got[1].InputBytes, len(k2msg))
+	}
+
+	// A queued stream counts as connected, and closing the route drops it — the
+	// accepted one the test still holds goes with its own Close.
+	in3, far3 := peerPipe("k1")
+	defer far3.Close()
+	pl.deliver(in3)
+	if got := tn.PeerStats()[0].CurrentConns; got != 1 {
+		t.Fatalf("k1 current conns with a queued stream = %d, want 1", got)
+	}
+	_ = c2.Close()
+	if err := pl.Close(); err != nil {
+		t.Fatalf("Close route: %v", err)
+	}
+	got = tn.PeerStats()
+	if got[0].CurrentConns != 0 || got[1].CurrentConns != 0 {
+		t.Errorf("current conns after the route closed = %d/%d, want 0/0", got[0].CurrentConns, got[1].CurrentConns)
+	}
+}
+
+// mustTransfer writes msg from src and requires exactly msg back on dst —
+// net.Pipe is synchronous, so the write needs a reader on the other end.
+func mustTransfer(t *testing.T, src, dst net.Conn, msg []byte) {
+	t.Helper()
+	werr := make(chan error, 1)
+	go func() { _, err := src.Write(msg); werr <- err }()
+	buf := make([]byte, len(msg))
+	if _, err := io.ReadFull(dst, buf); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if err := <-werr; err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if string(buf) != string(msg) {
+		t.Fatalf("read %q, want %q", buf, msg)
 	}
 }
 

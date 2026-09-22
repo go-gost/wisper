@@ -115,7 +115,6 @@ export function applyStats(statsList: Tunnel[]): void {
             stats: s.stats,
             status: s.status,
             error: s.error,
-            active_peers: s.active_peers,
             peer_stats: s.peer_stats,
           }
         : t,

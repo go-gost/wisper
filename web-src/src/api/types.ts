@@ -79,6 +79,8 @@ export interface PeerStats {
   total_conns: number;
   input_bytes: number;
   output_bytes: number;
+  input_rate_bytes: number;
+  output_rate_bytes: number;
 }
 
 export interface Tunnel {
@@ -93,8 +95,6 @@ export interface Tunnel {
   error: string;
   options: TunnelOptions;
   stats: ServiceStats;
-  /** p2p tunnels: peer keys with a live stream right now. */
-  active_peers?: string[];
   /** p2p tunnels: per-peer traffic, allowlist order. */
   peer_stats?: PeerStats[];
 }

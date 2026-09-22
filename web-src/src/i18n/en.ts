@@ -147,8 +147,6 @@ const en: Record<string, string> = {
   p2pPeers: 'Allowed peers',
   p2pPeersHint: 'One peer public key per line, optionally followed by an alias (generated when omitted). Empty means no inbound traffic is routed to this tunnel.',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
-  p2pConnected: 'Connected',
-  p2pConnectedEmpty: 'No peer connected right now.',
   p2pColPeer: 'Peer',
   p2pColConns: 'Conns',
   p2pColDown: 'Download',

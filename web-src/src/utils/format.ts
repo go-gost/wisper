@@ -99,12 +99,3 @@ export function formatHeaders(header: Record<string, string[]> | string): string
 export function maskKey(k: string): string {
   return '•'.repeat(k.length);
 }
-
-/** maskKeyList masks each entry of a comma-separated key list. */
-export function maskKeyList(list: string): string {
-  return list
-    .split(',')
-    .map((k) => maskKey(k.trim()))
-    .filter(Boolean)
-    .join(', ');
-}

@@ -45,6 +45,12 @@ func (t *updateStatsTask) updateTunnel() error {
 			continue
 		}
 
+		// p2p tunnels also break their traffic down per peer; the same tick
+		// turns those counters into rates.
+		if u, ok := tun.(tunnel.PeerStatsUpdater); ok {
+			u.UpdatePeerStats()
+		}
+
 		oldStats := tun.Stats()
 
 		d := time.Since(oldStats.Time)

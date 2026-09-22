@@ -12,7 +12,6 @@ import (
 	"context"
 	"io"
 	"net"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -169,17 +168,8 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	msg := []byte("hello-private-p2p")
 	mustEcho(t, conn, msg)
 
-	// The live view the tunnel page polls: the dialing peer's key is listed
-	// while its stream is open, and drops off once the stream ends.
-	stater, ok := tn.(interface{ ActivePeers() []string })
-	if !ok {
-		t.Fatalf("p2p tunnel %T has no ActivePeers", tn)
-	}
-	if got := stater.ActivePeers(); !slices.Equal(got, []string{peerKey}) {
-		t.Errorf("ActivePeers while connected = %v, want [%s]", got, peerKey)
-	}
-
-	// ... and so is its traffic: the round trip above is that peer's, alone.
+	// The live view the tunnel page polls: the dialing peer is the one — and
+	// only one — connected, and the round trip above is its traffic.
 	pstater, ok := tn.(interface{ PeerStats() []wtunnel.PeerStat })
 	if !ok {
 		t.Fatalf("p2p tunnel %T has no PeerStats", tn)
@@ -193,6 +183,26 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 	}
 	if pstats[0].TotalConns < 1 || pstats[0].CurrentConns < 1 {
 		t.Errorf("peer conns = %d total / %d current, want its stream counted", pstats[0].TotalConns, pstats[0].CurrentConns)
+	}
+
+	// Rates come from the snapshot the stats task takes each tick: a transfer
+	// inside the window shows up, the bytes before it do not.
+	updater, ok := tn.(wtunnel.PeerStatsUpdater)
+	if !ok {
+		t.Fatalf("p2p tunnel %T does not update peer stats", tn)
+	}
+	updater.UpdatePeerStats()
+	time.Sleep(2 * time.Millisecond)
+	window := []byte("rate window")
+	mustEcho(t, conn, window)
+	updater.UpdatePeerStats()
+
+	pstats = pstater.PeerStats()
+	if pstats[0].InputRateBytes == 0 || pstats[0].OutputRateBytes == 0 {
+		t.Errorf("peer rates = %d in / %d out, want the window's transfer counted", pstats[0].InputRateBytes, pstats[0].OutputRateBytes)
+	}
+	if pstats[0].InputBytes < uint64(len(msg)+len(window)) {
+		t.Errorf("peer input bytes = %d, want the running total %d", pstats[0].InputBytes, len(msg)+len(window))
 	}
 
 	// The tunnel serves its peer route with a standard gost service, so the
@@ -216,18 +226,31 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 		t.Errorf("stats OutputBytes = %d, want >= %d", got, len(msg))
 	}
 
-	// Stream ended: the live list goes back to empty. Teardown is async — the
-	// service closes its conn once the forwarding ends — so poll briefly.
+	// Stream ended: the peer shows as disconnected, its bytes still counted.
+	// Teardown is async — the service closes its conn once the forwarding ends —
+	// so poll briefly.
 	if err := conn.Close(); err != nil {
 		t.Fatalf("close stream: %v", err)
 	}
 	deadline := time.Now().Add(5 * time.Second)
-	for len(stater.ActivePeers()) > 0 && time.Now().Before(deadline) {
+	for currentConns(pstater) > 0 && time.Now().Before(deadline) {
 		time.Sleep(50 * time.Millisecond)
 	}
-	if got := stater.ActivePeers(); len(got) != 0 {
-		t.Errorf("ActivePeers after the stream ended = %v, want none", got)
+	if got := currentConns(pstater); got != 0 {
+		t.Errorf("peer current conns after the stream ended = %d, want 0", got)
 	}
+	if pstats := pstater.PeerStats(); pstats[0].InputBytes < uint64(len(msg)) {
+		t.Errorf("peer input bytes after the stream ended = %d, want the transfer kept", pstats[0].InputBytes)
+	}
+}
+
+// currentConns sums the peers' open streams.
+func currentConns(ps interface{ PeerStats() []wtunnel.PeerStat }) int {
+	var n int
+	for _, p := range ps.PeerStats() {
+		n += int(p.CurrentConns)
+	}
+	return n
 }
 
 // TestP2PTunnelRefusesUnlistedPeer is the negative case: the allowlist admits
