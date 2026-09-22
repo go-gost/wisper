@@ -34,7 +34,7 @@
 |---|---|---|
 | `p2PTunnel` | `tunnel/p2p.go`（新） | 一种隧道类型：key 生命周期 + 内嵌 host 生命周期；`Run`/`Close`/`Entrypoint` |
 | `P2PSettings` | `config/config.go` | 部署级设置：`derp`（wss URL）、`secure`、`caFile`；挂在 `Settings.P2P` |
-| API 分支 | `api/tunnel_handler.go` | create/update/list/get 的 type switch 增 `p2p`；响应增 `peer_key` |
+| API 分支 | `api/tunnel_handler.go` | create/update 的 type switch 增 `p2p`（pubkey 复用 `entrypoint` 字段，无新字段）|
 | UI | `web-src/src/{api/types.ts,pages/*,i18n/*}` | 类型卡片、表单（后端地址）、详情页 pubkey + 接入提示、设置页 p2p 三项 |
 
 **`p2PTunnel` 细节**
@@ -42,8 +42,8 @@
 - key 路径由隧道 ID 推导：`<UserConfigDir>/wisper/p2p/<id>.key`（hex，0600）。不进 config.yml。
 - `Run()`：load-or-create key → `p2p.New(&p2p.Config{Derp: settings.p2p.derp, Key: path,
   Targets: []string{"tcp://" + Endpoint}, Direct: &false, TLS: {Secure, CAFile}})` → `host.Connect()`
-  → running。`Connect` 失败**不致命**（engine 后台重连，与 p2p CLI 语义一致）：状态仍 running，
-  错误进 `err` 供 UI 展示。
+  → running。`Connect` 失败**不致命**：仅记日志、**不写 `err`**（避免 API 状态翻成 error；
+  与 p2p CLI 语义一致，engine 后台重连）。
 - `Entrypoint()` 返回 `host.PublicKey()`（base64，UI 的"共享给对端"值；API 响应里即 `entrypoint`
   字段，卡片按现有样式展示）；`Endpoint()` 仍是本地后端地址。`IsClosed()`/`Close()` 沿用
   close-once 模式；`Close` **保留** key 文件
@@ -88,7 +88,7 @@ p2ps:
 
 1. `tunnel/p2p_test.go`（普通构建，无网络）：`t.Setenv("XDG_CONFIG_HOME", t.TempDir())` 后
    - key 文件生成 + 权限 0600 + stop→start 复用同一 pubkey；
-   - 缺 `settings.p2p.derp` → Run 报错/setErr；
+   - `p2pDerpURL`：空设置 → 默认 `wss://derp.gost.run/derp`；已配置 → 用配置值；
    - Close 幂等。
 2. e2e（build tag `p2ppoc`，复用 `tunnel/p2p_udp_poc_test.go` 的 `startDerper`）：
    `TestP2PTunnelAcceptsPeerByKey`——起 wisper `p2p` 隧道（Endpoint = 本地 echo），
