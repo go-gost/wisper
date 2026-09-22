@@ -55,7 +55,7 @@ The project is a **single Go module** (`github.com/go-gost/wisper`, `go.mod` at 
 |---------|---------|
 | `main` (`main.go`) | Entry point: parses flags, inits config, starts stats runner, starts HTTP server, graceful shutdown |
 | `web.go` | Embeds Lit web build and serves it with SPA fallback |
-| `config/` | App settings + tunnel/entrypoint persistence to `~/.config/wisper/config.yml`. Thread-safe via `atomic.Value` with deep-copy semantics |
+| `config/` | App settings + tunnel/entrypoint persistence to `~/.config/wisper/wisper.yaml`. Thread-safe via `atomic.Value` with deep-copy semantics |
 | `tunnel/` | `Tunnel` interface + 4 concrete types (file, http, tcp, udp) + `ChainConfig` builder |
 | `tunnel/entrypoint/` | Entrypoint types (tcp, udp) implementing `tunnel.Tunnel` interface |
 | `api/` | REST handlers (`Go 1.22 ServeMux` with method routing) + CORS middleware |
@@ -66,7 +66,7 @@ The project is a **single Go module** (`github.com/go-gost/wisper`, `go.mod` at 
 ### Startup flow
 
 1. `main()` parses `-addr` and `-version` flags
-2. `config.Init()` creates `~/.config/wisper/`, loads `config.yml` (creates empty config if missing), initializes structured logging
+2. `config.Init()` creates `~/.config/wisper/`, loads `wisper.yaml` (creates empty config if missing), initializes structured logging
 3. `tunnel.LoadConfig()` and `entrypoint.LoadConfig()` reconstruct tunnel/entrypoint objects from persisted config, auto-starting non-closed ones
 4. `runner.Exec()` starts the stats polling task (1s interval, async)
 5. HTTP server starts on the configured address with the combined API + web handler
@@ -195,7 +195,7 @@ Theming uses **CSS custom properties** toggled by `.dark` class on `document.doc
 
 ## Configuration
 
-- Config file: `~/.config/wisper/config.yml` (YAML)
+- Config file: `~/.config/wisper/wisper.yaml` (YAML)
 - Log file: `~/.config/wisper/logs/wisper.log` (JSON format, 10MB rotation, 7-day retention)
 - `config.Get()` returns a deep copy — mutations are safe without locks
 - `config.Set()` + `cfg.Write()` persists changes
