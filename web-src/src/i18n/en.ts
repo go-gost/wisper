@@ -136,7 +136,7 @@ const en: Record<string, string> = {
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (tcp inner).',
   p2pIdentity: 'P2P Identity',
   p2pIdentityHint: 'Share this key with peers: their p2p entrypoint dials this host by it.',
-  p2pKeyWarning: 'Treat this key as a password: whoever obtains it can impersonate this host, and any peer that allow-lists this host will accept them. Never paste it into public channels, issues, chats or screenshots.',
+  p2pKeyWarning: 'Treat this key as a password: whoever obtains it can impersonate this host, and any peer that allow-lists this host will accept them. Never share it on public channels.',
   p2pIdentityIdle: 'Relay not connected — start a p2p tunnel or entrypoint so peers can dial in.',
   p2pPeers: 'Allowed peers',
   p2pPeersHint: 'One peer public key per line. Empty means no inbound traffic is routed to this tunnel.',
