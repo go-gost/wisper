@@ -3,8 +3,9 @@
 2026-09-21 可行性评估。结论：可集成，但 p2p 只能当**链节点底层传输**，
 不能替代 wisper 反向隧道的公网 ingress/rendezvous。
 
-> 状态：评估已完成，进程内 POC 通过；p2p 已发布 `v0.4.0` 并成为 wisper 的直接依赖；
-> UDP 入口点限制已 e2e 实测（2026-09-21，见「已知限制」）。
+> 状态：评估已完成，进程内 POC 通过；反向侧与入口点已改为共享的进程级 p2p host（p2p
+> `v0.4.2`，2026-09-22，见「私有 p2p 模式」）；UDP 入口点限制已 e2e 实测（2026-09-21，
+> 见「已知限制」）。
 
 ## 接缝
 
@@ -14,7 +15,7 @@
   `xp2p.NewTunnelDialer`，`SupportedDialer` 白名单含 tcp/tls/ws/wss/mux/udp。
 - wisper 不走 x config loader，而是手搓 `xconfig.Config` 再 `chain_parser.ParseChain`；
   因此 `p2ps:` 不会自动注册，需自行
-  `registry.P2PRegistry().Register(name, host.Provider())`
+  `registry.P2PRegistry().Register(name, host.Tunnel())`
   （旧 gRPC 方式为 `p2p_plugin.NewGRPCPlugin(...)`）。
 
 ## 依赖与可用性
@@ -26,15 +27,15 @@
   `scripts/smoke-local-relay.sh`。
 - p2p 已完成库化（根包 `package p2p` + `cmd/p2p`，见
   [p2p 库化重构计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-21-p2p-package-extraction.md)），
-  当前发布 `v0.4.1`（含进程内 udp framing 修复）；wisper `go.mod` 依赖 `github.com/go-gost/p2p v0.4.1`。
+  当前发布 `v0.4.2`（`Tunnel.Listen()`/`Dial` API、进程内 udp framing 修复）；wisper `go.mod` 依赖 `github.com/go-gost/p2p v0.4.2`。
 
 ## 边界与定位
 
 - p2p 是 peer→peer 可达性，不是公网入口：DERP 只在对端 key 之间转发，
   随机公网客户端无法直连；因此不能替换 wisper “本地→公网子域名端点”的反向隧道本体。
 - 合理定位：entrypoint（出站拨号）+ 新增“私有 peer-to-peer”模式
-  （wisper 侧 p2p host 带 `--target` 指向本地服务，远端 gost/wisper 用 peer key
-  开隧道进来）。
+  （wisper 侧进程级 p2p host，每条隧道按对端公钥路由到本地服务；远端 gost/wisper 用该
+  身份公钥开隧道进来）。
 - p2p 数据面不加密（内层 tls/wss 负责机密性）；控制面默认无鉴权，跨机需 token +
   控制 TLS；UDP datagram 路径无内层 dialer 可加密。
 - p2p engine 模式需要部署 DERP relay（官方 derper），且无名称发现，
@@ -78,7 +79,7 @@ tun 形态（p2p e2e 的 `udp-tun`/`udp-outlet`）不受上述影响：那些场
 
 ## 进程内 POC
 
-- 走**进程内**：`p2p.New(&p2p.Config{})` + `host.Provider()` 直接
+- 走**进程内**：`p2p.New(&p2p.Config{})` + `host.Tunnel()` 直接
   `registry.P2PRegistry().Register`。无子进程 / 无 loopback gRPC / 无 token。
   进程外 gRPC 只在 host 必须独立进程、多进程共享、或非 Go 客户端时才需要。
 - 可用性已验证：`wisper/tunnel/p2p_poc_test.go`（build tag `p2ppoc`）。
@@ -87,19 +88,30 @@ tun 形态（p2p e2e 的 `udp-tun`/`udp-outlet`）不受上述影响：那些场
 - 两测试：`TestP2PChainCarriesTCP`（stub 模式进程内 host + echo，wisper
   ChainConfig 改 node.Addr/forward+tcp/metadata.p2p，route.Dial 成功回显）；
   `TestP2PUnregisteredFailsClosed`（未注册 provider → ParseChain 报错，无静默旁路）。
-- 注册约定：`registry.P2PRegistry().Register(name, host.Provider())`；
-  可加 `var _ xp2p.TunnelProvider = (*p2p.Provider)(nil)` 做编译期断言。
+- 注册约定：`registry.P2PRegistry().Register(name, host.Tunnel())`；
+  可加 `var _ xp2p.Tunnel = (*p2p.Tunnel)(nil)` 做编译期断言。
 - UDP 入口点形态另有实测 harness：`tunnel/p2p_udp_poc_test.go`（同 tag，需 docker 提取 derper），
   跑法 `TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDP -v ./tunnel/`；结论见「已知限制」。
 
 ## 私有 p2p 模式（反向侧，已实现 2026-09-22）
 
-wisper 新增隧道类型 `p2p`：进程内嵌一个 p2p host，把 **Endpoint**（本地后端地址）通过 DERP
-暴露给持有其 **base64 pubkey** 的对端。不经 gost.run，也没有公网入口——定位是"私有 peer-to-peer"。
+wisper 新增隧道类型 `p2p`：**进程级 p2p host** 持有一份身份，入站流按 **对端公钥** 路由给
+各条隧道，每条隧道由**标准 gost service**（peer 路由 listener + local handler）转发到其
+**Endpoint**（本地后端地址）。不经 gost.run，也没有公网入口——定位是"私有 peer-to-peer"。
+
+**本机身份（进程级，一份）**：首个 p2p 隧道或 p2p 入口点启动时创建
+`~/.config/wisper/p2p/host.key`（0600），之后所有 p2p 隧道/入口点共用这一份身份；设置页
+"P2P Identity" 显示其 base64 公钥（`GET /api/p2p`，host 未运行时空串）。host 以引用计数
+存活：最后一个使用者关闭时 host 停止，key 文件保留（stop/start、更新对象都保持同一身份）。
 
 **用法**：设置页（或 `config.yml` 的 `settings.p2p`）配置 `derp`（默认
 `wss://derp.gost.run/derp`，可改为自建 relay）、`secure`、`caFile`；然后新建 type=`p2p`
-的隧道，Endpoint = 本地服务地址，运行后详情页显示 **pubkey**（对端寻址用它）。
+的隧道，填「对端公钥」（Peer public key，允许拨入的对端，必填）与 Endpoint = 本地服务地址。
+详情页 `entrypoint` 行显示的就是该对端公钥（本机身份在设置页，不在这里）。
+
+**准入即白名单**：每条隧道在 host 上注册一条 peer 路由，与隧道 1:1（同一对端公钥不能属于
+两条隧道）；入站流按 RemoteAddr（对端 base64 公钥）查表投递，**未登记 peer 的入站流直接
+关闭**——没有 fallback，也没有"默认隧道"。对端按本机身份公钥拨入：
 
 **对端接入**（gost；`p2ps` 可用 gRPC 插件，也可进程内注册 provider）：
 
@@ -111,35 +123,45 @@ chains:
   - name: chain-0
     hops:
       - nodes:
-          - addr: <详情页显示的 pubkey>
+          - addr: <设置页显示的本机身份公钥>
             dialer: {type: tcp}
             connector: {type: forward}
             metadata: {p2p: p2p}
 ```
 
+**隧道 stats/auth/录制**：与入口点对称——都来自挂在这条 peer 路由上的标准 gost service。
+连接与字节计数在 peer 路由 Accept 处按 x listener 的做法包一层
+（`stats.wrapper.WrapConn`），`runner/task/stats.go` 每秒把 `Status().Stats()` 回填进
+`Tunnel.Stats()`，因此详情页的速率与其它隧道类型一致（早期"host 不暴露、详情页显示 —"
+的限制已消除）。
+
 **出站侧（p2p entrypoint）**：入口点类型 `p2p`——本地监听 + 对端 pubkey。本地客户端连
-监听地址，流量经内嵌 host 的隧道拨到对端 target（内层 `tcp`，**数据面明文**；跨公网建议后续用
-tls/ws 变体）。对端可以是 wisper 的反向侧 p2p 隧道，也可以是任意带 target 的 p2p host。
-本侧 key 在 `~/.config/wisper/p2p/<entrypoint-id>.key`（0600），stop/start 与更新复用，
-删除入口点时移除。API 语义：响应里 `endpoint` = 对端 pubkey、`entrypoint` = 本地监听地址。
+监听地址，流量经**同一个共享 host** 的隧道拨到对端 target（内层 `tcp`，**数据面明文**；跨公网
+建议后续用 tls/ws 变体）。对端可以是 wisper 的反向侧 p2p 隧道，也可以是任意带 target 的
+p2p host。本侧身份同样是进程级 `host.key`（不再有 per-entrypoint key）。API 语义：响应里
+`endpoint` = 对端 pubkey、`entrypoint` = 本地监听地址。
 
 **生命周期与语义**：
-- 一隧道一 host（target 池按流 round-robin，共享 host 会让不同 peer 的流串到别的服务）。
 - relay 连不上不致命：状态保持 running，engine 每 5s 重连（与 p2p CLI 一致）。
-- key 文件 `~/.config/wisper/p2p/<id>.key`（0600）：`stop/start` 与**更新隧道**都复用同一身份；
-  只有**删除隧道**才移除（API 的 delete 路径负责）。key 不进 config.yml。
-- 无 per-tunnel 流量统计（host 不暴露），详情页显示 "—"。
+- 隧道/入口点 `Close()` 幂等：注销 peer 路由与 provider 注册、归还 host 引用；`host.key` 不动。
+- **旧模型（已被取代）**：每隧道一份 `~/.config/wisper/p2p/<id>.key` 的一隧道一 host
+  （带 `Config.Targets`，host 内部桥接到 target、无 service、无统计）。v0.4.2 起重构为上面的
+  进程级 host + peer 路由；遗留的 per-tunnel key 文件只在删除对象时清理（API delete 路径调
+  `RemoveP2PKey`）。
 
-**安全边界**：pubkey 即准入——持有 key 且可达 relay 的任何人能访问该本地服务；p2p 没有
-admission。建议 relay 侧 `-verify-clients=true`，并在本地服务上另加鉴权。详情页有固定提示。
+**安全边界**：pubkey 即地址——DERP 只在对端 key 之间转发，peer 只能按 base64 pubkey 寻址
+（无名称发现）；准入即白名单——隧道只服务其「对端公钥」的入站流，其余直接关闭。因此持有对端
+key 的人就是这条隧道的对端本身（可信方），p2p 层没有按连接的 auth。建议 relay 侧
+`-verify-clients=true`，并在本地服务上另加鉴权。
 
-**依赖版本**：framing 修复已随 p2p **`v0.4.1`**（`204e2d5`）发布，wisper `go.mod` 已 bump；
-go.work 与 `GOWORK=off` 两种模式行为一致。
+**依赖版本**：p2p `v0.4.2`（`Tunnel.Listen()`/`Dial` API、进程内 udp framing 修复）与
+x `v0.18.0`，wisper `go.mod` 已 bump；go.work 与 `GOWORK=off` 两种模式行为一致。
 
-**验证**：`tunnel/p2p_test.go`（key 生命周期/TLS 配置/默认 relay，无网络）；e2e
-`tunnel/p2p_e2e_test.go`（tag `p2ppoc`：真 derper + 对端按 key 拨入回环，跑法
-`TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；API 级
-（curl）已验证 create/list/delete + settings 往返 + key 文件 0600/清理；**浏览器内的
+**验证**：`tunnel/p2p_test.go`（Peer 必填/生命周期/TLS 配置/默认 relay，无网络）与
+`tunnel/p2p_host_test.go`（引用计数、路由 1:1、未登记 peer 关闭）；e2e
+`tunnel/p2p_e2e_test.go`（tag `p2ppoc`：真 derper + 对端按身份公钥拨入回环，并断言服务的
+实时计数非零；跑法 `TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；
+API 级（curl）已验证 create/list/delete + `/api/p2p` 身份往返 + `host.key` 0600；**浏览器内的
 UI 视觉与交互尚未人工过一遍**（类型卡片/设置项/详情页提示）。
 
 ## 实施注意
