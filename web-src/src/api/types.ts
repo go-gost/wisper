@@ -58,8 +58,10 @@ export interface TunnelOptions {
   keepalive: boolean;
   ttl: number;
   record_mode: string;
-  /** Remote peer's base64 public key (p2p tunnels). */
+  /** Remote peer's base64 public key (p2p entrypoints). */
   peer?: string;
+  /** Inbound allowlist: base64 public keys whose streams reach this p2p tunnel. Empty = unreachable. */
+  peers?: string[];
 }
 
 export interface Tunnel {
@@ -88,8 +90,10 @@ export interface TunnelCreateRequest {
   rewriteHost?: boolean;
   file_upload?: boolean;
   record_mode?: string;
-  /** Remote peer's base64 public key (p2p tunnels). */
+  /** Remote peer's base64 public key (p2p entrypoints). */
   peer?: string;
+  /** Inbound allowlist: base64 public keys whose streams reach this p2p tunnel. */
+  peers?: string[];
 }
 
 // ─── Entrypoint ──────────────────────────────────────────────────────────────

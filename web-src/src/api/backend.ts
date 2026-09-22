@@ -155,8 +155,11 @@ export class GoBackend {
 
   // ─── P2P ────────────────────────────────────────────────────────────────
 
-  /** Process-wide p2p identity. `public_key` is empty while the host is idle. */
-  getP2PIdentity(): Promise<{ public_key: string }> {
-    return this.request<{ public_key: string }>('GET', '/api/p2p');
+  /**
+   * Process-wide p2p identity. `public_key` is materialized on demand (never
+   * empty); `running` tells whether the shared host is currently started.
+   */
+  getP2PIdentity(): Promise<{ public_key: string; running: boolean }> {
+    return this.request<{ public_key: string; running: boolean }>('GET', '/api/p2p');
   }
 }

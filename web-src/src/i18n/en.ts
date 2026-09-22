@@ -134,6 +134,9 @@ const en: Record<string, string> = {
   p2pIdentity: 'P2P Identity',
   p2pIdentityHint: 'Share this key with peers: their p2p entrypoint dials this host by it.',
   p2pIdentityIdle: 'Not running yet — start a p2p tunnel or entrypoint to create the identity.',
+  p2pPeers: 'Allowed peers',
+  p2pPeersHint: 'One peer public key per line. Empty means no inbound traffic is routed to this tunnel.',
+  p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
 
   // Inspector
   qrCode: 'QR Code',

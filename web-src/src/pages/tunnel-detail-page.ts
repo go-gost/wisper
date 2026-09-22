@@ -50,7 +50,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _showAuth = false;
   @state() private _showPassword = false;
   @state() private _recordMode = 'off';
-  @state() private _peer = '';
+  @state() private _peers = ''; // p2p allowlist, one key per line
 
   // Native bridge detection
   private get _isNativeDirPicker(): boolean {
@@ -135,7 +135,7 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = false;
     this._showAuth = false;
     this._recordMode = 'off';
-    this._peer = '';
+    this._peers = '';
   }
 
   private _populateForm(t: Tunnel) {
@@ -150,7 +150,7 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = t.options.file_upload ?? false;
     this._showAuth = !!(t.options.username || t.options.basic_auth);
     this._recordMode = t.options.record_mode || 'off';
-    this._peer = t.options.peer ?? '';
+    this._peers = (t.options.peers ?? []).join('\n');
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ export class TunnelDetailPage extends LitElement {
         record_mode: this._recordMode,
       };
       if (this.tunnelType === 'p2p') {
-        body.peer = this._peer.trim() || undefined;
+        body.peers = this._peers.split('\n').map(s => s.trim()).filter(Boolean);
       }
       if (this._showAuth) {
         body.username = this._username.trim() || undefined;
@@ -459,6 +459,11 @@ export class TunnelDetailPage extends LitElement {
 
     .info-value.uuid {
       font-size: var(--font-sm);
+    }
+
+    .info-value.empty {
+      color: var(--text-muted);
+      font-family: inherit;
     }
 
     .record-warn {
@@ -856,12 +861,18 @@ export class TunnelDetailPage extends LitElement {
                   <span class="info-label">Target</span>
                   <span class="info-value">${t2.endpoint}</span>
                 </div>
+                <!-- For p2p this IS the inbound allowlist (joined); the host's
+                     own identity lives in Settings. -->
                 <div class="info-row">
-                  <span class="info-label">Entrypoint</span>
-                  <span class="info-value">${t2.entrypoint}</span>
-                  <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
-                    ${icon('copy')}
-                  </button>
+                  <span class="info-label">${this.tunnelType === 'p2p' ? t('p2pPeers') : 'Entrypoint'}</span>
+                  ${t2.entrypoint
+                    ? html`
+                      <span class="info-value">${t2.entrypoint}</span>
+                      <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
+                        ${icon('copy')}
+                      </button>
+                    `
+                    : html`<span class="info-value empty">${t('p2pPeersEmpty')}</span>`}
                 </div>
                 ${this.tunnelType === 'p2p'
                   ? html`<div class="p2p-hint">${t('p2pHint')}</div>`
@@ -1027,13 +1038,17 @@ export class TunnelDetailPage extends LitElement {
                   </div>
                 </div>
 
-                <!-- Peer public key (p2p only) -->
+                <!-- Allowed peers (p2p only) -->
                 ${this.tunnelType === 'p2p'
                   ? html`
                     <div class="form-group">
-                      <label class="form-label">${t('entrypointPeerKey')}</label>
-                      <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
-                        @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
+                      <label class="form-label">${t('p2pPeers')}</label>
+                      <textarea class="form-input" rows="3" placeholder="Base64 public key per line"
+                        .value=${this._peers}
+                        @input=${(e: Event) => { this._peers = (e.target as HTMLTextAreaElement).value; }}></textarea>
+                      <div style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding-top:4px;">
+                        ${t('p2pPeersHint')}
+                      </div>
                     </div>
                   `
                   : ''}

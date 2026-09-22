@@ -37,6 +37,7 @@ export class SettingsPage extends LitElement {
   @state() private _p2pSecure = true;
   @state() private _p2pCaFile = '';
   @state() private _p2pPublicKey = '';
+  @state() private _p2pRunning = false;
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 3;
@@ -98,9 +99,12 @@ export class SettingsPage extends LitElement {
 
   private async _fetchP2PIdentity(): Promise<void> {
     try {
-      this._p2pPublicKey = (await this._backend.getP2PIdentity()).public_key;
+      const id = await this._backend.getP2PIdentity();
+      this._p2pPublicKey = id.public_key;
+      this._p2pRunning = id.running;
     } catch {
       this._p2pPublicKey = '';
+      this._p2pRunning = false;
     }
   }
 
@@ -481,10 +485,10 @@ export class SettingsPage extends LitElement {
           <div class="card">
             <div class="card-padded">
               <div style="display:flex;align-items:center;gap:8px;">
-                <span class="identity-key ${this._p2pPublicKey ? '' : 'muted'}">
-                  ${this._p2pPublicKey || t('p2pIdentityIdle')}
+                <span class="identity-key ${this._p2pRunning ? '' : 'muted'}">
+                  ${this._p2pRunning ? this._p2pPublicKey : t('p2pIdentityIdle')}
                 </span>
-                ${this._p2pPublicKey
+                ${this._p2pRunning
                   ? html`<button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
                     ${icon('copy')}
                   </button>`
