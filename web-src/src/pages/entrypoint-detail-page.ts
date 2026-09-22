@@ -523,6 +523,9 @@ export class EntrypointDetailPage extends LitElement {
                   <span class="info-label">Created</span>
                   <span class="info-value text">${formatTimestamp(ep.created_at)}</span>
                 </div>
+                ${this.entrypointType === 'p2p'
+                  ? ''
+                  : html`
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
                   <span class="info-value uuid">${ep.id ?? '—'}</span>
@@ -531,7 +534,7 @@ export class EntrypointDetailPage extends LitElement {
                       ${icon('copy')}
                     </button>`
                     : ''}
-                </div>
+                </div>`}
                 <div class="info-row">
                   <span class="info-label">Name</span>
                   <span class="info-value text">${ep.name}</span>
@@ -602,6 +605,10 @@ export class EntrypointDetailPage extends LitElement {
                   <input class="form-input" readonly .value=${typeLabel + ' Entrypoint'}>
                 </div>
 
+                <!-- A p2p entrypoint dials the peer directly: no tunnel id. -->
+                ${this.entrypointType === 'p2p'
+                  ? ''
+                  : html`
                 <div class="form-group">
                   <label class="form-label">Tunnel ID</label>
                   <input class="form-input"
@@ -609,7 +616,7 @@ export class EntrypointDetailPage extends LitElement {
                     .value=${this._tunnelId}
                     placeholder="Paste tunnel UUID"
                     @input=${(e: Event) => { this._tunnelId = (e.target as HTMLInputElement).value; }}>
-                </div>
+                </div>`}
 
                 <div class="form-group">
                   <label class="form-label">${t('fieldName')}</label>

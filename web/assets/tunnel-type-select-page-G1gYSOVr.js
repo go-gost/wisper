@@ -1,22 +1,22 @@
-import{a as v,j as r,b as d,i as f,t as u}from"./index-BJgf-zFi.js";import{i as s}from"./app-scaffold-v1rie1FH.js";import{E as g}from"./types-BnWCZ3Cd.js";var b=Object.getOwnPropertyDescriptor,y=(t,i,l,n)=>{for(var e=n>1?void 0:n?b(i,l):i,a=t.length-1,p;a>=0;a--)(p=t[a])&&(e=p(e)||e);return e};const x={tcp:"link",udp:"broadcast",p2p:"hub"},c={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"}};let o=class extends v{_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return d`
+import{a as f,j as r,b as p,i as v,t as u}from"./index-CF7ca8rJ.js";import{i as s}from"./app-scaffold-McxCOgZ0.js";import{T as g}from"./types-BnWCZ3Cd.js";var b=Object.getOwnPropertyDescriptor,y=(e,i,c,n)=>{for(var t=n>1?void 0:n?b(i,c):i,a=e.length-1,l;a>=0;a--)(l=e[a])&&(t=l(t)||t);return t};const x={file:"folder",http:"globe",tcp:"link",udp:"broadcast",p2p:"hub"},d={file:{bg:"#ecfdf5",fg:"#059669"},http:{bg:"#eff6ff",fg:"#3b82f6"},tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"}};let o=class extends f{_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return p`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
             ${s("chevron-left")}
           </button>
-          <span class="page-title">${r("entrypointNewTitle")}</span>
+          <span class="page-title">${r("tunnelNewTitle")}</span>
         </div>
 
         <div class="list">
-          ${g.map(t=>d`
-            <div class="type-card" @click=${()=>this._navigate(`/entrypoint/${t.value}/new`)}>
-              <div class="type-icon" style="background:${c[t.value].bg};color:${c[t.value].fg}">${s(x[t.value])}</div>
+          ${g.map(e=>p`
+            <div class="type-card" @click=${()=>this._navigate(`/tunnel/${e.value}/new`)}>
+              <div class="type-icon" style="background:${d[e.value].bg};color:${d[e.value].fg}">${s(x[e.value])}</div>
               <div class="type-content">
                 <div class="type-title">
-                  ${r(`type${t.value.charAt(0).toUpperCase()+t.value.slice(1)}`)} Entrypoint
+                  ${r(`type${e.value.charAt(0).toUpperCase()+e.value.slice(1)}`)} Tunnel
                 </div>
                 <div class="type-desc">
-                  ${r(`type${t.value.charAt(0).toUpperCase()+t.value.slice(1)}EntryDesc`)}
+                  ${r(`type${e.value.charAt(0).toUpperCase()+e.value.slice(1)}Desc`)}
                 </div>
               </div>
               <span class="type-arrow">${s("chevron-right")}</span>
@@ -24,7 +24,7 @@ import{a as v,j as r,b as d,i as f,t as u}from"./index-BJgf-zFi.js";import{i as 
           `)}
         </div>
       </app-scaffold>
-    `}};o.styles=f`
+    `}};o.styles=v`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -34,6 +34,7 @@ import{a as v,j as r,b as d,i as f,t as u}from"./index-BJgf-zFi.js";import{i as 
 
     .page-title { font-size: var(--font-md); font-weight: 600; }
 
+    /* ── Type cards ── */
     .list {
       padding: 8px 16px 0;
       display: flex; flex-direction: column;
@@ -71,4 +72,4 @@ import{a as v,j as r,b as d,i as f,t as u}from"./index-BJgf-zFi.js";import{i as 
     .type-arrow {
       color: var(--text-muted); flex-shrink: 0;
     }
-  `;o=y([u("entrypoint-type-select-page")],o);export{o as EntrypointTypeSelectPage};
+  `;o=y([u("tunnel-type-select-page")],o);export{o as TunnelTypeSelectPage};
