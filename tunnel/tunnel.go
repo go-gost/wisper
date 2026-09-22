@@ -49,6 +49,7 @@ const (
 	HTTPTunnel = "http"
 	TCPTunnel  = "tcp"
 	UDPTunnel  = "udp"
+	P2PTunnel  = "p2p"
 )
 
 var (
@@ -314,6 +315,11 @@ func Delete(id string) {
 	for i, s := range tunnels.list {
 		if s != nil && s.ID() == id {
 			s.Close()
+			if s.Type() == P2PTunnel {
+				if err := RemoveP2PKey(s.ID()); err != nil {
+					logger.Default().Error(fmt.Sprintf("remove p2p key %s: %v", s.ID(), err))
+				}
+			}
 			tunnels.list = append(tunnels.list[:i], tunnels.list[i+1:]...)
 			return
 		}
@@ -535,6 +541,8 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		t = NewTCPTunnel(options...)
 	case UDPTunnel:
 		t = NewUDPTunnel(options...)
+	case P2PTunnel:
+		t = NewP2PTunnel(options...)
 	default:
 		return nil
 	}
