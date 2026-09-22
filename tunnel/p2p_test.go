@@ -62,13 +62,17 @@ func TestP2PTunnelKeyLifecycle(t *testing.T) {
 	}
 }
 
-// TestP2PTunnelRequiresDerp: without settings.p2p.derp the tunnel fails loudly
-// instead of silently exposing nothing.
-func TestP2PTunnelRequiresDerp(t *testing.T) {
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{}})
-	tn := NewP2PTunnel(IDOption("no-derp"))
-	if err := tn.Run(); err == nil {
-		t.Fatal("Run without a DERP URL = nil error, want a failure")
+// TestP2PDerpDefault: an empty settings.p2p resolves to the public gost.run
+// relay (never a hard failure).
+func TestP2PDerpDefault(t *testing.T) {
+	if got := p2pDerpURL(nil); got != defaultP2PDerp {
+		t.Fatalf("p2pDerpURL(nil) = %q, want %q", got, defaultP2PDerp)
 	}
-	_ = tn.Close()
+	if got := p2pDerpURL(&cfg.Settings{}); got != defaultP2PDerp {
+		t.Fatalf("p2pDerpURL(empty) = %q, want %q", got, defaultP2PDerp)
+	}
+	want := "wss://relay.example/derp"
+	if got := p2pDerpURL(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: want}}); got != want {
+		t.Fatalf("p2pDerpURL(configured) = %q, want %q", got, want)
+	}
 }

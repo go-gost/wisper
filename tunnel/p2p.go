@@ -1,7 +1,6 @@
 package tunnel
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -126,6 +125,15 @@ func RemoveP2PKey(id string) error {
 	return nil
 }
 
+// p2pDerpURL returns the configured DERP relay, falling back to the public
+// gost.run relay — the same read-time-default pattern as GetServerName.
+func p2pDerpURL(s *cfg.Settings) string {
+	if s != nil && s.P2P != nil && s.P2P.Derp != "" {
+		return s.P2P.Derp
+	}
+	return defaultP2PDerp
+}
+
 func (s *p2pTunnel) Run() (err error) {
 	if s.IsClosed() {
 		return ErrTunnelClosed
@@ -137,10 +145,6 @@ func (s *p2pTunnel) Run() (err error) {
 	}()
 
 	settings := cfg.Get().Settings
-	if settings == nil || settings.P2P == nil || settings.P2P.Derp == "" {
-		err = errors.New("p2p tunnel requires a DERP relay URL (settings → p2p)")
-		return
-	}
 	keyPath, err := P2PKeyPath(s.opts.ID)
 	if err != nil {
 		return
@@ -148,7 +152,7 @@ func (s *p2pTunnel) Run() (err error) {
 
 	direct := false
 	host, err := p2p.New(&p2p.Config{
-		Derp:    settings.P2P.Derp,
+		Derp:    p2pDerpURL(settings),
 		Key:     keyPath,
 		Targets: []string{"tcp://" + s.opts.Endpoint},
 		Direct:  &direct,

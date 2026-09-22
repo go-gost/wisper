@@ -19,6 +19,8 @@ import (
 const (
 	defaultEndpointAddr = "gost.run"
 	defaultServerName   = "wisper.gost.run"
+	// defaultP2PDerp is the DERP relay used when settings.p2p.derp is empty.
+	defaultP2PDerp = "wss://derp.gost.run/derp"
 )
 
 // GetEndpointAddr returns the public entrypoint domain, reading from config
