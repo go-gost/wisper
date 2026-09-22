@@ -6,9 +6,9 @@
 
 **Architecture:** `tunnel/p2p_host.go` 的 manager（引用计数 + 路由 + per-peer 队列 listener）；`p2pTunnel` 与 `p2pEntryPoint` 都 `acquire/release`；隧道用 `peerListener + local handler → 后端` 的 service（stats/auth 免费）。
 
-**Tech Stack:** Go（`github.com/go-gost/p2p` v0.4.2 的 `Host.Listen()`、x 的 local handler/router/service）、Lit + TS、tag `p2ppoc` 的 e2e。
+**Tech Stack:** Go（`github.com/go-gost/p2p` v0.4.2 的 `Provider.Listen()`/`Dial`、x 的 local handler/router/service）、Lit + TS、tag `p2ppoc` 的 e2e。
 
-**Spec:** `docs/superpowers/specs/2026-09-22-p2p-inbound-listen-redesign.md`（依赖 p2p 仓的 [Host.Listen 计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-22-p2p-host-listen.md) → `v0.4.2`）
+**Spec:** `docs/superpowers/specs/2026-09-22-p2p-inbound-listen-redesign.md`（依赖 p2p 仓的 [Provider.Listen 计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-22-p2p-host-listen.md) → `v0.4.2`）
 
 **运行前置：** p2p `v0.4.2` 已发布并 bump；`TMPDIR=/config/tmp`；e2e 需 docker（derper 已缓存）。
 
@@ -102,7 +102,7 @@ func (m *p2pHostManager) acquire() (*p2p.Host, error) {
 		if err != nil {
 			return nil, fmt.Errorf("p2p host: %w", err)
 		}
-		ln, err := host.Listen()
+		ln, err := host.Provider().Listen()
 		if err != nil {
 			_ = host.Close()
 			return nil, err

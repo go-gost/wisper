@@ -1,4 +1,4 @@
-# p2p 入站流交给 embedder（Host.Listen）+ wisper 反向侧改造
+# p2p 入站流交给 embedder（Provider.Listen / Dial）+ wisper 反向侧改造
 
 > 2026-09-22。承接 [出站侧](2026-09-22-wisper-p2p-entrypoint-design.md)：
 > 反向侧当前用 `Config.Targets`（host 自己桥 target）→ 拿不到 conn、没有流量统计、
@@ -9,7 +9,7 @@
 
 ## 目标与非目标
 
-- 目标：p2p 提供 `Host.Listen()`（入站 peer 流，conn 的 `RemoteAddr()` 携带 peer key）；
+- 目标：p2p 提供 `Provider.Listen()`（入站 peer 流，conn 的 `RemoteAddr()` 携带 peer key）；
   wisper 用**进程级 host**（一份身份/一条 DERP 连接）+ 按 peer key 路由到各隧道；
   每条隧道一个标准 gost service（`Listen()` 作 listener + `local` handler → 后端）→
   **stats / auth / 录制免费**，与 entrypoint 完全对称。
@@ -18,6 +18,12 @@
 
 ## p2p 侧 API（契约，发 `v0.4.2`）
 
+> 命名（2026-09-22 修订）：**`Provider` 是唯一对外的传输接口** —— `Dial` / `Listen` / `Close`，
+> 与 `net` 包一致；`Host` 只负责生命周期（New/Connect/PublicKey/Close）。因此原
+> `Provider.OpenTunnelStream` 改名 **`Dial`**、原计划的 `Host.Listen` 移到 **`Provider.Listen`**。
+> 这要求 x 的 `xp2p.TunnelProvider` 接口同步改名（结构化匹配是唯一纽带），
+> 见 `x/docs/plans/2026-09-22-p2p-provider-dial-rename.md`：**x 先改发版 → p2p 跟随 → wisper bump**。
+
 ```go
 // Listen returns a listener over inbound peer tunnel streams. Each accepted
 // conn's RemoteAddr() carries the peer's base64 public key (Network() "p2p");
@@ -25,7 +31,7 @@
 // is full are dropped (lossy, like the datagram channel). It is mutually
 // exclusive with Config.Targets: with targets configured the host bridges
 // internally (the CLI behaviour) and Listen returns an error.
-func (h *Host) Listen() (net.Listener, error)
+func (p *Provider) Listen() (net.Listener, error)
 ```
 
 - 合成地址与既有 `streamAddr` 同款：`Network() = "p2p"`、`String() = <base64 key>`。
@@ -84,6 +90,6 @@ func (h *Host) Listen() (net.Listener, error)
 
 ## 交付物与分期
 
-1. **p2p**：`Host.Listen()` + 互斥校验 + 测试 → 发 `v0.4.2` → wisper bump；
+1. **p2p**：`Provider.Listen()` + 互斥校验 + 测试 → 发 `v0.4.2` → wisper bump；
 2. **wisper**：host manager（refcount + 路由）+ p2p 隧道改用 `Listen()` + 设置页身份区 +
    隧道 peer 字段 + 文档更新（p2p-integration.md 反向侧一节改写）。
