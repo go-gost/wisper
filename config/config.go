@@ -144,6 +144,20 @@ type Settings struct {
 	StatsInterval int `yaml:"stats_interval,omitempty" json:"stats_interval,omitempty"`
 	// Inspector API URL (e.g., http://inspector:8000). Empty = disabled.
 	InspectorURL string `yaml:"inspector_url,omitempty" json:"inspector_url,omitempty"`
+	// P2P holds the private p2p mode settings (DERP relay).
+	P2P *P2PSettings `yaml:",omitempty" json:"p2p,omitempty"`
+}
+
+// P2PSettings holds the deployment-level p2p host settings: the DERP relay and
+// the relay's TLS options. Per-tunnel p2p tunnels share them; the tunnel's own
+// config carries only its local backend address.
+type P2PSettings struct {
+	// Derp is the DERP relay URL (wss://host/derp). Required for p2p tunnels.
+	Derp string `yaml:",omitempty" json:"derp"`
+	// Secure verifies the relay's TLS certificate (nil = true).
+	Secure *bool `yaml:",omitempty" json:"secure,omitempty"`
+	// CAFile is a PEM CA file to trust the relay's self-signed certificate.
+	CAFile string `yaml:"caFile,omitempty" json:"ca_file,omitempty"`
 }
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.
