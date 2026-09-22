@@ -3,7 +3,9 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -773,5 +775,49 @@ func TestUpdateP2PTunnel(t *testing.T) {
 	}
 	if got, _ := upeers[1].(map[string]any)["alias"].(string); got != "laptop" {
 		t.Errorf("k2 alias after update = %q, want it kept", got)
+	}
+}
+
+// freePort returns a port nothing is listening on.
+func freePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("free port: %v", err)
+	}
+	defer ln.Close()
+	return ln.Addr().(*net.TCPAddr).Port
+}
+
+// TestUpdateRunningEntrypoint: an entrypoint holds its listen address, so the
+// old one must let go before the replacement starts — otherwise every edit of
+// a running entrypoint answered 500 "bind: address already in use".
+func TestUpdateRunningEntrypoint(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	secure := false
+	config.Set(&config.Config{Settings: &config.Settings{
+		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure},
+	}})
+
+	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
+	resp, created := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+		"name": "Peer", "type": "p2p", "endpoint": addr, "peer": "k1",
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create p2p entrypoint = %d: %v", resp.StatusCode, created)
+	}
+	id, _ := created["id"].(string)
+	defer entrypoint.Delete(id)
+
+	resp, updated := putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
+		"name": "Peer", "type": "p2p", "endpoint": addr, "peer": "k2",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update p2p entrypoint = %d: %v", resp.StatusCode, updated)
+	}
+	if opts, _ := updated["options"].(map[string]any); opts["peer"] != "k2" {
+		t.Errorf("peer after update = %v, want the submitted k2", opts["peer"])
 	}
 }

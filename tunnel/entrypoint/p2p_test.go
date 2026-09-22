@@ -88,3 +88,37 @@ func TestP2PEntryPointRequiresPeer(t *testing.T) {
 	}
 	_ = ep.Close()
 }
+
+// TestSaveConfigKeepsPeer: the persisted config must carry what LoadConfig
+// reads back. A p2p entrypoint's peer key above all — without it Run fails and
+// the entrypoint comes back stopped, with no way to tell why.
+func TestSaveConfigKeepsPeer(t *testing.T) {
+	t.Chdir(t.TempDir()) // SaveConfig writes ./wisper.yaml when no config dir is set
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	ep := NewP2PEntryPoint(
+		tp.IDOption("ep-save"),
+		tp.EndpointOption("127.0.0.1:0"),
+		tp.PeerOption(testPeerKey),
+		tp.KeepaliveOption(true),
+		tp.TTLOption(30),
+	)
+	Add(ep)
+	defer Delete("ep-save")
+
+	if err := SaveConfig(); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+
+	saved := cfg.Get().EntryPoints
+	if len(saved) != 1 {
+		t.Fatalf("saved %d entrypoints, want 1", len(saved))
+	}
+	if saved[0].Peer != testPeerKey {
+		t.Errorf("persisted peer = %q, want %q", saved[0].Peer, testPeerKey)
+	}
+	if !saved[0].Keepalive || saved[0].TTL != 30 {
+		t.Errorf("persisted keepalive/ttl = %v/%d, want true/30", saved[0].Keepalive, saved[0].TTL)
+	}
+}

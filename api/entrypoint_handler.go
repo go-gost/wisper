@@ -113,6 +113,11 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		epType = old.Type()
 	}
 
+	// Every entrypoint type binds its own local address (and a p2p one also
+	// claims a provider name on the shared host), so the old one has to let go
+	// before the replacement can start.
+	old.Close()
+
 	// Create replacement with same ID first (before deleting old).
 	opts := append([]tunnel.Option{
 		tunnel.IDOption(id),
