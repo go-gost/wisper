@@ -50,6 +50,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _showAuth = false;
   @state() private _showPassword = false;
   @state() private _recordMode = 'off';
+  @state() private _peer = '';
 
   // Native bridge detection
   private get _isNativeDirPicker(): boolean {
@@ -134,6 +135,7 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = false;
     this._showAuth = false;
     this._recordMode = 'off';
+    this._peer = '';
   }
 
   private _populateForm(t: Tunnel) {
@@ -148,6 +150,7 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = t.options.file_upload ?? false;
     this._showAuth = !!(t.options.username || t.options.basic_auth);
     this._recordMode = t.options.record_mode || 'off';
+    this._peer = t.options.peer ?? '';
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -201,6 +204,9 @@ export class TunnelDetailPage extends LitElement {
         file_upload: this._fileUpload,
         record_mode: this._recordMode,
       };
+      if (this.tunnelType === 'p2p') {
+        body.peer = this._peer.trim() || undefined;
+      }
       if (this._showAuth) {
         body.username = this._username.trim() || undefined;
         body.password = this._password || undefined;
@@ -1020,6 +1026,17 @@ export class TunnelDetailPage extends LitElement {
                       : ''}
                   </div>
                 </div>
+
+                <!-- Peer public key (p2p only) -->
+                ${this.tunnelType === 'p2p'
+                  ? html`
+                    <div class="form-group">
+                      <label class="form-label">${t('entrypointPeerKey')}</label>
+                      <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
+                        @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
+                    </div>
+                  `
+                  : ''}
 
                 <!-- URL Prefix (HTTP + file) -->
                 ${this.tunnelType === 'http' || this.tunnelType === 'file'

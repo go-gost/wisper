@@ -152,4 +152,11 @@ export class GoBackend {
   getVersion(): Promise<VersionInfo> {
     return this.request<VersionInfo>('GET', '/api/version');
   }
+
+  // ─── P2P ────────────────────────────────────────────────────────────────
+
+  /** Process-wide p2p identity. `public_key` is empty while the host is idle. */
+  getP2PIdentity(): Promise<{ public_key: string }> {
+    return this.request<{ public_key: string }>('GET', '/api/p2p');
+  }
 }

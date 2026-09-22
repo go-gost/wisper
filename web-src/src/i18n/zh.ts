@@ -131,6 +131,9 @@ const zh: Record<string, string> = {
   p2pHint: '持有此公钥且可访问中继的任何人，都能访问该本地服务；p2p 不再进行额外认证。',
   entrypointPeerKey: '对端公钥',
   p2pEntryHint: '本地客户端连接监听地址；流量经 p2p 隧道到对端公钥，明文（内层 tcp）。',
+  p2pIdentity: 'P2P 身份',
+  p2pIdentityHint: '将此公钥分享给对端：他们的 p2p 入口点用它拨号到本机。',
+  p2pIdentityIdle: '尚未运行——启动一条 p2p 隧道或入口点以创建身份。',
 
   // Inspector
   qrCode: '二维码',

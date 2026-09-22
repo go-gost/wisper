@@ -131,6 +131,9 @@ const en: Record<string, string> = {
   p2pHint: 'Anyone holding this key who can reach the relay can access the local service. No further authentication is applied by p2p.',
   entrypointPeerKey: 'Peer public key',
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (tcp inner).',
+  p2pIdentity: 'P2P Identity',
+  p2pIdentityHint: 'Share this key with peers: their p2p entrypoint dials this host by it.',
+  p2pIdentityIdle: 'Not running yet — start a p2p tunnel or entrypoint to create the identity.',
 
   // Inspector
   qrCode: 'QR Code',

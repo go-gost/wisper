@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { t, onLocaleChange } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getSettings, updateSettings, subscribe } from '../store/settings-store';
+import { copyToClipboard } from '../utils/clipboard';
 import { GoBackend } from '../api/backend';
 import type { ThemePreference, LanguagePreference } from '../api/types';
 import '../components/app-scaffold';
@@ -35,6 +36,7 @@ export class SettingsPage extends LitElement {
   @state() private _p2pDerp = '';
   @state() private _p2pSecure = true;
   @state() private _p2pCaFile = '';
+  @state() private _p2pPublicKey = '';
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 3;
@@ -76,11 +78,13 @@ export class SettingsPage extends LitElement {
         this._statsInterval = s2.stats_interval || 1;
         this._inspectorUrl = s2.inspector_url || '';
         this.requestUpdate();
+        this._fetchP2PIdentity();
       }),
       onLocaleChange(() => this.requestUpdate()),
     );
 
     this._fetchVersion();
+    this._fetchP2PIdentity();
   }
 
   private async _fetchVersion(): Promise<void> {
@@ -90,6 +94,19 @@ export class SettingsPage extends LitElement {
     } catch {
       this._version = '';
     }
+  }
+
+  private async _fetchP2PIdentity(): Promise<void> {
+    try {
+      this._p2pPublicKey = (await this._backend.getP2PIdentity()).public_key;
+    } catch {
+      this._p2pPublicKey = '';
+    }
+  }
+
+  private async _copyP2PKey() {
+    await copyToClipboard(this._p2pPublicKey);
+    this._showSnackbar(t('copiedToClipboard'));
   }
 
   disconnectedCallback() {
@@ -306,6 +323,22 @@ export class SettingsPage extends LitElement {
       font-size: var(--font-sm); color: var(--text-muted); margin-top: 2px;
     }
 
+    /* ── P2P identity ── */
+    .identity-key {
+      flex: 1;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-sm);
+      color: var(--text);
+      word-break: break-all;
+    }
+    .identity-key.muted { color: var(--text-muted); }
+    .copy-btn-mini {
+      background: none; border: none; cursor: pointer;
+      padding: 2px; color: var(--text-muted); display: flex;
+      border-radius: 3px;
+    }
+    .copy-btn-mini:hover { background: var(--border-subtle); color: var(--text); }
+
     /* ── Switch ── */
     .switch-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -438,6 +471,26 @@ export class SettingsPage extends LitElement {
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- P2P Identity -->
+        <div class="section">
+          <div class="section-title">${t('p2pIdentity')}</div>
+          <div class="card">
+            <div class="card-padded">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="identity-key ${this._p2pPublicKey ? '' : 'muted'}">
+                  ${this._p2pPublicKey || t('p2pIdentityIdle')}
+                </span>
+                ${this._p2pPublicKey
+                  ? html`<button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
+                    ${icon('copy')}
+                  </button>`
+                  : ''}
+              </div>
+              <p class="hint">${t('p2pIdentityHint')}</p>
             </div>
           </div>
         </div>
