@@ -330,6 +330,12 @@ export class SettingsPage extends LitElement {
     }
 
     /* ── P2P identity ── */
+    .p2p-warning {
+      color: var(--red);
+      font-size: var(--font-xs);
+      line-height: 1.5;
+      margin-top: 6px;
+    }
     .identity-key {
       flex: 1;
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -499,6 +505,7 @@ export class SettingsPage extends LitElement {
                   </button>
                 </div>
                 <p class="hint">${t('p2pIdentityHint')}</p>
+                <p class="p2p-warning">${t('p2pKeyWarning')}</p>
                 ${this._p2pRunning ? '' : html`<p class="hint">${t('p2pIdentityIdle')}</p>`}
               </div>
               <div class="form-group">

@@ -136,6 +136,7 @@ const zh: Record<string, string> = {
   p2pEntryHint: '本地客户端连接监听地址；流量经 p2p 隧道到对端公钥，明文（内层 tcp）。',
   p2pIdentity: 'P2P 身份',
   p2pIdentityHint: '将此公钥分享给对端：他们的 p2p 入口点用它拨号到本机。',
+  p2pKeyWarning: '请把此 key 当作密码：拿到它的人可以冒充本机，凡将本机列入白名单的对端都会接受其接入。切勿粘贴到公开渠道（issue、群聊、截图）。',
   p2pIdentityIdle: '中继未连接——启动任一 p2p 隧道或入口点后，对端才能拨入。',
   p2pPeers: '允许的对端',
   p2pPeersHint: '每行一个对端公钥；留空表示没有入站流量会路由到该隧道。',
