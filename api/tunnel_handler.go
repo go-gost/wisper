@@ -325,6 +325,14 @@ func handleDeleteTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if t.Type() == tunnel.P2PTunnel {
+		// The key file is the tunnel's identity. Removing it here (not in
+		// tunnel.Delete) keeps an update/replace from rotating the pubkey.
+		if err := tunnel.RemoveP2PKey(id); err != nil {
+			slog.Error("remove p2p key", "id", id, "err", err)
+		}
+	}
+
 	tunnel.Delete(id)
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)

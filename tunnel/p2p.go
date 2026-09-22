@@ -112,8 +112,9 @@ func P2PKeyPath(id string) (string, error) {
 	return filepath.Join(dir, "wisper", "p2p", id+".key"), nil
 }
 
-// RemoveP2PKey deletes a tunnel's key file; called when the tunnel is deleted
-// (Close keeps it so stop/start reuses the identity).
+// RemoveP2PKey deletes a tunnel's key file; called by the API's delete handler
+// only (not by tunnel.Delete/replace), so a tunnel update keeps its identity.
+// Close likewise keeps the file so stop/start reuses the identity.
 func RemoveP2PKey(id string) error {
 	path, err := P2PKeyPath(id)
 	if err != nil {
@@ -134,6 +135,18 @@ func p2pDerpURL(s *cfg.Settings) string {
 	return defaultP2PDerp
 }
 
+// p2pTLSConfig returns the relay TLS options, or nil to keep p2p's defaults
+// (verify against the system roots) when settings.p2p is unset.
+func p2pTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
+	if s == nil || s.P2P == nil {
+		return nil
+	}
+	if s.P2P.Secure == nil && s.P2P.CAFile == "" {
+		return nil
+	}
+	return &p2p.TLSConfig{Secure: s.P2P.Secure, CAFile: s.P2P.CAFile}
+}
+
 func (s *p2pTunnel) Run() (err error) {
 	if s.IsClosed() {
 		return ErrTunnelClosed
@@ -151,13 +164,14 @@ func (s *p2pTunnel) Run() (err error) {
 	}
 
 	direct := false
-	host, err := p2p.New(&p2p.Config{
+	conf := &p2p.Config{
 		Derp:    p2pDerpURL(settings),
 		Key:     keyPath,
 		Targets: []string{"tcp://" + s.opts.Endpoint},
 		Direct:  &direct,
-		TLS:     &p2p.TLSConfig{Secure: settings.P2P.Secure, CAFile: settings.P2P.CAFile},
-	})
+	}
+	conf.TLS = p2pTLSConfig(settings)
+	host, err := p2p.New(conf)
 	if err != nil {
 		err = fmt.Errorf("p2p host: %w", err)
 		return

@@ -60,24 +60,24 @@ var (
 
 // Options holds the configuration for creating a tunnel.
 type Options struct {
-	ID          string
-	Name        string
-	Endpoint    string
+	ID       string
+	Name     string
+	Endpoint string
 	// Prefix is the custom public URL host prefix (subdomain label) requested
 	// from the tunnel server. Distinct from Hostname, which for HTTP tunnels
 	// means backend Host-header rewrite.
-	Prefix      string
-	Hostname    string
-	Username    string
-	Password    string
-	EnableTLS   bool
-	RewriteHost bool
-	FileUpload  bool
-	Keepalive   bool
-	TTL         int
-	RecordMode  string
-	CreatedAt   time.Time
-	Stats       config.ServiceStats
+	Prefix        string
+	Hostname      string
+	Username      string
+	Password      string
+	EnableTLS     bool
+	RewriteHost   bool
+	FileUpload    bool
+	Keepalive     bool
+	TTL           int
+	RecordMode    string
+	CreatedAt     time.Time
+	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
 }
 
@@ -309,7 +309,9 @@ func Get(id string) Tunnel {
 	return nil
 }
 
-// Delete removes and closes the tunnel with the given ID.
+// Delete removes and closes the tunnel with the given ID. The p2p key file is
+// left intact (the API's delete handler removes it), so an update/replace keeps
+// the tunnel's identity.
 func Delete(id string) {
 	tunnels.mux.Lock()
 	defer tunnels.mux.Unlock()
@@ -317,11 +319,6 @@ func Delete(id string) {
 	for i, s := range tunnels.list {
 		if s != nil && s.ID() == id {
 			s.Close()
-			if s.Type() == P2PTunnel {
-				if err := RemoveP2PKey(s.ID()); err != nil {
-					logger.Default().Error(fmt.Sprintf("remove p2p key %s: %v", s.ID(), err))
-				}
-			}
 			tunnels.list = append(tunnels.list[:i], tunnels.list[i+1:]...)
 			return
 		}
@@ -334,11 +331,11 @@ func Delete(id string) {
 // server (same tunnel ID cannot be registered twice concurrently).
 func RestartRunning() {
 	type restartInfo struct {
-		index int
-		opts  Options
-		fav   bool
-		stats          config.ServiceStats
-		statsBaseline  config.ServiceStats
+		index         int
+		opts          Options
+		fav           bool
+		stats         config.ServiceStats
+		statsBaseline config.ServiceStats
 	}
 
 	var pending []restartInfo
@@ -350,9 +347,9 @@ func RestartRunning() {
 			continue
 		}
 		pending = append(pending, restartInfo{
-			index: i,
-			opts:  t.Options(),
-			fav:   t.IsFavorite(),
+			index:         i,
+			opts:          t.Options(),
+			fav:           t.IsFavorite(),
 			stats:         t.Stats(),
 			statsBaseline: t.StatsBaseline(),
 		})
@@ -445,19 +442,19 @@ func LoadConfig() {
 		}
 
 		tun := createTunnel(cfg.Type, Options{
-			ID:          cfg.ID,
-			Name:        cfg.Name,
-			Endpoint:    cfg.Endpoint,
-			Prefix:      cfg.Prefix,
-			Hostname:    cfg.Hostname,
-			Username:    cfg.Username,
-			Password:    cfg.Password,
-			EnableTLS:   cfg.EnableTLS,
-			RewriteHost: cfg.RewriteHost,
-			FileUpload:  cfg.FileUpload,
-			RecordMode:  cfg.RecordMode,
-			CreatedAt:   cfg.CreatedAt,
-			Stats:       cfg.Stats,
+			ID:            cfg.ID,
+			Name:          cfg.Name,
+			Endpoint:      cfg.Endpoint,
+			Prefix:        cfg.Prefix,
+			Hostname:      cfg.Hostname,
+			Username:      cfg.Username,
+			Password:      cfg.Password,
+			EnableTLS:     cfg.EnableTLS,
+			RewriteHost:   cfg.RewriteHost,
+			FileUpload:    cfg.FileUpload,
+			RecordMode:    cfg.RecordMode,
+			CreatedAt:     cfg.CreatedAt,
+			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
 		})
 		if tun == nil {
@@ -489,22 +486,22 @@ func SaveConfig() error {
 		opts := tun.Options()
 
 		cfg.Tunnels = append(cfg.Tunnels, &config.Tunnel{
-			ID:        tun.ID(),
-			Name:      tun.Name(),
-			Type:      tun.Type(),
-			Endpoint:  tun.Endpoint(),
-			Prefix:    opts.Prefix,
-			Hostname:  opts.Hostname,
-			Username:  opts.Username,
-			Password:  opts.Password,
-				EnableTLS:   opts.EnableTLS,
-				RewriteHost: opts.RewriteHost,
-				FileUpload:  opts.FileUpload,
-			RecordMode: opts.RecordMode,
-			Favorite:  tun.IsFavorite(),
-			Closed:    tun.IsClosed(),
-			CreatedAt: opts.CreatedAt,
-			Stats:     tun.Stats(),
+			ID:            tun.ID(),
+			Name:          tun.Name(),
+			Type:          tun.Type(),
+			Endpoint:      tun.Endpoint(),
+			Prefix:        opts.Prefix,
+			Hostname:      opts.Hostname,
+			Username:      opts.Username,
+			Password:      opts.Password,
+			EnableTLS:     opts.EnableTLS,
+			RewriteHost:   opts.RewriteHost,
+			FileUpload:    opts.FileUpload,
+			RecordMode:    opts.RecordMode,
+			Favorite:      tun.IsFavorite(),
+			Closed:        tun.IsClosed(),
+			CreatedAt:     opts.CreatedAt,
+			Stats:         tun.Stats(),
 			StatsBaseline: tun.StatsBaseline(),
 		})
 	}
@@ -529,8 +526,8 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		PasswordOption(opts.Password),
 		EnableTLSOption(opts.EnableTLS),
 		CreatedAtOption(opts.CreatedAt),
-			RewriteHostOption(opts.RewriteHost),
-			FileUploadOption(opts.FileUpload),
+		RewriteHostOption(opts.RewriteHost),
+		FileUploadOption(opts.FileUpload),
 		RecordModeOption(opts.RecordMode),
 	}
 

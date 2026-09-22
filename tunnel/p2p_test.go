@@ -9,7 +9,8 @@ import (
 )
 
 // TestP2PTunnelKeyLifecycle covers the key file: created on Run with 0600,
-// reused across stop/start (same identity), removed by Delete.
+// reused across stop/start and across Delete/replace (same identity), and
+// removed by RemoveP2PKey — the call the API's delete handler makes.
 func TestP2PTunnelKeyLifecycle(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
@@ -50,15 +51,23 @@ func TestP2PTunnelKeyLifecycle(t *testing.T) {
 	if err := tn2.Run(); err != nil {
 		t.Fatalf("Run after restart: %v", err)
 	}
-	Set(tn2) // replaces the old entry in place; Delete would drop the key file too
+	Set(tn2) // replaces the old entry in place, like an API update
 	if got := tn2.Entrypoint(); got != key1 {
 		t.Fatalf("pubkey changed across restart: %q -> %q", key1, got)
 	}
 	_ = tn2.Close()
 
 	Delete("test-p2p-id")
+	if _, err := os.Stat(keyPath); err != nil {
+		t.Fatalf("Delete removed the key file: %v (update/replace must keep the identity)", err)
+	}
+
+	// The API delete path removes the key separately.
+	if err := RemoveP2PKey("test-p2p-id"); err != nil {
+		t.Fatalf("RemoveP2PKey: %v", err)
+	}
 	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
-		t.Fatalf("Delete left the key file behind: %v", err)
+		t.Fatalf("RemoveP2PKey left the key file behind: %v", err)
 	}
 }
 
@@ -74,5 +83,24 @@ func TestP2PDerpDefault(t *testing.T) {
 	want := "wss://relay.example/derp"
 	if got := p2pDerpURL(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: want}}); got != want {
 		t.Fatalf("p2pDerpURL(configured) = %q, want %q", got, want)
+	}
+}
+
+// TestP2PTLSConfig: an unset settings.p2p must not panic and keeps p2p's
+// defaults; a configured one is passed through.
+func TestP2PTLSConfig(t *testing.T) {
+	if got := p2pTLSConfig(nil); got != nil {
+		t.Fatalf("p2pTLSConfig(nil) = %+v, want nil", got)
+	}
+	if got := p2pTLSConfig(&cfg.Settings{}); got != nil {
+		t.Fatalf("p2pTLSConfig(empty) = %+v, want nil", got)
+	}
+	if got := p2pTLSConfig(&cfg.Settings{P2P: &cfg.P2PSettings{}}); got != nil {
+		t.Fatalf("p2pTLSConfig(defaults) = %+v, want nil", got)
+	}
+	no := false
+	got := p2pTLSConfig(&cfg.Settings{P2P: &cfg.P2PSettings{CAFile: "/tmp/ca.pem", Secure: &no}})
+	if got == nil || got.CAFile != "/tmp/ca.pem" || got.Secure == nil || *got.Secure {
+		t.Fatalf("p2pTLSConfig(configured) = %+v, want the configured values", got)
 	}
 }
