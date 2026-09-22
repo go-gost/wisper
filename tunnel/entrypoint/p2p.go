@@ -2,7 +2,6 @@ package entrypoint
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -14,7 +13,6 @@ import (
 	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
-	"github.com/go-gost/p2p"
 	cfg "github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
 	xchain "github.com/go-gost/x/chain"
@@ -34,16 +32,16 @@ import (
 )
 
 // p2pEntryPoint is the out-dial counterpart of the p2pTunnel: it listens on a
-// local address and forwards every connection through an embedded p2p host's
-// tunnel to a peer identified by its base64 public key. The peer's own target
-// is the outlet (no local admission — the key is the credential).
+// local address and forwards every connection through the process-wide p2p
+// host's tunnel to a peer identified by its base64 public key. The peer's own
+// target is the outlet (no local admission — the key is the credential).
 type p2pEntryPoint struct {
 	opts     tunnel.Options
 	peer     string
 	provider string // p2p registry name, unique per entrypoint
 	config   *config.Config
 	forward  service.Service
-	host     *p2p.Host
+	acquired bool // holds one reference on the shared p2p host
 
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
@@ -167,37 +165,24 @@ func (s *p2pEntryPoint) Run() (err error) {
 		return
 	}
 
-	settings := cfg.Get().Settings
-	keyPath, err := tunnel.P2PKeyPath(s.opts.ID)
+	// The identity is process-wide: take a reference on the shared host. A
+	// failed relay connection is not fatal: the engine retries in the
+	// background and the entrypoint keeps running, so the manager logs it
+	// rather than failing the Run.
+	host, err := tunnel.AcquireP2PHost()
 	if err != nil {
 		return
 	}
-
-	direct := false
-	conf := &p2p.Config{
-		Derp:   tunnel.P2PDerpURL(settings),
-		Key:    keyPath,
-		Direct: &direct,
-	}
-	conf.TLS = tunnel.P2PTLSConfig(settings)
-	host, err := p2p.New(conf)
-	if err != nil {
-		err = fmt.Errorf("p2p host: %w", err)
-		return
-	}
-	// A failed relay connection is not fatal: the engine retries in the
-	// background and the entrypoint keeps running (its peer key stays visible),
-	// so this is logged and not written to s.err.
-	if cerr := host.Connect(); cerr != nil {
-		p2pLog().WithFields(map[string]any{
-			"kind":       "entrypoint",
-			"entrypoint": s.opts.Name,
-		}).Warnf("p2p derp connect: %v", cerr)
-	}
-
-	s.mu.Lock()
-	s.host = host
-	s.mu.Unlock()
+	// Until the service is wired, Run owns the reference and the provider
+	// registration; afterwards Close gives them back. A failure from here on
+	// rolls both back so a dropped object cannot leak them.
+	started := false
+	defer func() {
+		if !started {
+			registry.P2PRegistry().Unregister(s.provider)
+			tunnel.ReleaseP2PHost()
+		}
+	}()
 
 	// Register the provider before parsing the chain: the chain node resolves
 	// metadata.p2p by name at parse time. The Unregister clears a stale
@@ -266,8 +251,9 @@ func (s *p2pEntryPoint) Run() (err error) {
 	}
 
 	s.mu.Lock()
-	s.forward = forward
+	s.forward, s.acquired = forward, true
 	s.mu.Unlock()
+	started = true // the reference and the provider are Close's now
 
 	go func() {
 		serveErr := forward.Serve()
@@ -315,9 +301,9 @@ func (s *p2pEntryPoint) SetStatsBaseline(baseline cfg.ServiceStats) {
 	s.statsBaseline = baseline
 }
 
-// Close stops the local listener, unregisters the p2p provider and shuts the
-// embedded host down. It is idempotent; the key file is kept so stop/start
-// reuses the identity (the API's delete handler removes it).
+// Close stops the local listener, unregisters the p2p provider and gives the
+// shared host reference back. It is idempotent; the shared identity file is
+// kept so stop/start keeps the same key.
 func (s *p2pEntryPoint) Close() error {
 	defer func() {
 		select {
@@ -328,8 +314,8 @@ func (s *p2pEntryPoint) Close() error {
 	}()
 
 	s.mu.Lock()
-	forward, host := s.forward, s.host
-	s.forward, s.host = nil, nil
+	forward, acquired := s.forward, s.acquired
+	s.forward, s.acquired = nil, false
 	s.mu.Unlock()
 
 	var err error
@@ -337,10 +323,10 @@ func (s *p2pEntryPoint) Close() error {
 		err = forward.Close()
 	}
 	registry.P2PRegistry().Unregister(s.provider)
-	if host != nil {
-		if cerr := host.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
+	// acquired is set exactly when Run completed, so an entrypoint that never
+	// started (or whose Run rolled back) releases nothing here.
+	if acquired {
+		tunnel.ReleaseP2PHost()
 	}
 	return err
 }

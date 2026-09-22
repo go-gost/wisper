@@ -40,6 +40,21 @@ type p2pHostManager struct {
 
 var p2pHost = &p2pHostManager{routes: make(map[string]*peerListener)}
 
+// AcquireP2PHost returns the process-wide p2p host, starting it on first use
+// (key + relay + accept loop), and takes a reference on it. Every
+// AcquireP2PHost must be matched by exactly one ReleaseP2PHost, or the host
+// never shuts down.
+func AcquireP2PHost() (*p2p.Host, error) { return p2pHost.acquire() }
+
+// ReleaseP2PHost gives one reference back; the last one stops the host, its
+// accept loop and every peer route. Releasing without a matching acquire
+// would cut someone else's reference short.
+func ReleaseP2PHost() { p2pHost.release() }
+
+// P2PHostPublicKey returns the shared host's base64 public key — the value a
+// peer's p2p entrypoint dials — or "" while the host is not running.
+func P2PHostPublicKey() string { return p2pHost.PublicKey() }
+
 // acquire starts the host on first use (key + relay + Listen + accept loop) and
 // takes a reference. A failed relay connection is not fatal: the engine retries
 // in the background, so it is logged, never returned.
