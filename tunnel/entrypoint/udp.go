@@ -29,12 +29,12 @@ import (
 )
 
 type udpEntryPoint struct {
-	endpoint string
-	opts     tunnel.Options
-	config   *config.Config
-	forward  service.Service
-	favorite atomic.Bool
-	stats    cfg.ServiceStats
+	endpoint      string
+	opts          tunnel.Options
+	config        *config.Config
+	forward       service.Service
+	favorite      atomic.Bool
+	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
 
 	cclose chan struct{}

@@ -28,12 +28,12 @@ import (
 )
 
 type tcpTunnel struct {
-	endpoint string
-	opts     Options
-	config   *config.Config
-	forward  service.Service
-	favorite atomic.Bool
-	stats    cfg.ServiceStats
+	endpoint      string
+	opts          Options
+	config        *config.Config
+	forward       service.Service
+	favorite      atomic.Bool
+	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
 
 	cclose chan struct{}
