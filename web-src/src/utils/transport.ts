@@ -16,7 +16,9 @@ export type PeerTransport =
 
 /** The i18n keys are resolved per call: labels must follow the locale. */
 interface TransportSpec {
-  /** Icon name (utils/icons.ts). */
+  /** Icon name (utils/icons.ts). One icon per side: the bolt for a direct
+   *  path, the hub for every relay state — the reason a peer is on the relay
+   *  is the tooltip's job, not a second icon's. */
   icon: string;
   /** Style hook: a direct path, a fixable problem, or plain relay. */
   tone: 'direct' | 'warn' | 'muted';
@@ -34,7 +36,7 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     whyKey: 'p2pTransportWhyPunching',
   },
   failed: {
-    icon: 'zap-off',
+    icon: 'hub',
     tone: 'warn',
     labelKey: 'p2pTransportRelay',
     whyKey: 'p2pTransportWhyFailed',
@@ -58,7 +60,7 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     whyKey: 'p2pTransportWhyNoCandidates',
   },
   'stun-unreachable': {
-    icon: 'cloud-off',
+    icon: 'hub',
     tone: 'warn',
     labelKey: 'p2pTransportRelay',
     whyKey: 'p2pTransportWhyStun',

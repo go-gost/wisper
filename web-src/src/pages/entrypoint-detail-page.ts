@@ -323,7 +323,11 @@ export class EntrypointDetailPage extends LitElement {
       background: var(--border-subtle);
       color: var(--text-muted);
       font-family: inherit;
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
+    }
+    .peer-badge svg {
+      width: 12px;
+      height: 12px;
     }
     .peer-badge.direct {
       color: var(--green-text);

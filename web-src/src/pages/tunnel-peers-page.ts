@@ -394,7 +394,7 @@ export class TunnelPeersPage extends LitElement {
       border-radius: var(--radius-pill);
       background: var(--border-subtle);
       color: var(--text-muted);
-      font-size: var(--font-xs);
+      font-size: var(--font-sm);
     }
     .peer-badge svg {
       width: 12px;
