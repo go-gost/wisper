@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-RpefXFnK.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
-import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u as D,b as i,i as z,t as E}from"./index-RpefXFnK.js";import{d as C,m as I,c as h,a as u,b as f,n as m,r as p}from"./format-DGmPmkVB.js";import{i as d}from"./app-scaffold-Ah4D5ude.js";import{c as T}from"./clipboard-C3x8_sid.js";var R=Object.defineProperty,P=Object.getOwnPropertyDescriptor,o=(t,a,r,l)=>{for(var s=l>1?void 0:l?P(a,r):a,c=t.length-1,b;c>=0;c--)(b=t[c])&&(s=(l?b(a,r,s):b(s))||s);return l&&s&&R(a,r,s),s};let n=class extends g{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(y(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const r=_().find(l=>l.id===t);r&&(this._entrypoint=r,a?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??"",this._peer=t.options?.peer??""}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0};this.mode==="create"?(await v(()=>import("./index-RpefXFnK.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await v(()=>import("./index-RpefXFnK.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await x())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await $(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await w(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await T(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=t?t.stats:null,r=this._typeLabel(),l=t?.options?.peer??"";return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DiTO8Aui.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
+import{a as m,f as _,c as y,j as e,_ as b,v as x,w,l as $,n as k,x as S,u as D,b as s,i as z,t as T}from"./index-DiTO8Aui.js";import{d as C,m as E,c as v,a as u,b as f,n as g,r as l}from"./format-Dcsnt3Qa.js";import{i as d}from"./app-scaffold-DVYQssM3.js";import{c as I}from"./clipboard-C3x8_sid.js";var R=Object.defineProperty,P=Object.getOwnPropertyDescriptor,n=(t,a,r,p)=>{for(var i=p>1?void 0:p?P(a,r):a,c=t.length-1,h;c>=0;c--)(h=t[c])&&(i=(p?h(a,r,i):h(i))||i);return p&&i&&R(a,r,i),i};let o=class extends m{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._protocol="tcp",this._keepalive=!0,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(_(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const r=y().find(p=>p.id===t);r&&(this._entrypoint=r,a?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._protocol="tcp",this._keepalive=!0}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??"",this._peer=t.options?.peer??"",this._protocol=t.options?.protocol==="udp"?"udp":"tcp",this._keepalive=t.options?.keepalive??!0}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0};this.mode==="create"?(await b(()=>import("./index-DiTO8Aui.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-DiTO8Aui.js").then(a=>a.F),__vite__mapDeps([0,1])).then(a=>a.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await x())}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${a?": "+a:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await w(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await $(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await k(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await S(this.entrypointId,this._resetKind),this._entrypoint&&D(this.entrypointId,this._entrypoint.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,a=t?t.stats:null,r=this._typeLabel(),p=t?.options?.peer??"";return s`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
@@ -9,13 +9,13 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
             ${this.mode==="create"?`${e("entrypointNewTitle")} — ${r}`:r+" Entrypoint"}
           </span>
 
-          ${this.mode==="view"&&t?i`
-              ${t.status==="running"?i`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
+          ${this.mode==="view"&&t?s`
+              ${t.status==="running"?s`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
                   ■ ${e("btnStop")}
-                </button>`:i`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
+                </button>`:s`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
                   ▶ ${e("btnStart")}
                 </button>`}
-            `:i`
+            `:s`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
                 ${d("check")} ${e("btnSave")}
               </button>
@@ -23,11 +23,11 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
         </div>
 
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
-        ${this.mode==="view"&&t?i`
+        ${this.mode==="view"&&t?s`
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
               ${t.status==="running"?e("statusRunning"):t.status==="error"?e("statusError"):e("statusStopped")}
-              ${t.error?i` — ${t.error}`:""}
+              ${t.error?s` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
 
@@ -41,11 +41,11 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
                   <span class="info-label">Created</span>
                   <span class="info-value text">${C(t.created_at)}</span>
                 </div>
-                ${this.entrypointType==="p2p"?"":i`
+                ${this.entrypointType==="p2p"?"":s`
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
                   <span class="info-value uuid">${t.id??"—"}</span>
-                  ${t.id?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
+                  ${t.id?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
                       ${d("copy")}
                     </button>`:""}
                 </div>`}
@@ -57,11 +57,11 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
                   <span class="info-label">Bind Address</span>
                   <span class="info-value">${t.entrypoint}</span>
                 </div>
-                ${this.entrypointType==="p2p"?i`
+                ${this.entrypointType==="p2p"?s`
                     <div class="info-row">
                       <span class="info-label">${e("entrypointPeerKey")}</span>
-                      <span class="info-value">${this._showPeer?l:I(l)}</span>
-                      ${l?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
+                      <span class="info-value">${this._showPeer?p:E(p)}</span>
+                      ${p?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(p)}>
                           ${d("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?e("hideKey"):e("revealKey")}"
@@ -69,21 +69,27 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
                           ${d(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
+                    <div class="info-row">
+                      <span class="info-label">${e("fieldProtocol")}</span>
+                      <span class="info-value text">
+                        ${(t.options?.protocol==="udp"?"udp":"tcp").toUpperCase()}
+                      </span>
+                    </div>
                     <div class="p2p-hint">${e("p2pEntryHint")}</div>
                   `:""}
               </div>
 
               <!-- Stats grid -->
-              ${a?i`
+              ${a?s`
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${h(a.total_conns)}</div>
-                      <div class="stat-rate">${h(a.current_conns)} active · ${a.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-value">${v(a.total_conns)}</div>
+                      <div class="stat-rate">${v(a.current_conns)} active · ${a.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${h(a.total_errs)}</div>
+                      <div class="stat-value">${v(a.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${d("rotate-cw")}</span></div>
@@ -107,7 +113,7 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
           `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
-        ${this.mode!=="view"?i`
+        ${this.mode!=="view"?s`
             <div class="section">
               <div class="card" style="padding:16px;">
                 <div class="form-group">
@@ -116,37 +122,53 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
                 </div>
 
                 <!-- A p2p entrypoint dials the peer directly: no tunnel id. -->
-                ${this.entrypointType==="p2p"?"":i`
+                ${this.entrypointType==="p2p"?"":s`
                 <div class="form-group">
                   <label class="form-label">Tunnel ID</label>
                   <input class="form-input"
                     ?readonly=${this.mode==="edit"}
                     .value=${this._tunnelId}
                     placeholder="Paste tunnel UUID"
-                    @input=${s=>{this._tunnelId=s.target.value}}>
+                    @input=${i=>{this._tunnelId=i.target.value}}>
                 </div>`}
 
                 <div class="form-group">
                   <label class="form-label">${e("fieldName")}</label>
                   <input class="form-input" .value=${this._name} placeholder="My Entrypoint"
-                    @input=${s=>{this._name=s.target.value}}>
+                    @input=${i=>{this._name=i.target.value}}>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label">${e("fieldBindAddress")}</label>
                   <input class="form-input" .value=${this._endpoint} placeholder="0.0.0.0:9090"
-                    @input=${s=>{this._endpoint=s.target.value}}>
+                    @input=${i=>{this._endpoint=i.target.value}}>
                 </div>
 
-                ${this.entrypointType==="p2p"?i`
+                ${this.entrypointType==="p2p"?s`
                     <div class="form-group">
                       <label class="form-label">${e("entrypointPeerKey")}</label>
                       <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
-                        @input=${s=>{this._peer=s.target.value}}>
+                        @input=${i=>{this._peer=i.target.value}}>
                     </div>
+                    <div class="switch-row" @click=${()=>{this._protocol=this._protocol==="tcp"?"udp":"tcp"}}>
+                      <span class="switch-label">${e("fieldProtocol")}</span>
+                      <span class="protocol-value">
+                        ${this._protocol==="udp"?e("protocolUdp"):e("protocolTcp")}
+                        ${d("chevron-right")}
+                      </span>
+                    </div>
+                    ${this._protocol==="udp"?s`
+                    <div class="switch-row">
+                      <span class="switch-label">${e("switchKeepalive")}</span>
+                      <div class="switch ${this._keepalive?"on":""}"
+                        @click=${()=>{this._keepalive=!this._keepalive}}>
+                        <div class="switch-knob"></div>
+                      </div>
+                    </div>
+                    <div class="p2p-hint">${e("keepaliveHint")}</div>`:""}
                   `:""}
 
-                ${this.mode==="edit"?i`
+                ${this.mode==="edit"?s`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
@@ -158,11 +180,11 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
             </div>
           `:""}
 
-        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?s`<div class="toast">${this._snackbar}</div>`:""}
 
-        ${this._showResetDialog?i`
+        ${this._showResetDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
-              <div class="dialog-box" @click=${s=>s.stopPropagation()}>
+              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${e("resetStatsConfirmTitle")}</div>
                 <div class="dialog-message">${e("resetStatsConfirm")}</div>
                 <div class="dialog-actions">
@@ -177,9 +199,9 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
             </div>
           `:""}
 
-        ${this._showDeleteDialog?i`
+        ${this._showDeleteDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
-              <div class="dialog-box" @click=${s=>s.stopPropagation()}>
+              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${e("deleteConfirmTitle")}</div>
                 <div class="dialog-message">${e("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
@@ -194,7 +216,7 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
             </div>
           `:""}
       </app-scaffold>
-    `}};n.styles=z`
+    `}};o.styles=z`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -297,6 +319,54 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
       color: var(--text-muted);
       line-height: 1.5;
       padding: 0 14px 10px;
+    }
+
+    /* ── Option rows (protocol, keepalive) ── */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+    }
+    .switch-label {
+      font-size: var(--font-sm);
+      color: var(--text);
+    }
+    .protocol-value {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .switch {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      flex-shrink: 0;
+    }
+    .switch.on {
+      background: var(--accent);
+    }
+    .switch-knob {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    }
+    .switch.on .switch-knob {
+      left: 20px;
     }
 
     /* ── Stats grid ── */
@@ -445,4 +515,4 @@ import{a as g,f as y,c as _,j as e,_ as v,v as x,w as $,l as w,n as k,x as S,u a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([m()],n.prototype,"entrypointType",2);o([m()],n.prototype,"entrypointId",2);o([p()],n.prototype,"mode",2);o([p()],n.prototype,"_entrypoint",2);o([p()],n.prototype,"_saving",2);o([p()],n.prototype,"_snackbar",2);o([p()],n.prototype,"_showDeleteDialog",2);o([p()],n.prototype,"_showResetDialog",2);o([p()],n.prototype,"_name",2);o([p()],n.prototype,"_endpoint",2);o([p()],n.prototype,"_tunnelId",2);o([p()],n.prototype,"_peer",2);o([p()],n.prototype,"_showPeer",2);n=o([E("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
+  `;n([g()],o.prototype,"entrypointType",2);n([g()],o.prototype,"entrypointId",2);n([l()],o.prototype,"mode",2);n([l()],o.prototype,"_entrypoint",2);n([l()],o.prototype,"_saving",2);n([l()],o.prototype,"_snackbar",2);n([l()],o.prototype,"_showDeleteDialog",2);n([l()],o.prototype,"_showResetDialog",2);n([l()],o.prototype,"_name",2);n([l()],o.prototype,"_endpoint",2);n([l()],o.prototype,"_tunnelId",2);n([l()],o.prototype,"_peer",2);n([l()],o.prototype,"_showPeer",2);n([l()],o.prototype,"_protocol",2);n([l()],o.prototype,"_keepalive",2);o=n([T("entrypoint-detail-page")],o);export{o as EntrypointDetailPage};

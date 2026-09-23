@@ -79,6 +79,10 @@ type Options struct {
 	// Peer is this link's other end: for a p2p entrypoint, the remote host's
 	// base64 public key to dial.
 	Peer string
+	// Protocol is a p2p entrypoint's inner protocol: "tcp" (the default when
+	// empty) or "udp". It selects the local listener and the chain node's
+	// dialer.
+	Protocol string
 	// Peers is a p2p tunnel's inbound allowlist: the base64 public keys of the
 	// peers whose streams are routed to it. Empty is valid — the tunnel runs,
 	// it just receives nothing (there is no catch-all route).
@@ -188,6 +192,13 @@ func RecordModeOption(mode string) Option {
 func PeerOption(peer string) Option {
 	return func(opts *Options) {
 		opts.Peer = peer
+	}
+}
+
+// ProtocolOption sets a p2p entrypoint's inner protocol ("tcp" or "udp").
+func ProtocolOption(protocol string) Option {
+	return func(opts *Options) {
+		opts.Protocol = protocol
 	}
 }
 
@@ -404,6 +415,7 @@ func RestartRunning() {
 			RecordMode:  p.opts.RecordMode,
 			Peers:       p.opts.Peers,
 			PeerAliases: p.opts.PeerAliases,
+			Protocol:    p.opts.Protocol,
 			CreatedAt:   p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -488,6 +500,7 @@ func LoadConfig() {
 			FileUpload:    cfg.FileUpload,
 			RecordMode:    cfg.RecordMode,
 			Peer:          cfg.Peer,
+			Protocol:      cfg.Protocol,
 			Peers:         cfg.Peers,
 			PeerAliases:   NormalizePeerAliases(cfg.Peers, cfg.PeerAliases),
 			CreatedAt:     cfg.CreatedAt,
@@ -536,6 +549,7 @@ func SaveConfig() error {
 			FileUpload:    opts.FileUpload,
 			RecordMode:    opts.RecordMode,
 			Peer:          opts.Peer,
+			Protocol:      opts.Protocol,
 			Peers:         opts.Peers,
 			PeerAliases:   opts.PeerAliases,
 			Favorite:      tun.IsFavorite(),

@@ -125,6 +125,8 @@ export interface EntrypointOptions {
   ttl: number;
   /** Remote peer's base64 public key (p2p entrypoints). */
   peer?: string;
+  /** A p2p entrypoint's inner protocol: 'tcp' (default) or 'udp'. */
+  protocol?: string;
 }
 
 export interface Entrypoint {
@@ -150,6 +152,8 @@ export interface EntrypointCreateRequest {
   ttl?: number;
   /** Remote peer's base64 public key (p2p entrypoints). */
   peer?: string;
+  /** A p2p entrypoint's inner protocol: 'tcp' (default) or 'udp'. */
+  protocol?: string;
 }
 
 // ─── Stats Snapshot ──────────────────────────────────────────────────────────

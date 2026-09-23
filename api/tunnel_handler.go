@@ -63,6 +63,8 @@ type tunnelOptionsResp struct {
 	RecordMode  string `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
+	// Protocol is a p2p entrypoint's inner protocol: "tcp" or "udp".
+	Protocol string `json:"protocol,omitempty"`
 	// Peers is a p2p tunnel's inbound allowlist. Empty is valid: the tunnel
 	// runs and routes nothing.
 	Peers []peerJSON `json:"peers,omitempty"`
@@ -148,6 +150,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			TTL:         opts.TTL,
 			RecordMode:  opts.RecordMode,
 			Peer:        opts.Peer,
+			Protocol:    opts.Protocol,
 			Peers:       peersJSON(opts.Peers, opts.PeerAliases),
 		},
 		Stats: statsResponse{

@@ -20,9 +20,11 @@ import (
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
 	_ "github.com/go-gost/x/connector/forward" // chain node connector for p2p nodes
 	_ "github.com/go-gost/x/dialer/tcp"        // chain node dialer for p2p nodes
+	_ "github.com/go-gost/x/dialer/udp"        // chain node dialer for a udp p2p entrypoint
 	"github.com/go-gost/x/handler/forward/local"
 	"github.com/go-gost/x/hop"
 	"github.com/go-gost/x/listener/tcp"
+	"github.com/go-gost/x/listener/udp"
 	xlogger "github.com/go-gost/x/logger"
 	mdx "github.com/go-gost/x/metadata"
 	xstats "github.com/go-gost/x/observer/stats"
@@ -32,9 +34,10 @@ import (
 )
 
 // p2pEntryPoint is the out-dial counterpart of the p2pTunnel: it listens on a
-// local address and forwards every connection through the process-wide p2p
-// host's tunnel to a peer identified by its base64 public key. The peer's own
-// target is the outlet (no local admission — the key is the credential).
+// local address and forwards every connection (or datagram session, for the
+// udp protocol) through the process-wide p2p host's tunnel to a peer identified
+// by its base64 public key. The peer's own target is the outlet (no local
+// admission — the key is the credential).
 type p2pEntryPoint struct {
 	opts     tunnel.Options
 	peer     string
@@ -52,8 +55,9 @@ type p2pEntryPoint struct {
 	mu     sync.RWMutex
 }
 
-// NewP2PEntryPoint creates a p2p entrypoint: a local TCP listener whose
-// traffic exits through an embedded p2p host to the peer's public key.
+// NewP2PEntryPoint creates a p2p entrypoint: a local listener (tcp by default,
+// udp with ProtocolOption) whose traffic exits through an embedded p2p host to
+// the peer's public key.
 func NewP2PEntryPoint(opts ...tunnel.Option) EntryPoint {
 	var options tunnel.Options
 	for _, opt := range opts {
@@ -108,16 +112,28 @@ func p2pLog() logger.Logger {
 	return xlogger.NewLogger(xlogger.OutputOption(io.Discard))
 }
 
+// protocol returns the entrypoint's inner protocol: "tcp" (the default when
+// unset) or "udp". It selects the local listener, the handler's network and the
+// chain node's dialer, so a udp entrypoint carries datagrams end to end.
+func (s *p2pEntryPoint) protocol() string {
+	if s.opts.Protocol == "udp" {
+		return "udp"
+	}
+	return "tcp"
+}
+
 func (s *p2pEntryPoint) init() error {
-	tcpSvc := &config.ServiceConfig{
+	protocol := s.protocol()
+
+	svc := &config.ServiceConfig{
 		Name: s.opts.Name,
 		Addr: s.opts.Endpoint,
 		Handler: &config.HandlerConfig{
-			Type:  "tcp",
+			Type:  protocol,
 			Chain: s.opts.Name,
 		},
 		Listener: &config.ListenerConfig{
-			Type: "tcp",
+			Type: protocol,
 		},
 		Forwarder: &config.ForwarderConfig{
 			Nodes: []*config.ForwardNodeConfig{
@@ -128,20 +144,30 @@ func (s *p2pEntryPoint) init() error {
 			},
 		},
 	}
+	if protocol == "udp" {
+		// The udp listener's session semantics: keepalive holds a client's
+		// session (and so its tunnel) between datagrams, ttl retires it.
+		svc.Listener.Metadata = map[string]any{
+			"keepalive": s.opts.Keepalive,
+			"ttl":       time.Duration(s.opts.TTL) * time.Second,
+		}
+	}
 
 	// Patch the tunnel chain into a p2p chain: the node dials the peer's
 	// public key through the embedded host's tunnel (metadata.p2p selects the
 	// provider), and the "forward" connector hands the tunnel conn straight to
-	// the target — the peer's own target routing decides the outlet.
+	// the target — the peer's own target routing decides the outlet. The node's
+	// dialer is the entrypoint's protocol, so a udp entrypoint asks the host
+	// for a datagram tunnel.
 	chCfg := tunnel.ChainConfig(s.opts.ID, s.opts.Name, s.opts.RecordMode)
 	node := chCfg.Hops[0].Nodes[0]
 	node.Addr = s.peer
 	node.Connector = &config.ConnectorConfig{Type: "forward"}
-	node.Dialer = &config.DialerConfig{Type: "tcp"}
+	node.Dialer = &config.DialerConfig{Type: protocol}
 	node.Metadata = map[string]any{"p2p": s.provider}
 
 	s.config = &config.Config{
-		Services: []*config.ServiceConfig{tcpSvc},
+		Services: []*config.ServiceConfig{svc},
 		Chains:   []*config.ChainConfig{chCfg},
 	}
 	return nil
@@ -216,16 +242,27 @@ func (s *p2pEntryPoint) Run() (err error) {
 		}
 
 		svcCfg := s.config.Services[0]
-		ln := tcp.NewListener(
-			listener.AddrOption(svcCfg.Addr),
-			listener.LoggerOption(log.WithFields(map[string]any{"kind": "listener", "listener": "tcp"})),
-			listener.StatsOption(pStats),
-		)
+		protocol := s.protocol()
+		lnLogger := log.WithFields(map[string]any{"kind": "listener", "listener": protocol})
+		var ln listener.Listener
+		if protocol == "udp" {
+			ln = udp.NewListener(
+				listener.AddrOption(svcCfg.Addr),
+				listener.LoggerOption(lnLogger),
+				listener.StatsOption(pStats),
+			)
+		} else {
+			ln = tcp.NewListener(
+				listener.AddrOption(svcCfg.Addr),
+				listener.LoggerOption(lnLogger),
+				listener.StatsOption(pStats),
+			)
+		}
 		if err = ln.Init(mdx.NewMetadata(svcCfg.Listener.Metadata)); err != nil {
 			return
 		}
 
-		handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tcp"})
+		handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": protocol})
 		h := local.NewHandler(
 			handler.RouterOption(xchain.NewRouter(
 				chain.ChainRouterOption(ch),

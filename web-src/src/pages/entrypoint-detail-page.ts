@@ -32,6 +32,11 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _tunnelId = '';
   @state() private _peer = '';
   @state() private _showPeer = false;
+  /** A p2p entrypoint's inner protocol: 'tcp' (default) or 'udp'. */
+  @state() private _protocol = 'tcp';
+  /** A udp p2p entrypoint's listener keepalive: hold a client's session
+   *  (and so its tunnel) between datagrams instead of per-datagram dials. */
+  @state() private _keepalive = true;
 
   private _unsubs: (() => void)[] = [];
 
@@ -89,6 +94,8 @@ export class EntrypointDetailPage extends LitElement {
     this._endpoint = '';
     this._tunnelId = '';
     this._peer = '';
+    this._protocol = 'tcp';
+    this._keepalive = true;
   }
 
   private _populateForm(ep: Entrypoint) {
@@ -96,6 +103,8 @@ export class EntrypointDetailPage extends LitElement {
     this._endpoint = ep.entrypoint;
     this._tunnelId = ep.id ?? '';
     this._peer = ep.options?.peer ?? '';
+    this._protocol = ep.options?.protocol === 'udp' ? 'udp' : 'tcp';
+    this._keepalive = ep.options?.keepalive ?? true;
   }
 
   private _navigate(path: string) {
@@ -132,6 +141,9 @@ export class EntrypointDetailPage extends LitElement {
         endpoint: this._endpoint.trim(),
         id: this._tunnelId.trim() || undefined,
         peer: this._peer.trim() || undefined,
+        protocol: this.entrypointType === 'p2p' ? this._protocol : undefined,
+        keepalive:
+          this.entrypointType === 'p2p' && this._protocol === 'udp' ? this._keepalive : undefined,
       };
 
       if (this.mode === 'create') {
@@ -313,6 +325,54 @@ export class EntrypointDetailPage extends LitElement {
       color: var(--text-muted);
       line-height: 1.5;
       padding: 0 14px 10px;
+    }
+
+    /* ── Option rows (protocol, keepalive) ── */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+    }
+    .switch-label {
+      font-size: var(--font-sm);
+      color: var(--text);
+    }
+    .protocol-value {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .switch {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      flex-shrink: 0;
+    }
+    .switch.on {
+      background: var(--accent);
+    }
+    .switch-knob {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: left var(--transition-fast);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    }
+    .switch.on .switch-knob {
+      left: 20px;
     }
 
     /* ── Stats grid ── */
@@ -559,6 +619,12 @@ export class EntrypointDetailPage extends LitElement {
                         </button>`
                         : ''}
                     </div>
+                    <div class="info-row">
+                      <span class="info-label">${t('fieldProtocol')}</span>
+                      <span class="info-value text">
+                        ${(ep.options?.protocol === 'udp' ? 'udp' : 'tcp').toUpperCase()}
+                      </span>
+                    </div>
                     <div class="p2p-hint">${t('p2pEntryHint')}</div>
                   `
                   : ''}
@@ -642,6 +708,26 @@ export class EntrypointDetailPage extends LitElement {
                       <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
                         @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
                     </div>
+                    <div class="switch-row" @click=${() => {
+                      this._protocol = this._protocol === 'tcp' ? 'udp' : 'tcp';
+                    }}>
+                      <span class="switch-label">${t('fieldProtocol')}</span>
+                      <span class="protocol-value">
+                        ${this._protocol === 'udp' ? t('protocolUdp') : t('protocolTcp')}
+                        ${icon('chevron-right')}
+                      </span>
+                    </div>
+                    ${this._protocol === 'udp'
+                      ? html`
+                    <div class="switch-row">
+                      <span class="switch-label">${t('switchKeepalive')}</span>
+                      <div class="switch ${this._keepalive ? 'on' : ''}"
+                        @click=${() => { this._keepalive = !this._keepalive; }}>
+                        <div class="switch-knob"></div>
+                      </div>
+                    </div>
+                    <div class="p2p-hint">${t('keepaliveHint')}</div>`
+                      : ''}
                   `
                   : ''}
 

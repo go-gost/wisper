@@ -1,6 +1,7 @@
 package entrypoint
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -101,6 +102,7 @@ func TestSaveConfigKeepsPeer(t *testing.T) {
 		tp.IDOption("ep-save"),
 		tp.EndpointOption("127.0.0.1:0"),
 		tp.PeerOption(testPeerKey),
+		tp.ProtocolOption("udp"),
 		tp.KeepaliveOption(true),
 		tp.TTLOption(30),
 	)
@@ -118,7 +120,55 @@ func TestSaveConfigKeepsPeer(t *testing.T) {
 	if saved[0].Peer != testPeerKey {
 		t.Errorf("persisted peer = %q, want %q", saved[0].Peer, testPeerKey)
 	}
+	if saved[0].Protocol != "udp" {
+		t.Errorf("persisted protocol = %q, want udp", saved[0].Protocol)
+	}
 	if !saved[0].Keepalive || saved[0].TTL != 30 {
 		t.Errorf("persisted keepalive/ttl = %v/%d, want true/30", saved[0].Keepalive, saved[0].TTL)
+	}
+}
+
+// TestP2PEntryPointUDPProtocol: a udp p2p entrypoint binds a udp socket and
+// asks the host for a datagram tunnel — the listener, the handler's network and
+// the chain node's dialer all follow the protocol, so the peer receives
+// datagram-framed traffic.
+func TestP2PEntryPointUDPProtocol(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+
+	ep := NewP2PEntryPoint(
+		tp.IDOption("test-p2p-ep-udp"),
+		tp.EndpointOption("127.0.0.1:0"),
+		tp.PeerOption(testPeerKey),
+		tp.ProtocolOption("udp"),
+		tp.KeepaliveOption(true),
+	)
+	if err := ep.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	defer ep.Close()
+
+	s := ep.(*p2pEntryPoint)
+	svc := s.config.Services[0]
+	if svc.Listener.Type != "udp" || svc.Handler.Type != "udp" {
+		t.Fatalf("listener/handler = %q/%q, want udp/udp", svc.Listener.Type, svc.Handler.Type)
+	}
+	if got := svc.Listener.Metadata["keepalive"]; got != true {
+		t.Fatalf("listener keepalive = %v, want true", got)
+	}
+	if got := s.config.Chains[0].Hops[0].Nodes[0].Dialer.Type; got != "udp" {
+		t.Fatalf("node dialer = %q, want udp", got)
+	}
+
+	// The service really bound a udp socket (0 -> a free port).
+	addr := s.forward.Addr()
+	if addr == nil {
+		t.Fatal("service has no address after Run")
+	}
+	if got := addr.Network(); got != "udp" {
+		t.Fatalf("bound listener network = %q, want udp", got)
+	}
+	if _, ok := addr.(*net.UDPAddr); !ok {
+		t.Fatalf("bound address %T is not a UDP address", addr)
 	}
 }

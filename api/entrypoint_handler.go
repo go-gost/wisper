@@ -20,6 +20,8 @@ type entrypointCreateRequest struct {
 	TTL       int    `json:"ttl,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
+	// Protocol is a p2p entrypoint's inner protocol: "tcp" (default) or "udp".
+	Protocol string `json:"protocol,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
@@ -30,6 +32,7 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.KeepaliveOption(r.Keepalive),
 		tunnel.TTLOption(r.TTL),
 		tunnel.PeerOption(r.Peer),
+		tunnel.ProtocolOption(r.Protocol),
 	}
 }
 
@@ -212,6 +215,7 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 		tunnel.TTLOption(opts.TTL),
 		tunnel.CreatedAtOption(opts.CreatedAt),
 		tunnel.PeerOption(opts.Peer),
+		tunnel.ProtocolOption(opts.Protocol),
 	}
 
 	var newEP entrypoint.EntryPoint

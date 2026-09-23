@@ -149,6 +149,7 @@ func RestartRunning() {
 			Keepalive:     p.opts.Keepalive,
 			TTL:           p.opts.TTL,
 			Peer:          p.opts.Peer,
+			Protocol:      p.opts.Protocol,
 			Peers:         p.opts.Peers,
 			CreatedAt:     p.opts.CreatedAt,
 			StatsBaseline: p.statsBaseline,
@@ -192,6 +193,7 @@ func LoadConfig() {
 			Keepalive:     cfg.Keepalive,
 			TTL:           cfg.TTL,
 			Peer:          cfg.Peer,
+			Protocol:      cfg.Protocol,
 			Peers:         cfg.Peers,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
@@ -237,6 +239,7 @@ func SaveConfig() error {
 			Keepalive:     opts.Keepalive,
 			TTL:           opts.TTL,
 			Peer:          opts.Peer,
+			Protocol:      opts.Protocol,
 			Favorite:      ep.IsFavorite(),
 			Closed:        ep.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -266,6 +269,7 @@ func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
 		tunnel.CreatedAtOption(opts.CreatedAt),
 		tunnel.StatsBaselineOption(opts.StatsBaseline),
 		tunnel.PeerOption(opts.Peer),
+		tunnel.ProtocolOption(opts.Protocol),
 		tunnel.PeersOption(opts.Peers...),
 	}
 	switch st {
