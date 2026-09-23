@@ -86,17 +86,17 @@ export function transportStyle(value?: string): TransportStyle | null {
   };
 }
 
-/** TransportView is what a list row draws: computed where the locale is known
- *  (a page), so a card stays a dumb renderer. */
+/** TransportView is what a list row draws — an icon, its tone and its tooltip.
+ *  It is resolved where the locale is known (a page), so a card stays a dumb
+ *  renderer. */
 export interface TransportView {
   icon: string;
   tone: 'direct' | 'warn' | 'muted';
-  text: string;
   hint: string;
 }
 
 /** transportView is the row-sized view of one value. */
 export function transportView(value?: string): TransportView | null {
   const st = transportStyle(value);
-  return st ? { icon: st.icon, tone: st.tone, text: st.label, hint: st.hint } : null;
+  return st ? { icon: st.icon, tone: st.tone, hint: st.hint } : null;
 }

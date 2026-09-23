@@ -117,23 +117,17 @@ export class TunnelCard extends LitElement {
       color: var(--text-muted);
     }
 
-    /* ── p2p transport chip (direct / relay, with the reason) ── */
-    .type-line {
+    /* ── p2p transport: one small icon beside the created-at, the reason in
+       its tooltip (a card has no room for the words) ── */
+    .right-top {
       display: flex;
       align-items: center;
-      gap: 6px;
-      min-width: 0;
+      gap: 5px;
     }
     .transport {
       display: inline-flex;
       align-items: center;
-      gap: 3px;
-      padding: 0 6px;
-      border-radius: var(--radius-pill);
-      background: var(--border-subtle);
       color: var(--text-muted);
-      font-size: var(--font-xs);
-      white-space: nowrap;
     }
     .transport svg {
       width: 12px;
@@ -141,7 +135,6 @@ export class TunnelCard extends LitElement {
     }
     .transport.direct {
       color: var(--green-text);
-      background: var(--green-bg);
     }
     .transport.warn {
       color: var(--amber);
@@ -226,24 +219,6 @@ export class TunnelCard extends LitElement {
     this.dispatchEvent(new CustomEvent('chevron-click', { bubbles: true, composed: true }));
   }
 
-  /** _renderTypeLine is the type label with the p2p transport chip beside it,
-   *  so a row says at a glance whether its peers ride a direct path. */
-  private _renderTypeLine() {
-    const st = this.transport;
-    if (!this.typeLabel && !st) return nothing;
-
-    return html`
-      <div class="type-line">
-        ${this.typeLabel ? html`<span class="type-label">${this.typeLabel}</span>` : nothing}
-        ${st
-          ? html`<span class="transport ${st.tone}" title=${st.hint}>
-              ${icon(st.icon)}<span>${st.text}</span>
-            </span>`
-          : nothing}
-      </div>
-    `;
-  }
-
   render() {
     const stopped = this.status === 'stopped';
 
@@ -253,12 +228,19 @@ export class TunnelCard extends LitElement {
 
         <div class="info">
           <div class="name">${this.name}</div>
-          ${this._renderTypeLine()}
+          ${this.typeLabel ? html`<div class="type-label">${this.typeLabel}</div>` : ''}
           ${this.meta ? html`<div class="meta">${this.meta}</div>` : ''}
         </div>
 
         <div class="right-col">
-          ${this.createdAt ? html`<span class="created-at">${formatRelativeTime(this.createdAt)}</span>` : ''}
+          <div class="right-top">
+            ${this.transport
+              ? html`<span class="transport ${this.transport.tone}" title=${this.transport.hint}>
+                  ${icon(this.transport.icon)}
+                </span>`
+              : nothing}
+            ${this.createdAt ? html`<span class="created-at">${formatRelativeTime(this.createdAt)}</span>` : ''}
+          </div>
           ${this.status === 'running' ? html`
             <div class="traffic">
               <div class="traffic-row">
