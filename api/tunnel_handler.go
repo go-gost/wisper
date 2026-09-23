@@ -145,7 +145,6 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			Prefix:      opts.Prefix,
 			Hostname:    opts.Hostname,
 			Username:    opts.Username,
-			Password:    opts.Password,
 			BasicAuth:   opts.Username != "",
 			EnableTLS:   opts.EnableTLS,
 			RewriteHost: opts.RewriteHost,
