@@ -223,13 +223,13 @@ func (s *p2pEntryPoint) Run() (err error) {
 		"service": s.opts.Name,
 	})
 
-	// The peer is known up front, so warm its path now: the relay session is
-	// brought up and the hole punch starts immediately, instead of waiting for
-	// the first local client. Until then the entrypoint has no path to show and
-	// nothing to punch — and the first client pays for it.
+	// The peer is known up front and this side is the one that dials out, so
+	// bring its path up and punch now: the direct path is being arranged (and
+	// visible in the status) before the first local client arrives, instead of
+	// waiting for traffic. Punch failures are logged, never fatal.
 	if peer := s.opts.Peer; peer != "" {
-		if err := host.Warm(peer); err != nil {
-			log.Warnf("p2p entrypoint: warm peer %s: %v", peer, err)
+		if err := host.Punch(peer); err != nil {
+			log.Warnf("p2p entrypoint: punch peer %s: %v", peer, err)
 		}
 	}
 

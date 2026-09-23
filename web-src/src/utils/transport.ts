@@ -39,7 +39,12 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     labelKey: 'p2pTransportRelay',
     whyKey: 'p2pTransportWhyFailed',
   },
-  derp: { icon: 'hub', tone: 'muted', labelKey: 'p2pTransportRelay' },
+  derp: {
+    icon: 'hub',
+    tone: 'muted',
+    labelKey: 'p2pTransportRelay',
+    whyKey: 'p2pTransportWhyRelay',
+  },
   disabled: {
     icon: 'hub',
     tone: 'muted',

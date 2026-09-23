@@ -174,6 +174,7 @@ const zh: Record<string, string> = {
   p2pTransportPunch: '打洞',
   p2pTransportPunching: '打洞中',
   p2pTransportHint: '两端直连（打洞成功），流量不经过中继。',
+  p2pTransportWhyRelay: '当前走中继，未使用直连',
   p2pTransportWhyPunching: '正在协商直连',
   p2pTransportWhyFailed: '打洞失败（多为对称 NAT）',
   p2pTransportWhyDisabled: '设置里关闭了直连',

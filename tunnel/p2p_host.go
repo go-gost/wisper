@@ -89,11 +89,13 @@ func P2PHostRunning() bool {
 	return p2pHost.host != nil
 }
 
-// warmPeers starts the path to each peer on the running host: it brings up the
-// relay session and the hole punch without opening a stream, so a freshly
-// registered allowlist is being arranged — and visible in P2PHostStatus —
-// before any traffic. A failure is the peer's business (it may not be up yet),
-// so it is logged, never returned. No-op while no host runs.
+// warmPeers brings up the relay session for each peer on the running host, so
+// a freshly registered allowlist appears in P2PHostStatus (and on the peers
+// page) before any traffic. It does not punch: this side answers its peers,
+// and a speculative round would fail for a peer that has not engaged yet —
+// with a failure that looks the same as a punch that cannot work. A failure is
+// the peer's business, so it is logged, never returned. No-op while no host
+// runs.
 func (m *p2pHostManager) warmPeers(peers []string) {
 	m.mu.Lock()
 	host := m.host
