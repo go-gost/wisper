@@ -24,6 +24,7 @@ import (
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
 	_ "github.com/go-gost/x/connector/forward"
 	_ "github.com/go-gost/x/dialer/tcp"
+	_ "github.com/go-gost/x/dialer/udp"
 	"github.com/go-gost/x/registry"
 
 	cfg "github.com/go-gost/wisper/config"
@@ -316,4 +317,95 @@ func TestP2PTunnelRefusesUnlistedPeer(t *testing.T) {
 		t.Fatalf("unlisted peer got a reply %q, want a closed stream", buf[:n])
 	}
 	t.Logf("unlisted peer refused at read: %v", err)
+}
+
+// dialHostUDP is dialHost's datagram twin: the chain node's dialer is udp, so
+// the p2p tunnel carries datagrams (one Read/Write per datagram on the
+// returned conn).
+func dialHostUDP(t *testing.T, ctx context.Context, provider, hostKey string) (net.Conn, error) {
+	t.Helper()
+	chCfg := wtunnel.ChainConfig("e2e-peer-udp-chain", "e2e-peer-udp-chain", "off")
+	node := chCfg.Hops[0].Nodes[0]
+	node.Addr = hostKey
+	node.Connector = &xconfig.ConnectorConfig{Type: "forward"}
+	node.Dialer = &xconfig.DialerConfig{Type: "udp"}
+	node.Metadata = map[string]any{"p2p": provider}
+	ch, err := chain_parser.ParseChain(chCfg, clogger.Default())
+	if err != nil {
+		t.Fatalf("parse chain: %v", err)
+	}
+	rt := ch.Route(ctx, "udp", hostKey)
+	if rt == nil {
+		t.Fatal("chain returned a nil route")
+	}
+	return rt.Dial(ctx, "udp", hostKey)
+}
+
+// TestP2PTunnelServesPeerDatagrams: a udp dial reaches a wisper p2p tunnel and
+// is served to its local backend — the tunnel's peer route delivers a datagram
+// conn, the service's local handler dials the backend as udp, and the reply
+// comes back on the same dial. This is the shape a udp entrypoint (or a tun
+// client) dials into; the per-peer counters count it.
+func TestP2PTunnelServesPeerDatagrams(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	echo := startUDPEcho(t, 0) // udp echo, from p2p_udp_poc_test.go (same package + tag)
+	derp := startDerper(t)
+
+	secure := false
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure},
+	}})
+
+	peer := newDialingHost(t, derp, strings.Repeat("55", 32))
+	peerKey := peer.PublicKey()
+
+	tn := runTunnel(t, "e2e-p2p-udp", echo, peerKey)
+
+	key := wtunnel.P2PHostPublicKey()
+	if key == "" {
+		t.Fatal("P2PHostPublicKey() = empty after Run, want the host's base64 key")
+	}
+	registerProvider(t, "e2e-peer-udp", peer)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	conn, err := dialHostUDP(t, ctx, "e2e-peer-udp", key)
+	if err != nil {
+		t.Fatalf("dial through the p2p tunnel: %v", err)
+	}
+	defer conn.Close()
+
+	// One datagram each way on the first send: the link buffers the datagram
+	// that triggers the dial until its edge is up.
+	msg := []byte("hello-udp-private-p2p")
+	if _, err := conn.Write(msg); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, len(msg))
+	n, err := conn.Read(buf)
+	if err != nil {
+		t.Fatalf("read the echo: %v", err)
+	}
+	if string(buf[:n]) != string(msg) {
+		t.Fatalf("echo = %q, want %q", buf[:n], msg)
+	}
+
+	// The peer's counters see the datagram traffic (the datagram conn wrapper,
+	// not x's byte-stream one, which would strip the PacketConn shape).
+	pstater, ok := tn.(interface{ PeerStats() []wtunnel.PeerStat })
+	if !ok {
+		t.Fatalf("p2p tunnel %T has no PeerStats", tn)
+	}
+	pstats := pstater.PeerStats()
+	if len(pstats) != 1 || pstats[0].Key != peerKey {
+		t.Fatalf("PeerStats = %+v, want one entry for the dialing peer", pstats)
+	}
+	if pstats[0].InputBytes < uint64(len(msg)) || pstats[0].OutputBytes < uint64(len(msg)) {
+		t.Errorf("peer bytes = %d in / %d out, want each >= %d",
+			pstats[0].InputBytes, pstats[0].OutputBytes, len(msg))
+	}
 }

@@ -2,17 +2,20 @@
 
 // UDP entrypoint over p2p: the shapes docs/p2p-integration.md left open, run
 // over the stack wisper's udp entrypoint actually builds
-// (tunnel/entrypoint/udp.go Run()): a local udp listener -> local forward
-// handler -> a chain whose node is a p2p udp tunnel -> a peer host holding a
-// udp target outlet.
+// (tunnel/entrypoint/p2p.go with ProtocolOption("udp")): a local udp listener
+// -> local forward handler -> a chain whose node is a p2p udp tunnel -> a peer
+// host holding a udp target outlet.
 //
 // Runs:
 //
-//	baseline  the provider as shipped: it frames udp conns (p2p 204e2d5), so a
-//	          datagram round-trips once the channel comes up.
-//	R3        two concurrent clients (keepalive=true): the second dial replaces
-//	          the channel's local edge (last-dial-wins) and frames carry no
-//	          client identity, so an in-flight reply is cross-delivered.
+//	baseline  a datagram round-trips on the FIRST send: the per-dial link
+//	          buffers the datagram that triggers the dial until its
+//	          presentation edge is up (p2p v0.6.0), so there is no bring-up
+//	          window to absorb (R2, which the retry loop used to hide).
+//	isolation two concurrent clients (keepalive=true, overlapping in-flight
+//	          window): each reply comes back on its own dial. The per-peer
+//	          channel's last-dial-wins edge replacement used to cross-deliver
+//	          them (R3).
 //
 // The addressing hypothesis (the local handler's ":0" suffix reaching
 // parsePeerKey) did NOT reproduce: the chain route dials node.Addr, the clean
@@ -356,88 +359,53 @@ func udpRead(t *testing.T, c net.Conn, timeout time.Duration) (string, error) {
 	return string(buf[:n]), nil
 }
 
-// udpRetryRoundTrip sends payload until a reply arrives or the budget runs
-// out, returning the reply and the number of sends it took. The channel drops
-// the session's first datagram while its peer edge is attached, and with
-// keepalive=false each reply also closes the session, so the retry opens a
-// fresh session — the loop absorbs both outcomes of that race.
-func udpRetryRoundTrip(t *testing.T, c net.Conn, payload string, budget time.Duration) (string, int) {
-	t.Helper()
-	deadline := time.Now().Add(budget)
-	for sends := 1; ; sends++ {
-		udpSend(t, c, payload)
-		got, err := udpRead(t, c, time.Second)
-		if err == nil {
-			return got, sends
-		}
-		if time.Now().After(deadline) {
-			return "", sends
-		}
-	}
-}
-
-// TestP2PUDPBaseline is the as-shipped baseline: the in-process provider frames
-// udp conns itself (p2p's frameConn, so both carriers hand the inner dialer the
-// same conn shape), and a datagram round-trips. The send is retried because the
-// channel drops the session's first datagram while its peer edge is attached.
+// TestP2PUDPBaseline: a datagram round-trips on the first send. The per-dial
+// link buffers the datagram that triggers the dial until its presentation edge
+// is up (p2p v0.6.0), so the session's first datagram is delivered instead of
+// being dropped in a bring-up window.
 func TestP2PUDPBaseline(t *testing.T) {
 	entry := startUDPEntrypoint(t, nil, 0, false)
 
 	c := udpClient(t, entry)
-	got, sends := udpRetryRoundTrip(t, c, "ping-baseline", 5*time.Second)
-	if got != "ping-baseline" {
-		t.Fatalf("round trip through the udp entrypoint: got %q after %d send(s)", got, sends)
+	udpSend(t, c, "ping-baseline")
+	got, err := udpRead(t, c, 10*time.Second)
+	if err != nil || got != "ping-baseline" {
+		t.Fatalf("first datagram round trip: got %q, %v; want ping-baseline on the first send", got, err)
 	}
-	t.Logf("baseline signature: reply after %d send(s) (the session's first datagram is dropped during channel bring-up)", sends)
 }
 
-// TestP2PUDPTwoClientsCollide is R3: two concurrent clients on the baseline,
-// with keepalive=true so the session (and the tunnel) survives its
-// first reply — under the default keepalive=false every reply tears the tunnel
-// down and there is no state to collide over. The second dial replaces the
-// channel's local edge (last-dial-wins) and the frames carry no client
-// identity, so the first client's in-flight reply is cross-delivered. The echo
-// delay engineers the overlap.
-func TestP2PUDPTwoClientsCollide(t *testing.T) {
+// TestP2PUDPTwoClientsIsolated: two concurrent clients with keepalive=true and
+// an engineered overlap (the echo delay holds c1's reply in flight while c2
+// dials). Each client's reply comes back on its own dial — the per-dial link
+// that replaced the per-peer channel, whose last-dial-wins local edge used to
+// cross-deliver the in-flight reply.
+func TestP2PUDPTwoClientsIsolated(t *testing.T) {
 	entry := startUDPEntrypoint(t, nil, 500*time.Millisecond, true)
 
 	c1 := udpClient(t, entry)
 	c2 := udpClient(t, entry)
 
-	// Warm c1: the first datagram is dropped during bring-up, the retry gets a
-	// reply, and keepalive keeps the session — and with it the tunnel — alive.
-	if got, sends := udpRetryRoundTrip(t, c1, "warm-c1", 5*time.Second); got != "warm-c1" {
-		t.Fatalf("client 1 warm-up: got %q after %d send(s)", got, sends)
-	}
 	udpSend(t, c1, "from-c1")
-
 	time.Sleep(100 * time.Millisecond) // c1's request is at the outlet, reply pending
-
-	// c2's datagram triggers its dial, which replaces the channel's local edge
-	// (last-dial-wins). The peer edge is already up (c1's tunnel kept the
-	// channel alive), so this datagram is forwarded too.
 	udpSend(t, c2, "from-c2")
 
-	// The frames carry no client identity: both replies land on the current
-	// edge, so c2 receives c1's in-flight reply as well as its own.
-	first, err := udpRead(t, c2, 5*time.Second)
-	if err != nil {
-		t.Fatalf("client 2 read: %v", err)
+	// Each client reads its own reply: c1's must not land on c2, which is
+	// exactly what the shared edge did.
+	if got, err := udpRead(t, c1, 10*time.Second); err != nil || got != "from-c1" {
+		t.Fatalf("client 1 read %q, %v; want from-c1", got, err)
 	}
-	second, err := udpRead(t, c2, 5*time.Second)
-	if err != nil {
-		t.Fatalf("client 2 second read: %v (got %q first)", err, first)
-	}
-	seen := map[string]bool{first: true, second: true}
-	if !seen["from-c1"] || !seen["from-c2"] {
-		t.Fatalf("client 2 received %q + %q, want the cross-delivered from-c1 and its own from-c2", first, second)
+	if got, err := udpRead(t, c2, 10*time.Second); err != nil || got != "from-c2" {
+		t.Fatalf("client 2 read %q, %v; want from-c2", got, err)
 	}
 
-	// c1's edge was replaced: its reply went to the other client and it gets
-	// nothing of its own.
-	reply, err := udpRead(t, c1, 1*time.Second)
-	if err == nil {
-		t.Fatalf("client 1 received %q; the edge replacement did not drop its reply", reply)
+	// A second round proves both links stay independent, not just the first
+	// datagram's buffering.
+	udpSend(t, c1, "again-c1")
+	udpSend(t, c2, "again-c2")
+	if got, err := udpRead(t, c1, 10*time.Second); err != nil || got != "again-c1" {
+		t.Fatalf("client 1 second read %q, %v; want again-c1", got, err)
 	}
-	t.Logf("R3 signature: client 2 received %q then %q (cross-delivery); client 1 got no reply (%v)", first, second, err)
+	if got, err := udpRead(t, c2, 10*time.Second); err != nil || got != "again-c2" {
+		t.Fatalf("client 2 second read %q, %v; want again-c2", got, err)
+	}
 }

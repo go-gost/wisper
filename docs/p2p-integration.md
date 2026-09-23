@@ -4,8 +4,10 @@
 不能替代 wisper 反向隧道的公网 ingress/rendezvous。
 
 > 状态：评估已完成，进程内 POC 通过；反向侧与入口点已改为共享的进程级 p2p host（p2p
-> `v0.4.2`，2026-09-22，见「私有 p2p 模式」）；UDP 入口点限制已 e2e 实测（2026-09-21，
-> 见「已知限制」）。
+> `v0.6.0`，2026-09-22，见「私有 p2p 模式」）；UDP 入口点限制已 e2e 实测（2026-09-21，
+> 见「已知限制」）——**三个数据面缺陷已由 p2p `v0.6.0`（每拨号一条 datagram link）修掉**，
+> wisper 侧同步支持 udp：反向侧按流服务 udp、p2p 入口点新增 `protocol: udp`
+> （2026-09-23，见「UDP 支持」）。
 
 ## 接缝
 
@@ -15,8 +17,8 @@
   `xp2p.NewTunnelDialer`，`SupportedDialer` 白名单含 tcp/tls/ws/wss/mux/udp。
 - wisper 不走 x config loader，而是手搓 `xconfig.Config` 再 `chain_parser.ParseChain`；
   因此 `p2ps:` 不会自动注册，需自行
-  `registry.P2PRegistry().Register(name, host.Tunnel())`
-  （旧 gRPC 方式为 `p2p_plugin.NewGRPCPlugin(...)`）。
+  `registry.P2PRegistry().Register(name, ep)`（`ep` 是 `*endpoint.Endpoint`，满足
+  `xp2p.Tunnel`）（旧 gRPC 方式为 `p2p_plugin.NewGRPCPlugin(...)`）。
 
 ## 依赖与可用性
 
@@ -27,7 +29,8 @@
   `scripts/smoke-local-relay.sh`。
 - p2p 已完成库化（根包 `package p2p` + `cmd/p2p`，见
   [p2p 库化重构计划](https://github.com/go-gost/p2p/blob/main/docs/2026-09-21-p2p-package-extraction.md)），
-  当前发布 `v0.4.2`（`Tunnel.Listen()`/`Dial` API、进程内 udp framing 修复）；wisper `go.mod` 依赖 `github.com/go-gost/p2p v0.4.2`。
+  当前发布 `v0.6.0`（contracts/endpoint/transport 分层；udp 数据面 = 每拨号一条 datagram
+  link）；wisper `go.mod` 依赖 `github.com/go-gost/p2p v0.6.0`。
 
 ## 边界与定位
 
@@ -41,45 +44,58 @@
 - p2p engine 模式需要部署 DERP relay（官方 derper），且无名称发现，
   peer 只能按 base64 pubkey 寻址。
 
-## 已知限制
+## 已知限制（历史实测；p2p v0.6.0 已修 R2/R3）
 
 入口点形态（本地 udp listener → local handler → chain node(p2p udp 隧道) → 对端 outlet）的
 **进程内 e2e 实测结论**（`tunnel/p2p_udp_poc_test.go`，build tag `p2ppoc`：真 derper + 两个
-进程内 p2p host + 与 `tunnel/entrypoint/udp.go` `Run()` 同构的栈；跑法
+进程内 p2p host + 与入口点 `Run()` 同构的栈；跑法
 `cd wisper && TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDP -v ./tunnel/`）：
 
-1. ~~**进程内 provider 缺 datagram framing**~~ —— **已修复**（p2p 本地 main `204e2d5`，未发布）：
-   进程内 `Provider` 现在对 `network=udp` 的 conn 自行加 2 字节 BE 长度前缀（复用 p2p
-   `frame.go` 的 `appendFrame`/`frameAt`），与 plugin 路径的 conn 形状一致。实测：修复前
-   隧道拨号成功、channel 正常建立但连发 3 包全无回复；修复后同一 harness 回环成功。
-   已随 p2p **`v0.4.1`** 发布并 bump；go.work 与 `GOWORK=off` 两种模式行为一致。
-2. **会话首个数据报必丢（R2）**：拨号由会话首包触发，而 channel 的 peer edge 异步挂载，
-   建链窗口内 `pumpLocal` 静默丢字节（p2p 设计如此：「Bytes are dropped while the opposite
-   edge is absent」）。实测（加 framing shim 后）：首发丢失、同会话第二次发送即回环成功——
-   50 次运行中 48 次需第 2 发、2 次第 1 发即回。
-3. **keepalive=false（入口点默认）下每请求一条隧道**：udp listener 写出回复后即关会话
-   （`x/internal/net/udp` 的 `if !c.keepalive { defer c.Close() }`）→ 会话关 → 隧道拆，
-   每个请求-响应都重建一次隧道。
-4. **多客户端互踩（R3，keepalive=true）**：每客户端一次 Dial → 同 peer 一个 channel、
-   `attachLocal` last-dial-wins；channel 本身保持 up，只换 local edge（日志实测：c2 建连与
-   c1 会话被取消在同一毫秒）。且帧里没有客户端身份 → 实测签名：**c2 收到 c1 的在途回复
-   （串投）后再收到自己的回复，c1 什么都收不到**。
+1. ~~**进程内 provider 缺 datagram framing**~~ —— **已修复**（p2p **`v0.4.1`**）：进程内
+   provider 对 `network=udp` 的 conn 自行加 2 字节 BE 长度前缀（复用 p2p `frame.go` 的
+   `appendFrame`/`frameAt`），与 plugin 路径的 conn 形状一致。
+2. ~~**会话首个数据报必丢（R2）**~~ —— **已修复**（p2p **`v0.6.0`**）：数据报链路在 peer edge
+   就绪前**缓冲** local edge 的字节（32 KiB 有界，超出即丢），触发拨号的那个数据报不再丢。
+   实测：`TestP2PUDPBaseline` 现在要求**首次发送**即回环成功（旧 harness 的 retry 循环已删）。
+3. **keepalive=false 下每请求一条隧道** —— 语义保留（每个数据报一条链路；正确但有开销）：
+   p2p 入口点的表单默认勾选 keepalive=true，客户端会话（及其隧道）在数据报之间保持。
+4. ~~**多客户端互踩（R3，keepalive=true）**~~ —— **已修复**（p2p **`v0.6.0`**）：每次拨号一条
+   独立 link，`TestP2PUDPTwoClientsIsolated` 断言两个并发客户端各自只收到自己的回复
+   （并跑第二轮证明两条链路持续独立）。
 
 > 已证伪、勿重复排查：入口点 node addr 的 `:0` 补端口**不会**打到 p2p 的 `parsePeerKey`——
 > `x/chain/route.go` 拨的是 `node.Addr`（干净 base64 key），`:0` 只补在 *target* 地址上，
 > 而 `x/connector/forward` 忽略该地址。入口点形态在 p2p 下**寻址正常**。
 
-修复方向（产品改动）：
-① ~~provider conn 按 network 包 framed~~ —— **已做，落在 p2p Provider 侧**（见上，比 x 侧包
-更小：不触碰 x、不会与 plugin 路径叠加成双层 framing）；② 多客户端：per-client channel，或
-GOST 侧 session 多路复用（对齐 relay 协议的 udp session id 思路）；③ 首包丢失 / 每请求重建隧道：
-入口点默认打开 keepalive，或 p2p 侧在 peer edge 就绪前缓冲 local edge 的字节（权衡内存与语义）。
+修复落在 p2p 库侧（比改 x 更小、不触碰 x，也不会与 plugin 路径叠加成双层 framing）：模型与
+决策见 p2p 仓库 `docs/2026-09-23-p2p-udp-per-dial-links.md`。tun 形态（p2p e2e 的
+`udp-tun`/`udp-outlet`）不受上述影响：那些场景两端都走 plugin 路径且单流。
 
-tun 形态（p2p e2e 的 `udp-tun`/`udp-outlet`）不受上述影响：那些场景两端都走 plugin 路径且单流。
+## UDP 支持（2026-09-23）
+
+p2p `v0.6.0` 把 udp 数据面重写为「每拨号一条 datagram link」，wisper 侧随之支持 udp：
+
+- **反向侧（p2p 隧道）透明服务 udp**：`Listen` 把 udp 流投递为**数据报 conn**
+  （`net.PacketConn`、帧已解析、地址是对端 key），peer 路由把它交给同一条隧道 service；x 的
+  local handler 用 `conn.(net.PacketConn)` 判定 udp，于是自动以 udp 拨 Endpoint 并按数据报
+  转发。**无需配置**：同一条 p2p 隧道既能服务 tcp 也能服务 udp 对端。per-peer 计数与 service
+  计数都保留——`tunnel/p2p_host.go` 的 `wrapConnStats` 对数据报 conn 用自带包装（x 的
+  `WrapConn` 会剥掉 PacketConn 形状，让 handler 误判成 tcp）。
+- **入口点（p2p）新增 `protocol` 选项**：`tcp`（默认）/ `udp`。udp 时本地监听是 udp listener
+  （keepalive/ttl 生效），链节点 dialer 也是 `udp` → 隧道按数据报语义拨出。API 的
+  create/update 与响应都带 `protocol`，并持久化到 `wisper.yaml`。
+- **验证**：`TestP2PTunnelServesPeerDatagrams`（真 derper：udp 拨入 wisper 反向侧 → 回显 +
+  per-peer 计数）、`TestP2PUDPBaseline`/`TestP2PUDPTwoClientsIsolated`（R2/R3 断言翻转）、
+  `TestP2PEntryPointUDPProtocol`（listener/handler/dialer 与绑定 socket 都是 udp）、
+  `TestSaveConfigKeepsPeer`（protocol 持久化往返）、`TestPeerListenerDeliversDatagramConn`
+  （投递的数据报 conn 形状与计数）。跑法：
+  `TMPDIR=/config/tmp DERPER_BIN=<derper> go test -tags p2ppoc ./tunnel/...`。
+- **边界**：数据面仍**明文**（p2p 只做可达性，内层协议不加密）；混合拓扑（同一对端既拨 udp
+  又接受本机多条 udp 拨号）不支持，见 p2p 文档的「非目标」。
 
 ## 进程内 POC
 
-- 走**进程内**：`p2p.New(&p2p.Config{})` + `host.Tunnel()` 直接
+- 走**进程内**：`endpoint.New(&p2p.Config{})` 直接
   `registry.P2PRegistry().Register`。无子进程 / 无 loopback gRPC / 无 token。
   进程外 gRPC 只在 host 必须独立进程、多进程共享、或非 Go 客户端时才需要。
 - 可用性已验证：`wisper/tunnel/p2p_poc_test.go`（build tag `p2ppoc`）。
@@ -88,8 +104,8 @@ tun 形态（p2p e2e 的 `udp-tun`/`udp-outlet`）不受上述影响：那些场
 - 两测试：`TestP2PChainCarriesTCP`（stub 模式进程内 host + echo，wisper
   ChainConfig 改 node.Addr/forward+tcp/metadata.p2p，route.Dial 成功回显）；
   `TestP2PUnregisteredFailsClosed`（未注册 provider → ParseChain 报错，无静默旁路）。
-- 注册约定：`registry.P2PRegistry().Register(name, host.Tunnel())`；
-  可加 `var _ xp2p.Tunnel = (*p2p.Tunnel)(nil)` 做编译期断言。
+- 注册约定：`registry.P2PRegistry().Register(name, ep)`（`ep` = `*endpoint.Endpoint`）；
+  可加 `var _ xp2p.Tunnel = (*endpoint.Endpoint)(nil)` 做编译期断言。
 - UDP 入口点形态另有实测 harness：`tunnel/p2p_udp_poc_test.go`（同 tag，需 docker 提取 derper），
   跑法 `TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PUDP -v ./tunnel/`；结论见「已知限制」。
 
@@ -139,16 +155,19 @@ chains:
 ```
 
 **隧道 stats/auth/录制**：与入口点对称——都来自挂在这条 peer 路由上的标准 gost service。
-连接与字节计数在 peer 路由 Accept 处按 x listener 的做法包一层
-（`stats.wrapper.WrapConn`），`runner/task/stats.go` 每秒把 `Status().Stats()` 回填进
+连接与字节计数在 peer 路由 Accept 处按 x listener 的做法包一层（`tunnel/p2p_host.go` 的
+`wrapConnStats`：tcp 流走 `stats.wrapper.WrapConn`，udp 数据报 conn 走自带包装以保留
+`net.PacketConn` 形状），`runner/task/stats.go` 每秒把 `Status().Stats()` 回填进
 `Tunnel.Stats()`，因此详情页的速率与其它隧道类型一致（早期"host 不暴露、详情页显示 —"
 的限制已消除）。
 
-**出站侧（p2p entrypoint）**：入口点类型 `p2p`——本地监听 + 对端 pubkey。本地客户端连
-监听地址，流量经**同一个共享 host** 的隧道拨到对端 target（内层 `tcp`，**数据面明文**；跨公网
-建议后续用 tls/ws 变体）。对端可以是 wisper 的反向侧 p2p 隧道，也可以是任意带 target 的
-p2p host。本侧身份同样是进程级 `host.key`（不再有 per-entrypoint key）。API 语义：响应里
-`endpoint` = 对端 pubkey、`entrypoint` = 本地监听地址。
+**出站侧（p2p entrypoint）**：入口点类型 `p2p`——本地监听 + 对端 pubkey + `protocol`
+（`tcp` 默认 / `udp`）。本地客户端连监听地址，流量经**同一个共享 host** 的隧道拨到对端 target
+（**数据面明文**；跨公网建议后续用 tls/ws 变体）。udp 时本地监听与链节点 dialer 都是 udp，
+隧道按数据报语义拨出（表单默认勾选 keepalive，会话在数据报之间保持）。对端可以是 wisper 的
+反向侧 p2p 隧道，也可以是任意带 target 的 p2p host。本侧身份同样是进程级 `host.key`（不再有
+per-entrypoint key）。API 语义：响应里 `endpoint` = 对端 pubkey、`entrypoint` = 本地监听地址，
+`options.protocol` = 内层协议。
 
 **生命周期与语义**：
 - relay 连不上不致命：状态保持 running，engine 每 5s 重连（与 p2p CLI 一致）。
@@ -164,8 +183,9 @@ p2p host。本侧身份同样是进程级 `host.key`（不再有 per-entrypoint 
 （可信方），p2p 层没有按连接的 auth。建议 relay 侧 `-verify-clients=true`，并在本地服务上
 另加鉴权。
 
-**依赖版本**：p2p `v0.4.2`（`Tunnel.Listen()`/`Dial` API、进程内 udp framing 修复）与
-x `v0.18.0`，wisper `go.mod` 已 bump；go.work 与 `GOWORK=off` 两种模式行为一致。
+**依赖版本**：p2p `v0.6.0`（contracts/endpoint/transport 分层、每拨号一条 datagram link、
+`Listen` 投递数据报 conn）与 x `v0.18.0`，wisper `go.mod` 已 bump；go.work 与 `GOWORK=off`
+两种模式行为一致。
 
 **API 与 UI**：隧道 create/update 请求与响应都带 `peers`（`[]string`，响应来自
 `Options.Peers`）；`GET /api/p2p` → `{"public_key": "...", "running": bool}`。详情页
