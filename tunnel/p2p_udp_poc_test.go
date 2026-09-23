@@ -161,9 +161,35 @@ func freePort(t *testing.T) int {
 	return ln.Addr().(*net.TCPAddr).Port
 }
 
+// freeUDPPort returns a currently free loopback UDP port (derper's STUN
+// listener is UDP, so a TCP probe would not detect a conflict).
+func freeUDPPort(t *testing.T) int {
+	t.Helper()
+	c, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	return c.LocalAddr().(*net.UDPAddr).Port
+}
+
 // startDerper runs the relay on a free high port (no root) and waits for its
 // listener. It returns the wss URL the hosts dial.
 func startDerper(t *testing.T) string {
+	t.Helper()
+	derp, _ := startDerperOpts(t, false)
+	return derp
+}
+
+// startDerperSTUN runs the relay with its STUN server enabled on a free port, so
+// peers can learn their public address and hole-punch. It returns the wss URL
+// and the STUN address (host:port).
+func startDerperSTUN(t *testing.T) (derp, stun string) {
+	t.Helper()
+	return startDerperOpts(t, true)
+}
+
+func startDerperOpts(t *testing.T, withSTUN bool) (string, string) {
 	t.Helper()
 	bin := derperBin(t)
 	dir := t.TempDir()
@@ -171,12 +197,17 @@ func startDerper(t *testing.T) string {
 	writeSelfSignedCert(t, certDir, "127.0.0.1")
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 
+	stunPort := 0
+	if withSTUN {
+		stunPort = freeUDPPort(t)
+	}
+
 	logPath := filepath.Join(dir, "derper.log")
 	logf, err := os.Create(logPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(bin,
+	args := []string{
 		"-c", filepath.Join(dir, "derper.json"),
 		"-hostname", "127.0.0.1",
 		"-certmode", "manual",
@@ -184,7 +215,11 @@ func startDerper(t *testing.T) string {
 		"-a", addr,
 		"-http-port", "-1",
 		"-stun=false",
-	)
+	}
+	if withSTUN {
+		args[len(args)-1] = fmt.Sprintf("-stun-port=%d", stunPort)
+	}
+	cmd := exec.Command(bin, args...)
 	cmd.Stdout, cmd.Stderr = logf, logf
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start derper: %v", err)
@@ -208,7 +243,11 @@ func startDerper(t *testing.T) string {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	return "wss://" + addr + "/derp"
+	stun := ""
+	if withSTUN {
+		stun = fmt.Sprintf("127.0.0.1:%d", stunPort)
+	}
+	return "wss://" + addr + "/derp", stun
 }
 
 // startUDPEcho starts a UDP echo server; replies are delayed by d (R3 uses the

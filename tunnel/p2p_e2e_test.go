@@ -31,6 +31,10 @@ import (
 	wtunnel "github.com/go-gost/wisper/tunnel"
 )
 
+// relayOnly pins a test's host to the relay: those derpers serve no STUN, so a
+// punch could only stall — the direct path has its own test (TestP2PTunnelDirectPath).
+var relayOnly = false
+
 // newDialingHost starts an in-process p2p host with a fixed key, connected to
 // the DERP relay — the dialing side of a tunnel.
 func newDialingHost(t *testing.T, derp, keyHex string) *endpoint.Endpoint {
@@ -137,7 +141,7 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 
 	secure := false
 	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
-		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure},
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure, Direct: &relayOnly},
 	}})
 
 	// The dialing side: an in-process host with a fixed key. Its public key is
@@ -255,6 +259,80 @@ func currentConns(ps interface{ PeerStats() []wtunnel.PeerStat }) int {
 	return n
 }
 
+// TestP2PTunnelDirectPath: the relay is only the fallback. With STUN reachable
+// and both ends punching, the tunnel must end up on a hole-punched path, and
+// the next stream must actually ride it — the difference between "direct is
+// switched on" and "direct is in use", which is what the settings page reports.
+func TestP2PTunnelDirectPath(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	echo := startEchoServer(t)
+	derp, stun := startDerperSTUN(t)
+
+	secure := false
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure, Stun: stun},
+	}})
+
+	// The dialing side punches too: a hole is mutual, so both ends need a
+	// candidate source (Wisper's own host gets one from the same STUN setting).
+	direct := true
+	peer, err := endpoint.New(&p2p.Config{
+		Derp: derp, KeyHex: strings.Repeat("45", 32), Stun: stun,
+		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
+	})
+	if err != nil {
+		t.Fatalf("new p2p host: %v", err)
+	}
+	t.Cleanup(func() { _ = peer.Close() })
+	if err := peer.Connect(); err != nil {
+		t.Fatalf("p2p connect to derper: %v", err)
+	}
+
+	runTunnel(t, "e2e-p2p-direct", echo, peer.PublicKey())
+	key := wtunnel.P2PHostPublicKey()
+	if key == "" {
+		t.Fatal("P2PHostPublicKey() = empty after Run")
+	}
+	registerProvider(t, "e2e-peer-direct", peer)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	conn, err := dialHost(t, ctx, "e2e-peer-direct", key)
+	if err != nil {
+		t.Fatalf("dial through the p2p tunnel: %v", err)
+	}
+	mustEcho(t, conn, []byte("hello-direct"))
+	conn.Close()
+
+	// The punch runs in the background: the first stream may well have opened
+	// on the relay before the direct session settled.
+	deadline := time.Now().Add(15 * time.Second)
+	host, dialer := wtunnel.P2PHostStatus(), peer.Status()
+	for (host.DirectPeers < 1 || dialer.DirectPeers < 1) && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+		host, dialer = wtunnel.P2PHostStatus(), peer.Status()
+	}
+	if host.DirectPeers < 1 || dialer.DirectPeers < 1 {
+		t.Fatalf("no direct session: host direct=%d relay=%d punch=%d/%d, dialer direct=%d relay=%d punch=%d/%d",
+			host.DirectPeers, host.DerpPeers, host.PunchSuccess, host.PunchAttempts,
+			dialer.DirectPeers, dialer.DerpPeers, dialer.PunchSuccess, dialer.PunchAttempts)
+	}
+
+	// A stream opened now rides the direct session — the counters say so.
+	before := peer.Status().StreamsDirect
+	conn2, err := dialHost(t, ctx, "e2e-peer-direct", key)
+	if err != nil {
+		t.Fatalf("dial over the direct path: %v", err)
+	}
+	defer conn2.Close()
+	mustEcho(t, conn2, []byte("over-direct"))
+	if got := peer.Status().StreamsDirect; got <= before {
+		t.Errorf("streams over the direct path = %d, want more than %d", got, before)
+	}
+}
+
 // TestP2PTunnelRefusesUnlistedPeer is the negative case: the allowlist admits
 // one key, and a host outside it gets nothing — no reply, and in practice a
 // closed stream, since the host's dispatch drops unregistered peers.
@@ -266,7 +344,7 @@ func TestP2PTunnelRefusesUnlistedPeer(t *testing.T) {
 
 	secure := false
 	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
-		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure},
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure, Direct: &relayOnly},
 	}})
 
 	listed := newDialingHost(t, derp, strings.Repeat("44", 32))
@@ -354,7 +432,7 @@ func TestP2PTunnelServesPeerDatagrams(t *testing.T) {
 
 	secure := false
 	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
-		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure},
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure, Direct: &relayOnly},
 	}})
 
 	peer := newDialingHost(t, derp, strings.Repeat("55", 32))
@@ -408,4 +486,72 @@ func TestP2PTunnelServesPeerDatagrams(t *testing.T) {
 		t.Errorf("peer bytes = %d in / %d out, want each >= %d",
 			pstats[0].InputBytes, pstats[0].OutputBytes, len(msg))
 	}
+}
+
+// TestP2PTunnelSetPeersAppliesInPlace: saving the allowlist does not restart the
+// tunnel. A live peer stream keeps working across the change (the service and
+// its listener are the same), and a peer added at the same time starts reaching
+// the tunnel.
+func TestP2PTunnelSetPeersAppliesInPlace(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	echo := startEchoServer(t)
+	derp := startDerper(t)
+
+	secure := false
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure, Direct: &relayOnly},
+	}})
+
+	peerA := newDialingHost(t, derp, strings.Repeat("66", 32))
+	peerB := newDialingHost(t, derp, strings.Repeat("77", 32))
+
+	tn := runTunnel(t, "e2e-p2p-setpeers", echo, peerA.PublicKey())
+	key := wtunnel.P2PHostPublicKey()
+	registerProvider(t, "e2e-peer-a", peerA)
+	registerProvider(t, "e2e-peer-b", peerB)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	connA, err := dialHost(t, ctx, "e2e-peer-a", key)
+	if err != nil {
+		t.Fatalf("dial A through the p2p tunnel: %v", err)
+	}
+	defer connA.Close()
+	mustEcho(t, connA, []byte("before-the-save"))
+
+	// A second peer is not listed yet: its stream must yield nothing. Any of
+	// the three refusals counts — the transport opens either way, so the
+	// stream being closed under the read is the usual shape.
+	if connB, err := dialHost(t, ctx, "e2e-peer-b", key); err == nil {
+		if _, werr := connB.Write([]byte("before-the-save")); werr == nil {
+			_ = connB.SetReadDeadline(time.Now().Add(3 * time.Second))
+			buf := make([]byte, 32)
+			if n, rerr := connB.Read(buf); rerr == nil {
+				t.Fatalf("an unlisted peer got a reply %q before the allowlist change", buf[:n])
+			}
+		}
+		_ = connB.Close()
+	}
+
+	// Add the second peer in place.
+	setter, ok := tn.(wtunnel.PeerSetter)
+	if !ok {
+		t.Fatalf("p2p tunnel %T does not take a peer list in place", tn)
+	}
+	if err := setter.SetPeers([]string{peerA.PublicKey(), peerB.PublicKey()}, nil); err != nil {
+		t.Fatalf("SetPeers: %v", err)
+	}
+
+	// A's live stream survived the change.
+	mustEcho(t, connA, []byte("after-the-save"))
+
+	// And B can now dial in.
+	connB, err := dialHost(t, ctx, "e2e-peer-b", key)
+	if err != nil {
+		t.Fatalf("dial B after the allowlist change: %v", err)
+	}
+	defer connB.Close()
+	mustEcho(t, connB, []byte("hello-b"))
 }

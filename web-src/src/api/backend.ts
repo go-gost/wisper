@@ -162,10 +162,18 @@ export class GoBackend {
 
   /**
    * Process-wide p2p identity. `public_key` is materialized on demand (never
-   * empty); `running` tells whether the shared host is currently started.
+   * empty); `running` tells whether the shared host is currently started. The
+   * transport counters are zero while it is not.
    */
-  getP2PIdentity(): Promise<{ public_key: string; running: boolean }> {
-    return this.request<{ public_key: string; running: boolean }>('GET', '/api/p2p');
+  getP2PIdentity(): Promise<{
+    public_key: string;
+    running: boolean;
+    direct_peers: number;
+    derp_peers: number;
+    punch_attempts: number;
+    punch_success: number;
+  }> {
+    return this.request('GET', '/api/p2p');
   }
 
   /** Probe the relay from the wisper process (its real network path and TLS

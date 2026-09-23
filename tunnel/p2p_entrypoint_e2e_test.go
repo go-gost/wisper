@@ -32,7 +32,7 @@ func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
 	secure := false
 	direct := false
 	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
-		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure},
+		P2P: &cfg.P2PSettings{Derp: derp, Secure: &secure, Direct: &relayOnly},
 	}})
 
 	// The peer side: an in-process host holding the echo as its target.

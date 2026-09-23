@@ -2,9 +2,11 @@ package tunnel
 
 import (
 	"encoding/base64"
+	"errors"
 	"io"
 	"math/rand/v2"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +35,14 @@ import (
 var (
 	_ PeerStatsReporter = (*p2pTunnel)(nil)
 	_ PeerStatsUpdater  = (*p2pTunnel)(nil)
+	_ PeerSetter        = (*p2pTunnel)(nil)
 )
+
+// PeerSetter is implemented by a tunnel whose inbound allowlist can change
+// without a restart.
+type PeerSetter interface {
+	SetPeers(peers []string, aliases map[string]string) error
+}
 
 // p2pTunnel exposes a local service to peers over the process-wide p2p host:
 // the peer dials the host by its base64 public key through the DERP relay, the
@@ -86,7 +95,11 @@ func (s *p2pTunnel) ID() string       { return s.opts.ID }
 func (s *p2pTunnel) Type() string     { return P2PTunnel }
 func (s *p2pTunnel) Name() string     { return s.opts.Name }
 func (s *p2pTunnel) Endpoint() string { return s.opts.Endpoint }
-func (s *p2pTunnel) Options() Options { return s.opts }
+func (s *p2pTunnel) Options() Options {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.opts
+}
 func (s *p2pTunnel) Favorite(b bool)  { s.favorite.Store(b) }
 func (s *p2pTunnel) IsFavorite() bool { return s.favorite.Load() }
 
@@ -117,7 +130,11 @@ func (s *p2pTunnel) SetStatsBaseline(b cfg.ServiceStats) {
 // Entrypoint is the value the tunnel page shows: the allowlist, "this link's
 // other ends" (comma-joined). This host's own identity is process-wide — see
 // EnsureP2PIdentity and the settings page.
-func (s *p2pTunnel) Entrypoint() string { return strings.Join(s.opts.Peers, ", ") }
+func (s *p2pTunnel) Entrypoint() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return strings.Join(s.opts.Peers, ", ")
+}
 
 // Status is the underlying gost service's status (state and live stats).
 func (s *p2pTunnel) Status() *xservice.Status {
@@ -181,6 +198,28 @@ func P2PDerpURL(s *cfg.Settings) string {
 		return s.P2P.Derp
 	}
 	return defaultP2PDerp
+}
+
+// P2PStunAddr returns the STUN server for the IPv4 direct path. An explicit
+// settings.p2p.stun wins; otherwise it is the relay's host on the standard STUN
+// port, since a derper serves STUN from the same host (unless it was started
+// with -stun=false). Empty when the relay cannot be parsed — the direct path
+// then has only IPv6 to work with.
+func P2PStunAddr(s *cfg.Settings) string {
+	if s != nil && s.P2P != nil && s.P2P.Stun != "" {
+		return s.P2P.Stun
+	}
+	u, err := url.Parse(P2PDerpURL(s))
+	if err != nil || u.Hostname() == "" {
+		return ""
+	}
+	return net.JoinHostPort(u.Hostname(), "3478")
+}
+
+// P2PDirect reports whether the direct (hole-punched) path is enabled. A
+// missing setting means on, matching p2p's own default.
+func P2PDirect(s *cfg.Settings) bool {
+	return s == nil || s.P2P == nil || s.P2P.Direct == nil || *s.P2P.Direct
 }
 
 // P2PTLSConfig returns the relay TLS options, or nil to keep p2p's defaults
@@ -249,7 +288,7 @@ func (s *p2pTunnel) Run() (err error) {
 		handler.LoggerOption(log),
 	)
 	if err = h.Init(mdx.NewMetadata(nil)); err != nil {
-		p2pHost.unregister(s.opts.Peers, ln)
+		p2pHost.unregister(ln)
 		p2pHost.release()
 		return
 	}
@@ -355,6 +394,7 @@ type PeerStat struct {
 func (s *p2pTunnel) PeerStats() []PeerStat {
 	s.mu.RLock()
 	ln, snapshot := s.ln, s.peerStats
+	peers := append([]string(nil), s.opts.Peers...)
 	s.mu.RUnlock()
 
 	pl, _ := ln.(*peerListener)
@@ -362,7 +402,7 @@ func (s *p2pTunnel) PeerStats() []PeerStat {
 		return nil
 	}
 
-	out := s.peerCounters(pl)
+	out := peerCounters(pl, peers)
 	for i := range out {
 		// The snapshot is in allowlist order too, so the rates line up by
 		// position.
@@ -394,7 +434,7 @@ func (s *p2pTunnel) UpdatePeerStats() {
 		prev[p.Key] = p
 	}
 
-	snapshot := s.peerCounters(pl)
+	snapshot := peerCounters(pl, s.opts.Peers)
 	if d > 0 {
 		for i, p := range snapshot {
 			before := prev[p.Key]
@@ -405,11 +445,12 @@ func (s *p2pTunnel) UpdatePeerStats() {
 	s.peerStats, s.peerStatsAt = snapshot, now
 }
 
-// peerCounters pairs every allowlisted peer with its live counters.
-func (s *p2pTunnel) peerCounters(pl *peerListener) []PeerStat {
+// peerCounters pairs every peer in the allowlist snapshot with its live
+// counters, in allowlist order.
+func peerCounters(pl *peerListener, peers []string) []PeerStat {
 	traffic := pl.peerTraffic()
-	out := make([]PeerStat, 0, len(s.opts.Peers))
-	for _, k := range s.opts.Peers {
+	out := make([]PeerStat, 0, len(peers))
+	for _, k := range peers {
 		st := PeerStat{Key: k}
 		if c := traffic[k]; c != nil {
 			st.CurrentConns = c.Get(stats.KindCurrentConns)
@@ -429,6 +470,35 @@ func rate(current, previous uint64, d time.Duration) uint64 {
 		return 0
 	}
 	return uint64(float64(current-previous) / d.Seconds())
+}
+
+// SetPeers applies a new inbound allowlist in place: the process-wide host's
+// routes are reconciled (all-or-nothing) and the tunnel's options are swapped,
+// so the service and its listener keep running and a live peer stream is not
+// cut. The allowlist gates NEW streams: a removed peer's established streams
+// run until they end on their own, and its counters leave the list.
+func (s *p2pTunnel) SetPeers(peers []string, aliases map[string]string) error {
+	if s.IsClosed() {
+		return ErrTunnelClosed
+	}
+
+	s.mu.RLock()
+	pl, _ := s.ln.(*peerListener)
+	s.mu.RUnlock()
+	if pl == nil {
+		return errors.New("p2p tunnel is not running")
+	}
+
+	normalized := NormalizePeerAliases(peers, aliases)
+	if err := p2pHost.reconcile(pl, peers); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.opts.Peers = peers
+	s.opts.PeerAliases = normalized
+	s.mu.Unlock()
+	return nil
 }
 
 // Close stops the service, drops the peer routes and gives the manager
@@ -454,7 +524,7 @@ func (s *p2pTunnel) Close() error {
 	// ln is set exactly when Run claimed the routes, so a tunnel that never
 	// acquired (or rolled back a failed Run) releases nothing here.
 	if ln != nil {
-		p2pHost.unregister(s.opts.Peers, ln)
+		p2pHost.unregister(ln)
 		p2pHost.release()
 	}
 	return err

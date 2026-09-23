@@ -93,6 +93,32 @@ p2p `v0.6.0` 把 udp 数据面重写为「每拨号一条 datagram link」，wis
 - **边界**：数据面仍**明文**（p2p 只做可达性，内层协议不加密）；混合拓扑（同一对端既拨 udp
   又接受本机多条 udp 拨号）不支持，见 p2p 文档的「非目标」。
 
+## 直连打洞（2026-09-23，默认开启）
+
+共享 host 现在**默认尝试直连**（`settings.p2p.direct`，nil = 开）：中继 session 建立后双方各
+自收集候选（IPv4 走 STUN、IPv6 绑本机出口地址），经控制通道交换后同时打洞（KCP + smux），
+成功则隧道流走直连、失败自动回退中继——**打洞是尽力而为，中继始终在**。反向侧与入口点共用
+同一个 host，所以一处设置两边都生效。
+
+- **STUN 地址无需配置**：`settings.p2p.stun` 留空即取**中继主机 + 3478**（derper 默认在该端口
+  提供 STUN，见 `-stun-port`）；自建中继换了端口或关了 STUN 时再显式填写。没有 STUN 也不妨：
+  双栈且都有全局 v6 时走 IPv6 直连（v6 不需要 STUN）。
+- **设置页**：P2P 区新增「直连（打洞）路径」开关与 STUN 输入；身份区多一行实时传输统计
+  ——`GET /api/p2p` 现在同时返回 `direct_peers`/`derp_peers`（当前各对端走哪条路）与
+  `punch_attempts`/`punch_success`（本机打洞成不成）。改这两项会重建 host（重启所有 p2p
+  隧道/入口点）。
+- **p2p v0.6.1 顺带修的**：`OpenStream` 原先在"打洞未成功"时对**每条**流都阻塞满
+  `punchWaitTimeout`（生产 5s）——对打洞不可能成功的对端（对称 NAT、UDP 被封）等于每条连接
+  都多等 5s。现在只有**真正发起打洞的那次调用**会等（与"让第一条连接走直连"的原意一致），
+  处于 in-flight / backoff 状态时立即回退中继。
+- **验证**：`TestP2PTunnelDirectPath`（tag `p2ppoc`：真 derper 开 STUN，反向往返走通后断言
+  两侧 `DirectPeers >= 1`，再开第二条流断言 `streams_direct` 增长——即流量确实走直连）；
+  `tunnel/p2p_test.go` 的 `TestP2PStunAddr`/`TestP2PDirect`（推导与默认值）；
+  p2p 侧 `TestPunchAndWaitDoesNotStallWhenPunchCannotStart`（backoff/in-flight 不再等）。
+  跑法：`TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnelDirectPath -v ./tunnel/`。
+- **实测**：本机回环（两进程同机、真 derper + STUN）直连可用，日志里流的 `transport=direct`；
+  跨 NAT 是否成取决于网络（对称型 NAT 仍永久走中继，属预期）。
+
 ## 进程内 POC
 
 - 走**进程内**：`endpoint.New(&p2p.Config{})` 直接
@@ -126,8 +152,9 @@ A 的 key"的死结。host 以引用计数存活：最后一个使用者关闭�
 
 **用法**：设置页（或 `config.yml` 的 `settings.p2p`）配置 `derp`（默认
 `wss://derp.gost.run/derp`，可改为自建 relay）、`secure`、`caFile`；然后新建 type=`p2p`
-的隧道，填「允许的对端」（Allowed peers，每行一个 base64 公钥，**可留空**）与
-Endpoint = 本地服务地址。对端数量不限：**N 个对端公钥 → 同一条隧道、同一个本地后端**。
+的隧道，Endpoint = 本地服务地址。**新建时白名单留空是正常起点**（"运行但不可达"），随后在
+详情页进入「允许的对端」页逐条添加（每行一条 base64 公钥，也可留空长期不加）。对端数量不限：
+**N 个对端公钥 → 同一条隧道、同一个本地后端**。
 详情页 `entrypoint` 行显示的就是这份列表（逗号连接；为空时显示未配置提示）——本机身份在
 设置页，不在这里。
 
@@ -187,20 +214,30 @@ per-entrypoint key）。API 语义：响应里 `endpoint` = 对端 pubkey、`ent
 `Listen` 投递数据报 conn）与 x `v0.18.0`，wisper `go.mod` 已 bump；go.work 与 `GOWORK=off`
 两种模式行为一致。
 
-**API 与 UI**：隧道 create/update 请求与响应都带 `peers`（`[]string`，响应来自
-`Options.Peers`）；`GET /api/p2p` → `{"public_key": "...", "running": bool}`。详情页
-p2p 隧道用「允许的对端」多行输入（每行一个 key），未配置时显示"没有入站流量能到达"的提示；
-设置页身份区以 `running` 区分"空闲（已持有身份）"与"运行中（显示 key）"。
+**API 与 UI**：隧道 create/update 请求与响应都带 `peers`（`[]Peer`，响应来自
+`Options.Peers`）；`GET /api/p2p` → `{"public_key", "running"}` + 直连/中继统计（见「直连
+打洞」）；`PUT /api/tunnels/{id}/peers` 只改白名单。白名单有独立的「允许的对端」页（详情页进入）：
+默认只读、公钥按字符掩码显示（顶栏眼睛图标整页揭示），一次编辑一行，删除需确认；未配置时显示
+"没有入站流量能到达"的提示。设置页身份区以 `running` 区分"空闲（已持有身份）"与"运行中
+（显示 key）"。
+
+**白名单就地生效**：保存不再重建隧道。`p2pHostManager.reconcile` 在进程级路由表里一次性完成
+增删（全有或全无——与其它隧道冲突的 key 会让整次改动被拒绝并返回 409），同一个
+`peerListener` 继续服务，因此在线的对端流不断；被移除的对端不再接入**新**流，其计数器随行消失
+（key 再次加入从零开始）。`PeerSetter` 是这个能力的接口；`unregister` 改为按 listener 身份
+注销（不再按 key 列表比对），因此陈旧注销不会误删他人路由。
 
 **验证**：`tunnel/p2p_test.go`（空白名单运行、生命周期、白名单 1/N 条、跨隧道重复 key、
 TLS 配置/默认 relay，无网络）、
-`tunnel/p2p_host_test.go`（引用计数、路由 1:1 与白名单批量注册、未登记 peer 关闭）与
+`tunnel/p2p_host_test.go`（引用计数、路由 1:1 与白名单批量注册、未登记 peer 关闭、就地
+reconcile 的增删/计数器清理/冲突整拒）与
 `tunnel/p2p_e2e_test.go`（tag `p2ppoc`：真 derper；`TestP2PTunnelAcceptsPeerByKey` 白名单
 内的对端按身份公钥拨入回环并断言服务实时计数非零；`TestP2PTunnelRefusesUnlistedPeer` 同场
 对照——白名单内的对端可回环，白名单外的 host 拨入拿不到任何回复/被关闭；跑法
-`TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；API 级（curl）
+`TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；API 级
+（`api/api_test.go` 的 `TestUpdateP2PTunnelPeers` 断言保存前后隧道对象同一，即未重建）；curl
 已验证 create/list/delete + `/api/p2p` 身份与 `running` 往返 + `peers` 回显 + `host.key`
-0600；**浏览器内的 UI 视觉与交互尚未人工过一遍**（多行对端输入/设置页空闲态/详情页列表）。
+0600；**浏览器内的 UI 视觉与交互尚未人工过一遍**（按行编辑/掩码与揭示/删除确认/设置页空闲态）。
 
 ## 实施注意
 

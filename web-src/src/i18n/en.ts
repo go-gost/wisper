@@ -131,6 +131,12 @@ const en: Record<string, string> = {
   settingsP2PSecure: 'Verify relay certificate',
   settingsP2PSecureDesc: 'Verify the relay TLS certificate. Disable only for a self-signed relay on a trusted network.',
   settingsP2PCAFileHint: 'PEM CA file to trust the relay\'s self-signed certificate. Empty uses the system roots.',
+  settingsP2PDirect: 'Direct (hole-punched) path',
+  settingsP2PDirectDesc:
+    'Try a direct path between the peers first and fall back to the relay. Needs UDP; IPv6 works without STUN.',
+  settingsP2PStun: 'STUN server',
+  settingsP2PStunHint:
+    'Used to find the public address for hole punching. Empty = the relay host on port 3478, which a derper serves by default.',
   settingsP2PCAFile: 'Relay CA file',
   p2pHint: 'Anyone holding this key who can reach the relay can access the local service. No further authentication is applied by p2p.',
   entrypointPeerKey: 'Peer public key',
@@ -141,6 +147,7 @@ const en: Record<string, string> = {
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
   peersTitle: 'Allowed peers',
   peersEntryDesc: '{n} allowed — manage the list',
+  peersNoAlias: 'No alias',
   peersAdd: 'Add peer',
   peersAliasPlaceholder: 'alias (optional)',
   peersKeyPlaceholder: 'Base64 public key',
@@ -151,7 +158,8 @@ const en: Record<string, string> = {
   peersEmpty: 'No peers yet: nothing can reach this tunnel.',
   peersHint:
     'Only these keys reach the tunnel; the key is a credential, so treat it like a password.',
-  peersRestartHint: 'Saving rebuilds this tunnel: live connections drop.',
+  peersRestartHint:
+    'Saving applies at once: live peer connections keep running, and a peer you remove stops reaching the tunnel.',
   peersNoneHint: 'No peers configured: this tunnel is running but unreachable.',
   notFound: 'Not found.',
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (the inner protocol is plaintext).',
@@ -164,6 +172,10 @@ const en: Record<string, string> = {
   p2pTestFailed: 'Unreachable',
   p2pKeyWarning: 'Treat this key as a password: whoever obtains it can impersonate this host, and any peer that allow-lists this host will accept them. Never share it on public channels.',
   p2pIdentityIdle: 'Relay not connected — start a p2p tunnel or entrypoint so peers can dial in.',
+  p2pTransport: 'Transport',
+  p2pTransportDirect: 'direct',
+  p2pTransportRelay: 'relay',
+  p2pTransportPunch: 'punched',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
   p2pColPeer: 'Peer',
   p2pColConns: 'Conns',

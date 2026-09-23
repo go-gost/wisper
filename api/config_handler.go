@@ -31,6 +31,8 @@ type P2PSettingsResp struct {
 	Derp   string `json:"derp"`
 	Secure *bool  `json:"secure,omitempty"`
 	CAFile string `json:"ca_file,omitempty"`
+	Stun   string `json:"stun,omitempty"`
+	Direct *bool  `json:"direct,omitempty"`
 }
 
 func handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +54,8 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			Derp:   settings.P2P.Derp,
 			Secure: settings.P2P.Secure,
 			CAFile: settings.P2P.CAFile,
+			Stun:   settings.P2P.Stun,
+			Direct: settings.P2P.Direct,
 		}
 	}
 
@@ -101,7 +105,9 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		p2pChanged = prev == nil ||
 			prev.Derp != req.P2P.Derp ||
 			prev.CAFile != req.P2P.CAFile ||
-			!boolPtrEqual(prev.Secure, req.P2P.Secure)
+			prev.Stun != req.P2P.Stun ||
+			!boolPtrEqual(prev.Secure, req.P2P.Secure) ||
+			!boolPtrEqual(prev.Direct, req.P2P.Direct)
 	}
 
 	if req.Server != nil {
@@ -132,6 +138,8 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			Derp:   req.P2P.Derp,
 			Secure: req.P2P.Secure,
 			CAFile: req.P2P.CAFile,
+			Stun:   req.P2P.Stun,
+			Direct: req.P2P.Direct,
 		}
 	}
 

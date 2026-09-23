@@ -383,6 +383,46 @@ func TestP2PDerpDefault(t *testing.T) {
 	}
 }
 
+// TestP2PStunAddr: the STUN server follows the relay unless it is set
+// explicitly, so a derper that serves STUN (the default) needs no config.
+func TestP2PStunAddr(t *testing.T) {
+	if got := P2PStunAddr(nil); got != "derp.gost.run:3478" {
+		t.Fatalf("P2PStunAddr(nil) = %q, want the public relay's STUN", got)
+	}
+	got := P2PStunAddr(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://relay.example:8443/derp"}})
+	if got != "relay.example:3478" {
+		t.Fatalf("P2PStunAddr(derp) = %q, want the relay host on the STUN port", got)
+	}
+	got = P2PStunAddr(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://relay.example/derp", Stun: "192.0.2.7:3479"}})
+	if got != "192.0.2.7:3479" {
+		t.Fatalf("P2PStunAddr(explicit) = %q, want the configured server", got)
+	}
+	// A relay URL that does not parse leaves the direct path to IPv6.
+	if got := P2PStunAddr(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: "://"}}); got != "" {
+		t.Fatalf("P2PStunAddr(bad relay) = %q, want empty", got)
+	}
+}
+
+// TestP2PDirect: the direct path is on unless it is turned off.
+func TestP2PDirect(t *testing.T) {
+	no, yes := false, true
+	for _, tc := range []struct {
+		name string
+		s    *cfg.Settings
+		want bool
+	}{
+		{"no settings", nil, true},
+		{"no p2p block", &cfg.Settings{}, true},
+		{"unset", &cfg.Settings{P2P: &cfg.P2PSettings{}}, true},
+		{"explicit on", &cfg.Settings{P2P: &cfg.P2PSettings{Direct: &yes}}, true},
+		{"explicit off", &cfg.Settings{P2P: &cfg.P2PSettings{Direct: &no}}, false},
+	} {
+		if got := P2PDirect(tc.s); got != tc.want {
+			t.Errorf("P2PDirect(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestP2PTLSConfig: an unset settings.p2p must not panic and keeps p2p's
 // defaults; a configured one is passed through.
 func TestP2PTLSConfig(t *testing.T) {

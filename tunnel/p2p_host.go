@@ -88,6 +88,20 @@ func P2PHostRunning() bool {
 	return p2pHost.host != nil
 }
 
+// P2PHostStatus snapshots the shared host's transport counters; zeros when no
+// host is running. DirectPeers/DerpPeers say where each peer's traffic goes
+// right now, and PunchSuccess/PunchAttempts whether punching works from here —
+// the difference between "direct is on" and "direct is actually in use".
+func P2PHostStatus() p2p.Status {
+	p2pHost.mu.Lock()
+	host := p2pHost.host
+	p2pHost.mu.Unlock()
+	if host == nil {
+		return p2p.Status{}
+	}
+	return host.Status()
+}
+
 // ensurePublicKey returns the running host's key, or materializes the identity
 // reader-only when no host is running. The manager lock keeps a concurrent
 // acquire from racing the transient host on the same key file.
@@ -125,10 +139,11 @@ func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 			return nil, err
 		}
 		settings := cfg.Get().Settings
-		direct := false
+		direct := P2PDirect(settings)
 		conf := &p2p.Config{
 			Derp:   P2PDerpURL(settings),
 			Key:    keyPath,
+			Stun:   P2PStunAddr(settings),
 			Direct: &direct,
 		}
 		conf.TLS = P2PTLSConfig(settings)
@@ -179,38 +194,62 @@ func (m *p2pHostManager) release() {
 // (or listed twice) rolls back the peers this call added and fails naming the
 // peer. An empty list is valid — the listener accepts nothing.
 func (m *p2pHostManager) register(peers []string) (net.Listener, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	pl := newPeerListener(peers)
-	var added []string
-	for _, peer := range peers {
-		if _, ok := m.routes[peer]; ok {
-			for _, p := range added {
-				delete(m.routes, p)
-			}
-			return nil, fmt.Errorf("peer %s is already used by another p2p tunnel", peer)
-		}
-		m.routes[peer] = pl
-		added = append(added, peer)
+	if err := m.reconcile(pl, peers); err != nil {
+		return nil, err
 	}
 	return pl, nil
+}
+
+// reconcile makes ln the route for exactly peers: it claims the missing keys
+// and drops the ones ln no longer serves, in one step. All-or-nothing — a key
+// another tunnel holds fails the whole change and leaves the table (and ln's
+// routes) untouched, so a rejected allowlist cannot half-apply.
+func (m *p2pHostManager) reconcile(ln *peerListener, peers []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	want := make(map[string]struct{}, len(peers))
+	for _, p := range peers {
+		if cur, ok := m.routes[p]; ok && cur != ln {
+			return fmt.Errorf("peer %s is already used by another p2p tunnel", p)
+		}
+		want[p] = struct{}{}
+	}
+	for p := range want {
+		m.routes[p] = ln
+	}
+	for p, l := range m.routes {
+		if l != ln {
+			continue
+		}
+		if _, keep := want[p]; !keep {
+			delete(m.routes, p)
+		}
+	}
+	ln.setPeers(peers)
+	return nil
 }
 
 // unregister drops every peer route ln still owns, so a stale unregister (a
 // replaced tunnel's) cannot remove a live route. The listener is closed once,
 // when at least one route was removed.
-func (m *p2pHostManager) unregister(peers []string, ln net.Listener) {
+func (m *p2pHostManager) unregister(ln net.Listener) {
+	pl, _ := ln.(*peerListener)
+	if pl == nil {
+		return
+	}
 	m.mu.Lock()
 	owned := false
-	for _, peer := range peers {
-		if pl, ok := m.routes[peer]; ok && pl == ln {
-			delete(m.routes, peer)
+	for p, l := range m.routes {
+		if l == pl {
+			delete(m.routes, p)
 			owned = true
 		}
 	}
 	m.mu.Unlock()
 	if owned {
-		_ = ln.Close()
+		_ = pl.Close()
 	}
 }
 
@@ -417,7 +456,30 @@ func (l *peerListener) Close() error { l.close(); return nil }
 
 // Addr is the route's allowlist (comma-joined): the route's identity, not a
 // socket.
-func (l *peerListener) Addr() net.Addr { return peerRouteAddr(strings.Join(l.peers, ",")) }
+func (l *peerListener) Addr() net.Addr {
+	l.mu.Lock()
+	peers := append([]string(nil), l.peers...)
+	l.mu.Unlock()
+	return peerRouteAddr(strings.Join(peers, ","))
+}
+
+// setPeers swaps the route's peer list (the tunnel's allowlist changed without
+// a restart). A dropped peer's counters go with it, so a key that comes back
+// starts from zero.
+func (l *peerListener) setPeers(peers []string) {
+	l.mu.Lock()
+	keep := make(map[string]struct{}, len(peers))
+	for _, p := range peers {
+		keep[p] = struct{}{}
+	}
+	for p := range l.traffic {
+		if _, ok := keep[p]; !ok {
+			delete(l.traffic, p)
+		}
+	}
+	l.peers = append([]string(nil), peers...)
+	l.mu.Unlock()
+}
 
 type peerRouteAddr string
 

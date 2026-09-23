@@ -191,10 +191,37 @@ func TestUpdateConfig(t *testing.T) {
 	}
 }
 
+// TestUpdateConfigP2PDirect: the direct path and its STUN server survive the
+// settings round trip (the UI writes them, the host reads them back).
+func TestUpdateConfigP2PDirect(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	resp, _ := putJSON(t, srv.URL+"/api/config", map[string]any{
+		"p2p": map[string]any{
+			"derp": "wss://relay.example/derp", "stun": "192.0.2.7:3479", "direct": false,
+		},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	_, body := getJSON(t, srv.URL+"/api/config")
+	p2p, _ := body["p2p"].(map[string]any)
+	if p2p == nil {
+		t.Fatalf("config has no p2p block: %v", body)
+	}
+	if p2p["stun"] != "192.0.2.7:3479" {
+		t.Errorf("stun = %v, want the saved server", p2p["stun"])
+	}
+	if direct, ok := p2p["direct"].(bool); !ok || direct {
+		t.Errorf("direct = %v, want false", p2p["direct"])
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tunnel list/get/delete tests (using pre-registered, non-running tunnels)
 // ---------------------------------------------------------------------------
-
 func TestListTunnelsEmpty(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
@@ -804,12 +831,18 @@ func TestUpdateP2PTunnelPeers(t *testing.T) {
 	}
 	id, _ := created["id"].(string)
 	defer tunnel.Delete(id)
+	before := tunnel.Get(id)
 
 	resp, updated := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
 		"peers": []map[string]any{{"key": key2, "alias": "laptop"}, {"key": key1}},
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("save peers = %d: %v", resp.StatusCode, updated)
+	}
+	// The list is taken in place: a rebuilt tunnel would be a new object (and
+	// would have dropped every live peer stream).
+	if after := tunnel.Get(id); after != before {
+		t.Fatal("saving the allowlist rebuilt the tunnel; it must apply in place")
 	}
 	// The peers-only save leaves the rest of the config alone.
 	if got, _ := updated["name"].(string); got != "Private" {

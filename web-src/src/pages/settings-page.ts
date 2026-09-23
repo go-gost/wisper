@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { t, onLocaleChange } from '../i18n/i18n';
 import { icon } from '../utils/icons';
@@ -37,11 +37,14 @@ export class SettingsPage extends LitElement {
   @state() private _p2pDerp = '';
   @state() private _p2pSecure = true;
   @state() private _p2pCaFile = '';
+  @state() private _p2pStun = '';
+  @state() private _p2pDirect = true;
   @state() private _showP2PKey = false;
   @state() private _p2pTesting = false;
   @state() private _p2pTest: { ok: boolean; latency?: number; error?: string } | null = null;
   @state() private _p2pPublicKey = '';
   @state() private _p2pRunning = false;
+  @state() private _p2pTransport: { direct: number; derp: number; attempts: number; success: number } | null = null;
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 3;
@@ -64,6 +67,8 @@ export class SettingsPage extends LitElement {
     this._p2pDerp = s.p2p?.derp || '';
     this._p2pSecure = s.p2p?.secure ?? true;
     this._p2pCaFile = s.p2p?.ca_file || '';
+    this._p2pStun = s.p2p?.stun || '';
+    this._p2pDirect = s.p2p?.direct ?? true;
     this._theme = s.theme;
     this._lang = s.lang;
     this._statsInterval = s.stats_interval || 1;
@@ -78,6 +83,8 @@ export class SettingsPage extends LitElement {
         this._p2pDerp = s2.p2p?.derp || '';
         this._p2pSecure = s2.p2p?.secure ?? true;
         this._p2pCaFile = s2.p2p?.ca_file || '';
+        this._p2pStun = s2.p2p?.stun || '';
+        this._p2pDirect = s2.p2p?.direct ?? true;
         this._theme = s2.theme;
         this._lang = s2.lang;
         this._statsInterval = s2.stats_interval || 1;
@@ -106,9 +113,13 @@ export class SettingsPage extends LitElement {
       const id = await this._backend.getP2PIdentity();
       this._p2pPublicKey = id.public_key;
       this._p2pRunning = id.running;
+      this._p2pTransport = id.running
+        ? { direct: id.direct_peers, derp: id.derp_peers, attempts: id.punch_attempts, success: id.punch_success }
+        : null;
     } catch {
       this._p2pPublicKey = '';
       this._p2pRunning = false;
+      this._p2pTransport = null;
     }
   }
 
@@ -159,7 +170,13 @@ export class SettingsPage extends LitElement {
         server: this._server,
         entrypoint: this._entrypoint,
         insecure: this._insecure,
-        p2p: { derp: this._p2pDerp, secure: this._p2pSecure, ca_file: this._p2pCaFile },
+        p2p: {
+          derp: this._p2pDerp,
+          secure: this._p2pSecure,
+          ca_file: this._p2pCaFile,
+          stun: this._p2pStun,
+          direct: this._p2pDirect,
+        },
       });
       this._showSnackbar('✓ ' + t('saved'));
     } catch {
@@ -525,6 +542,15 @@ export class SettingsPage extends LitElement {
                 <p class="hint">${t('p2pIdentityHint')}</p>
                 <p class="p2p-warning">${t('p2pKeyWarning')}</p>
                 ${this._p2pRunning ? '' : html`<p class="hint">${t('p2pIdentityIdle')}</p>`}
+                ${this._p2pTransport
+                  ? html`<p class="hint">
+                      ${t('p2pTransport')}: ${t('p2pTransportDirect')} ${this._p2pTransport.direct} ·
+                      ${t('p2pTransportRelay')} ${this._p2pTransport.derp}
+                      ${this._p2pTransport.attempts > 0
+                        ? html`· ${t('p2pTransportPunch')} ${this._p2pTransport.success}/${this._p2pTransport.attempts}`
+                        : nothing}
+                    </p>`
+                  : nothing}
               </div>
               <div class="form-group">
                 <label class="form-label">${t('settingsP2PDerp')}</label>
@@ -563,6 +589,23 @@ export class SettingsPage extends LitElement {
                   placeholder="/path/to/ca.pem"
                   @input=${(e: Event) => { this._p2pCaFile = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
                 <p class="hint">${t('settingsP2PCAFileHint')}</p>
+              </div>
+              <div class="switch-row" style="padding-top:18px;">
+                <div>
+                  <div class="switch-label">${t('settingsP2PDirect')}</div>
+                  <div class="switch-desc">${t('settingsP2PDirectDesc')}</div>
+                </div>
+                <div class="switch ${this._p2pDirect ? 'on' : ''}"
+                  @click=${() => { this._p2pDirect = !this._p2pDirect; }}>
+                  <div class="switch-knob"></div>
+                </div>
+              </div>
+              <div class="form-group" style="margin-top:18px;">
+                <label class="form-label">${t('settingsP2PStun')}</label>
+                <input class="form-input" .value=${this._p2pStun}
+                  placeholder="derp.gost.run:3478"
+                  @input=${(e: Event) => { this._p2pStun = (e.target as HTMLInputElement).value; }}>
+                <p class="hint">${t('settingsP2PStunHint')}</p>
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}

@@ -143,14 +143,21 @@ func TestP2PHostManagerRoutes(t *testing.T) {
 	// must not (and cannot) close it.
 	_ = got.Close()
 
-	// A stale unregister (a listener that owns no key of the list) is a no-op.
-	m.unregister([]string{"k4"}, ln2)
+	// A listener that owns no route (never registered, or already replaced) is
+	// a no-op: unregistering it must not touch another route, nor close it.
+	stranger := newPeerListener([]string{"k4"})
+	m.unregister(stranger)
 	if m.routes["k4"] != ln4 {
-		t.Fatal("a stale unregister removed another listener's route")
+		t.Fatal("unregistering an unknown listener removed another listener's route")
+	}
+	select {
+	case <-stranger.closed:
+		t.Fatal("unregister closed a route it did not own")
+	default:
 	}
 
-	// Unregistering the list removes every key it owns and closes the route.
-	m.unregister([]string{"k2", "k3"}, ln2)
+	// Unregistering the route removes every key it owns and closes it.
+	m.unregister(ln2)
 	if _, ok := m.routes["k2"]; ok {
 		t.Fatal("unregister left k2 routed")
 	}
@@ -177,6 +184,68 @@ func TestP2PHostManagerRoutes(t *testing.T) {
 	}
 	if _, err := local.Read(make([]byte, 1)); err == nil {
 		t.Fatal("Close left the queued conn open")
+	}
+}
+
+// TestP2PHostManagerReconcile: an allowlist change in place. The listener is
+// the same object (the service keeps running), keys are added and dropped for
+// it alone, a dropped peer's counters go with it, and a change that would steal
+// another tunnel's key is refused whole.
+func TestP2PHostManagerReconcile(t *testing.T) {
+	m := &p2pHostManager{routes: make(map[string]*peerListener)}
+
+	ln, err := m.register([]string{"k1", "k2"})
+	if err != nil {
+		t.Fatalf("register k1+k2: %v", err)
+	}
+	pl := ln.(*peerListener)
+	other, err := m.register([]string{"k3"})
+	if err != nil {
+		t.Fatalf("register k3: %v", err)
+	}
+
+	// A delivered stream gives k2 counters to lose.
+	inbound, far := peerPipe("k2")
+	defer far.Close()
+	m.dispatch(inbound)
+	if _, err := ln.Accept(); err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	if len(pl.peerTraffic()) != 1 {
+		t.Fatalf("peer traffic = %v, want one entry for k2", pl.peerTraffic())
+	}
+
+	// Swap the list: k4 in, k2 out, k1 kept.
+	if err := m.reconcile(pl, []string{"k1", "k4"}); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if m.routes["k1"] != ln || m.routes["k4"] != ln {
+		t.Fatal("reconcile did not claim the new key for the same route")
+	}
+	if _, ok := m.routes["k2"]; ok {
+		t.Fatal("reconcile left a dropped key routed")
+	}
+	if m.routes["k3"] != other {
+		t.Fatal("reconcile touched another tunnel's route")
+	}
+	if got := ln.Addr().String(); got != "k1,k4" {
+		t.Fatalf("route addr = %q, want the new allowlist", got)
+	}
+	if len(pl.peerTraffic()) != 0 {
+		t.Fatalf("peer traffic = %v, want the dropped peer's counters gone", pl.peerTraffic())
+	}
+
+	// All-or-nothing: k3 belongs to another tunnel, so nothing changes.
+	if err := m.reconcile(pl, []string{"k3"}); err == nil {
+		t.Fatal("a conflicting key was accepted")
+	} else if !strings.Contains(err.Error(), "k3") {
+		t.Fatalf("reconcile error = %v, want it to name the conflicting peer", err)
+	}
+	if m.routes["k1"] != ln || m.routes["k4"] != ln || m.routes["k3"] != other {
+		t.Fatal("a refused reconcile changed the route table")
+	}
+	if got := ln.Addr().String(); got != "k1,k4" {
+		t.Fatalf("route addr after the refusal = %q, want the accepted list", got)
 	}
 }
 

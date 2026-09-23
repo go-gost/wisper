@@ -148,9 +148,9 @@ type Settings struct {
 	P2P *P2PSettings `yaml:",omitempty" json:"p2p,omitempty"`
 }
 
-// P2PSettings holds the deployment-level p2p host settings: the DERP relay and
-// the relay's TLS options. Per-tunnel p2p tunnels share them; the tunnel's own
-// config carries only its local backend address.
+// P2PSettings holds the deployment-level p2p host settings: the DERP relay, its
+// TLS options, and the direct path. Per-tunnel p2p tunnels share them; the
+// tunnel's own config carries only its local backend address.
 type P2PSettings struct {
 	// Derp is the DERP relay URL (wss://host/derp). Required for p2p tunnels.
 	Derp string `yaml:",omitempty" json:"derp"`
@@ -158,6 +158,13 @@ type P2PSettings struct {
 	Secure *bool `yaml:",omitempty" json:"secure,omitempty"`
 	// CAFile is a PEM CA file to trust the relay's self-signed certificate.
 	CAFile string `yaml:"caFile,omitempty" json:"ca_file,omitempty"`
+	// Stun is the STUN server (host:port) for the IPv4 direct path. Empty
+	// derives it from the relay's host (see P2PStunAddr); the IPv6 direct path
+	// needs no STUN.
+	Stun string `yaml:",omitempty" json:"stun,omitempty"`
+	// Direct attempts a direct (hole-punched) path, falling back to the relay.
+	// nil = true.
+	Direct *bool `yaml:",omitempty" json:"direct,omitempty"`
 }
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.

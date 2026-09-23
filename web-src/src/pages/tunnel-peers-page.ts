@@ -4,11 +4,11 @@ import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getTunnels, subscribe, updatePeers } from '../store/tunnel-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber } from '../utils/format';
-import type { Tunnel } from '../api/types';
+import { formatBytes, formatRate, formatNumber, maskKey } from '../utils/format';
+import type { Peer, Tunnel } from '../api/types';
 import '../components/app-scaffold';
 
-/** One editable allowlist row. */
+/** One allowlist row. */
 interface PeerRow {
   key: string;
   alias: string;
@@ -17,7 +17,7 @@ interface PeerRow {
 /**
  * validPeerKey mirrors the API's check: a base64 (raw url) 32-byte public key,
  * i.e. 43 characters of the url-safe alphabet. An entry that is not a key is a
- * route nothing ever matches, so it is refused before the save.
+ * route nothing ever matches, so a row with one refuses to save.
  */
 function validPeerKey(k: string): boolean {
   if (!/^[A-Za-z0-9_-]{43}$/.test(k)) return false;
@@ -29,11 +29,16 @@ function validPeerKey(k: string): boolean {
   }
 }
 
+function rowsOf(t2: Tunnel | null): PeerRow[] {
+  return (t2?.options.peers ?? []).map((p: Peer) => ({ key: p.key, alias: p.alias ?? '' }));
+}
+
 /**
- * The allowlist manager of a p2p tunnel: one row per peer (key + display
- * alias), with the peer's live traffic beside it. Saving replaces the list and
- * rebuilds the tunnel — the process-wide host routes each peer key to exactly
- * one tunnel, so an edit restarts this one.
+ * The allowlist manager of a p2p tunnel. The list is read-only by default —
+ * the key is a credential, so it stays masked until revealed — and one row at
+ * a time is edited and saved. Saving applies in place: the process-wide host
+ * reconciles this tunnel's routes, so live peer streams keep running and a
+ * removed peer simply stops reaching the tunnel.
  */
 @customElement('tunnel-peers-page')
 export class TunnelPeersPage extends LitElement {
@@ -41,17 +46,23 @@ export class TunnelPeersPage extends LitElement {
   @property() tunnelId = '';
 
   @state() private _tunnel: Tunnel | null = null;
+  /** The saved list, rendered read-only. */
   @state() private _rows: PeerRow[] = [];
-  /** The saved list, to tell whether the form is dirty. */
-  private _saved: PeerRow[] = [];
+  /** Index of the row being edited, or 'new' for the draft row. */
+  @state() private _editing: number | 'new' | null = null;
+  /** The row's edit buffer. */
+  @state() private _draft: PeerRow = { key: '', alias: '' };
   @state() private _saving = false;
+  @state() private _rowError = '';
+  @state() private _confirmDelete: number | null = null;
+  @state() private _showKeys = false;
   @state() private _snackbar = '';
   private _unsub: (() => void) | null = null;
 
   connectedCallback() {
     super.connectedCallback();
     this._load();
-    // The stats task refreshes the tunnel each second; re-render for the rows'
+    // The stats task refreshes the tunnel each second: re-render for the rows'
     // live columns.
     this._unsub = subscribe(() => {
       const t2 = getTunnels().find(x => x.id === this.tunnelId);
@@ -67,65 +78,78 @@ export class TunnelPeersPage extends LitElement {
   private _load() {
     const t2 = getTunnels().find(x => x.id === this.tunnelId) ?? null;
     this._tunnel = t2;
-    const rows = (t2?.options.peers ?? []).map(p => ({ key: p.key, alias: p.alias ?? '' }));
-    this._rows = rows;
-    this._saved = rows.map(r => ({ ...r }));
+    this._rows = rowsOf(t2);
   }
 
-  private get _dirty(): boolean {
-    if (this._rows.length !== this._saved.length) return true;
-    return this._rows.some((r, i) => r.key !== this._saved[i].key || r.alias !== this._saved[i].alias);
+  private _startEdit(i: number) {
+    this._editing = i;
+    this._draft = { ...this._rows[i] };
+    this._rowError = '';
   }
 
-  /** _errors lists what stops the save: a bad key or a doubled one, per row. */
-  private _errors(): Map<number, string> {
-    const errs = new Map<number, string>();
-    const seen = new Map<string, number>();
-    this._rows.forEach((r, i) => {
-      const key = r.key.trim();
-      if (!key) {
-        errs.set(i, t('peersKeyRequired'));
-        return;
-      }
-      if (!validPeerKey(key)) {
-        errs.set(i, t('peersKeyInvalid'));
-        return;
-      }
-      const first = seen.get(key);
-      if (first !== undefined) {
-        errs.set(i, t('peersKeyDuplicate'));
-        errs.set(first, t('peersKeyDuplicate'));
-        return;
-      }
-      seen.set(key, i);
-    });
-    return errs;
+  private _startAdd() {
+    this._editing = 'new';
+    this._draft = { key: '', alias: '' };
+    this._rowError = '';
   }
 
-  private _statFor(key: string) {
-    return (this._tunnel?.peer_stats ?? []).find(s => s.key === key);
+  private _cancelEdit() {
+    this._editing = null;
+    this._rowError = '';
   }
 
-  private _handleSave = async () => {
-    const errs = this._errors();
-    if (errs.size > 0 || this._saving) return;
+  /** _saveRow persists the draft (replacing or appending) and re-reads the list. */
+  private _saveRow = async () => {
+    const draft = { key: this._draft.key.trim(), alias: this._draft.alias.trim() };
+    if (!validPeerKey(draft.key)) {
+      this._rowError = t('peersKeyInvalid');
+      return;
+    }
+    const others = this._rows.filter((_, i) => i !== this._editing);
+    if (others.some(r => r.key === draft.key)) {
+      this._rowError = t('peersKeyDuplicate');
+      return;
+    }
+
+    const next =
+      this._editing === 'new'
+        ? [...this._rows, draft]
+        : this._rows.map((r, i) => (i === this._editing ? draft : r));
+
+    if (await this._save(next)) {
+      this._editing = null;
+      this._rowError = '';
+    }
+  };
+
+  private _deleteRow = async (i: number) => {
+    this._confirmDelete = null;
+    await this._save(this._rows.filter((_, j) => j !== i));
+  };
+
+  /** _save writes the whole list; the API replaces it atomically. */
+  private async _save(rows: PeerRow[]): Promise<boolean> {
+    if (this._saving) return false;
     this._saving = true;
     try {
       const t2 = await updatePeers(
         this.tunnelId,
-        this._rows.map(r => ({ key: r.key.trim(), alias: r.alias.trim() || undefined })),
+        rows.map(r => ({ key: r.key, alias: r.alias || undefined })),
       );
       this._tunnel = t2;
-      const rows = (t2.options.peers ?? []).map(p => ({ key: p.key, alias: p.alias ?? '' }));
-      this._rows = rows;
-      this._saved = rows.map(r => ({ ...r }));
+      this._rows = rowsOf(t2);
       this._showSnackbar(t('saved'));
+      return true;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '';
-      this._showSnackbar(`${t('saveFailed')}${msg ? ': ' + msg : ''}`);
+      const text = `${t('saveFailed')}${msg ? ': ' + msg : ''}`;
+      if (this._editing !== null) this._rowError = text;
+      else this._showSnackbar(text);
+      return false;
+    } finally {
+      this._saving = false;
     }
-    this._saving = false;
-  };
+  }
 
   private _showSnackbar(msg: string) {
     this._snackbar = msg;
@@ -139,9 +163,49 @@ export class TunnelPeersPage extends LitElement {
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
 
+  private _statFor(key: string) {
+    return (this._tunnel?.peer_stats ?? []).find(s => s.key === key);
+  }
+
+  private _renderStats(key: string) {
+    const stat = this._statFor(key);
+    if (!stat) return html`<span class="muted">${t('peersNoTraffic')}</span>`;
+    return html`
+      <span>${formatNumber(stat.current_conns)} ${t('p2pColConns')}</span>
+      <span>↓ ${formatBytes(stat.output_bytes)} <span class="rate">${formatRate(stat.output_rate_bytes)}</span></span>
+      <span>↑ ${formatBytes(stat.input_bytes)} <span class="rate">${formatRate(stat.input_rate_bytes)}</span></span>
+    `;
+  }
+
+  private _renderEditor() {
+    return html`
+      <div class="peer-row editing">
+        <div class="row-line">
+          <input class="form-input alias grow" .value=${this._draft.alias}
+            placeholder=${t('peersAliasPlaceholder')}
+            @input=${(e: Event) => {
+              this._draft = { ...this._draft, alias: (e.target as HTMLInputElement).value };
+            }}>
+          <button class="icon-btn" title="${t('btnCancel')}" @click=${() => this._cancelEdit()}>
+            ${icon('close')}
+          </button>
+          <button class="icon-btn accent" title="${t('btnSave')}" ?disabled=${this._saving}
+            @click=${this._saveRow}>
+            ${icon('check')}
+          </button>
+        </div>
+        <input class="form-input key ${this._rowError ? 'invalid' : ''}" .value=${this._draft.key}
+          placeholder=${t('peersKeyPlaceholder')}
+          @input=${(e: Event) => {
+            this._draft = { ...this._draft, key: (e.target as HTMLInputElement).value };
+            this._rowError = '';
+          }}>
+        ${this._rowError ? html`<div class="row-error">${this._rowError}</div>` : nothing}
+      </div>
+    `;
+  }
+
   render() {
-    const errs = this._errors();
-    const peers = this._tunnel?.options.peers ?? [];
     const t2 = this._tunnel;
 
     return html`
@@ -151,10 +215,9 @@ export class TunnelPeersPage extends LitElement {
             ${icon('chevron-left')}
           </button>
           <span class="page-title">${t('peersTitle')}</span>
-          <button class="pill-btn primary appbar-action" title="${t('btnSave')}"
-            ?disabled=${this._saving || !this._dirty || errs.size > 0}
-            @click=${this._handleSave}>
-            ${icon('check')}
+          <button class="pill-btn appbar-action" title="${this._showKeys ? t('hideKey') : t('revealKey')}"
+            @click=${() => { this._showKeys = !this._showKeys; }}>
+            ${icon(this._showKeys ? 'eye-off' : 'eye')}
           </button>
         </div>
 
@@ -162,66 +225,68 @@ export class TunnelPeersPage extends LitElement {
           ? html`
             <div class="section">
               <div class="card">
-                ${this._rows.length === 0
+                ${this._rows.length === 0 && this._editing !== 'new'
                   ? html`<div class="empty">${t('peersEmpty')}</div>`
-                  : this._rows.map((row, i) => {
-                      const err = errs.get(i);
-                      const stat = this._statFor(row.key.trim());
-                      return html`
-                        <div class="peer-row">
-                          <div class="peer-inputs">
-                            <input class="form-input alias" .value=${row.alias}
-                              placeholder=${t('peersAliasPlaceholder')}
-                              @input=${(e: Event) => {
-                                this._rows[i] = { ...row, alias: (e.target as HTMLInputElement).value };
-                                this._rows = [...this._rows];
-                              }}>
-                            <input class="form-input key ${err ? 'invalid' : ''}" .value=${row.key}
-                              placeholder=${t('peersKeyPlaceholder')}
-                              @input=${(e: Event) => {
-                                this._rows[i] = { ...row, key: (e.target as HTMLInputElement).value };
-                                this._rows = [...this._rows];
-                              }}>
-                            <button class="icon-btn" title="${t('btnCopy')}"
-                              @click=${() => copyToClipboard(row.key)}>
-                              ${icon('copy')}
-                            </button>
-                            <button class="icon-btn danger" title="${t('btnDelete')}"
-                              @click=${() => {
-                                this._rows = this._rows.filter((_, j) => j !== i);
-                              }}>
-                              ${icon('trash')}
-                            </button>
-                          </div>
-                          ${err
-                            ? html`<div class="row-error">${err}</div>`
-                            : stat
-                              ? html`
-                                <div class="peer-stats">
-                                  <span>${formatNumber(stat.current_conns)} ${t('p2pColConns')}</span>
-                                  <span>↓ ${formatBytes(stat.output_bytes)}
-                                    <span class="rate">${formatRate(stat.output_rate_bytes)}</span></span>
-                                  <span>↑ ${formatBytes(stat.input_bytes)}
-                                    <span class="rate">${formatRate(stat.input_rate_bytes)}</span></span>
-                                </div>`
-                              : html`<div class="peer-stats muted">${t('peersNoTraffic')}</div>`}
-                        </div>
-                      `;
-                    })}
+                  : nothing}
+                ${this._rows.map((row, i) => {
+                  if (this._editing === i) return this._renderEditor();
+                  return html`
+                    <div class="peer-row">
+                      <div class="row-line">
+                        <span class="peer-alias">${row.alias || t('peersNoAlias')}</span>
+                        <span class="row-actions">
+                          <button class="icon-btn" title="${t('btnCopy')}" @click=${() => copyToClipboard(row.key)}>
+                            ${icon('copy')}
+                          </button>
+                          <button class="icon-btn" title="${t('btnEdit')}" @click=${() => this._startEdit(i)}>
+                            ${icon('edit')}
+                          </button>
+                          <button class="icon-btn danger" title="${t('btnDelete')}"
+                            @click=${() => { this._confirmDelete = i; }}>
+                            ${icon('trash')}
+                          </button>
+                        </span>
+                      </div>
+                      <div class="peer-key">${this._showKeys ? row.key : maskKey(row.key)}</div>
+                      <div class="peer-stats">${this._renderStats(row.key)}</div>
+                    </div>
+                  `;
+                })}
+                ${this._editing === 'new' ? this._renderEditor() : nothing}
 
-                <button class="add-row" @click=${() => {
-                  this._rows = [...this._rows, { key: '', alias: '' }];
-                }}>
-                  ${icon('plus')} ${t('peersAdd')}
-                </button>
+                ${this._editing === null
+                  ? html`
+                    <button class="add-row" @click=${() => this._startAdd()}>
+                      ${icon('plus')} ${t('peersAdd')}
+                    </button>`
+                  : nothing}
               </div>
 
               <div class="hint">${t('peersHint')}</div>
               <div class="hint">${t('peersRestartHint')}</div>
-              ${peers.length === 0 ? html`<div class="hint">${t('peersNoneHint')}</div>` : nothing}
+              ${this._rows.length === 0 ? html`<div class="hint">${t('peersNoneHint')}</div>` : nothing}
             </div>
           `
           : html`<div class="section"><div class="card"><div class="empty">${t('notFound')}</div></div></div>`}
+
+        ${this._confirmDelete !== null
+          ? html`
+            <div class="dialog-overlay" @click=${() => { this._confirmDelete = null; }}>
+              <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="dialog-title">${t('deleteConfirmTitle')}</div>
+                <div class="dialog-message">${t('deleteConfirmMessage')}</div>
+                <div class="dialog-actions">
+                  <button class="dialog-btn cancel" @click=${() => { this._confirmDelete = null; }}>
+                    ${t('btnCancel')}
+                  </button>
+                  <button class="dialog-btn danger" ?disabled=${this._saving}
+                    @click=${() => this._deleteRow(this._confirmDelete!)}>
+                    ${t('btnDelete')}
+                  </button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
 
         ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : nothing}
       </app-scaffold>
@@ -259,21 +324,15 @@ export class TunnelPeersPage extends LitElement {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-    }
-    .pill-btn.primary {
-      background: var(--accent);
-      color: var(--accent-fg);
-    }
-    .pill-btn svg {
-      width: 14px;
-      height: 14px;
+      background: var(--border-subtle);
+      color: var(--text);
     }
     .pill-btn:hover {
       opacity: 0.85;
     }
-    .pill-btn:disabled {
-      opacity: 0.4;
-      cursor: default;
+    .pill-btn svg {
+      width: 14px;
+      height: 14px;
     }
     .pill-btn.appbar-action {
       margin-left: auto;
@@ -299,12 +358,47 @@ export class TunnelPeersPage extends LitElement {
       padding: 10px 12px;
       border-bottom: 1px solid var(--border-subtle);
     }
-    .peer-inputs {
-      display: grid;
-      grid-template-columns: 1fr 2fr auto auto;
-      gap: 8px;
+    .row-line {
+      display: flex;
       align-items: center;
+      gap: 8px;
     }
+    .peer-alias {
+      flex: 1;
+      font-size: var(--font-sm);
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .row-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .peer-key {
+      padding-top: 2px;
+      font-family: var(--font-mono, monospace);
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      overflow-wrap: anywhere;
+      line-height: 1.4;
+    }
+    .peer-stats {
+      display: flex;
+      gap: 16px;
+      padding-top: 6px;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+    }
+    .peer-stats .muted {
+      font-style: italic;
+    }
+    .peer-stats .rate {
+      color: var(--text-muted);
+      opacity: 0.8;
+    }
+
     .form-input {
       width: 100%;
       box-sizing: border-box;
@@ -320,7 +414,11 @@ export class TunnelPeersPage extends LitElement {
       outline: none;
       border-color: var(--accent);
     }
+    .form-input.alias.grow {
+      flex: 1;
+    }
     .form-input.key {
+      margin-top: 6px;
       font-family: var(--font-mono, monospace);
       font-size: var(--font-xs);
     }
@@ -344,6 +442,13 @@ export class TunnelPeersPage extends LitElement {
     .icon-btn.danger:hover {
       color: var(--red);
     }
+    .icon-btn.accent {
+      color: var(--accent);
+    }
+    .icon-btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
     .icon-btn svg {
       width: 14px;
       height: 14px;
@@ -352,20 +457,6 @@ export class TunnelPeersPage extends LitElement {
       padding-top: 6px;
       font-size: var(--font-xs);
       color: var(--red);
-    }
-    .peer-stats {
-      display: flex;
-      gap: 16px;
-      padding-top: 6px;
-      font-size: var(--font-xs);
-      color: var(--text-muted);
-    }
-    .peer-stats.muted {
-      font-style: italic;
-    }
-    .peer-stats .rate {
-      color: var(--text-muted);
-      opacity: 0.8;
     }
 
     .add-row {
@@ -396,6 +487,59 @@ export class TunnelPeersPage extends LitElement {
       line-height: 1.5;
     }
 
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .dialog-box {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      width: min(90vw, 360px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dialog-title {
+      font-size: var(--font-md);
+      font-weight: 600;
+    }
+    .dialog-message {
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+    }
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .dialog-btn {
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: var(--font-sm);
+      font-family: inherit;
+    }
+    .dialog-btn.cancel {
+      background: var(--border-subtle);
+      color: var(--text);
+    }
+    .dialog-btn.danger {
+      background: var(--red);
+      color: #fff;
+    }
+    .dialog-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
     .toast {
       position: fixed;
       left: 50%;
@@ -408,6 +552,7 @@ export class TunnelPeersPage extends LitElement {
       padding: 8px 16px;
       font-size: var(--font-sm);
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      z-index: 100;
     }
   `;
 }

@@ -175,6 +175,10 @@ export interface P2PSettings {
   derp: string;
   secure?: boolean;
   ca_file?: string;
+  /** STUN server for the IPv4 direct path; empty = the relay host on :3478. */
+  stun?: string;
+  /** Attempt a direct (hole-punched) path; omitted = true. */
+  direct?: boolean;
 }
 
 export interface AppSettings {

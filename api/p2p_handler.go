@@ -14,6 +14,12 @@ type p2pIdentityResponse struct {
 	// Running reports whether the shared host is started (a p2p tunnel or
 	// entrypoint is live). The key alone cannot tell: an idle host still has one.
 	Running bool `json:"running"`
+	// Transport counters, zero while the host is not running: where the peers'
+	// traffic goes now (direct vs relay) and how punching is faring.
+	DirectPeers   int   `json:"direct_peers"`
+	DerpPeers     int   `json:"derp_peers"`
+	PunchAttempts int64 `json:"punch_attempts"`
+	PunchSuccess  int64 `json:"punch_success"`
 }
 
 // handleGetP2PIdentity returns the shared p2p host's base64 public key. The
@@ -21,9 +27,14 @@ type p2pIdentityResponse struct {
 // no p2p tunnel or entrypoint is running; Running says which of the two states
 // the host is in.
 func handleGetP2PIdentity(w http.ResponseWriter, r *http.Request) {
+	st := tunnel.P2PHostStatus()
 	writeJSON(w, http.StatusOK, p2pIdentityResponse{
-		PublicKey: tunnel.P2PHostPublicKey(),
-		Running:   tunnel.P2PHostRunning(),
+		PublicKey:     tunnel.P2PHostPublicKey(),
+		Running:       tunnel.P2PHostRunning(),
+		DirectPeers:   st.DirectPeers,
+		DerpPeers:     st.DerpPeers,
+		PunchAttempts: st.PunchAttempts,
+		PunchSuccess:  st.PunchSuccess,
 	})
 }
 

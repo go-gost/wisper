@@ -609,39 +609,22 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	opts := old.Options()
-	opts.Peers = peers
-	opts.PeerAliases = tunnel.NormalizePeerAliases(peers, aliases)
-
-	// The routes must be free before the replacement claims them.
-	old.Close()
-
-	t := tunnel.NewP2PTunnel(
-		tunnel.IDOption(id),
-		tunnel.NameOption(opts.Name),
-		tunnel.EndpointOption(opts.Endpoint),
-		tunnel.PeerOption(opts.Peer),
-		tunnel.PeersOption(opts.Peers...),
-		tunnel.PeerAliasesOption(opts.PeerAliases),
-		tunnel.RecordModeOption(opts.RecordMode),
-		tunnel.KeepaliveOption(opts.Keepalive),
-		tunnel.TTLOption(opts.TTL),
-		tunnel.CreatedAtOption(opts.CreatedAt),
-	)
-	t.SetStats(old.Stats())
-	t.SetStatsBaseline(old.StatsBaseline())
-	t.Favorite(old.IsFavorite())
-
-	if err := t.Run(); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to restart tunnel: "+err.Error())
+	// The list is taken in place: the routes are reconciled on the
+	// process-wide host, so the tunnel's service keeps running and a live peer
+	// stream is not cut. A conflict (a key another tunnel holds) leaves
+	// everything as it was and is reported as such.
+	setter, ok := old.(tunnel.PeerSetter)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "tunnel does not take a peer list")
 		return
 	}
-
-	tunnel.Delete(id)
-	tunnel.Add(t)
+	if err := setter.SetPeers(peers, aliases); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
 
-	writeJSON(w, http.StatusOK, toTunnelResponse(t))
+	writeJSON(w, http.StatusOK, toTunnelResponse(old))
 }
