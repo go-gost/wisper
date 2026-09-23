@@ -1,11 +1,12 @@
 import type {
-  Tunnel,
-  TunnelCreateRequest,
+  AppSettings,
+  AppSettingsUpdate,
   Entrypoint,
   EntrypointCreateRequest,
   StatsSnapshot,
-  AppSettings,
-  AppSettingsUpdate,
+  Tunnel,
+  TunnelCreateRequest,
+  TunnelPeersRequest,
   VersionInfo,
 } from './types';
 
@@ -81,6 +82,10 @@ export class GoBackend {
 
   updateTunnel(id: string, body: TunnelCreateRequest): Promise<Tunnel> {
     return this.request<Tunnel>('PUT', `/api/tunnels/${id}`, body);
+  }
+
+  updateTunnelPeers(id: string, body: TunnelPeersRequest): Promise<Tunnel> {
+    return this.request<Tunnel>('PUT', `/api/tunnels/${id}/peers`, body);
   }
 
   deleteTunnel(id: string): Promise<void> {

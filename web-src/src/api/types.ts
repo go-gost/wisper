@@ -143,6 +143,11 @@ export interface Entrypoint {
   stats: ServiceStats;
 }
 
+/** TunnelPeersRequest replaces a p2p tunnel's allowlist on its own. */
+export interface TunnelPeersRequest {
+  peers: Peer[];
+}
+
 export interface EntrypointCreateRequest {
   name: string;
   type: EntrypointType;

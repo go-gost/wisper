@@ -51,7 +51,6 @@ export class TunnelDetailPage extends LitElement {
   @state() private _showPassword = false;
   @state() private _recordMode = 'off';
   @state() private _showPeers = false;
-  @state() private _peers = ''; // p2p allowlist, one key per line
 
   // Native bridge detection
   private get _isNativeDirPicker(): boolean {
@@ -136,7 +135,6 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = false;
     this._showAuth = false;
     this._recordMode = 'off';
-    this._peers = '';
   }
 
   private _populateForm(t: Tunnel) {
@@ -151,10 +149,6 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = t.options.file_upload ?? false;
     this._showAuth = !!(t.options.username || t.options.basic_auth);
     this._recordMode = t.options.record_mode || 'off';
-    // One peer per line: "<key> <alias>", the alias optional.
-    this._peers = (t.options.peers ?? [])
-      .map(p => (p.alias ? `${p.key} ${p.alias}` : p.key))
-      .join('\n');
   }
 
   /** _peerLabels renders the allowlist for display: each peer's alias by
@@ -216,16 +210,11 @@ export class TunnelDetailPage extends LitElement {
         file_upload: this._fileUpload,
         record_mode: this._recordMode,
       };
-      if (this.tunnelType === 'p2p') {
-        body.peers = this._peers
-          .split('\n')
-          .map(s => s.trim())
-          .filter(Boolean)
-          .map(line => {
-            const [key, ...rest] = line.split(/\s+/);
-            const alias = rest.join(' ');
-            return alias ? { key, alias } : { key };
-          });
+      if (this.tunnelType === 'p2p' && this.mode === 'edit') {
+        // The allowlist is managed on its own page; an edit here must carry it
+        // along — the API replaces the whole config, so omitting it clears the
+        // list (and the p2p host's routes).
+        body.peers = this._tunnel?.options.peers ?? [];
       }
       if (this._showAuth) {
         body.username = this._username.trim() || undefined;
@@ -1054,35 +1043,29 @@ export class TunnelDetailPage extends LitElement {
                 `
                 : ''}
 
-              <!-- Per-peer traffic: this run's counters, one row per allowlisted
-                   peer (zeros included), refreshed by the stats poll. -->
-              ${this.tunnelType === 'p2p' && peerStats.length
+              <!-- Allowed peers: the allowlist lives on its own page (long lists,
+                   per-peer live traffic), and saving it restarts the tunnel. -->
+              ${this.tunnelType === 'p2p'
                 ? html`
-                  <div class="peer-table">
-                    <div class="peer-row head">
-                      <span>${t('p2pColPeer')}</span>
-                      <span>${t('p2pColConns')}</span>
-                      <span>${t('p2pColDown')}</span>
-                      <span>${t('p2pColUp')}</span>
-                    </div>
-                    ${peerStats.map(p => html`
-                      <div class="peer-row">
-                        <span class="peer-name">${p.alias || maskKey(p.key)}</span>
-                        <span>${formatNumber(p.current_conns)}</span>
-                        <span>
-                          ${formatBytes(p.output_bytes)}
-                          <span class="peer-rate">${formatRate(p.output_rate_bytes)}</span>
-                        </span>
-                        <span>
-                          ${formatBytes(p.input_bytes)}
-                          <span class="peer-rate">${formatRate(p.input_rate_bytes)}</span>
-                        </span>
+                  <div class="section" style="padding-top:0;">
+                    <div class="card" style="padding:0;">
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
+                        @click=${() => this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/peers`)}>
+                        <span style="color:var(--accent);">${icon('users')}</span>
+                        <div style="flex:1;">
+                          <div style="font-size:var(--font-sm);font-weight:600;">${t('peersTitle')}</div>
+                          <div style="font-size:var(--font-sm);color:var(--text-muted);">
+                            ${peerStats.length
+                              ? t('peersEntryDesc').replace('{n}', String(peerStats.length))
+                              : t('peersNoneHint')}
+                          </div>
+                        </div>
+                        <span style="color:var(--text-muted);">&rarr;</span>
                       </div>
-                    `)}
+                    </div>
                   </div>
                 `
                 : nothing}
-            </div>
 
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
                  inspecting, and only when an inspector URL is configured. -->
@@ -1152,21 +1135,6 @@ export class TunnelDetailPage extends LitElement {
                       : ''}
                   </div>
                 </div>
-
-                <!-- Allowed peers (p2p only) -->
-                ${this.tunnelType === 'p2p'
-                  ? html`
-                    <div class="form-group">
-                      <label class="form-label">${t('p2pPeers')}</label>
-                      <textarea class="form-input" rows="3" placeholder="<public key> [alias]"
-                        .value=${this._peers}
-                        @input=${(e: Event) => { this._peers = (e.target as HTMLTextAreaElement).value; }}></textarea>
-                      <div style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding-top:4px;">
-                        ${t('p2pPeersHint')}
-                      </div>
-                    </div>
-                  `
-                  : ''}
 
                 <!-- URL Prefix (HTTP + file) -->
                 ${this.tunnelType === 'http' || this.tunnelType === 'file'

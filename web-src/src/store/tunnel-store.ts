@@ -1,5 +1,5 @@
 import { GoBackend } from '../api/backend';
-import type { Tunnel, TunnelCreateRequest } from '../api/types';
+import type { Tunnel, TunnelCreateRequest, Peer } from '../api/types';
 import { subscribe as subscribeSettings } from './settings-store';
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -60,6 +60,15 @@ export async function create(req: TunnelCreateRequest): Promise<Tunnel> {
 /** Update an existing tunnel (stop old, start new). */
 export async function update(id: string, req: TunnelCreateRequest): Promise<Tunnel> {
   const t = await backend.updateTunnel(id, req);
+  tunnels = tunnels.map(x => (x.id === id ? t : x));
+  notify();
+  return t;
+}
+
+/** Save a p2p tunnel's allowlist: the tunnel is rebuilt (its routes are
+ *  per-key and only one tunnel may claim one), so live connections drop. */
+export async function updatePeers(id: string, peers: Peer[]): Promise<Tunnel> {
+  const t = await backend.updateTunnelPeers(id, { peers });
   tunnels = tunnels.map(x => (x.id === id ? t : x));
   notify();
   return t;
