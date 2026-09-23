@@ -60,6 +60,7 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("DELETE /api/tunnels/{id}", handleDeleteTunnel)
 	mux.HandleFunc("POST /api/tunnels/{id}/start", handleStartTunnel)
 	mux.HandleFunc("POST /api/tunnels/{id}/stop", handleStopTunnel)
+	mux.HandleFunc("PUT /api/tunnels/{id}/peers", handleUpdateTunnelPeers)
 	mux.HandleFunc("POST /api/tunnels/{id}/stats/reset", handleResetTunnelStats)
 
 	// Entrypoint endpoints

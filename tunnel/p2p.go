@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"encoding/base64"
 	"io"
 	"math/rand/v2"
 	"net"
@@ -162,6 +163,15 @@ func RemoveP2PKey(id string) error {
 		return err
 	}
 	return nil
+}
+
+// ValidPeerKey reports whether k is a base64 (raw URL) 32-byte curve25519
+// public key — the only shape a p2p allowlist entry can match. An entry that is
+// not a key is a silent no-op route (nothing ever matches it), so the API
+// rejects one up front.
+func ValidPeerKey(k string) bool {
+	b, err := base64.RawURLEncoding.DecodeString(k)
+	return err == nil && len(b) == 32
 }
 
 // P2PDerpURL returns the configured DERP relay, falling back to the public

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -775,6 +776,87 @@ func TestUpdateP2PTunnel(t *testing.T) {
 	}
 	if got, _ := upeers[1].(map[string]any)["alias"].(string); got != "laptop" {
 		t.Errorf("k2 alias after update = %q, want it kept", got)
+	}
+}
+
+// TestUpdateP2PTunnelPeers: the peers page saves the allowlist on its own. The
+// endpoint replaces just the list (the rest of the config survives), keeps the
+// submitted aliases and generates the missing ones, and refuses an entry that
+// cannot be a key — a junk key is a route that silently never matches.
+func TestUpdateP2PTunnelPeers(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	secure := false
+	config.Set(&config.Config{Settings: &config.Settings{
+		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure},
+	}})
+
+	key1 := strings.Repeat("A", 43) // base64 of 32 bytes: a well-formed peer key
+	key2 := strings.Repeat("B", 43)
+
+	resp, created := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
+		"name": "Private", "type": "p2p", "endpoint": "127.0.0.1:9",
+		"peers": []map[string]any{{"key": key1}},
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create p2p tunnel = %d: %v", resp.StatusCode, created)
+	}
+	id, _ := created["id"].(string)
+	defer tunnel.Delete(id)
+
+	resp, updated := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key2, "alias": "laptop"}, {"key": key1}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("save peers = %d: %v", resp.StatusCode, updated)
+	}
+	// The peers-only save leaves the rest of the config alone.
+	if got, _ := updated["name"].(string); got != "Private" {
+		t.Errorf("name after saving peers = %q, want it kept", got)
+	}
+	if got, _ := updated["endpoint"].(string); got != "127.0.0.1:9" {
+		t.Errorf("endpoint after saving peers = %q, want it kept", got)
+	}
+
+	peers, _ := updated["options"].(map[string]any)["peers"].([]any)
+	if len(peers) != 2 {
+		t.Fatalf("saved peers = %v, want two entries", peers)
+	}
+	p0, _ := peers[0].(map[string]any)
+	if p0["key"] != key2 || p0["alias"] != "laptop" {
+		t.Errorf("peers[0] = %v, want the submitted alias", p0)
+	}
+	p1, _ := peers[1].(map[string]any)
+	if p1["key"] != key1 {
+		t.Errorf("peers[1] = %v, want the second submitted key", p1)
+	}
+	if a, _ := p1["alias"].(string); a == "" {
+		t.Error("an entry without an alias got none back, want a generated one")
+	}
+
+	// A junk key: it would be a route nothing ever matches.
+	resp, _ = putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": "not-a-key"}},
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("saving a junk key = %d, want 400", resp.StatusCode)
+	}
+
+	// A duplicate key: the host routes one key to exactly one tunnel, so a
+	// doubled entry is a config error, not a no-op.
+	resp, _ = putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key1}, {"key": key1}},
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("saving a duplicate key = %d, want 400", resp.StatusCode)
+	}
+
+	// The rejected saves changed nothing.
+	peers, _ = updated["options"].(map[string]any)["peers"].([]any)
+	tun := tunnel.Get(id)
+	if tun == nil || len(tun.Options().Peers) != 2 {
+		t.Fatalf("allowlist after the rejected saves = %v, want the accepted one", tun.Options().Peers)
 	}
 }
 

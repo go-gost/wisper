@@ -560,3 +560,88 @@ func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(t))
 }
+
+// tunnelPeersRequest is the JSON body for saving a p2p tunnel's allowlist on
+// its own — the peers page changes the list without touching the rest of the
+// tunnel's config.
+type tunnelPeersRequest struct {
+	Peers []peerJSON `json:"peers"`
+}
+
+// handleUpdateTunnelPeers replaces a p2p tunnel's inbound allowlist and
+// restarts it. The tunnel is rebuilt rather than patched: the process-wide host
+// routes each peer key to exactly one tunnel, so the old one must give its
+// routes up before the replacement claims them.
+func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	old := tunnel.Get(id)
+	if old == nil {
+		writeError(w, http.StatusNotFound, "tunnel not found")
+		return
+	}
+	if old.Type() != tunnel.P2PTunnel {
+		writeError(w, http.StatusBadRequest, "only p2p tunnels have an allowlist")
+		return
+	}
+
+	var req tunnelPeersRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	peers := make([]string, 0, len(req.Peers))
+	aliases := make(map[string]string, len(req.Peers))
+	seen := make(map[string]bool, len(req.Peers))
+	for _, p := range req.Peers {
+		key := strings.TrimSpace(p.Key)
+		if !tunnel.ValidPeerKey(key) {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("peer %q is not a base64 public key", key))
+			return
+		}
+		if seen[key] {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("peer %s is listed twice", key))
+			return
+		}
+		seen[key] = true
+		peers = append(peers, key)
+		if a := strings.TrimSpace(p.Alias); a != "" {
+			aliases[key] = a
+		}
+	}
+
+	opts := old.Options()
+	opts.Peers = peers
+	opts.PeerAliases = tunnel.NormalizePeerAliases(peers, aliases)
+
+	// The routes must be free before the replacement claims them.
+	old.Close()
+
+	t := tunnel.NewP2PTunnel(
+		tunnel.IDOption(id),
+		tunnel.NameOption(opts.Name),
+		tunnel.EndpointOption(opts.Endpoint),
+		tunnel.PeerOption(opts.Peer),
+		tunnel.PeersOption(opts.Peers...),
+		tunnel.PeerAliasesOption(opts.PeerAliases),
+		tunnel.RecordModeOption(opts.RecordMode),
+		tunnel.KeepaliveOption(opts.Keepalive),
+		tunnel.TTLOption(opts.TTL),
+		tunnel.CreatedAtOption(opts.CreatedAt),
+	)
+	t.SetStats(old.Stats())
+	t.SetStatsBaseline(old.StatsBaseline())
+	t.Favorite(old.IsFavorite())
+
+	if err := t.Run(); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to restart tunnel: "+err.Error())
+		return
+	}
+
+	tunnel.Delete(id)
+	tunnel.Add(t)
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
+
+	writeJSON(w, http.StatusOK, toTunnelResponse(t))
+}
