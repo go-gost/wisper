@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"encoding/binary"
 	"io"
 	"net"
 	"os"
@@ -13,6 +14,82 @@ import (
 )
 
 const testPeerKey = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+
+// TestP2PStunProbe: the settings-page probe reports the mapping the STUN server
+// sends back, so a user can tell a wrong or blocked STUN server from a working
+// one (the usual reason a hole punch never comes up).
+func TestP2PStunProbe(t *testing.T) {
+	const mapped = "203.0.113.7:4567"
+	addr := startFakeSTUN(t, mapped)
+
+	got, public, latency, err := TestP2PStun(addr)
+	if err != nil {
+		t.Fatalf("TestP2PStun: %v", err)
+	}
+	if got != addr {
+		t.Errorf("probed %q, want the address passed in", got)
+	}
+	if public != mapped {
+		t.Errorf("mapped = %q, want what the server reported (%q)", public, mapped)
+	}
+	if latency <= 0 {
+		t.Errorf("latency = %v, want the round trip measured", latency)
+	}
+
+	// An empty address probes the configured server, not nothing.
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{
+		Derp: "wss://relay.example/derp", Stun: addr,
+	}}})
+	if got, _, _, err := TestP2PStun(""); err != nil || got != addr {
+		t.Errorf("TestP2PStun(empty) = %q, %v; want the configured STUN server", got, err)
+	}
+}
+
+// startFakeSTUN runs a minimal STUN responder on loopback that reports a fixed
+// mapping, and returns the address to probe.
+func startFakeSTUN(t *testing.T, mapped string) string {
+	t.Helper()
+	ua, err := net.ResolveUDPAddr("udp4", mapped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ip4 := ua.IP.To4()
+	if ip4 == nil {
+		t.Fatalf("fake STUN mapping %q is not IPv4", mapped)
+	}
+
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+
+	go func() {
+		const magic = 0x2112A442
+		buf := make([]byte, 1500)
+		for {
+			n, src, err := conn.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			if n < 20 || binary.BigEndian.Uint16(buf[0:2]) != 0x0001 {
+				continue // not a binding request
+			}
+			resp := make([]byte, 20, 32)
+			binary.BigEndian.PutUint16(resp[0:2], 0x0101) // binding success
+			binary.BigEndian.PutUint16(resp[2:4], 12)     // attribute length
+			binary.BigEndian.PutUint32(resp[4:8], magic)
+			copy(resp[8:20], buf[8:20]) // transaction id
+			v := make([]byte, 8)
+			v[1] = 0x01 // IPv4
+			binary.BigEndian.PutUint16(v[2:4], uint16(ua.Port)^uint16(magic>>16))
+			binary.BigEndian.PutUint32(v[4:8], binary.BigEndian.Uint32(ip4)^magic)
+			resp = append(resp, 0x00, 0x20, 0x00, 0x08) // XOR-MAPPED-ADDRESS
+			_, _ = conn.WriteToUDP(append(resp, v...), src)
+		}
+	}()
+	return conn.LocalAddr().String()
+}
 
 // TestP2PTunnelEmptyAllowlist: Peers is an allowlist, not a requirement — an
 // empty list runs the tunnel and routes nothing to it (no catch-all).

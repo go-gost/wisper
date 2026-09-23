@@ -103,10 +103,17 @@ p2p `v0.6.0` 把 udp 数据面重写为「每拨号一条 datagram link」，wis
 - **STUN 地址无需配置**：`settings.p2p.stun` 留空即取**中继主机 + 3478**（derper 默认在该端口
   提供 STUN，见 `-stun-port`）；自建中继换了端口或关了 STUN 时再显式填写。没有 STUN 也不妨：
   双栈且都有全局 v6 时走 IPv6 直连（v6 不需要 STUN）。
-- **设置页**：P2P 区新增「直连（打洞）路径」开关与 STUN 输入；身份区多一行实时传输统计
-  ——`GET /api/p2p` 现在同时返回 `direct_peers`/`derp_peers`（当前各对端走哪条路）与
+- **设置页**：P2P 区新增「直连（打洞）路径」开关与 STUN 输入；STUN 输入下面有和中继一样的
+  「测试」按钮（`POST /api/p2p/test-stun`，见下）；身份区多一行实时传输统计——`GET /api/p2p`
+  现在同时返回 `direct_peers`/`derp_peers`（当前各对端走哪条路）与
   `punch_attempts`/`punch_success`（本机打洞成不成）。改这两项会重建 host（重启所有 p2p
   隧道/入口点）。
+- **STUN 测试**：`POST /api/p2p/test-stun` body `{"stun":"host:port"}`（留空 = 用配置/推导的
+  地址），返回 `{"ok", "stun", "mapped", "latency_ms", "error"}`——`mapped` 是服务器看到的
+  本机公网地址（打洞要用的映射），失败是 200 + `ok:false`（和探针语义一致：连不上是结果，
+  不是请求错误）。底层是 p2p 新增的 `endpoint.StunLookup`（`internal/stun` 是 internal 包，
+  wisper 引不到，且 STUN 的实现归属在 p2p）。探测用自己的 socket，报的端口是那条 socket 的
+  映射，不是之后打洞那条。
 - **p2p v0.6.1 顺带修的**：`OpenStream` 原先在"打洞未成功"时对**每条**流都阻塞满
   `punchWaitTimeout`（生产 5s）——对打洞不可能成功的对端（对称 NAT、UDP 被封）等于每条连接
   都多等 5s。现在只有**真正发起打洞的那次调用**会等（与"让第一条连接走直连"的原意一致），

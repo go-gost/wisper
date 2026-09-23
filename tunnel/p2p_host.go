@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -521,4 +522,27 @@ func TestP2PRelay(derp string, secure *bool, caFile string) (string, time.Durati
 		return derp, 0, err
 	}
 	return derp, time.Since(start), nil
+}
+
+// TestP2PStun probes the STUN server the direct path would use, so the settings
+// page can verify it before saving. An empty stun tests the configured (or
+// derived) one, the way TestP2PRelay treats its relay. It returns the address
+// probed, the public mapping the server reported, and the round trip.
+func TestP2PStun(stun string) (string, string, time.Duration, error) {
+	if stun == "" {
+		stun = P2PStunAddr(cfg.Get().Settings)
+	}
+	if stun == "" {
+		return "", "", 0, errors.New("no STUN server configured")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	mapped, err := endpoint.StunLookup(ctx, stun)
+	if err != nil {
+		return stun, "", 0, err
+	}
+	return stun, mapped.String(), time.Since(start), nil
 }

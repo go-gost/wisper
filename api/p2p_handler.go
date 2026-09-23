@@ -71,3 +71,39 @@ func handleTestP2PRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, p2pRelayTestResponse{OK: true, Derp: derp, LatencyMS: latency.Milliseconds()})
 }
+
+// p2pStunTestRequest is the body of POST /api/p2p/test-stun: the STUN address
+// as typed in the settings form. Empty probes the saved setting (or the one
+// derived from the relay).
+type p2pStunTestRequest struct {
+	Stun string `json:"stun"`
+}
+
+// p2pStunTestResponse reports the probe outcome. A server that does not answer
+// is a 200 with ok=false, like the relay probe: it is the result, not a
+// request error. Mapped is the public address the server saw — what a peer
+// would have to reach.
+type p2pStunTestResponse struct {
+	OK        bool   `json:"ok"`
+	Stun      string `json:"stun,omitempty"`
+	Mapped    string `json:"mapped,omitempty"`
+	LatencyMS int64  `json:"latency_ms,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// handleTestP2PStun probes the STUN server the direct path would use: a wrong
+// or blocked STUN address is the usual reason a hole punch never comes up.
+func handleTestP2PStun(w http.ResponseWriter, r *http.Request) {
+	var req p2pStunTestRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	stun, mapped, latency, err := tunnel.TestP2PStun(req.Stun)
+	if err != nil {
+		writeJSON(w, http.StatusOK, p2pStunTestResponse{OK: false, Stun: stun, Error: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, p2pStunTestResponse{
+		OK: true, Stun: stun, Mapped: mapped, LatencyMS: latency.Milliseconds(),
+	})
+}

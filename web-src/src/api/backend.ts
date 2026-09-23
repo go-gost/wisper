@@ -186,4 +186,16 @@ export class GoBackend {
   }> {
     return this.request('POST', '/api/p2p/test', req);
   }
+
+  /** Probe the STUN server the direct path would use; `mapped` is the public
+   *  address the server saw. An empty `stun` probes the configured one. */
+  testP2PStun(req: { stun: string }): Promise<{
+    ok: boolean;
+    stun?: string;
+    mapped?: string;
+    latency_ms?: number;
+    error?: string;
+  }> {
+    return this.request('POST', '/api/p2p/test-stun', req);
+  }
 }

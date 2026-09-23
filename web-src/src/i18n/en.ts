@@ -137,6 +137,7 @@ const en: Record<string, string> = {
   settingsP2PStun: 'STUN server',
   settingsP2PStunHint:
     'Used to find the public address for hole punching. Empty = the relay host on port 3478, which a derper serves by default.',
+  p2pStunMapped: 'public address',
   settingsP2PCAFile: 'Relay CA file',
   p2pHint: 'Anyone holding this key who can reach the relay can access the local service. No further authentication is applied by p2p.',
   entrypointPeerKey: 'Peer public key',

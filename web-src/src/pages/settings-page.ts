@@ -42,6 +42,8 @@ export class SettingsPage extends LitElement {
   @state() private _showP2PKey = false;
   @state() private _p2pTesting = false;
   @state() private _p2pTest: { ok: boolean; latency?: number; error?: string } | null = null;
+  @state() private _p2pStunTesting = false;
+  @state() private _p2pStunTest: { ok: boolean; mapped?: string; latency?: number; error?: string } | null = null;
   @state() private _p2pPublicKey = '';
   @state() private _p2pRunning = false;
   @state() private _p2pTransport: { direct: number; derp: number; attempts: number; success: number } | null = null;
@@ -137,6 +139,45 @@ export class SettingsPage extends LitElement {
       this._p2pTest = { ok: false, error: String(e) };
     }
     this._p2pTesting = false;
+  }
+
+  private async _testStun() {
+    this._p2pStunTesting = true;
+    this._p2pStunTest = null;
+    try {
+      const res = await this._backend.testP2PStun({ stun: this._p2pStun });
+      this._p2pStunTest = { ok: res.ok, mapped: res.mapped, latency: res.latency_ms, error: res.error };
+    } catch (e) {
+      this._p2pStunTest = { ok: false, error: String(e) };
+    }
+    this._p2pStunTesting = false;
+  }
+
+  /** _renderProbeRow is the shared "test this endpoint" row: a status dot with
+   *  the last result, and the button that runs the probe. */
+  private _renderProbeRow(
+    test: { ok: boolean; latency?: number; error?: string } | null,
+    testing: boolean,
+    detail: string,
+    onTest: () => void,
+  ) {
+    return html`
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:var(--font-sm);padding-top:8px;">
+        <span style="display:flex;align-items:center;gap:6px;color:var(--text-muted);">
+          <span style="width:8px;height:8px;border-radius:50%;background:${test ? (test.ok ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)'};display:inline-block;"></span>
+          ${test
+            ? (test.ok
+                ? `${t('p2pTestOk')}${test.latency != null ? ` · ${test.latency} ms` : ''}${detail}`
+                : t('p2pTestFailed'))
+            : t('p2pUntested')}
+        </span>
+        <button class="save-btn" style="width:auto;padding:6px 16px;margin:0;"
+          ?disabled=${testing} @click=${onTest}>
+          ${testing ? t('p2pTesting') : t('p2pTest')}
+        </button>
+      </div>
+      ${test && !test.ok ? html`<p class="p2p-warning">${test.error ?? ''}</p>` : nothing}
+    `;
   }
 
   private async _copyP2PKey() {
@@ -558,21 +599,7 @@ export class SettingsPage extends LitElement {
                   placeholder="wss://derp.gost.run/derp"
                   @input=${(e: Event) => { this._p2pDerp = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
               </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;font-size:var(--font-sm);padding-top:8px;">
-                <span style="display:flex;align-items:center;gap:6px;color:var(--text-muted);">
-                  <span style="width:8px;height:8px;border-radius:50%;background:${this._p2pTest ? (this._p2pTest.ok ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)'};display:inline-block;"></span>
-                  ${this._p2pTest
-                    ? (this._p2pTest.ok ? `${t('p2pTestOk')} · ${this._p2pTest.latency} ms` : t('p2pTestFailed'))
-                    : t('p2pUntested')}
-                </span>
-                <button class="save-btn" style="width:auto;padding:6px 16px;margin:0;"
-                  ?disabled=${this._p2pTesting} @click=${this._testP2P}>
-                  ${this._p2pTesting ? t('p2pTesting') : t('p2pTest')}
-                </button>
-              </div>
-              ${this._p2pTest && !this._p2pTest.ok
-                ? html`<p class="p2p-warning">${this._p2pTest.error ?? ''}</p>`
-                : ''}
+              ${this._renderProbeRow(this._p2pTest, this._p2pTesting, '', () => this._testP2P())}
               <div class="switch-row" style="padding-bottom:18px;">
                 <div>
                   <div class="switch-label">${t('settingsP2PSecure')}</div>
@@ -604,8 +631,17 @@ export class SettingsPage extends LitElement {
                 <label class="form-label">${t('settingsP2PStun')}</label>
                 <input class="form-input" .value=${this._p2pStun}
                   placeholder="derp.gost.run:3478"
-                  @input=${(e: Event) => { this._p2pStun = (e.target as HTMLInputElement).value; }}>
+                  @input=${(e: Event) => {
+                    this._p2pStun = (e.target as HTMLInputElement).value;
+                    this._p2pStunTest = null;
+                  }}>
                 <p class="hint">${t('settingsP2PStunHint')}</p>
+                ${this._renderProbeRow(
+                  this._p2pStunTest,
+                  this._p2pStunTesting,
+                  this._p2pStunTest?.mapped ? ` · ${t('p2pStunMapped')} ${this._p2pStunTest.mapped}` : '',
+                  () => this._testStun(),
+                )}
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}
