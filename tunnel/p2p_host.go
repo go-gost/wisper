@@ -144,7 +144,7 @@ func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 		conf := &p2p.Config{
 			Derp:   P2PDerpURL(settings),
 			Key:    keyPath,
-			Stun:   P2PStunAddr(settings),
+			Stun:   p2pHostStun(settings),
 			Direct: &direct,
 		}
 		conf.TLS = P2PTLSConfig(settings)
@@ -522,6 +522,44 @@ func TestP2PRelay(derp string, secure *bool, caFile string) (string, time.Durati
 		return derp, 0, err
 	}
 	return derp, time.Since(start), nil
+}
+
+// p2pHostStun returns the STUN server to build the p2p host with. An explicit
+// settings.p2p.stun is used as given — the settings page can test it, and a
+// server that is down now may come back — while a *derived* one (P2PStunAddr)
+// is used only if it answers: the public relay serves no STUN, and handing
+// that guess over would leave every punch, and with it the first stream of
+// every peer, waiting on a server that never replies.
+func p2pHostStun(settings *cfg.Settings) string {
+	if settings != nil && settings.P2P != nil && settings.P2P.Stun != "" {
+		return settings.P2P.Stun
+	}
+	if !P2PDirect(settings) {
+		return "" // relay-only: nothing to probe for
+	}
+	addr := P2PStunAddr(settings)
+	if addr == "" {
+		return ""
+	}
+	if !stunAnswers(addr) {
+		// Say so: the address was a guess from the relay, and a silent guess
+		// would leave a user wondering why direct never comes up.
+		if log := logger.Default(); log != nil {
+			log.Warnf("p2p: derived STUN %s does not answer, direct (IPv4) stays off; set settings.p2p.stun to enable it", addr)
+		}
+		return ""
+	}
+	return addr
+}
+
+// stunAnswers probes addr once. The budget is short on purpose: a STUN server
+// answers in milliseconds when it answers at all, and this runs on the way to
+// a host that is about to serve traffic.
+func stunAnswers(addr string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+	_, err := endpoint.StunLookup(ctx, addr)
+	return err == nil
 }
 
 // TestP2PStun probes the STUN server the direct path would use, so the settings

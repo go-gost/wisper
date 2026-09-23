@@ -17,6 +17,11 @@ import (
 	"github.com/go-gost/wisper/tunnel/entrypoint"
 )
 
+// directOff pins the p2p hosts in these tests to the relay: they cover API
+// shapes, and a host with the direct path on probes for a STUN server on the
+// way up.
+var directOff = false
+
 // setupTestServer creates an HTTP test server with the API handler.
 // It resets global tunnel/entrypoint state and config.
 func setupTestServer(t *testing.T) *httptest.Server {
@@ -747,7 +752,7 @@ func TestUpdateP2PTunnel(t *testing.T) {
 	// An unreachable relay: the connect is non-fatal, the host routes anyway.
 	secure := false
 	config.Set(&config.Config{Settings: &config.Settings{
-		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure},
+		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure, Direct: &directOff},
 	}})
 
 	resp, created := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
@@ -816,7 +821,7 @@ func TestUpdateP2PTunnelPeers(t *testing.T) {
 	defer srv.Close()
 	secure := false
 	config.Set(&config.Config{Settings: &config.Settings{
-		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure},
+		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure, Direct: &directOff},
 	}})
 
 	key1 := strings.Repeat("A", 43) // base64 of 32 bytes: a well-formed peer key
@@ -913,7 +918,7 @@ func TestUpdateRunningEntrypoint(t *testing.T) {
 	defer srv.Close()
 	secure := false
 	config.Set(&config.Config{Settings: &config.Settings{
-		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure},
+		P2P: &config.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Secure: &secure, Direct: &directOff},
 	}})
 
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))

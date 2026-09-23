@@ -182,7 +182,7 @@ const en: Record<string, string> = {
   p2pTransportWhyPunching: 'negotiating a direct path',
   p2pTransportWhyFailed: 'punch failed (often a symmetric NAT)',
   p2pTransportWhyDisabled: 'direct path is off in the settings',
-  p2pTransportWhyNoCandidates: 'no STUN server configured and no IPv6',
+  p2pTransportWhyNoCandidates: 'no usable STUN server and no IPv6',
   p2pTransportWhyStun: 'STUN server does not answer',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
   p2pColPeer: 'Peer',

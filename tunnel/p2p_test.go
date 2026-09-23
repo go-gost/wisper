@@ -15,6 +15,10 @@ import (
 
 const testPeerKey = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
 
+// directOff pins these tests to the relay: they cover lifecycle and routing,
+// and a host with the direct path on would probe for a STUN server on the way up.
+var directOff = false
+
 // TestP2PStunProbe: the settings-page probe reports the mapping the STUN server
 // sends back, so a user can tell a wrong or blocked STUN server from a working
 // one (the usual reason a hole punch never comes up).
@@ -95,7 +99,7 @@ func startFakeSTUN(t *testing.T, mapped string) string {
 // empty list runs the tunnel and routes nothing to it (no catch-all).
 func TestP2PTunnelEmptyAllowlist(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
 	if p2pHost.refs != 0 {
 		t.Fatal("manager is not idle: a previous test leaked a reference")
 	}
@@ -139,7 +143,7 @@ func TestP2PTunnelEmptyAllowlist(t *testing.T) {
 // back; the shared identity file outlives the tunnel.
 func TestP2PTunnelLifecycle(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
 	if p2pHost.refs != 0 {
 		t.Fatal("manager is not idle: a previous test leaked a reference")
 	}
@@ -206,7 +210,7 @@ func TestP2PTunnelLifecycle(t *testing.T) {
 // tunnel — N peers, one backend — and Close drops them all.
 func TestP2PTunnelPeerAllowlist(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
 	if p2pHost.refs != 0 {
 		t.Fatal("manager is not idle: a previous test leaked a reference")
 	}
@@ -260,7 +264,7 @@ func TestP2PTunnelPeerAllowlist(t *testing.T) {
 // second Run fails, rolls its claim back, and leaves the first tunnel routing.
 func TestP2PTunnelDuplicatePeerKey(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
 	if p2pHost.refs != 0 {
 		t.Fatal("manager is not idle: a previous test leaked a reference")
 	}
@@ -477,6 +481,30 @@ func TestP2PStunAddr(t *testing.T) {
 	// A relay URL that does not parse leaves the direct path to IPv6.
 	if got := P2PStunAddr(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: "://"}}); got != "" {
 		t.Fatalf("P2PStunAddr(bad relay) = %q, want empty", got)
+	}
+}
+
+// TestP2PHostStun: an explicit STUN server is trusted as given, a derived one
+// only after it answers — the derived guess (the relay host) is a dead end
+// against the public relay, and a punch against it would stall every peer's
+// first stream for nothing.
+func TestP2PHostStun(t *testing.T) {
+	if got := p2pHostStun(&cfg.Settings{P2P: &cfg.P2PSettings{Stun: "192.0.2.7:3479"}}); got != "192.0.2.7:3479" {
+		t.Errorf("explicit STUN = %q, want it used as given", got)
+	}
+	// 192.0.2.1 (TEST-NET-1) is guaranteed unroutable, so the derived address
+	// there cannot answer.
+	if got := p2pHostStun(&cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://192.0.2.1/derp"}}); got != "" {
+		t.Errorf("derived STUN that does not answer = %q, want none", got)
+	}
+
+	// The probe itself: a server that answers, and one that does not.
+	addr := startFakeSTUN(t, "203.0.113.7:4567")
+	if !stunAnswers(addr) {
+		t.Error("stunAnswers(answering server) = false")
+	}
+	if stunAnswers("192.0.2.1:9") {
+		t.Error("stunAnswers(unroutable server) = true")
 	}
 }
 

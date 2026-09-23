@@ -37,7 +37,7 @@ func (c peerConn) RemoteAddr() net.Addr { return peerRouteAddr(c.peer) }
 func TestP2PHostManagerRefcount(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	// Unreachable relay: the connect fails instantly and, by design, non-fatally.
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
 
 	m := p2pHost
 	if m.refs != 0 || m.host != nil {
@@ -271,7 +271,7 @@ func TestP2PHostManagerDispatchUnknownPeer(t *testing.T) {
 // anything. It never starts the shared host.
 func TestEnsureP2PIdentity(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
 	if p2pHost.refs != 0 || p2pHost.host != nil {
 		t.Fatal("manager is not idle: a previous test leaked a reference")
 	}
