@@ -63,11 +63,10 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
 export interface TransportStyle {
   icon: string;
   tone: 'direct' | 'warn' | 'muted';
+  /** The badge text: one word per state, the same for every peer — the reason
+   *  is what the tooltip is for. */
   label: string;
-  why: string;
-  /** The badge text: the state, plus why it is on the relay. */
-  text: string;
-  /** The tooltip. */
+  /** The tooltip: the state, and why it is on the relay. */
   hint: string;
 }
 
@@ -83,8 +82,6 @@ export function transportStyle(value?: string): TransportStyle | null {
     icon: spec.icon,
     tone: spec.tone,
     label,
-    why,
-    text: why ? `${label} · ${why}` : label,
     hint: why ? `${label} · ${why}` : t('p2pTransportHint'),
   };
 }
@@ -98,45 +95,8 @@ export interface TransportView {
   hint: string;
 }
 
-/** transportView is the row-sized view of a summary: the state, a direct count
- *  when only some peers are direct, and the tooltip. */
-export function transportView(summary: TransportSummary): TransportView | null {
-  const st = transportStyle(summary.state);
-  if (!st) return null;
-
-  const partial = summary.state === 'direct' && summary.direct < summary.total;
-  const text = partial ? `${st.label} ${summary.direct}/${summary.total}` : st.label;
-  return { icon: st.icon, tone: st.tone, text, hint: st.hint };
-}
-
-export interface TransportSummary {
-  /** The state worth showing for the whole object. */
-  state: string;
-  /** Direct peers, and how many peers reported anything. */
-  direct: number;
-  total: number;
-}
-
-/** What to say about an object with several peers: the most interesting state
- *  wins (a direct path beats a punch in flight beats a reason), because that is
- *  the one thing a list row has room for. */
-const PRECEDENCE: PeerTransport[] = [
-  'direct',
-  'punching',
-  'failed',
-  'stun-unreachable',
-  'no-candidates',
-  'disabled',
-  'derp',
-];
-
-export function summarizeTransports(values: (string | undefined)[]): TransportSummary {
-  const present = values.filter((v): v is string => !!v);
-  if (present.length === 0) return { state: '', direct: 0, total: 0 };
-
-  const direct = present.filter(v => v === 'direct').length;
-  for (const state of PRECEDENCE) {
-    if (present.includes(state)) return { state, direct, total: present.length };
-  }
-  return { state: present[0], direct, total: present.length };
+/** transportView is the row-sized view of one value. */
+export function transportView(value?: string): TransportView | null {
+  const st = transportStyle(value);
+  return st ? { icon: st.icon, tone: st.tone, text: st.label, hint: st.hint } : null;
 }

@@ -4,7 +4,7 @@ import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatNumber } from '../utils/format';
-import { summarizeTransports, transportView, type TransportView } from '../utils/transport';
+import { transportView, type TransportView } from '../utils/transport';
 import {
   getTunnels,
   isLoading as tunnelsLoading,
@@ -131,13 +131,11 @@ export class HomePage extends LitElement {
     return this._statusLabel(item.data.status);
   }
 
-  /** _transport is the p2p chip for a row: a tunnel summarizes its allowlist,
-   *  an entrypoint its single peer. Null when nothing is connected. */
+  /** _transport is the p2p chip for a row. Only an entrypoint has it: its one
+   *  peer has one path, while a tunnel's peers may each be on a different one
+   *  — that per-peer view belongs on the peers page, not on a summary row. */
   private _transport(item: Item): TransportView | null {
-    if (item.kind === 'entrypoint') {
-      return transportView(summarizeTransports([item.data.peer_transport]));
-    }
-    return transportView(summarizeTransports((item.data.peer_stats ?? []).map(p => p.transport)));
+    return item.kind === 'entrypoint' ? transportView(item.data.peer_transport) : null;
   }
 
   private _typeLabel(item: Item): string {

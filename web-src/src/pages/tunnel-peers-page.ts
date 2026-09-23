@@ -178,14 +178,15 @@ export class TunnelPeersPage extends LitElement {
     `;
   }
 
-  /** _renderTransport marks where this peer's traffic goes right now, and why
-   *  when it is on the relay — the only place the difference between peers
-   *  shows. Nothing when the peer has no session at all. */
+  /** _renderTransport marks where this peer's traffic goes right now — the
+   *  only place the difference between peers shows. The badge stays one word
+   *  per state; the reason (a STUN server that does not answer, a punch that
+   *  failed, ...) is in the tooltip. Nothing when the peer has no session. */
   private _renderTransport(key: string) {
     const st = transportStyle(this._statFor(key)?.transport);
     if (!st) return nothing;
     return html`<span class="peer-badge ${st.tone}" title=${st.hint}>
-      ${icon(st.icon)}<span>${st.text}</span>
+      ${icon(st.icon)}<span>${st.label}</span>
     </span>`;
   }
 

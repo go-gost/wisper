@@ -108,7 +108,7 @@ export class EntrypointDetailPage extends LitElement {
     this._keepalive = ep.options?.keepalive ?? true;
   }
 
-  /** _renderTransport is the peer's path, with the reason when it is the relay. */
+  /** _renderTransport is the peer's path: one word, with the reason on hover. */
   private _renderTransport(value?: string) {
     const st = transportStyle(value);
     if (!st) return nothing;
@@ -117,7 +117,7 @@ export class EntrypointDetailPage extends LitElement {
         <span class="info-label">${t('p2pTransport')}</span>
         <span class="info-value text">
           <span class="peer-badge ${st.tone}" title=${st.hint}>
-            ${icon(st.icon)}<span>${st.text}</span>
+            ${icon(st.icon)}<span>${st.label}</span>
           </span>
         </span>
       </div>
