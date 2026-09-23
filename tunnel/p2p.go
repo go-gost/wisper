@@ -267,6 +267,14 @@ func (s *p2pTunnel) Run() (err error) {
 		"service": s.opts.Name,
 	})
 
+	// Warm every allowlisted peer: the paths are then being arranged (and each
+	// peer's state is visible on the peers page) from the start, instead of
+	// only once a peer dials in — which, for the reverse direction, may be
+	// never until traffic.
+	if err == nil {
+		p2pHost.warmPeers(s.opts.Peers)
+	}
+
 	// Stats carry over across a restart, like the other tunnel types.
 	pStats := xstats.NewStats(false)
 	{
@@ -498,6 +506,10 @@ func (s *p2pTunnel) SetPeers(peers []string, aliases map[string]string) error {
 	s.opts.Peers = peers
 	s.opts.PeerAliases = normalized
 	s.mu.Unlock()
+
+	// A peer added here must get the same head start a peer configured at Run
+	// time does, or its row would stay blank until it happens to dial in.
+	p2pHost.warmPeers(peers)
 	return nil
 }
 

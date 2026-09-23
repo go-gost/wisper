@@ -89,6 +89,27 @@ func P2PHostRunning() bool {
 	return p2pHost.host != nil
 }
 
+// warmPeers starts the path to each peer on the running host: it brings up the
+// relay session and the hole punch without opening a stream, so a freshly
+// registered allowlist is being arranged — and visible in P2PHostStatus —
+// before any traffic. A failure is the peer's business (it may not be up yet),
+// so it is logged, never returned. No-op while no host runs.
+func (m *p2pHostManager) warmPeers(peers []string) {
+	m.mu.Lock()
+	host := m.host
+	m.mu.Unlock()
+	if host == nil {
+		return
+	}
+	for _, peer := range peers {
+		if err := host.Warm(peer); err != nil {
+			if log := logger.Default(); log != nil {
+				log.Warnf("p2p: warm peer %s: %v", peer, err)
+			}
+		}
+	}
+}
+
 // P2PHostStatus snapshots the shared host's transport counters; zeros when no
 // host is running. DirectPeers/DerpPeers say where each peer's traffic goes
 // right now, and PunchSuccess/PunchAttempts whether punching works from here —

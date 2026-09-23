@@ -163,6 +163,12 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 
 	registerProvider(t, "e2e-peer", peer)
 
+	// Run warms the allowlist: the peers page has a path to show for this peer
+	// before it dials in, instead of a blank row until traffic.
+	if got := wtunnel.P2PHostStatus().PeerTransports[peerKey]; got == "" {
+		t.Errorf("no transport for the allowlisted peer right after Run (want the path warmed)")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	conn, err := dialHost(t, ctx, "e2e-peer", key)
