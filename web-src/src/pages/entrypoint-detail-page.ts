@@ -1,7 +1,8 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
+import { transportStyle } from '../utils/transport';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
@@ -105,6 +106,22 @@ export class EntrypointDetailPage extends LitElement {
     this._peer = ep.options?.peer ?? '';
     this._protocol = ep.options?.protocol === 'udp' ? 'udp' : 'tcp';
     this._keepalive = ep.options?.keepalive ?? true;
+  }
+
+  /** _renderTransport is the peer's path, with the reason when it is the relay. */
+  private _renderTransport(value?: string) {
+    const st = transportStyle(value);
+    if (!st) return nothing;
+    return html`
+      <div class="info-row">
+        <span class="info-label">${t('p2pTransport')}</span>
+        <span class="info-value text">
+          <span class="peer-badge ${st.tone}" title=${st.hint}>
+            ${icon(st.icon)}<span>${st.text}</span>
+          </span>
+        </span>
+      </div>
+    `;
   }
 
   private _navigate(path: string) {
@@ -298,7 +315,9 @@ export class EntrypointDetailPage extends LitElement {
 
     /* Where a p2p entrypoint's peer traffic goes now. Same look as the peers page. */
     .peer-badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
       padding: 1px 8px;
       border-radius: var(--radius-pill);
       background: var(--border-subtle);
@@ -309,6 +328,9 @@ export class EntrypointDetailPage extends LitElement {
     .peer-badge.direct {
       color: var(--green-text);
       background: var(--green-bg);
+    }
+    .peer-badge.warn {
+      color: var(--amber);
     }
 
     .info-label {
@@ -634,17 +656,7 @@ export class EntrypointDetailPage extends LitElement {
                         </button>`
                         : ''}
                     </div>
-                    ${ep.peer_transport
-                      ? html`
-                        <div class="info-row">
-                          <span class="info-label">${t('p2pTransport')}</span>
-                          <span class="info-value text">
-                            <span class="peer-badge ${ep.peer_transport}">
-                              ${ep.peer_transport === 'direct' ? t('p2pTransportDirect') : t('p2pTransportRelay')}
-                            </span>
-                          </span>
-                        </div>`
-                      : ''}
+                    ${this._renderTransport(ep.peer_transport)}
                     <div class="info-row">
                       <span class="info-label">${t('fieldProtocol')}</span>
                       <span class="info-value text">

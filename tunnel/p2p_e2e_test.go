@@ -191,10 +191,11 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 		t.Errorf("peer conns = %d total / %d current, want its stream counted", pstats[0].TotalConns, pstats[0].CurrentConns)
 	}
 
-	// This derper serves no STUN, so the connected peer is on the relay — the
-	// per-peer view the peers page marks.
-	if got := wtunnel.P2PHostStatus().PeerTransports[peerKey]; got != "derp" {
-		t.Errorf("peer transport = %q, want derp (no STUN on this derper)", got)
+	// This setup pins direct off (relayOnly), so the connected peer's path is
+	// reported as such, not as an anonymous relay — the per-peer view the
+	// peers page and the tunnel card mark.
+	if got := wtunnel.P2PHostStatus().PeerTransports[peerKey]; got != "disabled" {
+		t.Errorf("peer transport = %q, want disabled (direct is switched off here)", got)
 	}
 
 	// Rates come from the snapshot the stats task takes each tick: a transfer

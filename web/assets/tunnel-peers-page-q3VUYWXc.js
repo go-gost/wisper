@@ -1,45 +1,45 @@
-import{a as y,j as r,s as x,g as f,B as m,b as i,A as p,i as w,t as $}from"./index-D46JLA48.js";import{c as k,a as b,b as v,m as E,n as _,r as d}from"./format-Dmw6anAb.js";import{i as c}from"./app-scaffold-DgSOZ1A-.js";import{c as z}from"./clipboard-C3x8_sid.js";var D=Object.defineProperty,K=Object.getOwnPropertyDescriptor,o=(e,t,s,n)=>{for(var l=n>1?void 0:n?K(t,s):t,u=e.length-1,h;u>=0;u--)(h=e[u])&&(l=(n?h(t,s,l):h(l))||l);return n&&l&&D(t,s,l),l};function T(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function g(e){return(e?.options.peers??[]).map(t=>({key:t.key,alias:t.alias??""}))}let a=class extends y{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:""},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._unsub=null,this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim()};if(!T(e.key)){this._rowError=r("peersKeyInvalid");return}if(this._rows.filter((n,l)=>l!==this._editing).some(n=>n.key===e.key)){this._rowError=r("peersKeyDuplicate");return}const s=this._editing==="new"?[...this._rows,e]:this._rows.map((n,l)=>l===this._editing?e:n);await this._save(s)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,s)=>s!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=x(()=>{const e=f().find(t=>t.id===this.tunnelId);e&&(this._tunnel=e)})}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=f().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=g(e)}_startEdit(e){this._editing=e,this._draft={...this._rows[e]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:""},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await m(this.tunnelId,e.map(s=>({key:s.key,alias:s.alias||void 0})));return this._tunnel=t,this._rows=g(t),this._showSnackbar(r("saved")),!0}catch(t){const s=t instanceof Error?t.message:"",n=`${r("saveFailed")}${s?": "+s:""}`;return this._editing!==null?this._rowError=n:this._showSnackbar(n),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderStats(e){const t=this._statFor(e);return t?i`
+import{a as x,j as r,s as y,g as f,B as m,b as i,A as c,i as w,t as $}from"./index-G3s0sdGD.js";import{c as k,a as b,b as v,m as E,n as _,r as p}from"./format-Wkm80Kl_.js";import{i as d}from"./app-scaffold-BATzU5C1.js";import{c as z}from"./clipboard-C3x8_sid.js";import{a as K}from"./transport-CnvVIN4H.js";var C=Object.defineProperty,D=Object.getOwnPropertyDescriptor,o=(e,t,s,n)=>{for(var l=n>1?void 0:n?D(t,s):t,u=e.length-1,h;u>=0;u--)(h=e[u])&&(l=(n?h(t,s,l):h(l))||l);return n&&l&&C(t,s,l),l};function P(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function g(e){return(e?.options.peers??[]).map(t=>({key:t.key,alias:t.alias??""}))}let a=class extends x{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:""},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._unsub=null,this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim()};if(!P(e.key)){this._rowError=r("peersKeyInvalid");return}if(this._rows.filter((n,l)=>l!==this._editing).some(n=>n.key===e.key)){this._rowError=r("peersKeyDuplicate");return}const s=this._editing==="new"?[...this._rows,e]:this._rows.map((n,l)=>l===this._editing?e:n);await this._save(s)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,s)=>s!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=y(()=>{const e=f().find(t=>t.id===this.tunnelId);e&&(this._tunnel=e)})}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=f().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=g(e)}_startEdit(e){this._editing=e,this._draft={...this._rows[e]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:""},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await m(this.tunnelId,e.map(s=>({key:s.key,alias:s.alias||void 0})));return this._tunnel=t,this._rows=g(t),this._showSnackbar(r("saved")),!0}catch(t){const s=t instanceof Error?t.message:"",n=`${r("saveFailed")}${s?": "+s:""}`;return this._editing!==null?this._rowError=n:this._showSnackbar(n),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderStats(e){const t=this._statFor(e);return t?i`
       <span>${k(t.current_conns)} ${r("p2pColConns")}</span>
       <span>↓ ${b(t.output_bytes)} <span class="rate">${v(t.output_rate_bytes)}</span></span>
       <span>↑ ${b(t.input_bytes)} <span class="rate">${v(t.input_rate_bytes)}</span></span>
-    `:i`<span class="muted">${r("peersNoTraffic")}</span>`}_renderTransport(e){const t=this._statFor(e)?.transport;return t?i`<span class="peer-badge ${t}">
-      ${t==="direct"?r("p2pTransportDirect"):r("p2pTransportRelay")}
-    </span>`:p}_renderEditor(){return i`
+    `:i`<span class="muted">${r("peersNoTraffic")}</span>`}_renderTransport(e){const t=K(this._statFor(e)?.transport);return t?i`<span class="peer-badge ${t.tone}" title=${t.hint}>
+      ${d(t.icon)}<span>${t.text}</span>
+    </span>`:c}_renderEditor(){return i`
       <div class="peer-row editing">
         <div class="row-line">
           <input class="form-input alias grow" .value=${this._draft.alias}
             placeholder=${r("peersAliasPlaceholder")}
             @input=${e=>{this._draft={...this._draft,alias:e.target.value}}}>
           <button class="icon-btn" title="${r("btnCancel")}" @click=${()=>this._cancelEdit()}>
-            ${c("close")}
+            ${d("close")}
           </button>
           <button class="icon-btn accent" title="${r("btnSave")}" ?disabled=${this._saving}
             @click=${this._saveRow}>
-            ${c("check")}
+            ${d("check")}
           </button>
         </div>
         <input class="form-input key ${this._rowError?"invalid":""}" .value=${this._draft.key}
           placeholder=${r("peersKeyPlaceholder")}
           @input=${e=>{this._draft={...this._draft,key:e.target.value},this._rowError=""}}>
-        ${this._rowError?i`<div class="row-error">${this._rowError}</div>`:p}
+        ${this._rowError?i`<div class="row-error">${this._rowError}</div>`:c}
       </div>
     `}render(){const e=this._tunnel;return i`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`)}>
-            ${c("chevron-left")}
+            ${d("chevron-left")}
           </button>
           <span class="page-title">${r("peersTitle")}</span>
           <button class="pill-btn appbar-action" title="${this._showKeys?r("hideKey"):r("revealKey")}"
             @click=${()=>{this._showKeys=!this._showKeys}}>
-            ${c(this._showKeys?"eye-off":"eye")}
+            ${d(this._showKeys?"eye-off":"eye")}
           </button>
         </div>
 
         ${e?i`
             <div class="section">
               <div class="card">
-                ${this._rows.length===0&&this._editing!=="new"?i`<div class="empty">${r("peersEmpty")}</div>`:p}
+                ${this._rows.length===0&&this._editing!=="new"?i`<div class="empty">${r("peersEmpty")}</div>`:c}
                 ${this._rows.map((t,s)=>this._editing===s?this._renderEditor():i`
                     <div class="peer-row">
                       <div class="row-line">
@@ -47,14 +47,14 @@ import{a as y,j as r,s as x,g as f,B as m,b as i,A as p,i as w,t as $}from"./ind
                         ${this._renderTransport(t.key)}
                         <span class="row-actions">
                           <button class="icon-btn" title="${r("btnCopy")}" @click=${()=>z(t.key)}>
-                            ${c("copy")}
+                            ${d("copy")}
                           </button>
                           <button class="icon-btn" title="${r("btnEdit")}" @click=${()=>this._startEdit(s)}>
-                            ${c("edit")}
+                            ${d("edit")}
                           </button>
                           <button class="icon-btn danger" title="${r("btnDelete")}"
                             @click=${()=>{this._confirmDelete=s}}>
-                            ${c("trash")}
+                            ${d("trash")}
                           </button>
                         </span>
                       </div>
@@ -62,17 +62,17 @@ import{a as y,j as r,s as x,g as f,B as m,b as i,A as p,i as w,t as $}from"./ind
                       <div class="peer-stats">${this._renderStats(t.key)}</div>
                     </div>
                   `)}
-                ${this._editing==="new"?this._renderEditor():p}
+                ${this._editing==="new"?this._renderEditor():c}
 
                 ${this._editing===null?i`
                     <button class="add-row" @click=${()=>this._startAdd()}>
-                      ${c("plus")} ${r("peersAdd")}
-                    </button>`:p}
+                      ${d("plus")} ${r("peersAdd")}
+                    </button>`:c}
               </div>
 
               <div class="hint">${r("peersHint")}</div>
               <div class="hint">${r("peersRestartHint")}</div>
-              ${this._rows.length===0?i`<div class="hint">${r("peersNoneHint")}</div>`:p}
+              ${this._rows.length===0?i`<div class="hint">${r("peersNoneHint")}</div>`:c}
             </div>
           `:i`<div class="section"><div class="card"><div class="empty">${r("notFound")}</div></div></div>`}
 
@@ -91,9 +91,9 @@ import{a as y,j as r,s as x,g as f,B as m,b as i,A as p,i as w,t as $}from"./ind
                   </button>
                 </div>
               </div>
-            </div>`:p}
+            </div>`:c}
 
-        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:p}
+        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:c}
       </app-scaffold>
     `}};a.styles=w`
     .back-btn {
@@ -175,15 +175,25 @@ import{a as y,j as r,s as x,g as f,B as m,b as i,A as p,i as w,t as $}from"./ind
     }
     .peer-badge {
       flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
       padding: 1px 8px;
       border-radius: var(--radius-pill);
       background: var(--border-subtle);
       color: var(--text-muted);
       font-size: var(--font-xs);
     }
+    .peer-badge svg {
+      width: 12px;
+      height: 12px;
+    }
     .peer-badge.direct {
       color: var(--green-text);
       background: var(--green-bg);
+    }
+    .peer-badge.warn {
+      color: var(--amber);
     }
     .row-actions {
       display: flex;
@@ -368,4 +378,4 @@ import{a as y,j as r,s as x,g as f,B as m,b as i,A as p,i as w,t as $}from"./ind
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       z-index: 100;
     }
-  `;o([_()],a.prototype,"tunnelType",2);o([_()],a.prototype,"tunnelId",2);o([d()],a.prototype,"_tunnel",2);o([d()],a.prototype,"_rows",2);o([d()],a.prototype,"_editing",2);o([d()],a.prototype,"_draft",2);o([d()],a.prototype,"_saving",2);o([d()],a.prototype,"_rowError",2);o([d()],a.prototype,"_confirmDelete",2);o([d()],a.prototype,"_showKeys",2);o([d()],a.prototype,"_snackbar",2);a=o([$("tunnel-peers-page")],a);export{a as TunnelPeersPage};
+  `;o([_()],a.prototype,"tunnelType",2);o([_()],a.prototype,"tunnelId",2);o([p()],a.prototype,"_tunnel",2);o([p()],a.prototype,"_rows",2);o([p()],a.prototype,"_editing",2);o([p()],a.prototype,"_draft",2);o([p()],a.prototype,"_saving",2);o([p()],a.prototype,"_rowError",2);o([p()],a.prototype,"_confirmDelete",2);o([p()],a.prototype,"_showKeys",2);o([p()],a.prototype,"_snackbar",2);a=o([$("tunnel-peers-page")],a);export{a as TunnelPeersPage};

@@ -1,7 +1,8 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { formatBytes, formatRate, formatRelativeTime } from '../utils/format';
 import { icon } from '../utils/icons';
+import type { TransportView } from '../utils/transport';
 import type { ServiceStatus } from '../api/types';
 
 /**
@@ -34,6 +35,10 @@ export class TunnelCard extends LitElement {
   @property({ type: Number }) outputBytes = 0;
   @property({ type: Number }) inputRate = 0;
   @property({ type: Number }) outputRate = 0;
+
+  /** The p2p transport chip (utils/transport.transportView), or null when the
+   *  object has no p2p peers connected. Text comes pre-localized, as props do. */
+  @property({ attribute: false }) transport: TransportView | null = null;
 
   @property() createdAt = '';
   @property({ type: Boolean }) expanded = false;
@@ -110,6 +115,36 @@ export class TunnelCard extends LitElement {
     .meta {
       font-size: var(--font-sm);
       color: var(--text-muted);
+    }
+
+    /* ── p2p transport chip (direct / relay, with the reason) ── */
+    .type-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .transport {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 0 6px;
+      border-radius: var(--radius-pill);
+      background: var(--border-subtle);
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+      white-space: nowrap;
+    }
+    .transport svg {
+      width: 12px;
+      height: 12px;
+    }
+    .transport.direct {
+      color: var(--green-text);
+      background: var(--green-bg);
+    }
+    .transport.warn {
+      color: var(--amber);
     }
 
     /* ── Right column: created-at + traffic ── */
@@ -191,6 +226,24 @@ export class TunnelCard extends LitElement {
     this.dispatchEvent(new CustomEvent('chevron-click', { bubbles: true, composed: true }));
   }
 
+  /** _renderTypeLine is the type label with the p2p transport chip beside it,
+   *  so a row says at a glance whether its peers ride a direct path. */
+  private _renderTypeLine() {
+    const st = this.transport;
+    if (!this.typeLabel && !st) return nothing;
+
+    return html`
+      <div class="type-line">
+        ${this.typeLabel ? html`<span class="type-label">${this.typeLabel}</span>` : nothing}
+        ${st
+          ? html`<span class="transport ${st.tone}" title=${st.hint}>
+              ${icon(st.icon)}<span>${st.text}</span>
+            </span>`
+          : nothing}
+      </div>
+    `;
+  }
+
   render() {
     const stopped = this.status === 'stopped';
 
@@ -200,7 +253,7 @@ export class TunnelCard extends LitElement {
 
         <div class="info">
           <div class="name">${this.name}</div>
-          ${this.typeLabel ? html`<div class="type-label">${this.typeLabel}</div>` : ''}
+          ${this._renderTypeLine()}
           ${this.meta ? html`<div class="meta">${this.meta}</div>` : ''}
         </div>
 

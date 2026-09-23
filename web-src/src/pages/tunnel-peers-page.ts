@@ -5,6 +5,7 @@ import { icon } from '../utils/icons';
 import { getTunnels, subscribe, updatePeers } from '../store/tunnel-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, maskKey } from '../utils/format';
+import { transportStyle } from '../utils/transport';
 import type { Peer, Tunnel } from '../api/types';
 import '../components/app-scaffold';
 
@@ -177,14 +178,14 @@ export class TunnelPeersPage extends LitElement {
     `;
   }
 
-  /** _renderTransport marks where this peer's traffic goes right now — the
-   *  only place the difference between a direct and a relayed peer shows.
-   *  Nothing when the peer has no session at all. */
+  /** _renderTransport marks where this peer's traffic goes right now, and why
+   *  when it is on the relay — the only place the difference between peers
+   *  shows. Nothing when the peer has no session at all. */
   private _renderTransport(key: string) {
-    const tr = this._statFor(key)?.transport;
-    if (!tr) return nothing;
-    return html`<span class="peer-badge ${tr}">
-      ${tr === 'direct' ? t('p2pTransportDirect') : t('p2pTransportRelay')}
+    const st = transportStyle(this._statFor(key)?.transport);
+    if (!st) return nothing;
+    return html`<span class="peer-badge ${st.tone}" title=${st.hint}>
+      ${icon(st.icon)}<span>${st.text}</span>
     </span>`;
   }
 
@@ -385,15 +386,25 @@ export class TunnelPeersPage extends LitElement {
     }
     .peer-badge {
       flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
       padding: 1px 8px;
       border-radius: var(--radius-pill);
       background: var(--border-subtle);
       color: var(--text-muted);
       font-size: var(--font-xs);
     }
+    .peer-badge svg {
+      width: 12px;
+      height: 12px;
+    }
     .peer-badge.direct {
       color: var(--green-text);
       background: var(--green-bg);
+    }
+    .peer-badge.warn {
+      color: var(--amber);
     }
     .row-actions {
       display: flex;

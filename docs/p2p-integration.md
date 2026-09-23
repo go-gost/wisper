@@ -115,11 +115,17 @@ p2p `v0.6.0` 把 udp 数据面重写为「每拨号一条 datagram link」，wis
   wisper 引不到，且 STUN 的实现归属在 p2p）。探测用自己的 socket，报的端口是那条 socket 的
   映射，不是之后打洞那条。
 - **每个对端标出当前走哪条路**（2026-09-23）：`p2p.Status` 增加 `PeerTransports`（base64
-  公钥 → `"direct"`/`"derp"`，无会话的对端不出现），由 engine 的 `peerTransports()` 用与
-  计数同一套 `live()` 规则生成（`DirectPeers`/`DerpPeers` 现在就是它的汇总）。wisper 把它带进
-  API：tunnel 响应的 `peer_stats[].transport`（对端列表页据此显示「直连/中继」徽标）、
-  entrypoint 响应的 `peer_transport`（详情页对端那行）。gRPC transport 不带这个字段
-  （proto 冻结），插件路径只有计数。
+  公钥 → 状态值，无会话的对端不出现），由 engine 的 `peerTransports()` 用与计数同一套
+  `live()` 规则生成（`DirectPeers`/`DerpPeers` 现在就是它的汇总）。取值：
+  `direct`（打洞成功）/ `punching`（正在打洞）/ `failed`（该对端打洞失败，多是对称 NAT）/
+  `derp`（中继，无阻碍）/ `disabled`（设置里关了直连）/ `no-candidates`（没配 STUN 且无
+  IPv6）/ `stun-unreachable`（配了 STUN 但不响应，且没有 IPv6 兜底）——后三个是**主机级**
+  原因（对每个对端一样），前四个是**对端级**状态优先。wisper 把它带进 API：tunnel 响应的
+  `peer_stats[].transport`、entrypoint 响应的 `peer_transport`。UI 用
+  `web-src/src/utils/transport.ts` 统一映射成图标+文案：直连=闪电（绿）、打洞中=转圈、
+  打洞失败=断闪电、STUN 不可达=断云、其余中继=hub；对端列表页与入口点详情页显示徽标
+  （带原因后缀 + tooltip），首页每张卡片显示同一套图标（多个对端时按优先级取最有信息量的
+  一个，部分直连显示 `n/m`）。gRPC transport 不带这个字段（proto 冻结），插件路径只有计数。
 - **p2p v0.6.1 顺带修的**：`OpenStream` 原先在"打洞未成功"时对**每条**流都阻塞满
   `punchWaitTimeout`（生产 5s）——对打洞不可能成功的对端（对称 NAT、UDP 被封）等于每条连接
   都多等 5s。现在只有**真正发起打洞的那次调用**会等（与"让第一条连接走直连"的原意一致），
