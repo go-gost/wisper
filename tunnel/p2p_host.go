@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -67,9 +68,7 @@ func ReleaseP2PHost() { p2pHost.release() }
 func P2PHostPublicKey() string {
 	pub, err := EnsureP2PIdentity()
 	if err != nil {
-		if log := logger.Default(); log != nil {
-			log.Warnf("p2p identity: %v", err)
-		}
+		slog.Warn("p2p identity", "err", err)
 	}
 	return pub
 }
@@ -181,9 +180,7 @@ func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 			return nil, err
 		}
 		if cerr := host.Connect(); cerr != nil {
-			if log := logger.Default(); log != nil {
-				log.Warnf("p2p derp connect: %v", cerr)
-			}
+			slog.Warn("p2p derp connect", "err", cerr)
 		}
 		m.host, m.ln = host, ln
 		go m.acceptLoop(ln)
@@ -305,9 +302,7 @@ func (m *p2pHostManager) dispatch(conn net.Conn) {
 	pl := m.routes[peer]
 	m.mu.Unlock()
 	if pl == nil {
-		if log := logger.Default(); log != nil {
-			log.Warnf("p2p inbound stream from unregistered peer %s: closed", peer)
-		}
+		slog.Warn("p2p inbound stream from unregistered peer: closed", "peer", peer)
 		_ = conn.Close()
 		return
 	}
@@ -388,9 +383,7 @@ func (l *peerListener) deliver(conn net.Conn) {
 	case <-l.closed:
 		_ = c.Close()
 	default:
-		if log := logger.Default(); log != nil {
-			log.Warnf("p2p inbound stream for peer %s dropped (backlog full)", peer)
-		}
+		slog.Warn("p2p inbound stream dropped (backlog full)", "peer", peer)
 		_ = c.Close()
 	}
 }
@@ -567,9 +560,7 @@ func p2pHostStun(settings *cfg.Settings) string {
 	if !stunAnswers(addr) {
 		// Say so: the address was a guess from the relay, and a silent guess
 		// would leave a user wondering why direct never comes up.
-		if log := logger.Default(); log != nil {
-			log.Warnf("p2p: derived STUN %s does not answer, direct (IPv4) stays off; set settings.p2p.stun to enable it", addr)
-		}
+		slog.Warn("p2p: derived STUN does not answer, direct (IPv4) stays off; set settings.p2p.stun to enable it", "stun", addr)
 		return ""
 	}
 	return addr

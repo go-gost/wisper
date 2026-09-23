@@ -111,6 +111,11 @@ func initLog() {
 	}
 
 	logger.SetDefault(logger_parser.ParseLogger(&xconfig.LoggerConfig{Log: cfg}))
+
+	// One pipeline for the whole process: gost's components keep their logger,
+	// everything written with slog (wisper's own code and the embedded p2p
+	// library) lands in the same place, at the same level.
+	setDefaultSlog(logger.Default())
 }
 
 var (

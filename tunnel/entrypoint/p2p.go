@@ -3,6 +3,7 @@ package entrypoint
 import (
 	"errors"
 	"io"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -229,7 +230,7 @@ func (s *p2pEntryPoint) Run() (err error) {
 	// waiting for traffic. Punch failures are logged, never fatal.
 	if peer := s.opts.Peer; peer != "" {
 		if err := host.Punch(peer); err != nil {
-			log.Warnf("p2p entrypoint: punch peer %s: %v", peer, err)
+			slog.Warn("p2p entrypoint: punch peer", "peer", peer, "err", err)
 		}
 	}
 

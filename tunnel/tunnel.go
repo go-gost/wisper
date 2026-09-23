@@ -2,12 +2,11 @@ package tunnel
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/service"
 	"github.com/go-gost/wisper/config"
 	xconfig "github.com/go-gost/x/config"
@@ -427,7 +426,7 @@ func RestartRunning() {
 		newT.Favorite(p.fav)
 
 		if err := newT.Run(); err != nil {
-			logger.Default().Error(fmt.Sprintf("restart tunnel %s: %v", p.opts.Name, err))
+			slog.Error("restart tunnel", "name", p.opts.Name, "err", err)
 			continue
 		}
 
@@ -435,7 +434,7 @@ func RestartRunning() {
 	}
 
 	if err := SaveConfig(); err != nil {
-		logger.Default().Error(fmt.Sprintf("save config: %v", err))
+		slog.Error("save config", "err", err)
 	}
 }
 
@@ -563,7 +562,7 @@ func SaveConfig() error {
 	config.Set(cfg)
 
 	if err := cfg.Write(); err != nil {
-		logger.Default().Error(err)
+		slog.Error("write config", "err", err)
 		return err
 	}
 	return nil

@@ -2,10 +2,9 @@ package entrypoint
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"sync"
 
-	"github.com/go-gost/core/logger"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
 )
@@ -163,7 +162,7 @@ func RestartRunning() {
 		newEP.Favorite(p.fav)
 
 		if err := newEP.Run(); err != nil {
-			logger.Default().Error(fmt.Sprintf("restart entrypoint %s: %v", p.opts.Name, err))
+			slog.Error("restart entrypoint", "name", p.opts.Name, "err", err)
 			continue
 		}
 
@@ -171,7 +170,7 @@ func RestartRunning() {
 	}
 
 	if err := SaveConfig(); err != nil {
-		logger.Default().Error(fmt.Sprintf("save config: %v", err))
+		slog.Error("save config", "err", err)
 	}
 }
 
@@ -251,7 +250,7 @@ func SaveConfig() error {
 	config.Set(cfg)
 
 	if err := cfg.Write(); err != nil {
-		logger.Default().Error(err)
+		slog.Error("write config", "err", err)
 		return err
 	}
 	return nil
