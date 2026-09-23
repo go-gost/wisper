@@ -381,9 +381,9 @@ func TestPeerListenerDeliversDatagramConn(t *testing.T) {
 		t.Fatalf("current conns = %d, want 1 while the stream is open", got)
 	}
 
-	go far.Write([]byte("in"))
+	go func() { _, _ = far.Write([]byte("in")) }()
 	buf := make([]byte, 8)
-	c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_ = c.SetReadDeadline(time.Now().Add(3 * time.Second))
 	n, err := c.Read(buf)
 	if err != nil || string(buf[:n]) != "in" {
 		t.Fatalf("read %q, %v; want in", buf[:n], err)
@@ -392,9 +392,9 @@ func TestPeerListenerDeliversDatagramConn(t *testing.T) {
 		t.Fatalf("input bytes = %d, want 2", got)
 	}
 
-	go c.Write([]byte("out"))
+	go func() { _, _ = c.Write([]byte("out")) }()
 	out := make([]byte, 8)
-	far.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_ = far.SetReadDeadline(time.Now().Add(3 * time.Second))
 	n, err = far.Read(out)
 	if err != nil || string(out[:n]) != "out" {
 		t.Fatalf("far read %q, %v; want out", out[:n], err)
