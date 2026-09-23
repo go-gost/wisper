@@ -319,7 +319,7 @@ func (l *peerListener) deliver(conn net.Conn) {
 	peer := peerOf(conn)
 	// Each stream carries its peer's counters: closing it — by the service, or
 	// by the route's drain — retires the peer exactly once.
-	c := stats_wrapper.WrapConn(conn, l.peerStat(peer))
+	c := wrapConnStats(conn, l.peerStat(peer))
 	select {
 	case l.ch <- c:
 	case <-l.closed:
@@ -332,10 +332,64 @@ func (l *peerListener) deliver(conn net.Conn) {
 	}
 }
 
+// wrapConnStats counts a conn's bytes and conn count into pStats, keeping the
+// datagram shape a udp tunnel's conn must keep: x's WrapConn returns a
+// byte-stream conn, which would hide net.PacketConn from the handler that tells
+// udp by it. nil stats leaves the conn unwrapped, like WrapConn does.
+func wrapConnStats(c net.Conn, pStats stats.Stats) net.Conn {
+	if pStats == nil {
+		return c
+	}
+	if _, ok := c.(net.PacketConn); ok {
+		pStats.Add(stats.KindTotalConns, 1)
+		pStats.Add(stats.KindCurrentConns, 1)
+		return &statsPacketConn{Conn: c, stats: pStats}
+	}
+	return stats_wrapper.WrapConn(c, pStats)
+}
+
+// statsPacketConn is the udp counterpart of x's stats conn wrapper: the route
+// and the service take a net.Conn, while the handler tells a udp tunnel by
+// net.PacketConn, so this keeps both shapes (net.Conn's methods plus the
+// datagram pair). Bytes and the conn count go to the given counters.
+type statsPacketConn struct {
+	net.Conn
+	stats stats.Stats
+
+	closeOnce sync.Once
+}
+
+func (c *statsPacketConn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	c.stats.Add(stats.KindInputBytes, int64(n))
+	return n, err
+}
+
+func (c *statsPacketConn) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	c.stats.Add(stats.KindOutputBytes, int64(n))
+	return n, err
+}
+
+func (c *statsPacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
+	n, err := c.Read(b)
+	return n, c.RemoteAddr(), err
+}
+
+func (c *statsPacketConn) WriteTo(b []byte, _ net.Addr) (int, error) { return c.Write(b) }
+
+// Close retires the conn count once, then closes the underlying conn.
+func (c *statsPacketConn) Close() error {
+	c.closeOnce.Do(func() {
+		c.stats.Add(stats.KindCurrentConns, -1)
+	})
+	return c.Conn.Close()
+}
+
 func (l *peerListener) Accept() (net.Conn, error) {
 	select {
 	case c := <-l.ch:
-		return stats_wrapper.WrapConn(c, l.stats), nil
+		return wrapConnStats(c, l.stats), nil
 	case <-l.closed:
 		return nil, net.ErrClosed
 	}

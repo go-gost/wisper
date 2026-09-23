@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-gost/core/observer/stats"
 	cfg "github.com/go-gost/wisper/config"
 )
 
@@ -252,5 +253,96 @@ func TestEnsureP2PIdentity(t *testing.T) {
 	// The host is idle again; P2PHostPublicKey still reports the identity.
 	if got := P2PHostPublicKey(); got != pub {
 		t.Fatalf("P2PHostPublicKey with the host idle = %q, want %q", got, pub)
+	}
+}
+
+// peerDatagramPipe is peerPipe's datagram twin: the inbound conn also
+// satisfies net.PacketConn, the shape p2p's Listen hands over for a udp
+// tunnel.
+func peerDatagramPipe(peer string) (inbound, far net.Conn) {
+	far, in := net.Pipe()
+	return peerDatagramStream{peerConn: peerConn{Conn: in, peer: peer}}, far
+}
+
+type peerDatagramStream struct {
+	peerConn
+}
+
+func (c peerDatagramStream) ReadFrom(b []byte) (int, net.Addr, error) {
+	n, err := c.Read(b)
+	return n, c.RemoteAddr(), err
+}
+
+func (c peerDatagramStream) WriteTo(b []byte, _ net.Addr) (int, error) { return c.Write(b) }
+
+// TestPeerListenerDeliversDatagramConn: a udp tunnel's stream reaches the
+// service as a datagram conn — the shape the local handler tells udp by, which
+// x's WrapConn would strip — while its bytes still land in the peer's counters.
+func TestPeerListenerDeliversDatagramConn(t *testing.T) {
+	ln := newPeerListener([]string{"peer-a"})
+	inbound, far := peerDatagramPipe("peer-a")
+	defer far.Close()
+	ln.deliver(inbound)
+
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		c, err := ln.Accept()
+		if err == nil {
+			accepted <- c
+		}
+	}()
+
+	var c net.Conn
+	select {
+	case c = <-accepted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("datagram stream was not accepted")
+	}
+
+	if _, ok := c.(net.PacketConn); !ok {
+		t.Fatal("a udp tunnel stream must be delivered as a net.PacketConn")
+	}
+	if got := c.RemoteAddr().String(); got != "peer-a" {
+		t.Fatalf("remote addr = %q, want the peer key", got)
+	}
+
+	// The conn counts into the peer's counters (the per-peer table's source).
+	pStats := ln.peerStat("peer-a")
+	if got := pStats.Get(stats.KindCurrentConns); got != 1 {
+		t.Fatalf("current conns = %d, want 1 while the stream is open", got)
+	}
+
+	go far.Write([]byte("in"))
+	buf := make([]byte, 8)
+	c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	n, err := c.Read(buf)
+	if err != nil || string(buf[:n]) != "in" {
+		t.Fatalf("read %q, %v; want in", buf[:n], err)
+	}
+	if got := pStats.Get(stats.KindInputBytes); got != 2 {
+		t.Fatalf("input bytes = %d, want 2", got)
+	}
+
+	go c.Write([]byte("out"))
+	out := make([]byte, 8)
+	far.SetReadDeadline(time.Now().Add(3 * time.Second))
+	n, err = far.Read(out)
+	if err != nil || string(out[:n]) != "out" {
+		t.Fatalf("far read %q, %v; want out", out[:n], err)
+	}
+	// The counter is added after the write unblocks the reader, so poll.
+	deadline := time.Now().Add(2 * time.Second)
+	for pStats.Get(stats.KindOutputBytes) != 3 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := pStats.Get(stats.KindOutputBytes); got != 3 {
+		t.Fatalf("output bytes = %d, want 3", got)
+	}
+
+	if err := c.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if got := pStats.Get(stats.KindCurrentConns); got != 0 {
+		t.Fatalf("current conns after close = %d, want 0", got)
 	}
 }
