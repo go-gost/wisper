@@ -891,7 +891,6 @@ func TestUpdateP2PTunnelPeers(t *testing.T) {
 	}
 
 	// The rejected saves changed nothing.
-	peers, _ = updated["options"].(map[string]any)["peers"].([]any)
 	tun := tunnel.Get(id)
 	if tun == nil || len(tun.Options().Peers) != 2 {
 		t.Fatalf("allowlist after the rejected saves = %v, want the accepted one", tun.Options().Peers)
