@@ -63,6 +63,15 @@ func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
 	t.Cleanup(func() { _ = wtunnel.RemoveP2PKey("e2e-p2p-ep") })
 	t.Cleanup(func() { _ = ep.Close() })
 
+	// Run warms the configured peer: the relay session is up before any client
+	// arrives, so the entrypoint has a path to report (here "disabled" — this
+	// derper serves no STUN and direct is off). Without the warm-up there is
+	// nothing to show until traffic, which is what a user sees as "nothing
+	// happens after starting it".
+	if got := wtunnel.P2PHostStatus().PeerTransports[peer.PublicKey()]; got == "" {
+		t.Errorf("no transport for the configured peer right after Run (want the path warmed)")
+	}
+
 	addr := ep.Entrypoint() // the local listen address
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
