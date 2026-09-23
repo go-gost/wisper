@@ -136,7 +136,7 @@ const en: Record<string, string> = {
     'Try a direct path between the peers first and fall back to the relay. Needs UDP; IPv6 works without STUN.',
   settingsP2PStun: 'STUN server',
   settingsP2PStunHint:
-    'Used to find the public address for hole punching. Empty = the relay host on port 3478, which a derper serves by default.',
+    'Used to find the public address for hole punching. Empty = the relay host on port 3478, which a derper serves by default; a suggested public server sees that address too.',
   p2pStunMapped: 'public address',
   settingsP2PCAFile: 'Relay CA file',
   p2pHint: 'Anyone holding this key who can reach the relay can access the local service. No further authentication is applied by p2p.',

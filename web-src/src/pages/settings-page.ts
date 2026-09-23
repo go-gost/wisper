@@ -630,11 +630,16 @@ export class SettingsPage extends LitElement {
               <div class="form-group" style="margin-top:18px;">
                 <label class="form-label">${t('settingsP2PStun')}</label>
                 <input class="form-input" .value=${this._p2pStun}
+                  list="p2p-stun-presets"
                   placeholder="derp.gost.run:3478"
                   @input=${(e: Event) => {
                     this._p2pStun = (e.target as HTMLInputElement).value;
                     this._p2pStunTest = null;
                   }}>
+                <datalist id="p2p-stun-presets">
+                  <option value="stun.cloudflare.com:3478"></option>
+                  <option value="stun.l.google.com:19302"></option>
+                </datalist>
                 <p class="hint">${t('settingsP2PStunHint')}</p>
                 ${this._renderProbeRow(
                   this._p2pStunTest,

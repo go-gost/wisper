@@ -134,7 +134,7 @@ const zh: Record<string, string> = {
   settingsP2PDirect: '直连（打洞）路径',
   settingsP2PDirectDesc: '优先在对端之间打洞直连，失败时自动回退中继。需要 UDP 可达；IPv6 不需要 STUN。',
   settingsP2PStun: 'STUN 服务器',
-  settingsP2PStunHint: '用于探测公网地址以打洞。留空 = 中继主机 + 3478 端口（derper 默认在该端口提供 STUN）。',
+  settingsP2PStunHint: '用于探测公网地址以打洞。留空 = 中继主机 + 3478 端口（derper 默认在该端口提供 STUN）；用候选里的公共服务器，它同样会看到你的公网地址。',
   p2pStunMapped: '公网地址',
   settingsP2PCAFile: '中继 CA 证书文件',
   p2pHint: '持有此公钥且可访问中继的任何人，都能访问该本地服务；p2p 不再进行额外认证。',
