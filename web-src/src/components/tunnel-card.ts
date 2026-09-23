@@ -122,7 +122,7 @@ export class TunnelCard extends LitElement {
     .right-top {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 10px;
     }
     .transport {
       display: inline-flex;
