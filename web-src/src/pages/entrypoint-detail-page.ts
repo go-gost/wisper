@@ -296,6 +296,21 @@ export class EntrypointDetailPage extends LitElement {
     }
     .info-row:last-child { border-bottom: none; }
 
+    /* Where a p2p entrypoint's peer traffic goes now. Same look as the peers page. */
+    .peer-badge {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--border-subtle);
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: var(--font-xs);
+    }
+    .peer-badge.direct {
+      color: var(--green-text);
+      background: var(--green-bg);
+    }
+
     .info-label {
       font-size: var(--font-sm); font-weight: 600; color: var(--text-muted);
       text-transform: uppercase; letter-spacing: 0.5px;
@@ -619,6 +634,17 @@ export class EntrypointDetailPage extends LitElement {
                         </button>`
                         : ''}
                     </div>
+                    ${ep.peer_transport
+                      ? html`
+                        <div class="info-row">
+                          <span class="info-label">${t('p2pTransport')}</span>
+                          <span class="info-value text">
+                            <span class="peer-badge ${ep.peer_transport}">
+                              ${ep.peer_transport === 'direct' ? t('p2pTransportDirect') : t('p2pTransportRelay')}
+                            </span>
+                          </span>
+                        </div>`
+                      : ''}
                     <div class="info-row">
                       <span class="info-label">${t('fieldProtocol')}</span>
                       <span class="info-value text">

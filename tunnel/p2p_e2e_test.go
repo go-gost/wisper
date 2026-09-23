@@ -191,6 +191,12 @@ func TestP2PTunnelAcceptsPeerByKey(t *testing.T) {
 		t.Errorf("peer conns = %d total / %d current, want its stream counted", pstats[0].TotalConns, pstats[0].CurrentConns)
 	}
 
+	// This derper serves no STUN, so the connected peer is on the relay — the
+	// per-peer view the peers page marks.
+	if got := wtunnel.P2PHostStatus().PeerTransports[peerKey]; got != "derp" {
+		t.Errorf("peer transport = %q, want derp (no STUN on this derper)", got)
+	}
+
 	// Rates come from the snapshot the stats task takes each tick: a transfer
 	// inside the window shows up, the bytes before it do not.
 	updater, ok := tn.(wtunnel.PeerStatsUpdater)
@@ -318,6 +324,11 @@ func TestP2PTunnelDirectPath(t *testing.T) {
 		t.Fatalf("no direct session: host direct=%d relay=%d punch=%d/%d, dialer direct=%d relay=%d punch=%d/%d",
 			host.DirectPeers, host.DerpPeers, host.PunchSuccess, host.PunchAttempts,
 			dialer.DirectPeers, dialer.DerpPeers, dialer.PunchSuccess, dialer.PunchAttempts)
+	}
+	// The peers page marks each peer from this map, so the key must be there
+	// and say direct — the gauge alone would not tell which peer is which.
+	if got := host.PeerTransports[peer.PublicKey()]; got != "direct" {
+		t.Errorf("peer transport = %q, want direct", got)
 	}
 
 	// A stream opened now rides the direct session — the counters say so.

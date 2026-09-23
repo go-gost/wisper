@@ -75,6 +75,9 @@ export interface TunnelOptions {
 export interface PeerStats {
   key: string;
   alias?: string;
+  /** Where this peer's traffic goes now: 'direct' or 'derp'; absent when it
+   *  has no session at all. */
+  transport?: string;
   current_conns: number;
   total_conns: number;
   input_bytes: number;
@@ -97,6 +100,8 @@ export interface Tunnel {
   stats: ServiceStats;
   /** p2p tunnels: per-peer traffic, allowlist order. */
   peer_stats?: PeerStats[];
+  /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
+  peer_transport?: string;
 }
 
 export interface TunnelCreateRequest {
@@ -141,6 +146,8 @@ export interface Entrypoint {
   error: string;
   options: EntrypointOptions;
   stats: ServiceStats;
+  /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
+  peer_transport?: string;
 }
 
 /** TunnelPeersRequest replaces a p2p tunnel's allowlist on its own. */

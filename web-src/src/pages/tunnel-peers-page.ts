@@ -177,6 +177,17 @@ export class TunnelPeersPage extends LitElement {
     `;
   }
 
+  /** _renderTransport marks where this peer's traffic goes right now — the
+   *  only place the difference between a direct and a relayed peer shows.
+   *  Nothing when the peer has no session at all. */
+  private _renderTransport(key: string) {
+    const tr = this._statFor(key)?.transport;
+    if (!tr) return nothing;
+    return html`<span class="peer-badge ${tr}">
+      ${tr === 'direct' ? t('p2pTransportDirect') : t('p2pTransportRelay')}
+    </span>`;
+  }
+
   private _renderEditor() {
     return html`
       <div class="peer-row editing">
@@ -234,6 +245,7 @@ export class TunnelPeersPage extends LitElement {
                     <div class="peer-row">
                       <div class="row-line">
                         <span class="peer-alias">${row.alias || t('peersNoAlias')}</span>
+                        ${this._renderTransport(row.key)}
                         <span class="row-actions">
                           <button class="icon-btn" title="${t('btnCopy')}" @click=${() => copyToClipboard(row.key)}>
                             ${icon('copy')}
@@ -370,6 +382,18 @@ export class TunnelPeersPage extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .peer-badge {
+      flex: none;
+      padding: 1px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--border-subtle);
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+    }
+    .peer-badge.direct {
+      color: var(--green-text);
+      background: var(--green-bg);
     }
     .row-actions {
       display: flex;

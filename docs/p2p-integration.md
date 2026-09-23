@@ -114,6 +114,12 @@ p2p `v0.6.0` 把 udp 数据面重写为「每拨号一条 datagram link」，wis
   不是请求错误）。底层是 p2p 新增的 `endpoint.StunLookup`（`internal/stun` 是 internal 包，
   wisper 引不到，且 STUN 的实现归属在 p2p）。探测用自己的 socket，报的端口是那条 socket 的
   映射，不是之后打洞那条。
+- **每个对端标出当前走哪条路**（2026-09-23）：`p2p.Status` 增加 `PeerTransports`（base64
+  公钥 → `"direct"`/`"derp"`，无会话的对端不出现），由 engine 的 `peerTransports()` 用与
+  计数同一套 `live()` 规则生成（`DirectPeers`/`DerpPeers` 现在就是它的汇总）。wisper 把它带进
+  API：tunnel 响应的 `peer_stats[].transport`（对端列表页据此显示「直连/中继」徽标）、
+  entrypoint 响应的 `peer_transport`（详情页对端那行）。gRPC transport 不带这个字段
+  （proto 冻结），插件路径只有计数。
 - **p2p v0.6.1 顺带修的**：`OpenStream` 原先在"打洞未成功"时对**每条**流都阻塞满
   `punchWaitTimeout`（生产 5s）——对打洞不可能成功的对端（对称 NAT、UDP 被封）等于每条连接
   都多等 5s。现在只有**真正发起打洞的那次调用**会等（与"让第一条连接走直连"的原意一致），

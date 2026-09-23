@@ -1,13 +1,15 @@
-import{a as y,j as r,s as x,g as f,B as m,b as a,A as p,i as w,t as $}from"./index-B9gXKcRq.js";import{c as k,a as v,b,m as E,n as g,r as d}from"./format-KZutwuLQ.js";import{i as c}from"./app-scaffold-DRhr7GhQ.js";import{c as z}from"./clipboard-C3x8_sid.js";var K=Object.defineProperty,C=Object.getOwnPropertyDescriptor,o=(t,e,i,n)=>{for(var l=n>1?void 0:n?C(e,i):e,u=t.length-1,h;u>=0;u--)(h=t[u])&&(l=(n?h(e,i,l):h(l))||l);return n&&l&&K(e,i,l),l};function D(t){if(!/^[A-Za-z0-9_-]{43}$/.test(t))return!1;try{const e=t+"=".repeat((4-t.length%4)%4);return atob(e.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function _(t){return(t?.options.peers??[]).map(e=>({key:e.key,alias:e.alias??""}))}let s=class extends y{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:""},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._unsub=null,this._saveRow=async()=>{const t={key:this._draft.key.trim(),alias:this._draft.alias.trim()};if(!D(t.key)){this._rowError=r("peersKeyInvalid");return}if(this._rows.filter((n,l)=>l!==this._editing).some(n=>n.key===t.key)){this._rowError=r("peersKeyDuplicate");return}const i=this._editing==="new"?[...this._rows,t]:this._rows.map((n,l)=>l===this._editing?t:n);await this._save(i)&&(this._editing=null,this._rowError="")},this._deleteRow=async t=>{this._confirmDelete=null,await this._save(this._rows.filter((e,i)=>i!==t))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=x(()=>{const t=f().find(e=>e.id===this.tunnelId);t&&(this._tunnel=t)})}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const t=f().find(e=>e.id===this.tunnelId)??null;this._tunnel=t,this._rows=_(t)}_startEdit(t){this._editing=t,this._draft={...this._rows[t]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:""},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}async _save(t){if(this._saving)return!1;this._saving=!0;try{const e=await m(this.tunnelId,t.map(i=>({key:i.key,alias:i.alias||void 0})));return this._tunnel=e,this._rows=_(e),this._showSnackbar(r("saved")),!0}catch(e){const i=e instanceof Error?e.message:"",n=`${r("saveFailed")}${i?": "+i:""}`;return this._editing!==null?this._rowError=n:this._showSnackbar(n),!1}finally{this._saving=!1}}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar=""},2500)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(t){return(this._tunnel?.peer_stats??[]).find(e=>e.key===t)}_renderStats(t){const e=this._statFor(t);return e?a`
-      <span>${k(e.current_conns)} ${r("p2pColConns")}</span>
-      <span>↓ ${v(e.output_bytes)} <span class="rate">${b(e.output_rate_bytes)}</span></span>
-      <span>↑ ${v(e.input_bytes)} <span class="rate">${b(e.input_rate_bytes)}</span></span>
-    `:a`<span class="muted">${r("peersNoTraffic")}</span>`}_renderEditor(){return a`
+import{a as y,j as r,s as x,g as f,B as m,b as i,A as p,i as w,t as $}from"./index-D46JLA48.js";import{c as k,a as b,b as v,m as E,n as _,r as d}from"./format-Dmw6anAb.js";import{i as c}from"./app-scaffold-DgSOZ1A-.js";import{c as z}from"./clipboard-C3x8_sid.js";var D=Object.defineProperty,K=Object.getOwnPropertyDescriptor,o=(e,t,s,n)=>{for(var l=n>1?void 0:n?K(t,s):t,u=e.length-1,h;u>=0;u--)(h=e[u])&&(l=(n?h(t,s,l):h(l))||l);return n&&l&&D(t,s,l),l};function T(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function g(e){return(e?.options.peers??[]).map(t=>({key:t.key,alias:t.alias??""}))}let a=class extends y{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:""},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._unsub=null,this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim()};if(!T(e.key)){this._rowError=r("peersKeyInvalid");return}if(this._rows.filter((n,l)=>l!==this._editing).some(n=>n.key===e.key)){this._rowError=r("peersKeyDuplicate");return}const s=this._editing==="new"?[...this._rows,e]:this._rows.map((n,l)=>l===this._editing?e:n);await this._save(s)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,s)=>s!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=x(()=>{const e=f().find(t=>t.id===this.tunnelId);e&&(this._tunnel=e)})}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=f().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=g(e)}_startEdit(e){this._editing=e,this._draft={...this._rows[e]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:""},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await m(this.tunnelId,e.map(s=>({key:s.key,alias:s.alias||void 0})));return this._tunnel=t,this._rows=g(t),this._showSnackbar(r("saved")),!0}catch(t){const s=t instanceof Error?t.message:"",n=`${r("saveFailed")}${s?": "+s:""}`;return this._editing!==null?this._rowError=n:this._showSnackbar(n),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderStats(e){const t=this._statFor(e);return t?i`
+      <span>${k(t.current_conns)} ${r("p2pColConns")}</span>
+      <span>↓ ${b(t.output_bytes)} <span class="rate">${v(t.output_rate_bytes)}</span></span>
+      <span>↑ ${b(t.input_bytes)} <span class="rate">${v(t.input_rate_bytes)}</span></span>
+    `:i`<span class="muted">${r("peersNoTraffic")}</span>`}_renderTransport(e){const t=this._statFor(e)?.transport;return t?i`<span class="peer-badge ${t}">
+      ${t==="direct"?r("p2pTransportDirect"):r("p2pTransportRelay")}
+    </span>`:p}_renderEditor(){return i`
       <div class="peer-row editing">
         <div class="row-line">
           <input class="form-input alias grow" .value=${this._draft.alias}
             placeholder=${r("peersAliasPlaceholder")}
-            @input=${t=>{this._draft={...this._draft,alias:t.target.value}}}>
+            @input=${e=>{this._draft={...this._draft,alias:e.target.value}}}>
           <button class="icon-btn" title="${r("btnCancel")}" @click=${()=>this._cancelEdit()}>
             ${c("close")}
           </button>
@@ -18,10 +20,10 @@ import{a as y,j as r,s as x,g as f,B as m,b as a,A as p,i as w,t as $}from"./ind
         </div>
         <input class="form-input key ${this._rowError?"invalid":""}" .value=${this._draft.key}
           placeholder=${r("peersKeyPlaceholder")}
-          @input=${t=>{this._draft={...this._draft,key:t.target.value},this._rowError=""}}>
-        ${this._rowError?a`<div class="row-error">${this._rowError}</div>`:p}
+          @input=${e=>{this._draft={...this._draft,key:e.target.value},this._rowError=""}}>
+        ${this._rowError?i`<div class="row-error">${this._rowError}</div>`:p}
       </div>
-    `}render(){const t=this._tunnel;return a`
+    `}render(){const e=this._tunnel;return i`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`)}>
@@ -34,34 +36,35 @@ import{a as y,j as r,s as x,g as f,B as m,b as a,A as p,i as w,t as $}from"./ind
           </button>
         </div>
 
-        ${t?a`
+        ${e?i`
             <div class="section">
               <div class="card">
-                ${this._rows.length===0&&this._editing!=="new"?a`<div class="empty">${r("peersEmpty")}</div>`:p}
-                ${this._rows.map((e,i)=>this._editing===i?this._renderEditor():a`
+                ${this._rows.length===0&&this._editing!=="new"?i`<div class="empty">${r("peersEmpty")}</div>`:p}
+                ${this._rows.map((t,s)=>this._editing===s?this._renderEditor():i`
                     <div class="peer-row">
                       <div class="row-line">
-                        <span class="peer-alias">${e.alias||r("peersNoAlias")}</span>
+                        <span class="peer-alias">${t.alias||r("peersNoAlias")}</span>
+                        ${this._renderTransport(t.key)}
                         <span class="row-actions">
-                          <button class="icon-btn" title="${r("btnCopy")}" @click=${()=>z(e.key)}>
+                          <button class="icon-btn" title="${r("btnCopy")}" @click=${()=>z(t.key)}>
                             ${c("copy")}
                           </button>
-                          <button class="icon-btn" title="${r("btnEdit")}" @click=${()=>this._startEdit(i)}>
+                          <button class="icon-btn" title="${r("btnEdit")}" @click=${()=>this._startEdit(s)}>
                             ${c("edit")}
                           </button>
                           <button class="icon-btn danger" title="${r("btnDelete")}"
-                            @click=${()=>{this._confirmDelete=i}}>
+                            @click=${()=>{this._confirmDelete=s}}>
                             ${c("trash")}
                           </button>
                         </span>
                       </div>
-                      <div class="peer-key">${this._showKeys?e.key:E(e.key)}</div>
-                      <div class="peer-stats">${this._renderStats(e.key)}</div>
+                      <div class="peer-key">${this._showKeys?t.key:E(t.key)}</div>
+                      <div class="peer-stats">${this._renderStats(t.key)}</div>
                     </div>
                   `)}
                 ${this._editing==="new"?this._renderEditor():p}
 
-                ${this._editing===null?a`
+                ${this._editing===null?i`
                     <button class="add-row" @click=${()=>this._startAdd()}>
                       ${c("plus")} ${r("peersAdd")}
                     </button>`:p}
@@ -69,13 +72,13 @@ import{a as y,j as r,s as x,g as f,B as m,b as a,A as p,i as w,t as $}from"./ind
 
               <div class="hint">${r("peersHint")}</div>
               <div class="hint">${r("peersRestartHint")}</div>
-              ${this._rows.length===0?a`<div class="hint">${r("peersNoneHint")}</div>`:p}
+              ${this._rows.length===0?i`<div class="hint">${r("peersNoneHint")}</div>`:p}
             </div>
-          `:a`<div class="section"><div class="card"><div class="empty">${r("notFound")}</div></div></div>`}
+          `:i`<div class="section"><div class="card"><div class="empty">${r("notFound")}</div></div></div>`}
 
-        ${this._confirmDelete!==null?a`
+        ${this._confirmDelete!==null?i`
             <div class="dialog-overlay" @click=${()=>{this._confirmDelete=null}}>
-              <div class="dialog-box" @click=${e=>e.stopPropagation()}>
+              <div class="dialog-box" @click=${t=>t.stopPropagation()}>
                 <div class="dialog-title">${r("deleteConfirmTitle")}</div>
                 <div class="dialog-message">${r("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
@@ -90,9 +93,9 @@ import{a as y,j as r,s as x,g as f,B as m,b as a,A as p,i as w,t as $}from"./ind
               </div>
             </div>`:p}
 
-        ${this._snackbar?a`<div class="toast">${this._snackbar}</div>`:p}
+        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:p}
       </app-scaffold>
-    `}};s.styles=w`
+    `}};a.styles=w`
     .back-btn {
       background: none;
       border: none;
@@ -169,6 +172,18 @@ import{a as y,j as r,s as x,g as f,B as m,b as a,A as p,i as w,t as $}from"./ind
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .peer-badge {
+      flex: none;
+      padding: 1px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--border-subtle);
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+    }
+    .peer-badge.direct {
+      color: var(--green-text);
+      background: var(--green-bg);
     }
     .row-actions {
       display: flex;
@@ -353,4 +368,4 @@ import{a as y,j as r,s as x,g as f,B as m,b as a,A as p,i as w,t as $}from"./ind
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       z-index: 100;
     }
-  `;o([g()],s.prototype,"tunnelType",2);o([g()],s.prototype,"tunnelId",2);o([d()],s.prototype,"_tunnel",2);o([d()],s.prototype,"_rows",2);o([d()],s.prototype,"_editing",2);o([d()],s.prototype,"_draft",2);o([d()],s.prototype,"_saving",2);o([d()],s.prototype,"_rowError",2);o([d()],s.prototype,"_confirmDelete",2);o([d()],s.prototype,"_showKeys",2);o([d()],s.prototype,"_snackbar",2);s=o([$("tunnel-peers-page")],s);export{s as TunnelPeersPage};
+  `;o([_()],a.prototype,"tunnelType",2);o([_()],a.prototype,"tunnelId",2);o([d()],a.prototype,"_tunnel",2);o([d()],a.prototype,"_rows",2);o([d()],a.prototype,"_editing",2);o([d()],a.prototype,"_draft",2);o([d()],a.prototype,"_saving",2);o([d()],a.prototype,"_rowError",2);o([d()],a.prototype,"_confirmDelete",2);o([d()],a.prototype,"_showKeys",2);o([d()],a.prototype,"_snackbar",2);a=o([$("tunnel-peers-page")],a);export{a as TunnelPeersPage};
