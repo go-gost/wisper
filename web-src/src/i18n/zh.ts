@@ -62,6 +62,14 @@ const zh: Record<string, string> = {
   fieldHostname: '主机名',
   fieldPrefix: 'URL 前缀',
   fieldPrefixHint: '自定义 URL 主机名，8-63 个字符：小写字母、数字、连字符。被占用时回退为随机主机名。',
+  fieldNet: '设备地址',
+  fieldNetHint: '例如 hub 为 10.10.0.1/24，spoke 为 10.10.0.2/24',
+  fieldMTU: 'MTU',
+  fieldDeviceName: '设备名',
+  fieldDeviceNameHint: '留空则由内核命名。',
+  fieldRoutes: '路由',
+  fieldRoutesHint: '走该设备的网段，逗号分隔：192.168.50.0/24；0.0.0.0/0 表示全部流量。',
+  fieldDNS: 'DNS',
   switchRewriteHost: '重写主机头',
   switchEnableTLS: '启用 TLS',
   switchFileUpload: '文件上传',
@@ -89,6 +97,9 @@ const zh: Record<string, string> = {
   typeTcpEntryDesc: '将隧道端点暴露为本地 TCP 端口',
   typeUdpEntryDesc: '将隧道端点暴露为本地 UDP 端口',
   typeP2pEntryDesc: '按公钥把本地流量转发到对端（p2p 入口点）。',
+  typeTun: 'TUN',
+  typeTunDesc: '本机持有 tun 设备，为接入的各节点转发',
+  typeTunEntryDesc: '加入对端搭建的虚拟网络（tun 设备）',
 
   // Notifications
   copiedToClipboard: '已复制到剪贴板',
@@ -143,6 +154,12 @@ const zh: Record<string, string> = {
   protocolTcp: 'TCP',
   protocolUdp: 'UDP',
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
+  tunKeepaliveHint:
+    '把本机地址注册到 hub 的 tun server 并维持路由；hub 侧用于让已离开 spoke 的路由过期。仅点对点 tun↔tun 链路适合关闭。',
+  tunHubHint:
+    '设备就是网络本身：各 spoke 用标准 tun 客户端接入。再建一条 p2p 隧道，endpoint 填同一地址、允许列表填各 spoke 公钥。',
+  tunSpokeHint:
+    '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
   peersTitle: '允许的对端',
   peersEntryDesc: '{n} 个已允许 — 管理列表',
   peersNoAlias: '无别名',

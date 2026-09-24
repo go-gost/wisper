@@ -71,6 +71,8 @@ const ICON_PATHS: Record<string, SVGInner> = {
   broadcast: svg`<circle cx="12" cy="12" r="2" /><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />`,
   hub: svg`<circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />`,
 
+  network: svg`<rect x="9" y="3" width="6" height="6" rx="1" /><rect x="2" y="15" width="6" height="6" rx="1" /><rect x="16" y="15" width="6" height="6" rx="1" /><path d="M12 9v3" /><path d="M5 15v-1.5h14V15" />`,
+
   // p2p transport states: a bolt for a direct path, the hub (above) for every
   // relay state.
   zap: svg`<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />`,

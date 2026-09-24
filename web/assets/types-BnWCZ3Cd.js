@@ -1,1 +1,0 @@
-const e=[{value:"file",label:"File",desc:""},{value:"http",label:"HTTP",desc:""},{value:"tcp",label:"TCP",desc:""},{value:"udp",label:"UDP",desc:""},{value:"p2p",label:"P2P",desc:""}],l=[{value:"tcp",label:"TCP",desc:""},{value:"udp",label:"UDP",desc:""},{value:"p2p",label:"P2P",desc:""}];export{l as E,e as T};

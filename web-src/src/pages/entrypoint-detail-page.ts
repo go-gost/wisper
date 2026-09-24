@@ -38,6 +38,15 @@ export class EntrypointDetailPage extends LitElement {
   /** A udp p2p entrypoint's listener keepalive: hold a client's session
    *  (and so its tunnel) between datagrams instead of per-datagram dials. */
   @state() private _keepalive = true;
+  /** A tun entrypoint's keepalive period in seconds (x reads ttl as an int). */
+  @state() private _ttl = 15;
+
+  // tun spoke fields: this node's own device (see tunSpokeHint)
+  @state() private _net = '';
+  @state() private _mtu = 0;
+  @state() private _deviceName = '';
+  @state() private _routes = '';
+  @state() private _dns = '';
 
   private _unsubs: (() => void)[] = [];
 
@@ -97,6 +106,12 @@ export class EntrypointDetailPage extends LitElement {
     this._peer = '';
     this._protocol = 'tcp';
     this._keepalive = true;
+    this._ttl = 15;
+    this._net = '';
+    this._mtu = 0;
+    this._deviceName = '';
+    this._routes = '';
+    this._dns = '';
   }
 
   private _populateForm(ep: Entrypoint) {
@@ -106,6 +121,12 @@ export class EntrypointDetailPage extends LitElement {
     this._peer = ep.options?.peer ?? '';
     this._protocol = ep.options?.protocol === 'udp' ? 'udp' : 'tcp';
     this._keepalive = ep.options?.keepalive ?? true;
+    this._ttl = ep.options?.ttl || 15;
+    this._net = ep.options?.net ?? '';
+    this._mtu = ep.options?.mtu ?? 0;
+    this._deviceName = ep.options?.device_name ?? '';
+    this._routes = ep.options?.routes ?? '';
+    this._dns = ep.options?.dns ?? '';
   }
 
   /** _renderTransport is the peer's path: one word, with the reason on hover. */
@@ -168,12 +189,24 @@ export class EntrypointDetailPage extends LitElement {
       const body = {
         name: this._name.trim(),
         type: this.entrypointType,
-        endpoint: this._endpoint.trim(),
+        // A tun entrypoint binds no local socket: its device address is the net
+        // field below, and the endpoint is meaningless.
+        endpoint: this.entrypointType === 'tun' ? '' : this._endpoint.trim(),
         id: this._tunnelId.trim() || undefined,
         peer: this._peer.trim() || undefined,
         protocol: this.entrypointType === 'p2p' ? this._protocol : undefined,
         keepalive:
-          this.entrypointType === 'p2p' && this._protocol === 'udp' ? this._keepalive : undefined,
+          this.entrypointType === 'tun'
+            ? this._keepalive
+            : this.entrypointType === 'p2p' && this._protocol === 'udp'
+              ? this._keepalive
+              : undefined,
+        ttl: this.entrypointType === 'tun' ? this._ttl : undefined,
+        net: this.entrypointType === 'tun' ? this._net.trim() || undefined : undefined,
+        mtu: this.entrypointType === 'tun' ? this._mtu || undefined : undefined,
+        device_name: this.entrypointType === 'tun' ? this._deviceName.trim() || undefined : undefined,
+        routes: this.entrypointType === 'tun' ? this._routes.trim() || undefined : undefined,
+        dns: this.entrypointType === 'tun' ? this._dns.trim() || undefined : undefined,
       };
 
       if (this.mode === 'create') {
@@ -638,7 +671,7 @@ export class EntrypointDetailPage extends LitElement {
                   <span class="info-label">Created</span>
                   <span class="info-value text">${formatTimestamp(ep.created_at)}</span>
                 </div>
-                ${this.entrypointType === 'p2p'
+                ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
                   ? ''
                   : html`
                 <div class="info-row">
@@ -655,10 +688,43 @@ export class EntrypointDetailPage extends LitElement {
                   <span class="info-value text">${ep.name}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">Bind Address</span>
+                  <span class="info-label">${this.entrypointType === 'tun' ? t('fieldNet') : 'Bind Address'}</span>
                   <span class="info-value">${ep.entrypoint}</span>
                 </div>
-                ${this.entrypointType === 'p2p'
+                ${this.entrypointType === 'tun'
+                  ? html`
+                    ${ep.options?.mtu
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldMTU')}</span><span class="info-value text">${ep.options.mtu}</span></div>`
+                      : ''}
+                    ${ep.options?.device_name
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldDeviceName')}</span><span class="info-value text">${ep.options.device_name}</span></div>`
+                      : ''}
+                    ${ep.options?.routes
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldRoutes')}</span><span class="info-value text">${ep.options.routes}</span></div>`
+                      : ''}
+                    ${ep.options?.dns
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldDNS')}</span><span class="info-value text">${ep.options.dns}</span></div>`
+                      : ''}
+                    <div class="info-row">
+                      <span class="info-label">${t('entrypointPeerKey')}</span>
+                      <span class="info-value">${this._showPeer ? peer : maskKey(peer)}</span>
+                      ${peer
+                        ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(peer)}>
+                          ${icon('copy')}
+                        </button>
+                        <button class="copy-btn-mini" title="${this._showPeer ? t('hideKey') : t('revealKey')}"
+                          @click=${() => { this._showPeer = !this._showPeer; }}>
+                          ${icon(this._showPeer ? 'eye-off' : 'eye')}
+                        </button>`
+                        : ''}
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">${t('switchKeepalive')}</span>
+                      <span class="info-value text">${ep.options?.keepalive ? t('statusRunning') : t('statusStopped')}${ep.options?.ttl ? ` · ${ep.options.ttl}s` : ''}</span>
+                    </div>
+                    <div class="p2p-hint">${t('tunSpokeHint')}</div>
+                  `
+                  : this.entrypointType === 'p2p'
                   ? html`
                     <div class="info-row">
                       <span class="info-label">${t('entrypointPeerKey')}</span>
@@ -731,8 +797,8 @@ export class EntrypointDetailPage extends LitElement {
                   <input class="form-input" readonly .value=${typeLabel + ' Entrypoint'}>
                 </div>
 
-                <!-- A p2p entrypoint dials the peer directly: no tunnel id. -->
-                ${this.entrypointType === 'p2p'
+                <!-- A p2p or tun entrypoint has no tunnel id to route by. -->
+                ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
                   ? ''
                   : html`
                 <div class="form-group">
@@ -750,19 +816,71 @@ export class EntrypointDetailPage extends LitElement {
                     @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
                 </div>
 
+                ${this.entrypointType === 'tun'
+                  ? html`
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldNet')}</label>
+                      <input class="form-input" .value=${this._net} placeholder="10.10.0.2/24"
+                        @input=${(e: Event) => { this._net = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldNetHint')}</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldMTU')}</label>
+                      <input class="form-input" type="number" .value=${this._mtu ? String(this._mtu) : ''} placeholder="1420"
+                        @input=${(e: Event) => { this._mtu = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldDeviceName')}</label>
+                      <input class="form-input" .value=${this._deviceName} placeholder="wisper0"
+                        @input=${(e: Event) => { this._deviceName = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldDeviceNameHint')}</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldRoutes')}</label>
+                      <input class="form-input" .value=${this._routes} placeholder="0.0.0.0/0"
+                        @input=${(e: Event) => { this._routes = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldRoutesHint')}</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldDNS')}</label>
+                      <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
+                        @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
+                    </div>
+                  `
+                  : html`
                 <div class="form-group">
                   <label class="form-label">${t('fieldBindAddress')}</label>
                   <input class="form-input" .value=${this._endpoint} placeholder="0.0.0.0:9090"
                     @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
-                </div>
+                </div>`}
 
-                ${this.entrypointType === 'p2p'
+                ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
                   ? html`
                     <div class="form-group">
                       <label class="form-label">${t('entrypointPeerKey')}</label>
                       <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
                         @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
                     </div>
+                    ${this.entrypointType === 'tun'
+                      ? html`
+                        <div class="switch-row">
+                          <span class="switch-label">${t('switchKeepalive')}</span>
+                          <div class="switch ${this._keepalive ? 'on' : ''}"
+                            @click=${() => { this._keepalive = !this._keepalive; }}>
+                            <div class="switch-knob"></div>
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">${t('fieldTTL')}</label>
+                          <input class="form-input" type="number" .value=${this._ttl ? String(this._ttl) : ''} placeholder="15"
+                            @input=${(e: Event) => { this._ttl = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
+                        </div>
+                        <div class="p2p-hint">${t('tunKeepaliveHint')}</div>
+                        <div class="p2p-hint">${t('tunSpokeHint')}</div>
+                      `
+                      : ''}
+                    ${this.entrypointType === 'p2p'
+                      ? html`
                     <div class="switch-row" @click=${() => {
                       this._protocol = this._protocol === 'tcp' ? 'udp' : 'tcp';
                     }}>
@@ -782,6 +900,8 @@ export class EntrypointDetailPage extends LitElement {
                       </div>
                     </div>
                     <div class="p2p-hint">${t('keepaliveHint')}</div>`
+                      : ''}
+                  `
                       : ''}
                   `
                   : ''}

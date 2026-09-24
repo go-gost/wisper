@@ -1,4 +1,4 @@
-import{a as v,j as r,b as d,i as f,t as u}from"./index-BrIanC7P.js";import{i as s}from"./app-scaffold-QIQUMYeS.js";import{E as g}from"./types-BnWCZ3Cd.js";var b=Object.getOwnPropertyDescriptor,y=(t,i,l,n)=>{for(var e=n>1?void 0:n?b(i,l):i,a=t.length-1,p;a>=0;a--)(p=t[a])&&(e=p(e)||e);return e};const x={tcp:"link",udp:"broadcast",p2p:"hub"},c={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"}};let o=class extends v{_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return d`
+import{a as v,j as r,b as c,i as f,t as u}from"./index-BIk6eYxn.js";import{i as s}from"./app-scaffold-D4Cg2NeJ.js";import{E as g}from"./types-DwVOrt_K.js";var b=Object.getOwnPropertyDescriptor,y=(t,n,l,i)=>{for(var e=i>1?void 0:i?b(n,l):n,a=t.length-1,p;a>=0;a--)(p=t[a])&&(e=p(e)||e);return e};const x={tcp:"link",udp:"broadcast",p2p:"hub",tun:"network"},d={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"},tun:{bg:"#ecfeff",fg:"#0e7490"}};let o=class extends v{_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return c`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
@@ -8,9 +8,9 @@ import{a as v,j as r,b as d,i as f,t as u}from"./index-BrIanC7P.js";import{i as 
         </div>
 
         <div class="list">
-          ${g.map(t=>d`
+          ${g.map(t=>c`
             <div class="type-card" @click=${()=>this._navigate(`/entrypoint/${t.value}/new`)}>
-              <div class="type-icon" style="background:${c[t.value].bg};color:${c[t.value].fg}">${s(x[t.value])}</div>
+              <div class="type-icon" style="background:${d[t.value].bg};color:${d[t.value].fg}">${s(x[t.value])}</div>
               <div class="type-content">
                 <div class="type-title">
                   ${r(`type${t.value.charAt(0).toUpperCase()+t.value.slice(1)}`)} Entrypoint

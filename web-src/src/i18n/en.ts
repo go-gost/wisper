@@ -62,6 +62,14 @@ const en: Record<string, string> = {
   fieldHostname: 'Hostname',
   fieldPrefix: 'URL Prefix',
   fieldPrefixHint: 'Custom URL host, 8-63 chars: a-z, 0-9, hyphens. Falls back to a random host if taken.',
+  fieldNet: 'Device Address',
+  fieldNetHint: 'e.g. 10.10.0.1/24 for the hub, 10.10.0.2/24 for a spoke',
+  fieldMTU: 'MTU',
+  fieldDeviceName: 'Device Name',
+  fieldDeviceNameHint: 'Leave empty to let the kernel name it.',
+  fieldRoutes: 'Routes',
+  fieldRoutesHint: 'Subnets to send through the device, comma-separated: 192.168.50.0/24, or 0.0.0.0/0 for everything.',
+  fieldDNS: 'DNS',
   switchRewriteHost: 'Rewrite Host',
   switchEnableTLS: 'Enable TLS',
   switchFileUpload: 'File Upload',
@@ -89,6 +97,9 @@ const en: Record<string, string> = {
   typeTcpEntryDesc: 'Expose a tunnel endpoint as a local TCP port',
   typeUdpEntryDesc: 'Expose a tunnel endpoint as a local UDP port',
   typeP2pEntryDesc: 'Forward local traffic to a peer by public key (p2p entrypoint).',
+  typeTun: 'TUN',
+  typeTunDesc: 'Host a tun device and route between the peers that reach it',
+  typeTunEntryDesc: 'Join the virtual network of a peer (tun device)',
 
   // Notifications
   copiedToClipboard: 'Copied to clipboard',
@@ -146,6 +157,12 @@ const en: Record<string, string> = {
   protocolUdp: 'UDP',
   keepaliveHint:
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
+  tunKeepaliveHint:
+    'Registers this spoke with the hub\'s tun server and keeps the route alive; on the hub it expires the routes of spokes that left. Off suits only a direct tun-to-tun link.',
+  tunHubHint:
+    'The device is the network: the spokes are stock tun clients. Pair it with a p2p tunnel whose endpoint is this same address and whose peers are the spoke keys.',
+  tunSpokeHint:
+    'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
   peersTitle: 'Allowed peers',
   peersEntryDesc: '{n} allowed — manage the list',
   peersNoAlias: 'No alias',

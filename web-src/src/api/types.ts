@@ -1,7 +1,7 @@
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-export type TunnelType = 'file' | 'http' | 'tcp' | 'udp' | 'p2p';
-export type EntrypointType = 'tcp' | 'udp' | 'p2p';
+export type TunnelType = 'file' | 'http' | 'tcp' | 'udp' | 'p2p' | 'tun';
+export type EntrypointType = 'tcp' | 'udp' | 'p2p' | 'tun';
 export type ServiceStatus = 'running' | 'stopped' | 'error';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type LanguagePreference = 'en' | 'zh';
@@ -12,12 +12,14 @@ export const TUNNEL_TYPES: { value: TunnelType; label: string; desc: string }[] 
   { value: 'tcp', label: 'TCP', desc: '' },
   { value: 'udp', label: 'UDP', desc: '' },
   { value: 'p2p', label: 'P2P', desc: '' },
+  { value: 'tun', label: 'TUN', desc: '' },
 ];
 
 export const ENTRYPOINT_TYPES: { value: EntrypointType; label: string; desc: string }[] = [
   { value: 'tcp', label: 'TCP', desc: '' },
   { value: 'udp', label: 'UDP', desc: '' },
   { value: 'p2p', label: 'P2P', desc: '' },
+  { value: 'tun', label: 'TUN', desc: '' },
 ];
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
@@ -72,6 +74,16 @@ export interface TunnelOptions {
   peer?: string;
   /** Inbound allowlist: the peers whose streams reach this p2p tunnel. Empty = unreachable. */
   peers?: Peer[];
+  /** tun device address (CIDR, comma-separated for several). */
+  net?: string;
+  /** tun device MTU (absent = the implementation default, 1420). */
+  mtu?: number;
+  /** tun device name (absent = kernel-chosen). */
+  device_name?: string;
+  /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
+  routes?: string;
+  /** The device's DNS servers, comma-separated. */
+  dns?: string;
 }
 
 /** One peer's traffic during the tunnel's current run. */
@@ -118,12 +130,21 @@ export interface TunnelCreateRequest {
   enableTLS?: boolean;
   rewriteHost?: boolean;
   file_upload?: boolean;
+  keepalive?: boolean;
+  ttl?: number;
   record_mode?: string;
   /** Remote peer's base64 public key (p2p entrypoints). */
   peer?: string;
   /** Inbound allowlist: the peers whose streams reach this p2p tunnel. An
    *  entry's alias may be omitted — the backend generates one. */
   peers?: Peer[];
+  /** tun device address (CIDR, comma-separated for several). */
+  net?: string;
+  mtu?: number;
+  device_name?: string;
+  /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
+  routes?: string;
+  dns?: string;
 }
 
 // ─── Entrypoint ──────────────────────────────────────────────────────────────
@@ -135,6 +156,13 @@ export interface EntrypointOptions {
   peer?: string;
   /** A p2p entrypoint's inner protocol: 'tcp' (default) or 'udp'. */
   protocol?: string;
+  /** tun device address (CIDR, comma-separated for several). */
+  net?: string;
+  mtu?: number;
+  device_name?: string;
+  /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
+  routes?: string;
+  dns?: string;
 }
 
 export interface Entrypoint {
@@ -169,6 +197,13 @@ export interface EntrypointCreateRequest {
   peer?: string;
   /** A p2p entrypoint's inner protocol: 'tcp' (default) or 'udp'. */
   protocol?: string;
+  /** tun device address (CIDR, comma-separated for several). */
+  net?: string;
+  mtu?: number;
+  device_name?: string;
+  /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
+  routes?: string;
+  dns?: string;
 }
 
 // ─── Stats Snapshot ──────────────────────────────────────────────────────────
