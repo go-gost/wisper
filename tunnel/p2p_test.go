@@ -236,18 +236,17 @@ func TestP2PTunnelPeerAllowlist(t *testing.T) {
 		}
 	}
 
-	// Streams from any allowed key land on the one route.
+	// Streams from any allowed key are served, not turned away: the tunnel's
+	// service takes each one (its endpoint is unreachable, so it closes the
+	// conn) and the dialing side sees EOF. Accepting on the route directly
+	// would race that service — the route is the queue it drains.
 	for _, key := range []string{"peer-a", "peer-c"} {
 		inbound, far := peerPipe(key)
+		_ = far.SetReadDeadline(time.Now().Add(5 * time.Second))
 		p2pHost.dispatch(inbound)
-		got, err := pl.Accept()
-		if err != nil {
-			t.Fatalf("Accept for %s: %v", key, err)
+		if _, err := far.Read(make([]byte, 1)); err != io.EOF {
+			t.Fatalf("read after dispatch for %s = %v, want EOF", key, err)
 		}
-		if a := got.RemoteAddr(); a == nil || a.String() != key {
-			t.Fatalf("accepted conn RemoteAddr = %v, want %s", a, key)
-		}
-		_ = got.Close()
 		_ = far.Close()
 	}
 
@@ -279,13 +278,14 @@ func TestP2PTunnelDuplicatePeerKey(t *testing.T) {
 	if err := first.Run(); err != nil {
 		t.Fatalf("first Run: %v", err)
 	}
+	firstRoute := p2pHost.routes[testPeerKey]
 
 	second := NewP2PTunnel(IDOption("second"), EndpointOption("127.0.0.1:9"), PeersOption(testPeerKey))
 	if err := second.Run(); err == nil {
 		t.Fatal("two tunnels claimed the same peer key")
 	}
-	if p2pHost.routes[testPeerKey] == nil {
-		t.Fatal("the failed Run unregistered the first tunnel's route")
+	if got := p2pHost.routes[testPeerKey]; got == nil || got != firstRoute {
+		t.Fatal("the failed Run unregistered or replaced the first tunnel's route")
 	}
 	if p2pHost.refs != 1 {
 		t.Fatalf("refs after the failed Run = %d, want 1 (the failure leaked or stole a reference)", p2pHost.refs)
@@ -294,15 +294,11 @@ func TestP2PTunnelDuplicatePeerKey(t *testing.T) {
 		t.Fatalf("Close of the failed tunnel: %v", err)
 	}
 
-	// The first tunnel still routes its peer.
-	inbound, far := peerPipe(testPeerKey)
-	defer far.Close()
-	p2pHost.dispatch(inbound)
-	got, err := p2pHost.routes[testPeerKey].Accept()
-	if err != nil {
-		t.Fatalf("Accept on the surviving route: %v", err)
-	}
-	_ = got.Close()
+	// The surviving route is the first tunnel's, and nothing else was left
+	// behind: a route is a queue its own service drains, so this asserts the
+	// route's identity rather than Accepting on it (a manual Accept there races
+	// the service, and hangs whenever the service wins). Delivery is covered by
+	// TestP2PHostManagerRoutes, whose manager has no service.
 
 	if err := first.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
