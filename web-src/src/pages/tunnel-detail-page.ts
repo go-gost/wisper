@@ -827,6 +827,7 @@ export class TunnelDetailPage extends LitElement {
     .btn-edit-bottom {
       width: 100%;
       padding: 8px;
+      box-sizing: border-box;
       border-radius: var(--radius-md);
       border: 1px solid var(--border);
       background: var(--surface);
@@ -1042,30 +1043,31 @@ export class TunnelDetailPage extends LitElement {
                   </div>
                 `
                 : ''}
+            </div>
 
-              <!-- Allowed peers: the allowlist lives on its own page (long lists,
-                   per-peer live traffic), and saving it restarts the tunnel. -->
-              ${this.tunnelType === 'p2p'
-                ? html`
-                  <div class="section" style="padding-top:0;">
-                    <div class="card" style="padding:0;">
-                      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
-                        @click=${() => this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/peers`)}>
-                        <span style="color:var(--accent);">${icon('users')}</span>
-                        <div style="flex:1;">
-                          <div style="font-size:var(--font-sm);font-weight:600;">${t('peersTitle')}</div>
-                          <div style="font-size:var(--font-sm);color:var(--text-muted);">
-                            ${peerStats.length
-                              ? t('peersEntryDesc').replace('{n}', String(peerStats.length))
-                              : t('peersNoneHint')}
-                          </div>
+            <!-- Allowed peers: the allowlist lives on its own page (long lists,
+                 per-peer live traffic), and saving it restarts the tunnel. -->
+            ${this.tunnelType === 'p2p'
+              ? html`
+                <div class="section">
+                  <div class="card" style="padding:0;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
+                      @click=${() => this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/peers`)}>
+                      <span style="color:var(--accent);">${icon('users')}</span>
+                      <div style="flex:1;">
+                        <div style="font-size:var(--font-sm);font-weight:600;">${t('peersTitle')}</div>
+                        <div style="font-size:var(--font-sm);color:var(--text-muted);">
+                          ${peerStats.length
+                            ? t('peersEntryDesc').replace('{n}', String(peerStats.length))
+                            : t('peersNoneHint')}
                         </div>
-                        <span style="color:var(--text-muted);">&rarr;</span>
                       </div>
+                      <span style="color:var(--text-muted);">&rarr;</span>
                     </div>
                   </div>
-                `
-                : nothing}
+                </div>
+              `
+              : nothing}
 
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
                  inspecting, and only when an inspector URL is configured. -->
