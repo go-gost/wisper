@@ -108,6 +108,21 @@ netstack**：不碰 netlink、不碰设备配置，把 tun fd 的 IP 包喂给�
 每一步的门禁沿用现有习惯：`go build ./... && go vet ./...`、`CGO_ENABLED=1 go test -race ./...`
 （wisper 侧）、涉及 x 时 `GOWORK=off go build ./...` + x 发版与版本链。
 
+## 下一阶段（Android）工作顺序
+
+1. **x**：`x/listener/tun/tun_linux.go` 加 `//go:build linux && !android`，新增 android 变体——从**注入的 fd**
+   `tun.CreateTUNFromFile`，跳过 netlink/addr/route/dns 与 `net.InterfaceByName`（只留 `net` 回来的 `ip` 供 keepalive 用）。
+   门禁 `go build ./... && go vet ./...`；**已实测 `GOOS=android` 当前能编译 linux 那版**，所以这一步是"换实现"而非"修编译"。
+2. **x 发版 + 版本链**：x 打 tag → bump `wisper/go.mod`（core 若未动则不动）→ `GOWORK=off go build ./...` 门禁。
+3. **wisper/android**：Kotlin 侧 `VpnService`（`prepare()` 弹窗 → `Builder` 配地址/路由/MTU/DNS → `establish()` 拿 fd →
+   `WisperJNI.setTunFd(fd)`；manifest 声明 `dataSync|systemExempted` + `FOREGROUND_SERVICE_SYSTEM_EXEMPTED`），
+   Go 侧 `lib.go`/`lib_jni.c` 加导出 + 把 fd 交给 listener。**设备配置由 Kotlin 读 `/api/entrypoints` 的 tun 定义得到**，
+   Java 与 Go 不各配一份。
+4. **验证**：emulator 上 `adb shell appops set run.gost.wisper ACTIVATE_VPN allow` 免弹窗，走既有 `make android-test-*`；
+   真机验证第 7 条那个未知项（`CreateTUNFromFile` 的 netlink 调用在 app netns 内是否成功），失败即启第 7 条的 netstack 退路。
+
+不在这一阶段：全流量出口（要 `protect()`，侵入 p2p/x）、tun↔tun 直连的手动链路。
+
 ## 相关
 
 - `wisper/docs/p2p-integration.md` — p2p 接缝评估（本文是其 tun 续篇）
