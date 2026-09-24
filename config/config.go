@@ -208,6 +208,11 @@ type Tunnel struct {
 	// generated on demand — see NormalizePeerAliases.
 	PeerAliases map[string]string `yaml:"peer_aliases,omitempty" json:"peer_aliases,omitempty"`
 
+	// PeerDisabled lists allowlisted keys that are switched off: they stay in
+	// Peers (and on the peers page) but hold no route, so their new streams are
+	// closed while established ones drain. Empty means every peer is enabled.
+	PeerDisabled []string `yaml:"peer_disabled,omitempty" json:"peer_disabled,omitempty"`
+
 	Stats         ServiceStats
 	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
 	Favorite      bool

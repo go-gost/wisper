@@ -718,13 +718,13 @@ func TestPeerAliasesFlow(t *testing.T) {
 		t.Errorf("k1 alias = %q, want a generated peer-xxxx name", a)
 	}
 
-	out := peersJSON(opts.Peers, opts.PeerAliases)
+	out := peersJSON(opts.Peers, opts.PeerAliases, nil)
 	if len(out) != 2 || out[0].Alias != opts.PeerAliases["k1"] || out[1].Alias != "laptop" {
 		t.Errorf("response peers = %+v, want both aliases", out)
 	}
 
 	// No stored aliases (a tunnel saved before aliases existed): still named.
-	legacy := peersJSON([]string{"k1", "k2"}, nil)
+	legacy := peersJSON([]string{"k1", "k2"}, nil, []string{"k2"})
 	for _, p := range legacy {
 		if len(p.Alias) != len("peer-")+4 {
 			t.Errorf("legacy peer %s alias = %q, want a generated name", p.Key, p.Alias)
@@ -733,9 +733,12 @@ func TestPeerAliasesFlow(t *testing.T) {
 	if legacy[0].Alias == legacy[1].Alias {
 		t.Error("legacy peers share one alias")
 	}
-	if peersJSON(nil, nil) != nil {
+	if !legacy[1].Disabled || legacy[0].Disabled {
+		t.Errorf("disabled flags = %v/%v, want only k2 off", legacy[0].Disabled, legacy[1].Disabled)
+	}
+	if peersJSON(nil, nil, nil) != nil {
 		// An empty allowlist must stay absent from the JSON, not become [].
-		if got := peersJSON(nil, nil); len(got) != 0 {
+		if got := peersJSON(nil, nil, nil); len(got) != 0 {
 			t.Errorf("peersJSON() = %v, want empty", got)
 		}
 	}
@@ -888,6 +891,44 @@ func TestUpdateP2PTunnelPeers(t *testing.T) {
 	})
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("saving a duplicate key = %d, want 400", resp.StatusCode)
+	}
+
+	// Disabling a peer keeps it on the list but takes its route away: the row
+	// (and the key) survives so it can be switched back on without retyping.
+	resp, updated = putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key2, "alias": "laptop", "disabled": true}, {"key": key1}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("disabling a peer = %d: %v", resp.StatusCode, updated)
+	}
+	peers, _ = updated["options"].(map[string]any)["peers"].([]any)
+	if len(peers) != 2 {
+		t.Fatalf("peers after disabling = %v, want both kept", peers)
+	}
+	p0, _ = peers[0].(map[string]any)
+	if off, _ := p0["disabled"].(bool); !off || p0["key"] != key2 {
+		t.Errorf("peers[0] = %v, want the disabled entry flagged", p0)
+	}
+	p1, _ = peers[1].(map[string]any)
+	if off, _ := p1["disabled"].(bool); off {
+		t.Errorf("peers[1] = %v, want the enabled entry unflagged", p1)
+	}
+	off := tunnel.Get(id).Options().PeerDisabled
+	if len(off) != 1 || off[0] != key2 {
+		t.Errorf("PeerDisabled = %v, want [%s]", off, key2)
+	}
+
+	// The route really is free: a key the host still routed would fail the
+	// second tunnel's registration with a conflict.
+	resp, other := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
+		"name": "Other", "type": "p2p", "endpoint": "127.0.0.1:9",
+		"peers": []map[string]any{{"key": key2}},
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("claiming a disabled peer's key = %d: %v (the route was not released)", resp.StatusCode, other)
+	}
+	if otherID, _ := other["id"].(string); otherID != "" {
+		defer tunnel.Delete(otherID)
 	}
 
 	// The rejected saves changed nothing.

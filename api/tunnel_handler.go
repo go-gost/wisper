@@ -51,6 +51,9 @@ type peerStatsJSON struct {
 type peerJSON struct {
 	Key   string `json:"key"`
 	Alias string `json:"alias,omitempty"`
+	// Disabled keeps the peer on the list without giving it a route: its new
+	// streams are closed while established ones drain.
+	Disabled bool `json:"disabled,omitempty"`
 }
 
 type tunnelOptionsResp struct {
@@ -85,17 +88,21 @@ type statsResponse struct {
 	OutputRateBytes uint64  `json:"output_rate_bytes"`
 }
 
-// peersJSON pairs each allowlisted key with its display alias. A key without
-// one (a config older than aliases) is normalized on the way out, so the UI
-// always has a name to show.
-func peersJSON(peers []string, aliases map[string]string) []peerJSON {
+// peersJSON pairs each allowlisted key with its display alias and whether it is
+// switched off. A key without an alias (a config older than aliases) is
+// normalized on the way out, so the UI always has a name to show.
+func peersJSON(peers []string, aliases map[string]string, disabled []string) []peerJSON {
 	normalized := tunnel.NormalizePeerAliases(peers, aliases)
+	off := make(map[string]bool, len(disabled))
+	for _, k := range disabled {
+		off[k] = true
+	}
 	out := make([]peerJSON, 0, len(peers))
 	seen := make(map[string]bool, len(peers))
 	for _, k := range peers {
 		if a, ok := normalized[k]; ok && !seen[k] {
 			seen[k] = true
-			out = append(out, peerJSON{Key: k, Alias: a})
+			out = append(out, peerJSON{Key: k, Alias: a, Disabled: off[k]})
 		}
 	}
 	return out
@@ -155,7 +162,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			RecordMode:  opts.RecordMode,
 			Peer:        opts.Peer,
 			Protocol:    opts.Protocol,
-			Peers:       peersJSON(opts.Peers, opts.PeerAliases),
+			Peers:       peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled),
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
@@ -225,10 +232,14 @@ type tunnelCreateRequest struct {
 func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 	peers := make([]string, 0, len(r.Peers))
 	aliases := make(map[string]string, len(r.Peers))
+	var disabled []string
 	for _, p := range r.Peers {
 		peers = append(peers, p.Key)
 		if p.Alias != "" {
 			aliases[p.Key] = p.Alias
+		}
+		if p.Disabled {
+			disabled = append(disabled, p.Key)
 		}
 	}
 	aliases = tunnel.NormalizePeerAliases(peers, aliases)
@@ -247,6 +258,7 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.PeerOption(r.Peer),
 		tunnel.PeersOption(peers...),
 		tunnel.PeerAliasesOption(aliases),
+		tunnel.PeerDisabledOption(tunnel.NormalizePeerDisabled(peers, disabled)),
 	}
 }
 
@@ -481,6 +493,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnel.CreatedAtOption(opts.CreatedAt),
 		tunnel.PeersOption(opts.Peers...),
 		tunnel.PeerAliasesOption(opts.PeerAliases),
+		tunnel.PeerDisabledOption(opts.PeerDisabled),
 	}
 
 	var newT tunnel.Tunnel
@@ -605,6 +618,7 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 
 	peers := make([]string, 0, len(req.Peers))
 	aliases := make(map[string]string, len(req.Peers))
+	var disabled []string
 	seen := make(map[string]bool, len(req.Peers))
 	for _, p := range req.Peers {
 		key := strings.TrimSpace(p.Key)
@@ -621,6 +635,9 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		if a := strings.TrimSpace(p.Alias); a != "" {
 			aliases[key] = a
 		}
+		if p.Disabled {
+			disabled = append(disabled, key)
+		}
 	}
 
 	// The list is taken in place: the routes are reconciled on the
@@ -632,7 +649,7 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "tunnel does not take a peer list")
 		return
 	}
-	if err := setter.SetPeers(peers, aliases); err != nil {
+	if err := setter.SetPeers(peers, aliases, disabled); err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}

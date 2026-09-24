@@ -88,7 +88,11 @@ type Options struct {
 	Peers []string
 	// PeerAliases is the display name of each allowlisted key (key → alias),
 	// so pages show a short label instead of the key itself.
-	PeerAliases   map[string]string
+	PeerAliases map[string]string
+	// PeerDisabled is the allowlisted keys that are switched off: kept in Peers
+	// (and shown on the peers page) but given no route, so their new streams
+	// are closed while established ones drain.
+	PeerDisabled  []string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -213,6 +217,14 @@ func PeersOption(peers ...string) Option {
 func PeerAliasesOption(aliases map[string]string) Option {
 	return func(opts *Options) {
 		opts.PeerAliases = aliases
+	}
+}
+
+// PeerDisabledOption sets the allowlisted keys that are switched off. They stay
+// in the allowlist but hold no route.
+func PeerDisabledOption(disabled []string) Option {
+	return func(opts *Options) {
+		opts.PeerDisabled = disabled
 	}
 }
 
@@ -401,21 +413,22 @@ func RestartRunning() {
 	// Phase 2: start new tunnels with the updated config.
 	for _, p := range pending {
 		newT := createTunnel(tunnels.list[p.index].Type(), Options{
-			ID:          p.opts.ID,
-			Name:        p.opts.Name,
-			Endpoint:    p.opts.Endpoint,
-			Prefix:      p.opts.Prefix,
-			Hostname:    p.opts.Hostname,
-			Username:    p.opts.Username,
-			Password:    p.opts.Password,
-			EnableTLS:   p.opts.EnableTLS,
-			RewriteHost: p.opts.RewriteHost,
-			FileUpload:  p.opts.FileUpload,
-			RecordMode:  p.opts.RecordMode,
-			Peers:       p.opts.Peers,
-			PeerAliases: p.opts.PeerAliases,
-			Protocol:    p.opts.Protocol,
-			CreatedAt:   p.opts.CreatedAt,
+			ID:           p.opts.ID,
+			Name:         p.opts.Name,
+			Endpoint:     p.opts.Endpoint,
+			Prefix:       p.opts.Prefix,
+			Hostname:     p.opts.Hostname,
+			Username:     p.opts.Username,
+			Password:     p.opts.Password,
+			EnableTLS:    p.opts.EnableTLS,
+			RewriteHost:  p.opts.RewriteHost,
+			FileUpload:   p.opts.FileUpload,
+			RecordMode:   p.opts.RecordMode,
+			Peers:        p.opts.Peers,
+			PeerAliases:  p.opts.PeerAliases,
+			PeerDisabled: p.opts.PeerDisabled,
+			Protocol:     p.opts.Protocol,
+			CreatedAt:    p.opts.CreatedAt,
 		})
 		if newT == nil {
 			continue
@@ -502,6 +515,7 @@ func LoadConfig() {
 			Protocol:      cfg.Protocol,
 			Peers:         cfg.Peers,
 			PeerAliases:   NormalizePeerAliases(cfg.Peers, cfg.PeerAliases),
+			PeerDisabled:  NormalizePeerDisabled(cfg.Peers, cfg.PeerDisabled),
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -551,6 +565,7 @@ func SaveConfig() error {
 			Protocol:      opts.Protocol,
 			Peers:         opts.Peers,
 			PeerAliases:   opts.PeerAliases,
+			PeerDisabled:  opts.PeerDisabled,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -584,6 +599,7 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		RecordModeOption(opts.RecordMode),
 		PeersOption(opts.Peers...),
 		PeerAliasesOption(opts.PeerAliases),
+		PeerDisabledOption(opts.PeerDisabled),
 	}
 
 	switch st {

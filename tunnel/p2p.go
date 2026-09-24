@@ -39,9 +39,10 @@ var (
 )
 
 // PeerSetter is implemented by a tunnel whose inbound allowlist can change
-// without a restart.
+// without a restart. disabled names the allowlisted keys that are switched off:
+// they keep their place in the list but are given no route.
 type PeerSetter interface {
-	SetPeers(peers []string, aliases map[string]string) error
+	SetPeers(peers []string, aliases map[string]string, disabled []string) error
 }
 
 // p2pTunnel exposes a local service to peers over the process-wide p2p host:
@@ -253,7 +254,9 @@ func (s *p2pTunnel) Run() (err error) {
 	if _, err = p2pHost.acquire(); err != nil {
 		return
 	}
-	ln, err := p2pHost.register(s.opts.Peers)
+	// A disabled peer keeps its place in the allowlist but gets no route.
+	enabled := enabledPeers(s.opts.Peers, s.opts.PeerDisabled)
+	ln, err := p2pHost.register(enabled)
 	if err != nil {
 		p2pHost.release()
 		return
@@ -272,7 +275,7 @@ func (s *p2pTunnel) Run() (err error) {
 	// only once a peer dials in — which, for the reverse direction, may be
 	// never until traffic.
 	if err == nil {
-		p2pHost.warmPeers(s.opts.Peers)
+		p2pHost.warmPeers(enabled)
 	}
 
 	// Stats carry over across a restart, like the other tunnel types.
@@ -351,6 +354,52 @@ func NormalizePeerAliases(peers []string, known map[string]string) map[string]st
 		used[a] = true
 	}
 	return aliases
+}
+
+// NormalizePeerDisabled keeps only the disabled keys that are still listed, so
+// a key removed from the allowlist cannot linger in the config as a disabled
+// entry (and come back switched off if it is added again). Nil when nothing is
+// disabled.
+func NormalizePeerDisabled(peers []string, disabled []string) []string {
+	if len(peers) == 0 || len(disabled) == 0 {
+		return nil
+	}
+	listed := make(map[string]bool, len(peers))
+	for _, p := range peers {
+		listed[p] = true
+	}
+	out := make([]string, 0, len(disabled))
+	seen := make(map[string]bool, len(disabled))
+	for _, p := range disabled {
+		if listed[p] && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// enabledPeers is the allowlist with the disabled keys taken out: the set that
+// gets routes and warming. A disabled peer stays in the config and on the peers
+// page — it is the list the routes are built from that it leaves.
+func enabledPeers(peers []string, disabled []string) []string {
+	if len(disabled) == 0 {
+		return peers
+	}
+	off := make(map[string]bool, len(disabled))
+	for _, p := range disabled {
+		off[p] = true
+	}
+	out := make([]string, 0, len(peers))
+	for _, p := range peers {
+		if !off[p] {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // peerAliasAlphabet keeps aliases typeable: lowercase letters and digits.
@@ -484,8 +533,10 @@ func rate(current, previous uint64, d time.Duration) uint64 {
 // routes are reconciled (all-or-nothing) and the tunnel's options are swapped,
 // so the service and its listener keep running and a live peer stream is not
 // cut. The allowlist gates NEW streams: a removed peer's established streams
-// run until they end on their own, and its counters leave the list.
-func (s *p2pTunnel) SetPeers(peers []string, aliases map[string]string) error {
+// run until they end on their own, and its counters leave the list. A disabled
+// peer is the same thing with its place in the list kept — no route, no
+// warming, still on the peers page, so it can be switched back on.
+func (s *p2pTunnel) SetPeers(peers []string, aliases map[string]string, disabled []string) error {
 	if s.IsClosed() {
 		return ErrTunnelClosed
 	}
@@ -498,18 +549,21 @@ func (s *p2pTunnel) SetPeers(peers []string, aliases map[string]string) error {
 	}
 
 	normalized := NormalizePeerAliases(peers, aliases)
-	if err := p2pHost.reconcile(pl, peers); err != nil {
+	off := NormalizePeerDisabled(peers, disabled)
+	enabled := enabledPeers(peers, off)
+	if err := p2pHost.reconcile(pl, enabled); err != nil {
 		return err
 	}
 
 	s.mu.Lock()
 	s.opts.Peers = peers
 	s.opts.PeerAliases = normalized
+	s.opts.PeerDisabled = off
 	s.mu.Unlock()
 
 	// A peer added here must get the same head start a peer configured at Run
 	// time does, or its row would stay blank until it happens to dial in.
-	p2pHost.warmPeers(peers)
+	p2pHost.warmPeers(enabled)
 	return nil
 }
 

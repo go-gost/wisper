@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"net"
@@ -448,6 +449,83 @@ func TestNormalizePeerAliases(t *testing.T) {
 	again := NormalizePeerAliases([]string{"k1", "k2", "k3"}, got)
 	if again["k2"] != got["k2"] || again["k3"] != got["k3"] {
 		t.Fatalf("aliases changed on a second pass: %v -> %v", got, again)
+	}
+}
+
+// TestPeerDisabled covers the switched-off allowlist entries: a disabled key
+// keeps its place in the list (so the peers page can show it and switch it back
+// on) but is not part of the set routes and warming are built from.
+func TestPeerDisabled(t *testing.T) {
+	if got := NormalizePeerDisabled(nil, []string{"k1"}); got != nil {
+		t.Errorf("NormalizePeerDisabled(nil peers) = %v, want nil", got)
+	}
+	if got := NormalizePeerDisabled([]string{"k1"}, nil); got != nil {
+		t.Errorf("NormalizePeerDisabled(nil disabled) = %v, want nil", got)
+	}
+	// A key that left the allowlist must not linger as a disabled entry, or
+	// re-adding it would come back switched off.
+	got := NormalizePeerDisabled([]string{"k1", "k2"}, []string{"k2", "k9", "k2"})
+	if len(got) != 1 || got[0] != "k2" {
+		t.Errorf("NormalizePeerDisabled = %v, want [k2] only", got)
+	}
+
+	peers := []string{"k1", "k2", "k3"}
+	if on := enabledPeers(peers, nil); len(on) != 3 {
+		t.Errorf("enabledPeers(no disabled) = %v, want the list untouched", on)
+	}
+	on := enabledPeers(peers, []string{"k2"})
+	if len(on) != 2 || on[0] != "k1" || on[1] != "k3" {
+		t.Errorf("enabledPeers = %v, want [k1 k3]", on)
+	}
+	if on := enabledPeers(peers, []string{"k1", "k2", "k3"}); len(on) != 0 {
+		t.Errorf("enabledPeers(all disabled) = %v, want empty", on)
+	}
+}
+
+// TestSaveConfigKeepsPeers: a p2p tunnel's allowlist, its aliases and its
+// switches must survive the round trip through wisper.yaml — reloaded without
+// them, the tunnel comes back unreachable, nameless, or with a peer switched
+// back on.
+func TestSaveConfigKeepsPeers(t *testing.T) {
+	t.Chdir(t.TempDir()) // SaveConfig writes ./wisper.yaml when no config dir is set
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	tun := NewP2PTunnel(
+		IDOption("tun-save"),
+		NameOption("Private"),
+		EndpointOption("127.0.0.1:9"),
+		PeersOption("k1", "k2"),
+		PeerAliasesOption(map[string]string{"k1": "laptop"}),
+		PeerDisabledOption([]string{"k2"}),
+	)
+	tun.Close() // no services, no host: this test is about the file
+	Add(tun)
+	defer Delete("tun-save")
+
+	if err := SaveConfig(); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+
+	saved := cfg.Get().Tunnels
+	if len(saved) != 1 {
+		t.Fatalf("saved %d tunnels, want 1", len(saved))
+	}
+	if len(saved[0].Peers) != 2 || len(saved[0].PeerDisabled) != 1 || saved[0].PeerDisabled[0] != "k2" {
+		t.Errorf("persisted peers/disabled = %v/%v, want [k1 k2]/[k2]",
+			saved[0].Peers, saved[0].PeerDisabled)
+	}
+	if saved[0].PeerAliases["k1"] != "laptop" {
+		t.Errorf("persisted aliases = %v, want k1=laptop", saved[0].PeerAliases)
+	}
+
+	// The yaml key is the other half of the round trip: a reload reads the file.
+	raw, err := os.ReadFile("wisper.yaml")
+	if err != nil {
+		t.Fatalf("read back the config: %v", err)
+	}
+	if !bytes.Contains(raw, []byte("peer_disabled:")) {
+		t.Errorf("wisper.yaml carries no peer_disabled key:\n%s", raw)
 	}
 }
 

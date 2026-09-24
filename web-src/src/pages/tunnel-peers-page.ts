@@ -13,6 +13,8 @@ import '../components/app-scaffold';
 interface PeerRow {
   key: string;
   alias: string;
+  /** Switched off: kept on the list, given no route. */
+  disabled: boolean;
 }
 
 /**
@@ -31,7 +33,11 @@ function validPeerKey(k: string): boolean {
 }
 
 function rowsOf(t2: Tunnel | null): PeerRow[] {
-  return (t2?.options.peers ?? []).map((p: Peer) => ({ key: p.key, alias: p.alias ?? '' }));
+  return (t2?.options.peers ?? []).map((p: Peer) => ({
+    key: p.key,
+    alias: p.alias ?? '',
+    disabled: p.disabled === true,
+  }));
 }
 
 /**
@@ -52,7 +58,7 @@ export class TunnelPeersPage extends LitElement {
   /** Index of the row being edited, or 'new' for the draft row. */
   @state() private _editing: number | 'new' | null = null;
   /** The row's edit buffer. */
-  @state() private _draft: PeerRow = { key: '', alias: '' };
+  @state() private _draft: PeerRow = { key: '', alias: '', disabled: false };
   @state() private _saving = false;
   @state() private _rowError = '';
   @state() private _confirmDelete: number | null = null;
@@ -90,7 +96,7 @@ export class TunnelPeersPage extends LitElement {
 
   private _startAdd() {
     this._editing = 'new';
-    this._draft = { key: '', alias: '' };
+    this._draft = { key: '', alias: '', disabled: false };
     this._rowError = '';
   }
 
@@ -99,9 +105,22 @@ export class TunnelPeersPage extends LitElement {
     this._rowError = '';
   }
 
+  /** _toggleRow switches a peer off or back on and saves. Off keeps the row
+   *  (and its key) in place and only takes its route away, so it can be
+   *  switched back on without retyping the key. */
+  private _toggleRow = async (i: number) => {
+    const next = this._rows.map((r, j) => (j === i ? { ...r, disabled: !r.disabled } : r));
+    await this._save(next);
+  };
+
   /** _saveRow persists the draft (replacing or appending) and re-reads the list. */
   private _saveRow = async () => {
-    const draft = { key: this._draft.key.trim(), alias: this._draft.alias.trim() };
+    const draft = {
+      key: this._draft.key.trim(),
+      alias: this._draft.alias.trim(),
+      // The editor does not touch the switch; an edited row keeps its state.
+      disabled: this._draft.disabled === true,
+    };
     if (!validPeerKey(draft.key)) {
       this._rowError = t('peersKeyInvalid');
       return;
@@ -135,7 +154,7 @@ export class TunnelPeersPage extends LitElement {
     try {
       const t2 = await updatePeers(
         this.tunnelId,
-        rows.map(r => ({ key: r.key, alias: r.alias || undefined })),
+        rows.map(r => ({ key: r.key, alias: r.alias || undefined, disabled: r.disabled || undefined })),
       );
       this._tunnel = t2;
       this._rows = rowsOf(t2);
@@ -244,11 +263,18 @@ export class TunnelPeersPage extends LitElement {
                 ${this._rows.map((row, i) => {
                   if (this._editing === i) return this._renderEditor();
                   return html`
-                    <div class="peer-row">
+                    <div class="peer-row ${row.disabled ? 'off' : ''}">
                       <div class="row-line">
                         <span class="peer-alias">${row.alias || t('peersNoAlias')}</span>
-                        ${this._renderTransport(row.key)}
+                        ${row.disabled
+                          ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
+                          : this._renderTransport(row.key)}
                         <span class="row-actions">
+                          <button class="icon-btn" title="${row.disabled ? t('peersEnable') : t('peersDisable')}"
+                            ?disabled=${this._saving}
+                            @click=${() => this._toggleRow(i)}>
+                            ${icon(row.disabled ? 'play' : 'stop')}
+                          </button>
                           <button class="icon-btn" title="${t('btnCopy')}" @click=${() => copyToClipboard(row.key)}>
                             ${icon('copy')}
                           </button>
@@ -406,6 +432,13 @@ export class TunnelPeersPage extends LitElement {
     }
     .peer-badge.warn {
       color: var(--amber);
+    }
+    /* A switched-off peer keeps its place and its key, but nothing about it is
+       live: the row reads dimmed. */
+    .peer-row.off .peer-alias,
+    .peer-row.off .peer-key,
+    .peer-row.off .peer-stats {
+      opacity: 0.5;
     }
     .row-actions {
       display: flex;

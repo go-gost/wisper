@@ -243,8 +243,9 @@ per-entrypoint key）。API 语义：响应里 `endpoint` = 对端 pubkey、`ent
 
 **API 与 UI**：隧道 create/update 请求与响应都带 `peers`（`[]Peer`，响应来自
 `Options.Peers`）；`GET /api/p2p` → `{"public_key", "running"}` + 直连/中继统计（见「直连
-打洞」）；`PUT /api/tunnels/{id}/peers` 只改白名单。白名单有独立的「允许的对端」页（详情页进入）：
-默认只读、公钥按字符掩码显示（顶栏眼睛图标整页揭示），一次编辑一行，删除需确认；未配置时显示
+打洞」）；`PUT /api/tunnels/{id}/peers` 只改白名单（含每项的 `disabled`）。白名单有独立的
+「允许的对端」页（详情页进入）：默认只读、公钥按字符掩码显示（顶栏眼睛图标整页揭示），一次
+编辑一行，删除需确认；每行一个停止/播放按钮切换启用状态（见「对端开关」）；未配置时显示
 "没有入站流量能到达"的提示。设置页身份区以 `running` 区分"空闲（已持有身份）"与"运行中
 （显示 key）"。
 
@@ -253,6 +254,21 @@ per-entrypoint key）。API 语义：响应里 `endpoint` = 对端 pubkey、`ent
 `peerListener` 继续服务，因此在线的对端流不断；被移除的对端不再接入**新**流，其计数器随行消失
 （key 再次加入从零开始）。`PeerSetter` 是这个能力的接口；`unregister` 改为按 listener 身份
 注销（不再按 key 列表比对），因此陈旧注销不会误删他人路由。
+
+**对端开关（2026-09-23）**：白名单里的 key 可以**单独禁用**。禁用不是移除：key 仍留在
+`Peers`（和对端页）里，只是不再持有路由、也不预热——它的新流被关闭、已建立的流自然结束，
+重新启用不需要重新输入公钥。落点：`config.Tunnel.PeerDisabled` / `Options.PeerDisabled`；
+`NormalizePeerDisabled` 只保留仍在白名单里的 key（从白名单移除的 key 不会以禁用状态残留，
+再次加入时是启用的），`enabledPeers` 产出真正建路由与预热的那份列表——
+`register`/`reconcile`/`warmPeers` 一律用启用集合，`Peers` 保持完整（对端页与 `peer_stats`
+仍按完整白名单出行）。API：`peers` 每项带 `disabled`（create 与 `PUT /api/tunnels/{id}/peers`
+都接受），响应 `omitempty` 省略 `false`。UI：行上的停止/播放按钮就地切换（走同一条 `PUT`，
+仍不重建隧道），禁用行显示「已禁用」徽标、整行压暗，transport 徽标让位给状态徽标。
+**验证**：`tunnel/p2p_test.go` 的 `TestPeerDisabled`（规范化与启用集合）与
+`TestSaveConfigKeepsPeers`（白名单/别名/开关经 `wisper.yaml` 往返，含 yaml 键）、
+`api/api_test.go` 的 `TestPeerAliasesFlow`（响应带 `disabled`）与
+`TestUpdateP2PTunnelPeers`（禁用段：两个 key 都留在列表、只有被禁的那个带标记、
+`Options().PeerDisabled` 落到隧道对象）。
 
 **验证**：`tunnel/p2p_test.go`（空白名单运行、生命周期、白名单 1/N 条、跨隧道重复 key、
 TLS 配置/默认 relay，无网络）、
@@ -264,7 +280,8 @@ reconcile 的增删/计数器清理/冲突整拒）与
 `TMPDIR=/config/tmp go test -tags p2ppoc -run TestP2PTunnel -v ./tunnel/`）；API 级
 （`api/api_test.go` 的 `TestUpdateP2PTunnelPeers` 断言保存前后隧道对象同一，即未重建）；curl
 已验证 create/list/delete + `/api/p2p` 身份与 `running` 往返 + `peers` 回显 + `host.key`
-0600；**浏览器内的 UI 视觉与交互尚未人工过一遍**（按行编辑/掩码与揭示/删除确认/设置页空闲态）。
+0600；**浏览器内的 UI 视觉与交互尚未人工过一遍**（按行编辑/掩码与揭示/删除确认/对端开关/
+设置页空闲态）。
 
 ## 实施注意
 

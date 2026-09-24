@@ -51,6 +51,9 @@ export interface ItemStats {
 export interface Peer {
   key: string;
   alias?: string;
+  /** Switched off: the peer keeps its place on the list but gets no route, so
+   *  its new streams are closed while established ones drain. */
+  disabled?: boolean;
 }
 
 export interface TunnelOptions {

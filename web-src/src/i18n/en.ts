@@ -161,6 +161,11 @@ const en: Record<string, string> = {
     'Only these keys reach the tunnel; the key is a credential, so treat it like a password.',
   peersRestartHint:
     'Saving applies at once: live peer connections keep running, and a peer you remove stops reaching the tunnel.',
+  peersDisable: 'Disable (stays on the list, takes no new connections)',
+  peersEnable: 'Enable',
+  peersDisabled: 'Disabled',
+  peersDisabledHint:
+    'Disabled: the key stays on the list but takes no new connections; established ones drain.',
   peersNoneHint: 'No peers configured: this tunnel is running but unreachable.',
   notFound: 'Not found.',
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (the inner protocol is plaintext).',
