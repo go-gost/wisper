@@ -1,0 +1,21 @@
+# Context for android/Dockerfile.apk (BuildKit prefers <dockerfile>.dockerignore
+# over the root one, which drops android/ and web/ — this build needs both).
+.git/
+.gitignore
+.gitattributes
+
+# Rebuilt in the node stage; the tracked copy is for the Go-only images.
+web/
+web-src/node_modules/
+
+# Not part of the APK build
+src-tauri/
+dist/
+.github/
+extension/
+
+# Build outputs
+android/app/build/
+android/.gradle/
+android/app/src/main/jniLibs/
+**/*.apk

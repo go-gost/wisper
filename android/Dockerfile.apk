@@ -1,0 +1,53 @@
+# Builds the Android APK from this repo with nothing but docker on the host: the
+# web UI is built in a node stage, libwisper.so and the APK in the toolchain
+# image (android/Dockerfile.android, or the prebuilt one `make android` pulls).
+#
+#   docker build -f android/Dockerfile.apk --target apk --output type=local,dest=dist .
+#   → dist/app-debug.apk
+#
+# TOOLCHAIN must provide Go, the Android SDK 34 / NDK 27 and Gradle.
+ARG TOOLCHAIN=wisper-android:latest
+
+# --- web UI: same command the host used to run (vite writes ../web) ----------
+FROM node:22 AS web
+WORKDIR /src
+COPY web-src/package.json web-src/package-lock.json ./
+RUN npm ci
+COPY web-src/ ./
+RUN npx vite build
+
+# --- native library + APK ----------------------------------------------------
+FROM ${TOOLCHAIN} AS build
+WORKDIR /wisper
+COPY . .
+# The binary embeds web/ via //go:embed: take the fresh build, so a stale
+# committed web/ can never end up inside libwisper.so.
+COPY --from=web /web /wisper/web
+
+RUN --mount=type=cache,target=/root/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/root/.gradle \
+    set -e; \
+    NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"; \
+    echo "--- JNI bridge into the package root (cgo compiles it there) ---"; \
+    cp android/lib_jni.c .; \
+    mkdir -p android/app/src/main/jniLibs/arm64-v8a android/app/src/main/jniLibs/x86_64; \
+    echo "--- libwisper.so (arm64-v8a) ---"; \
+    CC="$NDK_BIN/aarch64-linux-android24-clang" \
+    CXX="$NDK_BIN/aarch64-linux-android24-clang++" \
+    CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
+      go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+        -o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
+    echo "--- libwisper.so (x86_64) ---"; \
+    CC="$NDK_BIN/x86_64-linux-android24-clang" \
+    CXX="$NDK_BIN/x86_64-linux-android24-clang++" \
+    CGO_ENABLED=1 GOOS=android GOARCH=amd64 \
+      go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+        -o android/app/src/main/jniLibs/x86_64/libwisper.so .; \
+    rm -f lib_jni.c; \
+    echo "--- APK ---"; \
+    cd android && gradle assembleDebug --no-daemon
+
+# --- the build output: the APK, and nothing else -----------------------------
+FROM scratch AS apk
+COPY --from=build /wisper/android/app/build/outputs/apk/debug/app-debug.apk /

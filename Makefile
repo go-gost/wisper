@@ -296,58 +296,37 @@ macos-installer: web macos-sidecar
 # ----- Cross-platform Go binaries (no Tauri shell) -----
 
 # ----- Android APK (Docker build) -----
-# Builds libwisper.so via NDK cross-compile + APK via Gradle, all inside a
-# Docker container (host needs no Android toolchain).
+# One `docker build` produces the APK: the web UI in a node stage, then
+# libwisper.so (NDK cross-compile) and the APK (Gradle) in the toolchain image.
+# The host needs docker and nothing else — no Node, no Go, no Android SDK.
 #
-# Prerequisites: Docker, Go 1.26+ on host (for `make web`).
+# The toolchain image is prebuilt and pulled from $(ANDROID_IMAGE); it is the
+# slow part (~1 GB of SDK/NDK/Gradle downloads), so it is not rebuilt per build.
+# When the registry is out of reach it falls back to android/Dockerfile.android.
 #
-# Wisper is mounted as /wisper; module resolution uses go.mod alone (no go.work).
-# The x module comes from the module cache as a versioned dependency (v0.11.0).
-#
-# Artifacts: android/app/build/outputs/apk/debug/app-debug.apk
+# Artifacts: $(ANDROID_OUT)/app-debug.apk
+# (`android-release` still builds the web UI on the host; it is CI's path.)
 
-ANDROID_IMAGE := wisper-android
+ANDROID_IMAGE ?= docker-registry.home.pi/wisper-android:latest
+ANDROID_OUT ?= dist/android
+
+.PHONY: android-image
+android-image:
+	@docker pull $(ANDROID_IMAGE) 2>/dev/null \
+		|| { echo "==> $(ANDROID_IMAGE) not available, building the toolchain image locally (slow)..."; \
+		     DOCKER_BUILDKIT=1 docker build -t $(ANDROID_IMAGE) -f android/Dockerfile.android android/; }
 
 .PHONY: android
-android: web
-	@echo "==> Building Docker image $(ANDROID_IMAGE)..."
-	DOCKER_BUILDKIT=1 docker build -t $(ANDROID_IMAGE) -f android/Dockerfile.android android/
-	@echo "==> Cross-compiling libwisper.so (arm64 + x86_64) + assembling APK..."
-	@mkdir -p android/app/src/main/jniLibs/arm64-v8a
-	@mkdir -p android/app/src/main/jniLibs/x86_64
-	docker run --rm \
-		-v "$(PWD):/wisper" \
-		-v "$$(go env GOMODCACHE):/root/go/pkg/mod" \
-		-v "$$(go env GOCACHE):/root/.cache/go-build" \
-		-w /wisper \
-		$(ANDROID_IMAGE) sh -c '\
-		set -e; \
-		NDK_BIN="$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"; \
-		echo "--- Copying JNI bridge into package root ---"; \
-		cp android/lib_jni.c .; \
-		echo "--- Cross-compiling libwisper.so (arm64-v8a) ---"; \
-		export CC="$$NDK_BIN/aarch64-linux-android24-clang"; \
-		export CXX="$$NDK_BIN/aarch64-linux-android24-clang++"; \
-		export CGO_ENABLED=1; \
-		export GOOS=android; \
-		export GOARCH=arm64; \
-		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
-			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
-		echo "--- libwisper.so (arm64): $$(wc -c < android/app/src/main/jniLibs/arm64-v8a/libwisper.so) bytes ---"; \
-		echo "--- Cross-compiling libwisper.so (x86_64) ---"; \
-		export CC="$$NDK_BIN/x86_64-linux-android24-clang"; \
-		export CXX="$$NDK_BIN/x86_64-linux-android24-clang++"; \
-		export GOARCH=amd64; \
-		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
-			-o android/app/src/main/jniLibs/x86_64/libwisper.so .; \
-		echo "--- libwisper.so (x86_64): $$(wc -c < android/app/src/main/jniLibs/x86_64/libwisper.so) bytes ---"; \
-		rm -f lib_jni.c; \
-		echo "--- Assembling APK with Gradle ---"; \
-		cd android; \
-		gradle assembleDebug --no-daemon; \
-		'
+android: android-image
+	@echo "==> Building the APK in Docker (web UI + libwisper.so + Gradle)..."
+	DOCKER_BUILDKIT=1 docker build \
+		-f android/Dockerfile.apk \
+		--build-arg TOOLCHAIN=$(ANDROID_IMAGE) \
+		--target apk \
+		--output type=local,dest=$(ANDROID_OUT) \
+		.
 	@echo "==> APK ready:"
-	@ls -lh android/app/build/outputs/apk/debug/*.apk 2>/dev/null || echo "  (no .apk found — check container logs)"
+	@ls -lh $(ANDROID_OUT)/*.apk
 
 # Same as `android` but builds a signed release APK. Requires a one-time
 # release keystore + keystore.properties (both gitignored):

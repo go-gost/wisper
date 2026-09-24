@@ -1,4 +1,4 @@
-# Docker image with Go 1.26, Android SDK 34, NDK 27, and Gradle 8.5.
+# Docker image with Go 1.27, Android SDK 34, NDK 27, and Gradle 8.5.
 # Build:  docker build -t wisper-android -f android/Dockerfile.android android/
 
 FROM ubuntu:24.04
@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
-# Go 1.26.4
-RUN curl -fsSL https://go.dev/dl/go1.26.4.linux-amd64.tar.gz | tar -C /usr/local -xz
+# Go 1.27.1
+RUN curl -fsSL https://go.dev/dl/go1.27.1.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH="/usr/local/go/bin:$PATH"
 
 # Gradle 8.5

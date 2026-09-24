@@ -243,13 +243,24 @@ make tauri-dev               # hot-reload frontend + sidecar
 make icons                   # requires Python 3 + Pillow
 ```
 
-Android APK is built via Docker + NDK cross-compile: `make android` / `make android-release`.
+`make android` builds the APK with docker alone — one `docker build` (multi-stage: `node:22` builds
+the web UI, the toolchain image builds `libwisper.so` via the NDK and the APK via Gradle, a
+`scratch` stage hands back just the APK) → `dist/android/app-debug.apk`. The host needs no Node, Go
+or Android SDK; `ANDROID_IMAGE` (default `docker-registry.home.pi/wisper-android:latest`) and
+`ANDROID_OUT` override the toolchain image and the output directory. The toolchain image is prebuilt
+and pulled; when the registry is unreachable `make android-image` builds it from
+`android/Dockerfile.android` instead. `make android-release` (signed, CI's path) still builds the
+web UI on the host.
+
 The Android service (`android/app/src/main/java/run/gost/wisper/WisperService.kt`) is a
 `VpnService`: an unprivileged app cannot open `/dev/net/tun`, so a tun entrypoint's device is
 created there and its fd handed to Go (`WisperJNI.setTunFd` → `tunnel.SetTunFD` → the listener's
 `fd` metadata). The 2s stats poll doubles as the VPN driver — it establishes the VPN once a tun
 entrypoint exists, or posts a permission nudge when consent is missing. One VPN, so one tun
 entrypoint.
+
+The app process has neither `$XDG_CONFIG_HOME` nor `$HOME`: every path it derives must come from the
+config directory the app passes to `config.Init` (`config.Dir()`), not from `os.UserConfigDir()`.
 
 The sidecar binary name is `wisper-api` (must differ from the Cargo package name `wisper`). All API calls use relative paths, no Node.js-specific APIs, optional `baseUrl` on GoBackend for non-embedded scenarios, CSS custom properties for theming everywhere.
 
