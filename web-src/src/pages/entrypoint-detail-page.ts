@@ -440,6 +440,13 @@ export class EntrypointDetailPage extends LitElement {
     .info-value.text {
       font-family: inherit; font-size: var(--font-md);
     }
+    /* A hidden key stays one line however long it is (a masked key is as long as
+       the key, which is three lines on a phone); revealed, it wraps in full.
+       min-width:0 is what lets the flex item shrink enough to ellipsize. */
+    .info-value.masked {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      min-width: 0;
+    }
     .info-value.uuid {
       font-size: var(--font-sm);
     }
@@ -755,7 +762,7 @@ export class EntrypointDetailPage extends LitElement {
                       : ''}
                     <div class="info-row">
                       <span class="info-label">${t('entrypointPeerKey')}</span>
-                      <span class="info-value">${this._showPeer ? peer : maskKey(peer)}</span>
+                      <span class="info-value ${this._showPeer ? '' : 'masked'}">${this._showPeer ? peer : maskKey(peer)}</span>
                       ${peer
                         ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(peer)}>
                           ${icon('copy')}
@@ -777,7 +784,7 @@ export class EntrypointDetailPage extends LitElement {
                   ? html`
                     <div class="info-row">
                       <span class="info-label">${t('entrypointPeerKey')}</span>
-                      <span class="info-value">${this._showPeer ? peer : maskKey(peer)}</span>
+                      <span class="info-value ${this._showPeer ? '' : 'masked'}">${this._showPeer ? peer : maskKey(peer)}</span>
                       ${peer
                         ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(peer)}>
                           ${icon('copy')}
