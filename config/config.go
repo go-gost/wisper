@@ -47,6 +47,33 @@ func WithConfigDir(dir string) Option {
 	}
 }
 
+// Dir returns the configuration directory: the one Init() was given — on
+// Android the app's files directory, since there is neither $XDG_CONFIG_HOME nor
+// $HOME — or the resolved default when Init() has not run.
+func Dir() string {
+	if configDir != "" {
+		return configDir
+	}
+	return resolveConfigDir("")
+}
+
+// resolveConfigDir picks the configuration directory: an explicit one wins,
+// otherwise $XDG_CONFIG_HOME (or $HOME)/wisper, falling back to the working
+// directory when the environment defines neither.
+func resolveConfigDir(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		slog.Error(fmt.Sprintf("configDir: %v", err))
+	}
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+	return filepath.Join(dir, "wisper")
+}
+
 // Init initializes the configuration directory and loads config.
 func Init(opts ...Option) {
 	o := &options{}
@@ -56,18 +83,7 @@ func Init(opts ...Option) {
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true})))
 
-	if o.configDir != "" {
-		configDir = o.configDir
-	} else {
-		dir, err := os.UserConfigDir()
-		if err != nil {
-			slog.Error(fmt.Sprintf("configDir: %v", err))
-		}
-		if dir == "" {
-			dir, _ = os.Getwd()
-		}
-		configDir = filepath.Join(dir, "wisper")
-	}
+	configDir = resolveConfigDir(o.configDir)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		slog.Error(fmt.Sprintf("mkdir config dir: %v", err))
 	}

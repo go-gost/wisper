@@ -158,26 +158,17 @@ func p2pLog() logger.Logger {
 	return xlogger.NewLogger(xlogger.OutputOption(io.Discard))
 }
 
-// P2PKeyPath is the legacy per-tunnel key file:
-// <UserConfigDir>/wisper/p2p/<id>.key (hex, 0600). The p2p identity is
-// process-wide now (P2PHostKeyPath); this only locates files left by older
-// versions so they can be cleaned up.
-func P2PKeyPath(id string) (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "wisper", "p2p", id+".key"), nil
+// P2PKeyPath is the legacy per-tunnel key file: <config dir>/p2p/<id>.key (hex,
+// 0600). The p2p identity is process-wide now (P2PHostKeyPath); this only
+// locates files left by older versions so they can be cleaned up.
+func P2PKeyPath(id string) string {
+	return filepath.Join(cfg.Dir(), "p2p", id+".key")
 }
 
 // RemoveP2PKey deletes a legacy per-tunnel key file; called by the API's
 // delete handlers so files left by older versions do not pile up.
 func RemoveP2PKey(id string) error {
-	path, err := P2PKeyPath(id)
-	if err != nil {
-		return err
-	}
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(P2PKeyPath(id)); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil

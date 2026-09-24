@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -28,15 +27,13 @@ import (
 // dropped (the transport is lossy by design).
 var p2pBacklog = 64
 
-// P2PHostKeyPath is the process-wide p2p identity: <config>/wisper/p2p/host.key
+// P2PHostKeyPath is the process-wide p2p identity: <config dir>/p2p/host.key
 // (0600, created on first use). One host, one identity, shared by every p2p
-// tunnel and entrypoint.
-func P2PHostKeyPath() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "wisper", "p2p", "host.key"), nil
+// tunnel and entrypoint. It hangs off the app's config directory rather than
+// $XDG_CONFIG_HOME: Android defines neither that nor $HOME, and the desktop
+// default config directory already is $XDG_CONFIG_HOME/wisper.
+func P2PHostKeyPath() string {
+	return filepath.Join(cfg.Dir(), "p2p", "host.key")
 }
 
 // p2pHostManager owns the process-wide host: refcounted lifetime, the inbound
@@ -134,13 +131,9 @@ func (m *p2pHostManager) ensurePublicKey() (string, error) {
 	if m.host != nil {
 		return m.host.PublicKey(), nil
 	}
-	keyPath, err := P2PHostKeyPath()
-	if err != nil {
-		return "", err
-	}
 	host, err := endpoint.New(&p2p.Config{
 		Derp: P2PDerpURL(cfg.Get().Settings),
-		Key:  keyPath,
+		Key:  P2PHostKeyPath(),
 	})
 	if err != nil {
 		return "", fmt.Errorf("p2p identity: %w", err)
@@ -157,15 +150,11 @@ func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.host == nil {
-		keyPath, err := P2PHostKeyPath()
-		if err != nil {
-			return nil, err
-		}
 		settings := cfg.Get().Settings
 		direct := P2PDirect(settings)
 		conf := &p2p.Config{
 			Derp:   P2PDerpURL(settings),
-			Key:    keyPath,
+			Key:    P2PHostKeyPath(),
 			Stun:   p2pHostStun(settings),
 			Direct: &direct,
 		}

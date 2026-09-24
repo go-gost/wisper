@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -178,7 +177,7 @@ func TestP2PTunnelLifecycle(t *testing.T) {
 	}
 
 	// The identity is process-wide: <config>/wisper/p2p/host.key, 0600.
-	keyPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "wisper", "p2p", "host.key")
+	keyPath := P2PHostKeyPath()
 	fi, err := os.Stat(keyPath)
 	if err != nil {
 		t.Fatalf("host.key: %v", err)

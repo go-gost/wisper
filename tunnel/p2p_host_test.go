@@ -288,7 +288,7 @@ func TestEnsureP2PIdentity(t *testing.T) {
 		t.Fatalf("EnsureP2PIdentity started the host: host %v refs %d", p2pHost.host, p2pHost.refs)
 	}
 
-	keyPath := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "wisper", "p2p", "host.key")
+	keyPath := P2PHostKeyPath()
 	fi, err := os.Stat(keyPath)
 	if err != nil {
 		t.Fatalf("host.key: %v", err)
@@ -413,5 +413,22 @@ func TestPeerListenerDeliversDatagramConn(t *testing.T) {
 	}
 	if got := pStats.Get(stats.KindCurrentConns); got != 0 {
 		t.Fatalf("current conns after close = %d, want 0", got)
+	}
+}
+
+// TestP2PHostKeyPathWithoutHome: Android defines neither $XDG_CONFIG_HOME nor
+// $HOME, which is what os.UserConfigDir() needs — the identity path must still
+// resolve, from wisper's own config directory (the app hands its files dir to
+// config.Init). This is what made creating a tun entrypoint fail on the phone.
+func TestP2PHostKeyPathWithoutHome(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", "")
+
+	got := P2PHostKeyPath()
+	if !filepath.IsAbs(got) {
+		t.Fatalf("P2PHostKeyPath() = %q, want an absolute path with no $HOME/$XDG_CONFIG_HOME", got)
+	}
+	if want := filepath.Join("p2p", "host.key"); !strings.HasSuffix(got, want) {
+		t.Fatalf("P2PHostKeyPath() = %q, want it to end in %q", got, want)
 	}
 }
