@@ -117,6 +117,7 @@ const en: Record<string, string> = {
   favoriteAdded: 'Added to favorites',
   favoriteRemoved: 'Removed from favorites',
   requiredField: 'This field is required',
+  vpnNotReady: 'The VPN did not come up — check the VPN permission and try again.',
   invalidPrefix: 'Invalid prefix: 8-63 lowercase letters, digits or hyphens; cannot start or end with a hyphen',
 
   // Stats interval

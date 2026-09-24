@@ -127,6 +127,43 @@ export class EntrypointDetailPage extends LitElement {
     this._deviceName = ep.options?.device_name ?? '';
     this._routes = ep.options?.routes ?? '';
     this._dns = ep.options?.dns ?? '';
+
+    // An existing tun entrypoint's device may not be up yet (a fresh app
+    // start): arm it now, so editing and saving works.
+    void this._armVpn();
+  }
+
+  /**
+   * Ask the Android app to bring the VPN up for these tun values, and resolve
+   * once its device exists: the entrypoint cannot be created before that, and
+   * only the app can create the device. A no-op elsewhere (desktop, browser) —
+   * there is no bridge, and nothing to arm.
+   */
+  private _armVpn(): Promise<boolean> {
+    const bridge = (window as any).WisperNative;
+    if (this.entrypointType !== 'tun' || !bridge?.armVpn) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      const cb = `__wisperArmVpn_${Date.now()}`;
+      const done = (ok: boolean) => {
+        delete (window as any)[cb];
+        resolve(ok);
+      };
+      (window as any)[cb] = done;
+      try {
+        bridge.armVpn(
+          this._net.trim(),
+          this._routes.trim(),
+          this._mtu || 0,
+          this._dns.trim(),
+          cb,
+        );
+      } catch (e) {
+        console.warn('armVpn failed', e);
+        done(true); // no bridge to wait for: let the save report the real error
+      }
+    });
   }
 
   /** _renderTransport is the peer's path: one word, with the reason on hover. */
@@ -181,6 +218,13 @@ export class EntrypointDetailPage extends LitElement {
   private async _handleSave() {
     if (!this._name.trim()) {
       this._showSnackbar(t('requiredField'));
+      return;
+    }
+
+    // A tun entrypoint's device must exist before it can be created, and only
+    // the app can create it: arm the VPN with these values and wait for it.
+    if (this.entrypointType === 'tun' && !(await this._armVpn())) {
+      this._showSnackbar(t('vpnNotReady'));
       return;
     }
 

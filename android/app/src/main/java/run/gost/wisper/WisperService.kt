@@ -60,6 +60,79 @@ class WisperService : VpnService() {
     @Volatile
     private var vpnEstablished = false
 
+    /**
+     * A tun device config the UI handed over before creating its entrypoint. The
+     * entrypoint cannot be created before its device exists, and the device can
+     * only come from here, so the form arms the VPN with its own values.
+     */
+    @Volatile
+    private var armedOptions: JSONObject? = null
+
+    /** The config the running device was built from, to notice a changed one. */
+    @Volatile
+    private var establishedConfig: String? = null
+
+    // ---------------------------------------------------------------
+    // VPN establishment
+    // ---------------------------------------------------------------
+
+    /**
+     * Remembers the tun device config the UI is about to create, and brings the
+     * VPN up for it. Called from the web UI (through the Activity's bridge)
+     * before it posts a tun entrypoint.
+     */
+    fun armVpn(net: String, routes: String, mtu: Int, dns: String) {
+        armedOptions = JSONObject().apply {
+            put("net", net)
+            put("routes", routes)
+            put("mtu", mtu)
+            put("dns", dns)
+        }
+        kickVpn()
+    }
+
+    /** Runs the VPN step now instead of waiting for the next poll tick. */
+    fun kickVpn() {
+        pollHandler.post { ensureVpn() }
+    }
+
+    /** Whether a device is up — what the UI waits for before creating its entrypoint. */
+    fun vpnReady(): Boolean = vpnEstablished
+
+    /**
+     * Brings the VPN up for the tun device the app is about to use — the armed
+     * config, or an existing tun entrypoint's. A user who has not permitted the
+     * VPN yet gets a nudge notification instead: establishing needs consent,
+     * which only an Activity can ask for.
+     *
+     * Every failure here is logged, never thrown: this runs on the poll thread,
+     * where an uncaught exception takes the whole service (and the backend with
+     * it) down.
+     */
+    private fun ensureVpn() {
+        try {
+            val opts = armedOptions
+                ?: fetchTunEntrypoint()?.optJSONObject("options")
+                ?: return
+
+            if (vpnEstablished) {
+                if (establishedConfig == opts.toString()) return
+                // A changed config needs a new device; the old one goes away
+                // with it, so a running entrypoint has to be started again.
+                Log.i(TAG, "VPN config changed, re-establishing")
+            }
+
+            if (VpnService.prepare(this) != null) {
+                nudgeVpnPermission()
+                return
+            }
+
+            establishVpn(opts)
+        } catch (e: Exception) {
+            Log.w(TAG, "VPN poll failed", e)
+        }
+    }
+
     /** The permission nudge is posted once, not on every poll. */
     private var vpnNudged = false
 
@@ -251,33 +324,6 @@ class WisperService : VpnService() {
     // VPN establishment
     // ---------------------------------------------------------------
 
-    /**
-     * Brings the VPN up as soon as a tun entrypoint exists, since the device
-     * that entrypoint needs can only come from here. A tun entrypoint the user
-     * has not permitted yet gets a nudge notification instead: establishing
-     * needs the user's consent, which only an Activity can ask for.
-     *
-     * Every failure here is logged, never thrown: this runs on the poll thread,
-     * where an uncaught exception takes the whole service (and the backend with
-     * it) down.
-     */
-    private fun ensureVpn() {
-        try {
-            if (vpnEstablished) return
-
-            val ep = fetchTunEntrypoint() ?: return
-
-            if (VpnService.prepare(this) != null) {
-                nudgeVpnPermission()
-                return
-            }
-
-            establishVpn(ep)
-        } catch (e: Exception) {
-            Log.w(TAG, "VPN poll failed", e)
-        }
-    }
-
     /** The first tun entrypoint the backend knows about, running or not. */
     private fun fetchTunEntrypoint(): JSONObject? {
         val body = httpGet("/api/entrypoints") ?: return null
@@ -296,9 +342,7 @@ class WisperService : VpnService() {
      * the Go side must not each keep a copy of the addresses, routes, MTU and
      * DNS — and hands the resulting fd to Go.
      */
-    private fun establishVpn(ep: JSONObject) {
-        val opts = ep.optJSONObject("options") ?: return
-
+    private fun establishVpn(opts: JSONObject) {
         val builder = Builder().setSession(getString(R.string.app_name))
 
         val addresses = cidrs(opts.optString("net"))
@@ -343,7 +387,8 @@ class WisperService : VpnService() {
         // device, so an entrypoint restart keeps working without a new VPN.
         WisperJNI.setTunFd(pfd.detachFd())
         vpnEstablished = true
-        Log.i(TAG, "VPN established for entrypoint ${ep.optString("name")}")
+        establishedConfig = opts.toString()
+        Log.i(TAG, "VPN established for ${opts.optString("net")}")
 
         promoteForegroundForVpn()
     }

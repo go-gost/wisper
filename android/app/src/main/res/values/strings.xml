@@ -7,4 +7,5 @@
     <string name="notification_stop">Stop</string>
     <string name="vpn_permission_title">Allow Wisper’s VPN</string>
     <string name="vpn_permission_text">A tun entrypoint needs a VPN connection on this device. Tap to allow it.</string>
+    <string name="vpn_permission_denied">VPN permission denied — a tun entrypoint needs it.</string>
 </resources>

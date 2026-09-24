@@ -117,6 +117,7 @@ const zh: Record<string, string> = {
   favoriteAdded: '已添加到收藏',
   favoriteRemoved: '已从收藏移除',
   requiredField: '此字段为必填项',
+  vpnNotReady: 'VPN 没能建立——请检查 VPN 授权后重试。',
   invalidPrefix: '前缀无效：需 8-63 个小写字母、数字或连字符，且不能以连字符开头或结尾',
 
   // Stats interval

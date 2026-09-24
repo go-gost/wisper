@@ -9,11 +9,13 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
+import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
@@ -99,6 +101,48 @@ class MainActivity : AppCompatActivity() {
             ).show()
             return uri.toString()
         }
+    }
+
+    // ── VPN consent ────────────────────────────────────────────────────
+    // A tun entrypoint cannot be created before its device exists, and the
+    // device comes from a VpnService — so the form arms the VPN first, and the
+    // consent dialog belongs to an Activity.
+    private val vpnConsentLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                boundService?.kickVpn()
+            } else {
+                // Denied: tell the waiting form at once instead of letting it
+                // time out.
+                pendingArmCallback?.let { webView.evaluateJavascript("$it(false)", null) }
+                pendingArmCallback = null
+                Toast.makeText(this, R.string.vpn_permission_denied, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+    /** The form's JS callback for an in-flight armVpn, if any. */
+    private var pendingArmCallback: String? = null
+
+    /**
+     * Fires the JS callback with whether a device came up, polling briefly: the
+     * consent dialog (when it appears) is the user's own delay.
+     */
+    private fun awaitVpn(callbackId: String) {
+        val deadline = System.currentTimeMillis() + 20_000
+        val tick = object : Runnable {
+            override fun run() {
+                val ready = boundService?.vpnReady() == true
+                if (ready || System.currentTimeMillis() > deadline) {
+                    if (pendingArmCallback == callbackId) {
+                        pendingArmCallback = null
+                    }
+                    webView.evaluateJavascript("$callbackId($ready)", null)
+                    return
+                }
+                webView.postDelayed(this, 300)
+            }
+        }
+        webView.postDelayed(tick, 300)
     }
 
     // ── Views ──────────────────────────────────────────────────────────
@@ -439,6 +483,40 @@ class MainActivity : AppCompatActivity() {
 
     // ── JavaScript Bridge ──────────────────────────────────────────────
     private inner class JsBridge {
+        // Arms the VPN for a tun entrypoint the web UI is about to create: the
+        // device must exist before the entrypoint can, and only this side can
+        // create it. The values are the form's, so Java and Go configure the
+        // same address, routes, MTU and DNS. The callback fires once the device
+        // is up (or gives up), so the UI does not post into a missing device.
+        @android.webkit.JavascriptInterface
+        fun armVpn(net: String, routes: String, mtu: Int, dns: String, callbackId: String) {
+            // The callback name is interpolated into JS, so it must not be able
+            // to carry any: the web UI sends its own identifier.
+            if (!callbackId.matches(Regex("^[A-Za-z0-9_]{1,64}$"))) {
+                Log.w("MainActivity", "armVpn: bad callback id")
+                return
+            }
+            runOnUiThread {
+                val svc = boundService
+                if (svc == null) {
+                    webView.evaluateJavascript("$callbackId(false)", null)
+                    return@runOnUiThread
+                }
+                svc.armVpn(net, routes, mtu, dns)
+
+                pendingArmCallback = callbackId
+                val prepare = VpnService.prepare(this@MainActivity)
+                if (prepare != null) {
+                    try {
+                        vpnConsentLauncher.launch(prepare)
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "VPN consent launch failed", e)
+                    }
+                }
+                awaitVpn(callbackId)
+            }
+        }
+
         @android.webkit.JavascriptInterface
         fun pickDir(callbackId: String) {
             runOnUiThread {
