@@ -70,11 +70,10 @@ export class TunnelPeersPage extends LitElement {
     super.connectedCallback();
     this._load();
     // The stats task refreshes the tunnel each second: re-render for the rows'
-    // live columns.
-    this._unsub = subscribe(() => {
-      const t2 = getTunnels().find(x => x.id === this.tunnelId);
-      if (t2) this._tunnel = t2;
-    });
+    // live columns. Reloading whole rather than patching _tunnel in place also
+    // covers the cold deep link, where the store only arrives after _load ran
+    // and the rows — what this page is for — would otherwise stay empty.
+    this._unsub = subscribe(() => this._load());
   }
 
   disconnectedCallback() {
