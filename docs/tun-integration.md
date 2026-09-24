@@ -5,6 +5,14 @@
 > 把各 spoke 桥到它的 UDP 口（`endpoint` 填 tun server 的地址），**白名单仍是准入**——未列出的 key 在拨号前就被关流。
 > 理由：设备持有者不需要 wisper，因此 hub 上的 wisper 无需特权；hub 类型的实现见提交 `8411554`/`31141c9`，
 > 随后删除（历史里保留）。本文其余部分（含 Android 章节）不受影响。
+>
+> **hub 上连 wisper 也不是必需的**：那条"把 spoke 桥到 tun server UDP 口"的隧道，用 `p2p` CLI 的
+> `--target=udp://<tun server>` 一样能做，正式形态见 `play/p2p-tun-hub/docker-compose.yaml`（hub 上
+> 只有一个 `p2p` 进程 + 一个 gost 进程）。差别只有两点：① **准入**——p2p 的 target 侧**没有白名单**
+> （设计如此，见 `p2p/docs/2026-09-13-p2p-udp-target-streams.md`），必须改由 tun server 的 `auther`
+> 承担（`username` = spoke 的 tun IP、`password` = 该 spoke 的 `token`），或用防火墙/relay 校验；
+> ② 少了 wisper 的 UI/API、peer 状态与 per-peer 统计。想要白名单前置拒绝或那套界面，才用 wisper 的
+> p2p 隧道类型当 hub 桥。
 
 2026-09-24 评估。**结论：可集成，p2p 侧零改动**。前提是 p2p 侧的 tun hub 已改为 gost 侧实现
 （`udp://` target outlet + gost 的 tun **server** 持有设备，p2p 只当管道、零 per-peer 状态，
