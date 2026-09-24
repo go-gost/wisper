@@ -158,6 +158,8 @@ const en: Record<string, string> = {
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
   tunKeepaliveHint:
     'Registers this spoke with the hub\'s tun server and keeps the route alive; on the hub it expires the routes of spokes that left. Off suits only a direct tun-to-tun link.',
+  tunPrivilegeHint:
+    'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating this entrypoint fails with "operation not permitted" otherwise.',
   tunSpokeHint:
     'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
   peersTitle: 'Allowed peers',

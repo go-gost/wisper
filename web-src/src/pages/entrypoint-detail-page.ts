@@ -407,6 +407,10 @@ export class EntrypointDetailPage extends LitElement {
     }
     .copy-btn-mini:hover { background: var(--border-subtle); color: var(--text); }
 
+    .p2p-hint.warn {
+      color: var(--red);
+    }
+
     .p2p-hint {
       font-size: var(--font-xs);
       color: var(--text-muted);
@@ -718,6 +722,7 @@ export class EntrypointDetailPage extends LitElement {
                         </button>`
                         : ''}
                     </div>
+                    ${this._renderTransport(ep.peer_transport)}
                     <div class="info-row">
                       <span class="info-label">${t('switchKeepalive')}</span>
                       <span class="info-value text">${ep.options?.keepalive ? t('statusRunning') : t('statusStopped')}${ep.options?.ttl ? ` · ${ep.options.ttl}s` : ''}</span>
@@ -797,6 +802,17 @@ export class EntrypointDetailPage extends LitElement {
                   <input class="form-input" readonly .value=${typeLabel + ' Entrypoint'}>
                 </div>
 
+                <!-- What a tun entrypoint is and what it needs, before the fields
+                     it implies: the device is the one thing here that can make
+                     the save fail. -->
+                ${this.entrypointType === 'tun'
+                  ? html`
+                    <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
+                    <div class="p2p-hint">${t('tunSpokeHint')}</div>
+                    <div class="p2p-hint">${t('tunKeepaliveHint')}</div>
+                  `
+                  : ''}
+
                 <!-- A p2p or tun entrypoint has no tunnel id to route by. -->
                 ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
                   ? ''
@@ -875,8 +891,6 @@ export class EntrypointDetailPage extends LitElement {
                           <input class="form-input" type="number" .value=${this._ttl ? String(this._ttl) : ''} placeholder="15"
                             @input=${(e: Event) => { this._ttl = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
                         </div>
-                        <div class="p2p-hint">${t('tunKeepaliveHint')}</div>
-                        <div class="p2p-hint">${t('tunSpokeHint')}</div>
                       `
                       : ''}
                     ${this.entrypointType === 'p2p'

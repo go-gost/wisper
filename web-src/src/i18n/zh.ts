@@ -155,6 +155,8 @@ const zh: Record<string, string> = {
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
   tunKeepaliveHint:
     '把本机地址注册到 hub 的 tun server 并维持路由；hub 侧用于让已离开 spoke 的路由过期。仅点对点 tun↔tun 链路适合关闭。',
+  tunPrivilegeHint:
+    'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建会报 “operation not permitted”。',
   tunSpokeHint:
     '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
   peersTitle: '允许的对端',
