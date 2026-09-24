@@ -138,19 +138,18 @@ Android 侧要新增一条 VpnService 通道 + 一处 x 改动。Android 可行�
 
 ### 实现形态（2026-09-24）
 
-- **谁建立 VPN**：`WisperService` 的 2s 轮询（原本只拉 `/api/stats`）顺带拉 `/api/entrypoints`：有 tun 入口点
-  且尚未建立 → `VpnService.prepare(this)` 为 null（已授权）就地 `Builder.establish()` 并把 fd 交给 Go；
-  未授权则发一条通知（`prepare()` 的 Intent 做 PendingIntent），点开授权后下一轮轮询自动建立。
-  **不需要改 Activity、不需要改 Web UI**；emulator 上用 appops 免弹窗时全自动。
+- **谁建立 VPN**：**表单先"预装"**——tun 表单保存前经 `WisperNative.armVpn`（JsBridge，和 `pickDir` 同一套）把 `net/routes/mtu/dns` 交给原生侧，需要授权就由前台 Activity 弹窗，建立好再回调，UI 才提交创建。原因是死锁：创建 tun 入口点需要设备 fd，而 fd 只能来自 VpnService，且**创建失败会回滚**（[api/entrypoint_handler.go](../api/entrypoint_handler.go) 在 `entrypoint.Add` 之前就 500），所以"等入口点存在再建立 VPN"永远等不到。
+  `WisperService` 的 2s 轮询保留为**兜底**：已有 tun 入口点（例如 App 重启后配置里那条）也会建立/重建（配置变了就重建，旧设备随旧 VPN 一起失效）；未授权时发一条提示通知。**不需要改 Go 侧**；emulator 上 `adb shell appops set run.gost.wisper ACTIVATE_VPN allow` 可免弹窗。
 - **两个竞态**：
   ① 恢复运行中的入口点在 backend 起来时就启动，而 VPN 要等轮询（≤2s）→ Go 侧 `WaitTunFD` 等（≤10s），
   正常情况下首次 start 就能成功；需要用户点通知授权的场景超过等待时间，才需要再点一次 start。
   ② `onRevoke()`（被系统/其他 VPN 抢走）→ 清 fd、置未建立，轮询重新建立。
 - **一个 VPN、一个 tun 入口点**：Android 一个 app 只有一个 VpnService，两个 tun 入口点会同时读同一块设备。
   v1 未拦截（UI 也不限制），文档里先记为已知限制。
-- **VPN 的生死跟随「有没有 tun 入口点」，而不是「它跑没跑」**：只要存在一个就建立（否则首次 start 永远
-  等不到设备），于是入口点全部停止时 VPN 也还挂着（系统栏有图标、虚拟网段没有出口）。v1 不在无 tun
-  入口点时主动拆掉，也不在改 net/routes/mtu 后重建（**改了要重启 App 或撤销 VPN 才生效**）。
+- **VPN 的生死跟随「有 tun 入口点 或 表单预装的配置」，而不是「它跑没跑」**：两者有一即可建立（否则首次
+  创建永远等不到设备），于是入口点全部停止时 VPN 也还挂着（系统栏有图标、虚拟网段没有出口）。v1 不在
+  "没人需要"时主动拆掉；改 net/routes/mtu 保存时会按新配置重建（旧设备随旧 VPN 失效，跑着的入口点要
+  重新启动一次）。
 - **不做全流量也顺手防了一个坑**：`Builder.addDisallowedApplication(packageName)` 让本进程自己的套接字
   绕开隧道（等价于给每个 p2p socket 调 `protect()` 的免侵入版），否则一旦有人把 routes 配成 `0.0.0.0/0`，
   承载隧道的 wss/打洞流量会自己绕回 hub。
