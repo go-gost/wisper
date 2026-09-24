@@ -262,6 +262,37 @@ else
   bad "the hub's p2p tunnel counted nothing: $(curl -s "http://$HUB_API/api/tunnels")"
 fi
 
+# The spoke's path to the hub is what the UI badges, so the response has to
+# carry it — a tun entrypoint is a peer link like a p2p one. "disabled" is p2p's
+# wording for the direct path being switched off, which is what this run does.
+transport=$(curl -s "http://$SPOKE_API/api/entrypoints" | sed -n 's/.*"peer_transport":"\([^"]*\)".*/\1/p')
+if [ -n "$transport" ]; then
+  ok "the spoke reports its peer's path ($transport)"
+else
+  bad "the spoke's entrypoint carries no peer path: $(curl -s "http://$SPOKE_API/api/entrypoints")"
+fi
+
+# --- a device that cannot be created ----------------------------------------
+
+# An invalid device name fails creation even as root, which is what makes this
+# reproducible: the disk is the interesting part — x's tun listener retries
+# every second, so a discarded entrypoint used to log one line per second
+# forever. Run fails and closes the listener, so exactly the first line lands.
+say "a tun entrypoint whose device cannot be created"
+code=$(post "$SPOKE_API" /api/entrypoints "{
+  \"name\": \"tun-bad\", \"type\": \"tun\", \"peer\": \"$HUB_KEY\",
+  \"net\": \"10.10.0.99/32\", \"device_name\": \"not/a/device/name\"
+}")
+[ "$code" = 500 ] || { bad "creating an entrypoint with an invalid device name returned $code, want 500"; }
+
+sleep 5
+attempts=$(grep -c '"service":"tun-bad"' "$SPOKE_CFG/wisper/logs/wisper.log" 2>/dev/null || true)
+if [ "$attempts" = 1 ]; then
+  ok "the failed device was attempted once, not retried forever"
+else
+  bad "the failed device was logged $attempts times in 5s, want 1"
+fi
+
 if [ "$fail" != 0 ]; then
   # wisper logs under its config dir, not on stdout (the redirect only catches
   # a start-up failure).

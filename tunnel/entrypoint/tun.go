@@ -225,8 +225,12 @@ func (s *tunEntryPoint) Run() (err error) {
 			listener.StatsOption(pStats),
 		)
 		// Init creates the device (and blocks until it exists), so a failure
-		// here fails the whole Run — nothing half-started is left behind.
+		// here fails the whole Run. The listener must be closed on the way out:
+		// its own loop retries a device creation that cannot succeed (a missing
+		// privilege, say) — one line per second, forever, for an object that is
+		// about to be discarded.
 		if err = ln.Init(mdx.NewMetadata(svcCfg.Listener.Metadata)); err != nil {
+			ln.Close()
 			return
 		}
 
