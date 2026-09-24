@@ -1,8 +1,8 @@
 package tunnel
 
 import (
+	"os"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -29,8 +29,12 @@ func SetTunFD(fd int) {
 	tunFDSet = make(chan struct{})
 	tunFDMu.Unlock()
 
+	// Closed through os, not syscall.Close: that one takes a Windows Handle on
+	// a Windows build, and this descriptor is only ever an Android one.
 	if prev > 0 && prev != fd {
-		syscall.Close(prev)
+		if f := os.NewFile(uintptr(prev), "tun"); f != nil {
+			_ = f.Close()
+		}
 	}
 }
 
