@@ -136,6 +136,19 @@ export class EntrypointDetailPage extends LitElement {
     }
   }
 
+  /** Back steps out of the editor before it leaves the page: from edit mode it
+   *  returns to this entrypoint's own page (whose URL carries no ?edit), and
+   *  only the view — or a create, which has no page behind it — goes to the
+   *  list. */
+  private _handleBack() {
+    if (this.mode === 'edit' && this.entrypointId) {
+      this.mode = 'view';
+      this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);
+      return;
+    }
+    this._navigate('/');
+  }
+
   private _showSnackbar(msg: string) {
     this._snackbar = msg;
     setTimeout(() => {
@@ -575,7 +588,7 @@ export class EntrypointDetailPage extends LitElement {
     return html`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
-          <button class="back-btn" @click=${() => this._navigate('/')}>
+          <button class="back-btn" @click=${() => this._handleBack()}>
             ${icon('chevron-left')}
           </button>
           <span class="page-title">

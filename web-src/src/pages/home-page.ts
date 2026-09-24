@@ -31,9 +31,14 @@ type Item =
   | { kind: 'tunnel'; data: Tunnel }
   | { kind: 'entrypoint'; data: Entrypoint };
 
+/** The selected list outlives the page: the router discards this component on
+ *  the way to a detail page, so coming back from an entrypoint has to land on
+ *  the entrypoint list, not on the default tab. */
+let activeTab = 0; // 0 = tunnels, 1 = entrypoints
+
 @customElement('home-page')
 export class HomePage extends LitElement {
-  @state() private _activeTab = 0; // 0 = tunnels, 1 = entrypoints
+  @state() private _activeTab = activeTab;
   @state() private showFavorites = false;
   @state() private _tunnels: Tunnel[] = [];
   @state() private _entrypoints: Entrypoint[] = [];
@@ -774,7 +779,8 @@ export class HomePage extends LitElement {
           .tabs=${[t('homeTabTunnel'), t('homeTabEntrypoint')]}
           .activeIndex=${this._activeTab}
           @tab-change=${(e: CustomEvent) => {
-            this._activeTab = e.detail.index;
+            activeTab = e.detail.index;
+            this._activeTab = activeTab;
             this._expandedId = null;
           }}
         ></nav-tabs>

@@ -13,6 +13,7 @@ export default defineConfig({
   testDir: './tests',
   // One wisper instance and one fixture serve the whole run: keep it serial.
   fullyParallel: false,
+  workers: 1,
   reporter: [['list']],
   timeout: 30_000,
 

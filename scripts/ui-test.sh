@@ -96,9 +96,10 @@ fi
 
 mkdir -p "$CFG_HOME/.config/wisper"
 cat >"$CFG_HOME/.config/wisper/wisper.yaml" <<'YAML'
-# Fixture for web-e2e/tests: one p2p tunnel, two allowlisted peers, the second
-# switched off. The relay address is unroutable on purpose — the host retries
-# in the background and the tunnel still runs, which is all the UI needs.
+# Fixture for web-e2e/tests: one p2p tunnel with two allowlisted peers (the
+# second switched off), and one stopped entrypoint so both lists have a card.
+# The relay address is unroutable on purpose — the host retries in the
+# background and the tunnel still runs, which is all the UI needs.
 settings:
   lang: en
   p2p:
@@ -117,6 +118,13 @@ tunnels:
       sLWN_c1IDB50J7lu1xvbme_ZQHDtcpSdUZYs87ys-JY: phone
     peer_disabled:
       - sLWN_c1IDB50J7lu1xvbme_ZQHDtcpSdUZYs87ys-JY
+    created_at: 2026-01-15T10:30:00Z
+entrypoints:
+  - id: e2e-entrypoint
+    name: Local echo
+    type: tcp
+    endpoint: 127.0.0.1:9
+    closed: true
     created_at: 2026-01-15T10:30:00Z
 YAML
 
