@@ -18,10 +18,21 @@ type entrypointCreateRequest struct {
 	Endpoint  string `json:"endpoint"`
 	Keepalive bool   `json:"keepalive,omitempty"`
 	TTL       int    `json:"ttl,omitempty"`
-	// Peer is the remote peer's base64 public key (p2p entrypoints).
+	// Peer is the remote peer's base64 public key (p2p and tun entrypoints).
 	Peer string `json:"peer,omitempty"`
 	// Protocol is a p2p entrypoint's inner protocol: "tcp" (default) or "udp".
 	Protocol string `json:"protocol,omitempty"`
+	// Net is a tun device's address (CIDR, comma-separated for several).
+	Net string `json:"net,omitempty"`
+	// MTU is the tun device's MTU (absent = the implementation default).
+	MTU int `json:"mtu,omitempty"`
+	// DeviceName is the tun device's name (absent = kernel-chosen).
+	DeviceName string `json:"device_name,omitempty"`
+	// Routes are the subnets routed through the device, comma-separated
+	// "cidr [gw]" pairs.
+	Routes string `json:"routes,omitempty"`
+	// DNS is the device's DNS servers, comma-separated.
+	DNS string `json:"dns,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
@@ -33,7 +44,41 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.TTLOption(r.TTL),
 		tunnel.PeerOption(r.Peer),
 		tunnel.ProtocolOption(r.Protocol),
+		tunnel.NetOption(r.Net),
+		tunnel.MTUOption(r.MTU),
+		tunnel.DeviceNameOption(r.DeviceName),
+		tunnel.RoutesOption(r.Routes),
+		tunnel.DNSOption(r.DNS),
 	}
+}
+
+// validateEntryPointRequest rejects a request the runtime cannot honor, before
+// any object is constructed.
+func validateEntryPointRequest(epType string, req *entrypointCreateRequest) error {
+	switch epType {
+	case entrypoint.TunEntryPoint:
+		return validateTunEntryPoint(req)
+	}
+	return nil
+}
+
+// validateTunEntryPoint checks what a spoke cannot do without: a device address
+// and the hub's public key (a bad key would leave the chain node dialing
+// nothing, with no error on the way out).
+func validateTunEntryPoint(r *entrypointCreateRequest) error {
+	if err := validateTunNet(r.Net); err != nil {
+		return err
+	}
+	if err := validateTunRoutes(r.Routes); err != nil {
+		return err
+	}
+	if err := validateTunDNS(r.DNS); err != nil {
+		return err
+	}
+	if !tunnel.ValidPeerKey(r.Peer) {
+		return fmt.Errorf("peer must be the hub's base64 public key")
+	}
+	return nil
 }
 
 func handleListEntrypoints(w http.ResponseWriter, r *http.Request) {
@@ -61,15 +106,13 @@ func handleCreateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ep entrypoint.EntryPoint
-	switch req.Type {
-	case entrypoint.TCPEntryPoint:
-		ep = entrypoint.NewTCPEntryPoint(req.toOptions()...)
-	case entrypoint.UDPEntryPoint:
-		ep = entrypoint.NewUDPEntryPoint(req.toOptions()...)
-	case entrypoint.P2PEntryPoint:
-		ep = entrypoint.NewP2PEntryPoint(req.toOptions()...)
-	default:
+	if err := validateEntryPointRequest(req.Type, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	ep := entrypoint.NewByType(req.Type, req.toOptions()...)
+	if ep == nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown entrypoint type: %s", req.Type))
 		return
 	}
@@ -116,6 +159,11 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		epType = old.Type()
 	}
 
+	if err := validateEntryPointRequest(epType, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// Every entrypoint type binds its own local address (and a p2p one also
 	// claims a provider name on the shared host), so the old one has to let go
 	// before the replacement can start.
@@ -127,15 +175,8 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		tunnel.CreatedAtOption(old.Options().CreatedAt),
 	}, req.toOptions()...)
 
-	var ep entrypoint.EntryPoint
-	switch epType {
-	case entrypoint.TCPEntryPoint:
-		ep = entrypoint.NewTCPEntryPoint(opts...)
-	case entrypoint.UDPEntryPoint:
-		ep = entrypoint.NewUDPEntryPoint(opts...)
-	case entrypoint.P2PEntryPoint:
-		ep = entrypoint.NewP2PEntryPoint(opts...)
-	default:
+	ep := entrypoint.NewByType(epType, opts...)
+	if ep == nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown entrypoint type: %s", epType))
 		return
 	}
@@ -205,28 +246,8 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Recreate and start
-	opts := ep.Options()
-	optsSlice := []tunnel.Option{
-		tunnel.IDOption(opts.ID),
-		tunnel.NameOption(opts.Name),
-		tunnel.EndpointOption(opts.Endpoint),
-		tunnel.HostnameOption(opts.Hostname),
-		tunnel.KeepaliveOption(opts.Keepalive),
-		tunnel.TTLOption(opts.TTL),
-		tunnel.CreatedAtOption(opts.CreatedAt),
-		tunnel.PeerOption(opts.Peer),
-		tunnel.ProtocolOption(opts.Protocol),
-	}
-
-	var newEP entrypoint.EntryPoint
-	switch ep.Type() {
-	case entrypoint.TCPEntryPoint:
-		newEP = entrypoint.NewTCPEntryPoint(optsSlice...)
-	case entrypoint.UDPEntryPoint:
-		newEP = entrypoint.NewUDPEntryPoint(optsSlice...)
-	case entrypoint.P2PEntryPoint:
-		newEP = entrypoint.NewP2PEntryPoint(optsSlice...)
-	default:
+	newEP := entrypoint.NewByType(ep.Type(), tunnel.TunnelOptions(ep.Options())...)
+	if newEP == nil {
 		writeError(w, http.StatusInternalServerError, "unknown entrypoint type")
 		return
 	}

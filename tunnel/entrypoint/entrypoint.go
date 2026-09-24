@@ -13,6 +13,9 @@ const (
 	TCPEntryPoint = "tcp"
 	UDPEntryPoint = "udp"
 	P2PEntryPoint = "p2p"
+	// TunEntryPoint is a spoke: this node owns a tun device whose IP packets
+	// ride a p2p datagram tunnel to a hub's public key.
+	TunEntryPoint = "tun"
 )
 
 var (
@@ -147,9 +150,15 @@ func RestartRunning() {
 			EnableTLS:     p.opts.EnableTLS,
 			Keepalive:     p.opts.Keepalive,
 			TTL:           p.opts.TTL,
+			RecordMode:    p.opts.RecordMode,
 			Peer:          p.opts.Peer,
 			Protocol:      p.opts.Protocol,
 			Peers:         p.opts.Peers,
+			Net:           p.opts.Net,
+			MTU:           p.opts.MTU,
+			DeviceName:    p.opts.DeviceName,
+			Routes:        p.opts.Routes,
+			DNS:           p.opts.DNS,
 			CreatedAt:     p.opts.CreatedAt,
 			StatsBaseline: p.statsBaseline,
 		})
@@ -191,9 +200,15 @@ func LoadConfig() {
 			EnableTLS:     cfg.EnableTLS,
 			Keepalive:     cfg.Keepalive,
 			TTL:           cfg.TTL,
+			RecordMode:    cfg.RecordMode,
 			Peer:          cfg.Peer,
 			Protocol:      cfg.Protocol,
 			Peers:         cfg.Peers,
+			Net:           cfg.Net,
+			MTU:           cfg.MTU,
+			DeviceName:    cfg.DeviceName,
+			Routes:        cfg.Routes,
+			DNS:           cfg.DNS,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -237,8 +252,14 @@ func SaveConfig() error {
 			EnableTLS:     opts.EnableTLS,
 			Keepalive:     opts.Keepalive,
 			TTL:           opts.TTL,
+			RecordMode:    opts.RecordMode,
 			Peer:          opts.Peer,
 			Protocol:      opts.Protocol,
+			Net:           opts.Net,
+			MTU:           opts.MTU,
+			DeviceName:    opts.DeviceName,
+			Routes:        opts.Routes,
+			DNS:           opts.DNS,
 			Favorite:      ep.IsFavorite(),
 			Closed:        ep.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -256,29 +277,27 @@ func SaveConfig() error {
 	return nil
 }
 
-func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
-	options := []tunnel.Option{
-		tunnel.IDOption(opts.ID),
-		tunnel.NameOption(opts.Name),
-		tunnel.EndpointOption(opts.Endpoint),
-		tunnel.HostnameOption(opts.Hostname),
-		tunnel.UsernameOption(opts.Username),
-		tunnel.PasswordOption(opts.Password),
-		tunnel.EnableTLSOption(opts.EnableTLS),
-		tunnel.CreatedAtOption(opts.CreatedAt),
-		tunnel.StatsBaselineOption(opts.StatsBaseline),
-		tunnel.PeerOption(opts.Peer),
-		tunnel.ProtocolOption(opts.Protocol),
-		tunnel.PeersOption(opts.Peers...),
-	}
+// NewByType constructs an entrypoint of the given type; nil for an unknown
+// type. It is the single place the type strings map to constructors.
+func NewByType(st string, options ...tunnel.Option) EntryPoint {
 	switch st {
 	case TCPEntryPoint:
-		ep = NewTCPEntryPoint(options...)
+		return NewTCPEntryPoint(options...)
 	case UDPEntryPoint:
-		ep = NewUDPEntryPoint(options...)
+		return NewUDPEntryPoint(options...)
 	case P2PEntryPoint:
-		ep = NewP2PEntryPoint(options...)
-	default:
+		return NewP2PEntryPoint(options...)
+	case TunEntryPoint:
+		return NewTunEntryPoint(options...)
+	}
+	return nil
+}
+
+func createEntryPoint(st string, opts tunnel.Options) (ep EntryPoint) {
+	options := append(tunnel.TunnelOptions(opts), tunnel.StatsBaselineOption(opts.StatsBaseline))
+
+	ep = NewByType(st, options...)
+	if ep == nil {
 		return nil
 	}
 

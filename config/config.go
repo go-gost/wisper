@@ -213,6 +213,25 @@ type Tunnel struct {
 	// closed while established ones drain. Empty means every peer is enabled.
 	PeerDisabled []string `yaml:"peer_disabled,omitempty" json:"peer_disabled,omitempty"`
 
+	// Net is a tun device's address: a CIDR, or several comma-separated. It is
+	// what the device advertises (and, for a spoke, what it registers with the
+	// hub's tun server).
+	Net string `yaml:",omitempty" json:"net,omitempty"`
+
+	// MTU is the tun device's MTU. 0 leaves the implementation default (1420).
+	MTU int `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+
+	// DeviceName is the tun device's name. Empty lets the kernel choose.
+	DeviceName string `yaml:"device_name,omitempty" json:"device_name,omitempty"`
+
+	// Routes are the subnets routed through the device, comma-separated
+	// "cidr [gw]" pairs: for a spoke, what to send into the tunnel (0.0.0.0/0
+	// for a full tunnel); for a hub, only subnets behind one of its spokes.
+	Routes string `yaml:",omitempty" json:"routes,omitempty"`
+
+	// DNS is the device's DNS servers, comma-separated.
+	DNS string `yaml:",omitempty" json:"dns,omitempty"`
+
 	Stats         ServiceStats
 	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
 	Favorite      bool

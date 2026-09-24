@@ -51,6 +51,9 @@ const (
 	TCPTunnel  = "tcp"
 	UDPTunnel  = "udp"
 	P2PTunnel  = "p2p"
+	// TunTunnel is a hub: this node holds the tun device and the hub kernel
+	// routes between the spokes whose datagrams arrive over a p2p tunnel.
+	TunTunnel = "tun"
 )
 
 var (
@@ -92,7 +95,18 @@ type Options struct {
 	// PeerDisabled is the allowlisted keys that are switched off: kept in Peers
 	// (and shown on the peers page) but given no route, so their new streams
 	// are closed while established ones drain.
-	PeerDisabled  []string
+	PeerDisabled []string
+	// Net is a tun device's address: a CIDR, or several comma-separated.
+	Net string
+	// MTU is the tun device's MTU (0 leaves the implementation default).
+	MTU int
+	// DeviceName is the tun device's name (empty lets the kernel choose).
+	DeviceName string
+	// Routes are the subnets routed through the device, comma-separated
+	// "cidr [gw]" pairs.
+	Routes string
+	// DNS is the device's DNS servers, comma-separated.
+	DNS           string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -225,6 +239,42 @@ func PeerAliasesOption(aliases map[string]string) Option {
 func PeerDisabledOption(disabled []string) Option {
 	return func(opts *Options) {
 		opts.PeerDisabled = disabled
+	}
+}
+
+// NetOption sets a tun device's address (a CIDR, or several comma-separated).
+func NetOption(net string) Option {
+	return func(opts *Options) {
+		opts.Net = net
+	}
+}
+
+// MTUOption sets a tun device's MTU (0 leaves the implementation default).
+func MTUOption(mtu int) Option {
+	return func(opts *Options) {
+		opts.MTU = mtu
+	}
+}
+
+// DeviceNameOption sets a tun device's name (empty lets the kernel choose).
+func DeviceNameOption(name string) Option {
+	return func(opts *Options) {
+		opts.DeviceName = name
+	}
+}
+
+// RoutesOption sets the subnets routed through a tun device (comma-separated
+// "cidr [gw]" pairs).
+func RoutesOption(routes string) Option {
+	return func(opts *Options) {
+		opts.Routes = routes
+	}
+}
+
+// DNSOption sets a tun device's DNS servers (comma-separated).
+func DNSOption(dns string) Option {
+	return func(opts *Options) {
+		opts.DNS = dns
 	}
 }
 
@@ -423,11 +473,18 @@ func RestartRunning() {
 			EnableTLS:    p.opts.EnableTLS,
 			RewriteHost:  p.opts.RewriteHost,
 			FileUpload:   p.opts.FileUpload,
+			Keepalive:    p.opts.Keepalive,
+			TTL:          p.opts.TTL,
 			RecordMode:   p.opts.RecordMode,
 			Peers:        p.opts.Peers,
 			PeerAliases:  p.opts.PeerAliases,
 			PeerDisabled: p.opts.PeerDisabled,
 			Protocol:     p.opts.Protocol,
+			Net:          p.opts.Net,
+			MTU:          p.opts.MTU,
+			DeviceName:   p.opts.DeviceName,
+			Routes:       p.opts.Routes,
+			DNS:          p.opts.DNS,
 			CreatedAt:    p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -510,12 +567,19 @@ func LoadConfig() {
 			EnableTLS:     cfg.EnableTLS,
 			RewriteHost:   cfg.RewriteHost,
 			FileUpload:    cfg.FileUpload,
+			Keepalive:     cfg.Keepalive,
+			TTL:           cfg.TTL,
 			RecordMode:    cfg.RecordMode,
 			Peer:          cfg.Peer,
 			Protocol:      cfg.Protocol,
 			Peers:         cfg.Peers,
 			PeerAliases:   NormalizePeerAliases(cfg.Peers, cfg.PeerAliases),
 			PeerDisabled:  NormalizePeerDisabled(cfg.Peers, cfg.PeerDisabled),
+			Net:           cfg.Net,
+			MTU:           cfg.MTU,
+			DeviceName:    cfg.DeviceName,
+			Routes:        cfg.Routes,
+			DNS:           cfg.DNS,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -560,12 +624,19 @@ func SaveConfig() error {
 			EnableTLS:     opts.EnableTLS,
 			RewriteHost:   opts.RewriteHost,
 			FileUpload:    opts.FileUpload,
+			Keepalive:     opts.Keepalive,
+			TTL:           opts.TTL,
 			RecordMode:    opts.RecordMode,
 			Peer:          opts.Peer,
 			Protocol:      opts.Protocol,
 			Peers:         opts.Peers,
 			PeerAliases:   opts.PeerAliases,
 			PeerDisabled:  opts.PeerDisabled,
+			Net:           opts.Net,
+			MTU:           opts.MTU,
+			DeviceName:    opts.DeviceName,
+			Routes:        opts.Routes,
+			DNS:           opts.DNS,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -583,8 +654,11 @@ func SaveConfig() error {
 	return nil
 }
 
-func createTunnel(st string, opts Options) (t Tunnel) {
-	options := []Option{
+// TunnelOptions returns the functional options carrying every shared field of
+// opts. The type-specific constructors take it as their starting set, so a new
+// shared field is threaded everywhere from one place.
+func TunnelOptions(opts Options) []Option {
+	return []Option{
 		IDOption(opts.ID),
 		NameOption(opts.Name),
 		EndpointOption(opts.Endpoint),
@@ -596,24 +670,45 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 		CreatedAtOption(opts.CreatedAt),
 		RewriteHostOption(opts.RewriteHost),
 		FileUploadOption(opts.FileUpload),
+		KeepaliveOption(opts.Keepalive),
+		TTLOption(opts.TTL),
 		RecordModeOption(opts.RecordMode),
+		PeerOption(opts.Peer),
+		ProtocolOption(opts.Protocol),
 		PeersOption(opts.Peers...),
 		PeerAliasesOption(opts.PeerAliases),
 		PeerDisabledOption(opts.PeerDisabled),
+		NetOption(opts.Net),
+		MTUOption(opts.MTU),
+		DeviceNameOption(opts.DeviceName),
+		RoutesOption(opts.Routes),
+		DNSOption(opts.DNS),
 	}
+}
 
+// NewByType constructs a tunnel of the given type; nil for an unknown type. It
+// is the single place the type strings map to constructors.
+func NewByType(st string, options ...Option) Tunnel {
 	switch st {
 	case FileTunnel:
-		t = NewFileTunnel(options...)
+		return NewFileTunnel(options...)
 	case HTTPTunnel:
-		t = NewHTTPTunnel(options...)
+		return NewHTTPTunnel(options...)
 	case TCPTunnel:
-		t = NewTCPTunnel(options...)
+		return NewTCPTunnel(options...)
 	case UDPTunnel:
-		t = NewUDPTunnel(options...)
+		return NewUDPTunnel(options...)
 	case P2PTunnel:
-		t = NewP2PTunnel(options...)
-	default:
+		return NewP2PTunnel(options...)
+	case TunTunnel:
+		return NewTunTunnel(options...)
+	}
+	return nil
+}
+
+func createTunnel(st string, opts Options) (t Tunnel) {
+	t = NewByType(st, TunnelOptions(opts)...)
+	if t == nil {
 		return nil
 	}
 

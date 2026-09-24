@@ -3,8 +3,10 @@ package api
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/go-gost/wisper/config"
@@ -75,6 +77,17 @@ type tunnelOptionsResp struct {
 	// Peers is a p2p tunnel's inbound allowlist. Empty is valid: the tunnel
 	// runs and routes nothing.
 	Peers []peerJSON `json:"peers,omitempty"`
+	// Net is a tun device's address (CIDR, comma-separated for several).
+	Net string `json:"net,omitempty"`
+	// MTU is the tun device's MTU (absent = the implementation default).
+	MTU int `json:"mtu,omitempty"`
+	// DeviceName is the tun device's name (absent = kernel-chosen).
+	DeviceName string `json:"device_name,omitempty"`
+	// Routes are the subnets routed through the device, comma-separated
+	// "cidr [gw]" pairs.
+	Routes string `json:"routes,omitempty"`
+	// DNS is the device's DNS servers, comma-separated.
+	DNS string `json:"dns,omitempty"`
 }
 
 type statsResponse struct {
@@ -163,6 +176,11 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			Peer:        opts.Peer,
 			Protocol:    opts.Protocol,
 			Peers:       peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled),
+			Net:         opts.Net,
+			MTU:         opts.MTU,
+			DeviceName:  opts.DeviceName,
+			Routes:      opts.Routes,
+			DNS:         opts.DNS,
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
@@ -221,12 +239,25 @@ type tunnelCreateRequest struct {
 	EnableTLS   bool   `json:"enableTLS,omitempty"`
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
 	FileUpload  bool   `json:"file_upload,omitempty"`
+	Keepalive   bool   `json:"keepalive,omitempty"`
+	TTL         int    `json:"ttl,omitempty"`
 	RecordMode  string `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
 	// Peers is a p2p tunnel's inbound allowlist; an entry's alias is optional
 	// and generated when omitted.
 	Peers []peerJSON `json:"peers,omitempty"`
+	// Net is a tun device's address (CIDR, comma-separated for several).
+	Net string `json:"net,omitempty"`
+	// MTU is the tun device's MTU (absent = the implementation default).
+	MTU int `json:"mtu,omitempty"`
+	// DeviceName is the tun device's name (absent = kernel-chosen).
+	DeviceName string `json:"device_name,omitempty"`
+	// Routes are the subnets routed through the device, comma-separated
+	// "cidr [gw]" pairs.
+	Routes string `json:"routes,omitempty"`
+	// DNS is the device's DNS servers, comma-separated.
+	DNS string `json:"dns,omitempty"`
 }
 
 func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
@@ -254,12 +285,110 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.EnableTLSOption(r.EnableTLS),
 		tunnel.RewriteHostOption(r.RewriteHost),
 		tunnel.FileUploadOption(r.FileUpload),
+		tunnel.KeepaliveOption(r.Keepalive),
+		tunnel.TTLOption(r.TTL),
 		tunnel.RecordModeOption(r.RecordMode),
 		tunnel.PeerOption(r.Peer),
 		tunnel.PeersOption(peers...),
 		tunnel.PeerAliasesOption(aliases),
 		tunnel.PeerDisabledOption(tunnel.NormalizePeerDisabled(peers, disabled)),
+		tunnel.NetOption(r.Net),
+		tunnel.MTUOption(r.MTU),
+		tunnel.DeviceNameOption(r.DeviceName),
+		tunnel.RoutesOption(r.Routes),
+		tunnel.DNSOption(r.DNS),
 	}
+}
+
+// validateTunNet rejects a device address the tun listener would otherwise
+// skip silently: x splits "net" and drops every entry it cannot parse, so a
+// typo would start a device with no address at all.
+func validateTunNet(netStr string) error {
+	if strings.TrimSpace(netStr) == "" {
+		return fmt.Errorf("net is required: the device address, e.g. 10.10.0.1/24")
+	}
+	for _, s := range strings.Split(netStr, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if _, _, err := net.ParseCIDR(s); err != nil {
+			return fmt.Errorf("invalid net %q: %v", s, err)
+		}
+	}
+	return nil
+}
+
+// validateTunRoutes checks the optional route list ("cidr [gw]" pairs). Like
+// net, an unparseable entry is skipped by the listener, so a typo would leave a
+// subnet unreachable with no error anywhere.
+func validateTunRoutes(routes string) error {
+	for _, s := range strings.Split(routes, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		fields := strings.Fields(s)
+		if _, _, err := net.ParseCIDR(fields[0]); err != nil {
+			return fmt.Errorf("invalid route %q: %v", fields[0], err)
+		}
+		if len(fields) > 1 && net.ParseIP(fields[1]) == nil {
+			return fmt.Errorf("invalid route gateway %q", fields[1])
+		}
+	}
+	return nil
+}
+
+// validateTunDNS checks the optional comma-separated DNS server list.
+func validateTunDNS(dns string) error {
+	for _, s := range strings.Split(dns, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if net.ParseIP(s) == nil {
+			return fmt.Errorf("invalid dns server %q", s)
+		}
+	}
+	return nil
+}
+
+// validateTunnelRequest rejects a request the runtime cannot honor, before any
+// object is constructed. Only the types with structural requirements appear
+// here; everything else is validated by its constructor.
+func validateTunnelRequest(tunnelType string, req *tunnelCreateRequest) error {
+	switch tunnelType {
+	case tunnel.TunTunnel:
+		return validateTunTunnel(req)
+	}
+	return nil
+}
+
+// validateTunTunnel checks what a tun hub cannot do without: a device address,
+// and the UDP address the tun server binds (the paired p2p tunnel must use the
+// same endpoint, so an ephemeral port would leave the two unreachable).
+func validateTunTunnel(r *tunnelCreateRequest) error {
+	if err := validateTunNet(r.Net); err != nil {
+		return err
+	}
+	if err := validateTunRoutes(r.Routes); err != nil {
+		return err
+	}
+	if err := validateTunDNS(r.DNS); err != nil {
+		return err
+	}
+
+	host, port, err := net.SplitHostPort(r.Endpoint)
+	if err != nil {
+		return fmt.Errorf("endpoint must be host:port for a tun tunnel: %v", err)
+	}
+	if net.ParseIP(host) == nil {
+		return fmt.Errorf("endpoint host must be an IP address (got %q)", host)
+	}
+	if p, err := strconv.Atoi(port); err != nil || p <= 0 || p > 65535 {
+		return fmt.Errorf("endpoint port must be 1-65535 (got %q)", port)
+	}
+	return nil
 }
 
 // prefixRe matches a DNS label: lowercase letters, digits and hyphens,
@@ -315,19 +444,13 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 		req.Prefix = p
 	}
 
-	var t tunnel.Tunnel
-	switch req.Type {
-	case tunnel.FileTunnel:
-		t = tunnel.NewFileTunnel(req.toOptions()...)
-	case tunnel.HTTPTunnel:
-		t = tunnel.NewHTTPTunnel(req.toOptions()...)
-	case tunnel.TCPTunnel:
-		t = tunnel.NewTCPTunnel(req.toOptions()...)
-	case tunnel.UDPTunnel:
-		t = tunnel.NewUDPTunnel(req.toOptions()...)
-	case tunnel.P2PTunnel:
-		t = tunnel.NewP2PTunnel(req.toOptions()...)
-	default:
+	if err := validateTunnelRequest(req.Type, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	t := tunnel.NewByType(req.Type, req.toOptions()...)
+	if t == nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown tunnel type: %s", req.Type))
 		return
 	}
@@ -381,11 +504,17 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnelType = old.Type()
 	}
 
+	if err := validateTunnelRequest(tunnelType, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// A p2p tunnel cannot be replaced while it lives: the process-wide host
 	// routes each peer key to exactly one tunnel, so the old one must give its
 	// routes up first (everything else binds its own socket and swaps after the
-	// replacement runs).
-	if old.Type() == tunnel.P2PTunnel {
+	// replacement runs). A tun tunnel is the same shape: the replacement binds
+	// the same UDP address, so the old one must release it first.
+	if old.Type() == tunnel.P2PTunnel || old.Type() == tunnel.TunTunnel {
 		old.Close()
 	}
 
@@ -395,19 +524,8 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnel.CreatedAtOption(old.Options().CreatedAt),
 	}, req.toOptions()...)
 
-	var t tunnel.Tunnel
-	switch tunnelType {
-	case tunnel.FileTunnel:
-		t = tunnel.NewFileTunnel(opts...)
-	case tunnel.HTTPTunnel:
-		t = tunnel.NewHTTPTunnel(opts...)
-	case tunnel.TCPTunnel:
-		t = tunnel.NewTCPTunnel(opts...)
-	case tunnel.UDPTunnel:
-		t = tunnel.NewUDPTunnel(opts...)
-	case tunnel.P2PTunnel:
-		t = tunnel.NewP2PTunnel(opts...)
-	default:
+	t := tunnel.NewByType(tunnelType, opts...)
+	if t == nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown tunnel type: %s", tunnelType))
 		return
 	}
@@ -477,38 +595,8 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Recreate and start
-	opts := t.Options()
-	optsSlice := []tunnel.Option{
-		tunnel.IDOption(opts.ID),
-		tunnel.NameOption(opts.Name),
-		tunnel.EndpointOption(opts.Endpoint),
-		tunnel.PrefixOption(opts.Prefix),
-		tunnel.HostnameOption(opts.Hostname),
-		tunnel.UsernameOption(opts.Username),
-		tunnel.PasswordOption(opts.Password),
-		tunnel.EnableTLSOption(opts.EnableTLS),
-		tunnel.RewriteHostOption(opts.RewriteHost),
-		tunnel.FileUploadOption(opts.FileUpload),
-		tunnel.RecordModeOption(opts.RecordMode),
-		tunnel.CreatedAtOption(opts.CreatedAt),
-		tunnel.PeersOption(opts.Peers...),
-		tunnel.PeerAliasesOption(opts.PeerAliases),
-		tunnel.PeerDisabledOption(opts.PeerDisabled),
-	}
-
-	var newT tunnel.Tunnel
-	switch t.Type() {
-	case tunnel.FileTunnel:
-		newT = tunnel.NewFileTunnel(optsSlice...)
-	case tunnel.HTTPTunnel:
-		newT = tunnel.NewHTTPTunnel(optsSlice...)
-	case tunnel.TCPTunnel:
-		newT = tunnel.NewTCPTunnel(optsSlice...)
-	case tunnel.UDPTunnel:
-		newT = tunnel.NewUDPTunnel(optsSlice...)
-	case tunnel.P2PTunnel:
-		newT = tunnel.NewP2PTunnel(optsSlice...)
-	default:
+	newT := tunnel.NewByType(t.Type(), tunnel.TunnelOptions(t.Options())...)
+	if newT == nil {
 		writeError(w, http.StatusInternalServerError, "unknown tunnel type")
 		return
 	}

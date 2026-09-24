@@ -49,22 +49,12 @@ func setupTestServer(t *testing.T) *httptest.Server {
 // The tunnel is left in "closed" state so no network services are started.
 func preRegisterTunnel(t *testing.T, tunnelType, name, endpoint string) tunnel.Tunnel {
 	t.Helper()
-	var tun tunnel.Tunnel
-	opts := []tunnel.Option{
+	tun := tunnel.NewByType(tunnelType,
 		tunnel.NameOption(name),
 		tunnel.EndpointOption(endpoint),
 		tunnel.CreatedAtOption(time.Date(2026, 1, 15, 10, 30, 0, 0, time.UTC)),
-	}
-	switch tunnelType {
-	case tunnel.FileTunnel:
-		tun = tunnel.NewFileTunnel(opts...)
-	case tunnel.HTTPTunnel:
-		tun = tunnel.NewHTTPTunnel(opts...)
-	case tunnel.TCPTunnel:
-		tun = tunnel.NewTCPTunnel(opts...)
-	case tunnel.UDPTunnel:
-		tun = tunnel.NewUDPTunnel(opts...)
-	default:
+	)
+	if tun == nil {
 		t.Fatalf("unknown tunnel type: %s", tunnelType)
 	}
 	// Close immediately so no network services are started.
@@ -76,18 +66,12 @@ func preRegisterTunnel(t *testing.T, tunnelType, name, endpoint string) tunnel.T
 // preRegisterEntrypoint creates an entrypoint (without Run) and adds it.
 func preRegisterEntrypoint(t *testing.T, epType, name, endpoint string) entrypoint.EntryPoint {
 	t.Helper()
-	var ep entrypoint.EntryPoint
-	opts := []tunnel.Option{
+	ep := entrypoint.NewByType(epType,
 		tunnel.NameOption(name),
 		tunnel.EndpointOption(endpoint),
 		tunnel.CreatedAtOption(time.Date(2026, 1, 15, 10, 30, 0, 0, time.UTC)),
-	}
-	switch epType {
-	case entrypoint.TCPEntryPoint:
-		ep = entrypoint.NewTCPEntryPoint(opts...)
-	case entrypoint.UDPEntryPoint:
-		ep = entrypoint.NewUDPEntryPoint(opts...)
-	default:
+	)
+	if ep == nil {
 		t.Fatalf("unknown entrypoint type: %s", epType)
 	}
 	ep.Close()
@@ -326,6 +310,105 @@ func TestGetTunnelWithOptions(t *testing.T) {
 	}
 }
 
+// TestGetTunTunnelOptions: a tun hub's device configuration (and the keepalive
+// pair) survives the trip out through the API — the fields the UI reads back
+// into the edit form.
+func TestGetTunTunnelOptions(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	tun := tunnel.NewTunTunnel(
+		tunnel.NameOption("Hub"),
+		tunnel.EndpointOption("127.0.0.1:8421"),
+		tunnel.NetOption("10.10.0.1/24"),
+		tunnel.MTUOption(1400),
+		tunnel.DeviceNameOption("wisper-hub"),
+		tunnel.RoutesOption("192.168.50.0/24"),
+		tunnel.DNSOption("10.10.0.1"),
+		tunnel.KeepaliveOption(true),
+		tunnel.TTLOption(15),
+	)
+	tun.Close() // no device is created: this test is about the API shape
+	tunnel.Add(tun)
+
+	resp, body := getJSON(t, srv.URL+"/api/tunnels/"+tun.ID())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
+	}
+	opts, ok := body["options"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected options object, got %v", body["options"])
+	}
+	for field, want := range map[string]any{
+		"net":         "10.10.0.1/24",
+		"mtu":         float64(1400),
+		"device_name": "wisper-hub",
+		"routes":      "192.168.50.0/24",
+		"dns":         "10.10.0.1",
+		"keepalive":   true,
+		"ttl":         float64(15),
+	} {
+		if got := opts[field]; got != want {
+			t.Errorf("options[%s] = %v, want %v", field, got, want)
+		}
+	}
+}
+
+// TestCreateTunTunnelValidation: the fields a tun hub cannot work without are
+// refused before any object is built, because x's tun listener skips what it
+// cannot parse (a typo would otherwise start a device with no address, or bind
+// a port the paired p2p tunnel can never reach).
+func TestCreateTunTunnelValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		body map[string]any
+	}{
+		{
+			name: "no net",
+			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421"},
+		},
+		{
+			name: "bad net",
+			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421", "net": "10.10.0.1"},
+		},
+		{
+			name: "endpoint without a port",
+			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1", "net": "10.10.0.1/24"},
+		},
+		{
+			name: "endpoint port 0",
+			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:0", "net": "10.10.0.1/24"},
+		},
+		{
+			name: "endpoint host is not an IP",
+			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "localhost:8421", "net": "10.10.0.1/24"},
+		},
+		{
+			name: "bad route",
+			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421", "net": "10.10.0.1/24", "routes": "not-a-cidr"},
+		},
+		{
+			name: "bad dns",
+			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421", "net": "10.10.0.1/24", "dns": "dns.example"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := setupTestServer(t)
+			defer srv.Close()
+
+			resp, body := postJSON(t, srv.URL+"/api/tunnels", tt.body)
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %v", resp.StatusCode, body)
+			}
+			if n := tunnel.Count(); n != 0 {
+				t.Errorf("%d tunnels registered after a rejected create, want 0", n)
+			}
+		})
+	}
+}
+
 func TestGetTunnelNotFound(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
@@ -494,6 +577,57 @@ func TestCreateEntrypointUnknownType(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Stats endpoint tests
 // ---------------------------------------------------------------------------
+
+// TestCreateTunEntryPointValidation: a spoke needs a device address and the
+// hub's key; everything else is refused before any object (or device) is built.
+func TestCreateTunEntryPointValidation(t *testing.T) {
+	const key = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+
+	tests := []struct {
+		name string
+		body map[string]any
+	}{
+		{
+			name: "no net",
+			body: map[string]any{"type": "tun", "name": "spoke", "peer": key},
+		},
+		{
+			name: "bad net",
+			body: map[string]any{"type": "tun", "name": "spoke", "net": "10.10.0.2", "peer": key},
+		},
+		{
+			name: "no peer",
+			body: map[string]any{"type": "tun", "name": "spoke", "net": "10.10.0.2/24"},
+		},
+		{
+			name: "peer is not a key",
+			body: map[string]any{"type": "tun", "name": "spoke", "net": "10.10.0.2/24", "peer": "hub.example.com:443"},
+		},
+		{
+			name: "bad route",
+			body: map[string]any{"type": "tun", "name": "spoke", "net": "10.10.0.2/24", "peer": key, "routes": "nope"},
+		},
+		{
+			name: "bad dns",
+			body: map[string]any{"type": "tun", "name": "spoke", "net": "10.10.0.2/24", "peer": key, "dns": "not-an-ip"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := setupTestServer(t)
+			defer srv.Close()
+
+			resp, body := postJSON(t, srv.URL+"/api/entrypoints", tt.body)
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %v", resp.StatusCode, body)
+			}
+			if n := entrypoint.Count(); n != 0 {
+				t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
+			}
+		})
+	}
+}
 
 func TestGetStatsEmpty(t *testing.T) {
 	srv := setupTestServer(t)
