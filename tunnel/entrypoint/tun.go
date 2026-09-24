@@ -3,6 +3,7 @@ package entrypoint
 import (
 	"errors"
 	"log/slog"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,6 +25,13 @@ import (
 	"github.com/go-gost/x/registry"
 	xservice "github.com/go-gost/x/service"
 	"github.com/google/uuid"
+)
+
+const (
+	// vpnDeviceWait is how long an Android start waits for the VpnService's
+	// device. The app establishes the VPN after the backend is up, and a
+	// restored entrypoint starts with it, so they race.
+	vpnDeviceWait = 10 * time.Second
 )
 
 // tunEntryPoint is the spoke half of a virtual network: it owns a tun device
@@ -120,6 +128,17 @@ func (s *tunEntryPoint) init() error {
 				"dns":    s.opts.DNS,
 			},
 		},
+	}
+
+	// Android: the device is a VpnService's, created and configured on the Java
+	// side, and its fd reaches us outside the config. Each device asks for one
+	// when it is built (so a rebuilt VPN or a restarted entrypoint gets a live
+	// descriptor), and waits rather than failing: the app can only establish
+	// the VPN once the backend — and this entrypoint — is already running.
+	if runtime.GOOS == "android" {
+		svc.Listener.Metadata["fd"] = func() int {
+			return tunnel.WaitTunFD(vpnDeviceWait)
+		}
 	}
 
 	// Patch the tunnel chain into a p2p chain: the node dials the peer's public

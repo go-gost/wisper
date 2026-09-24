@@ -7,6 +7,8 @@ package main
 */
 import "C"
 
+import "github.com/go-gost/wisper/tunnel"
+
 //export wisperStartGo
 func wisperStartGo(configDirC *C.char, addrC *C.char) C.int {
 	if err := Start(C.GoString(configDirC), C.GoString(addrC)); err != nil {
@@ -18,6 +20,11 @@ func wisperStartGo(configDirC *C.char, addrC *C.char) C.int {
 //export wisperStopGo
 func wisperStopGo() {
 	Stop()
+}
+
+//export wisperSetTunFdGo
+func wisperSetTunFdGo(fd C.int) {
+	tunnel.SetTunFD(int(fd))
 }
 
 // main is required by -buildmode=c-shared; never called directly.

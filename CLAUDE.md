@@ -244,6 +244,12 @@ make icons                   # requires Python 3 + Pillow
 ```
 
 Android APK is built via Docker + NDK cross-compile: `make android` / `make android-release`.
+The Android service (`android/app/src/main/java/run/gost/wisper/WisperService.kt`) is a
+`VpnService`: an unprivileged app cannot open `/dev/net/tun`, so a tun entrypoint's device is
+created there and its fd handed to Go (`WisperJNI.setTunFd` → `tunnel.SetTunFD` → the listener's
+`fd` metadata). The 2s stats poll doubles as the VPN driver — it establishes the VPN once a tun
+entrypoint exists, or posts a permission nudge when consent is missing. One VPN, so one tun
+entrypoint.
 
 The sidecar binary name is `wisper-api` (must differ from the Cargo package name `wisper`). All API calls use relative paths, no Node.js-specific APIs, optional `baseUrl` on GoBackend for non-embedded scenarios, CSS custom properties for theming everywhere.
 

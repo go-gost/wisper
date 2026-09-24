@@ -67,16 +67,18 @@ Android 侧要新增一条 VpnService 通道 + 一处 x 改动。Android 可行�
 约束与代价：
 
 1. **非 root 拿不到 `/dev/net/tun`** → 只能 `VpnService.Builder.establish()` 拿 fd，Java 侧配置 +
-   JNI 交给 Go，Go 侧用 `tun.CreateTUNFromFile`（已确认 pinned 的 `golang.zx2c4.com/wireguard`
-   有此 API，linux 实现覆盖 android）。这就是 WireGuard-Android 的做法；fd 传递按现有
-   `lib_jni.c` 模式加一个 `wisperSetTunFd(fd)` 即可。
-2. **设备配置必须走 Java Builder**（`addAddress` / `addRoute` / `setMtu` / `addDnsServer`）。
-   gost 现在的 android 编译结果是走 `x/listener/tun/tun_linux.go` 的 netlink + `resolvectl` shell
-   （已实测 `GOOS=android` 能编译，但 app 无 CAP_NET_ADMIN、也没有 `resolvectl`）→
-   **需要一处 x 改动**：`tun_linux.go` 加 `!android`，新增 android 变体（只包 fd，跳过
-   addr/route/dns 与 `net.InterfaceByName`）。连带 x 发版 + 版本链（core → x → gost，wisper 再 bump）。
-3. **路由变更要重建 VPN**（`Builder` 只能 establish 一次）→ fd 要做成可注入、可替换
-   （`tunListener.listenLoop` 本来就在循环重建设备），避免重建整条 p2p 隧道/会话。
+   JNI 交给 Go，Go 侧用 `tun.CreateUnmonitoredTUNFromFD`（pinned 的 `golang.zx2c4.com/wireguard`
+   提供，linux 实现覆盖 android；比 `CreateTUNFromFile` 少掉 netlink 监听与 `setMTU`）。
+   传递形态：`WisperJNI.setTunFd(fd)`（fd 由 Java 侧 `detachFd()` 让渡）→ `tunnel.SetTunFD`
+   → 入口点把**取 fd 的函数**放进 listener 的 `fd` metadata（不是号码）→ x 的 android 变体**每建一个设备
+   现场解析 + dup 一次**：设备关闭不影响 VPN（停止/重启入口点无需重建 VPN），号码也不会因为
+   设备重建时被回收（`fd` 收 int 也收 `func() int`，int 只适合固定不动的场景）。
+2. **设备配置必须走 Java Builder**（`addAddress` / `addRoute` / `setMtu` / `addDnsServer`），
+   配置来源就是 `/api/entrypoints` 里该 tun 入口点自己的字段（Java 与 Go 不各留一份）。
+   已落地：`x/listener/tun/tun_linux.go` 加 `linux && !android`，新增 `tun_android.go`
+   （只认 fd，跳过 netlink / addr / route / dns / `resolvectl`）。**x 发版 + 版本链待做**。
+3. **路由变更要重建 VPN**（`Builder` 只能 establish 一次）→ 重建 = 新 fd + `SetTunFD` 替换
+   （旧的由 Go 侧关闭），**在跑的入口点会随旧设备一起断**，需手动重启该入口点；v1 接受这个代价。
 4. **只路由虚拟网段就不需要 `protect()`**。`addRoute(虚拟网段 + 对端 LAN)` 时，relay 的 wss、
    打洞的 UDP 都是公网地址，不进隧道；要做 0.0.0.0/0 出口才需要给 p2p 的每个套接字调
    `VpnService.protect(fd)`（Go → JNI 回调，Jigsaw Intra 的现成先例），那是侵入 p2p/x 的活。
@@ -89,10 +91,11 @@ Android 侧要新增一条 VpnService 通道 + 一处 x 改动。Android 可行�
    可用 `adb shell appops set run.gost.wisper ACTIVATE_VPN allow` 免弹窗，**可自动化**。
 7. 手机不能当 hub（无公网入口）；Android 侧只需实现 spoke。
 
-**待实测（唯一未知项）**：`CreateTUNFromFile` 内部还会经 netlink 取 ifindex、`setMTU`
-（见其 linux 实现的 `getIFIndex` / `setMTU`），在 app 自己的 netns 内是否成功需真机验证
-（WireGuard-Android 是这么用的，但那是先例判断，不是我们的实测）。失败则退到 **userspace
-netstack**：不碰 netlink、不碰设备配置，把 tun fd 的 IP 包喂给现有 p2p udp 隧道
+**待实测**：最终选的是 `CreateUnmonitoredTUNFromFD`（`CreateTUNFromFile` 的那个 netlink 监听 +
+`setMTU` 版本正是不该在 app 里用的），所以「netlink 在 app netns 里能不能用」这个问题消失了；
+剩下要实测的是 `TUNGETIFF`（取接口名）与 `initFromFlags` 两个 ioctl 在 VpnService 的 fd 上是否通过
+（这正是 WireGuard-Android 走的同一条 API，属强先例、非实测）。失败则退到 **userspace netstack**：
+不碰设备、把 tun fd 的 IP 包喂给现有 p2p udp 隧道
 （Intra / tailscale-android 的同类做法；工作区里就有 `xjasonlyu/tun2socks` 可参考/复用）。
 另外 android 没有 netmon：Wi-Fi↔蜂窝切换后 relay wss 与打洞 socket 需重建，engine 的 5s 重拨
 能兜一部分，保活要在真机 + doze 下验证。
@@ -110,16 +113,44 @@ netstack**：不碰 netlink、不碰设备配置，把 tun fd 的 IP 包喂给�
 
 ## 下一阶段（Android）工作顺序
 
-1. **x**：`x/listener/tun/tun_linux.go` 加 `//go:build linux && !android`，新增 android 变体——从**注入的 fd**
-   `tun.CreateTUNFromFile`，跳过 netlink/addr/route/dns 与 `net.InterfaceByName`（只留 `net` 回来的 `ip` 供 keepalive 用）。
-   门禁 `go build ./... && go vet ./...`；**已实测 `GOOS=android` 当前能编译 linux 那版**，所以这一步是"换实现"而非"修编译"。
-2. **x 发版 + 版本链**：x 打 tag → bump `wisper/go.mod`（core 若未动则不动）→ `GOWORK=off go build ./...` 门禁。
-3. **wisper/android**：Kotlin 侧 `VpnService`（`prepare()` 弹窗 → `Builder` 配地址/路由/MTU/DNS → `establish()` 拿 fd →
-   `WisperJNI.setTunFd(fd)`；manifest 声明 `dataSync|systemExempted` + `FOREGROUND_SERVICE_SYSTEM_EXEMPTED`），
-   Go 侧 `lib.go`/`lib_jni.c` 加导出 + 把 fd 交给 listener。**设备配置由 Kotlin 读 `/api/entrypoints` 的 tun 定义得到**，
-   Java 与 Go 不各配一份。
-4. **验证**：emulator 上 `adb shell appops set run.gost.wisper ACTIVATE_VPN allow` 免弹窗，走既有 `make android-test-*`；
-   真机验证第 7 条那个未知项（`CreateTUNFromFile` 的 netlink 调用在 app netns 内是否成功），失败即启第 7 条的 netstack 退路。
+> **进展（2026-09-24）**：1、3 的代码已落地（x 已改、wisper Go/Kotlin/manifest 已改），
+> 2（x 发版与版本链）、4（真机验证）未做。实现时的取舍记在下面。
+
+1. ~~**x**：android 变体~~ **已完成**。`tun_linux.go` 加 `//go:build linux && !android`；新增 `tun_android.go`：
+   从 `fd` metadata `dup` 一份交给 `tun.CreateUnmonitoredTUNFromFD`，跳过 netlink/addr/route/dns 与
+   `net.InterfaceByName`（listenLoop 里那次查找改成只记日志——Android 上接口未必在本进程可见）。
+   `go build ./... && go vet ./...`（linux）+ `CGO_ENABLED=0 GOOS=android go build ./...` 通过。
+2. **x 发版 + 版本链**：x 打 tag（先 push tag）→ bump `wisper/go.mod` → `GOWORK=off go build ./...` 门禁。
+3. ~~**wisper/android**~~ **已完成**（细节见下）。Go：`tunnel/tunfd.go`（fd 保管 + `WaitTunFD`）、
+   `lib.go`/`lib_jni.c` 加 `wisperSetTunFdGo`、tun 入口点在 android 上等 fd（≤10s）并写进 listener metadata。
+   Kotlin：`WisperService` 改成 `VpnService`，由既有的 2s 轮询驱动（见下）。
+4. **验证（未做）**：emulator 上 `adb shell appops set run.gost.wisper ACTIVATE_VPN allow` 免弹窗，走既有 `make android-test-*`；
+   真机验证 `CreateUnmonitoredTUNFromFD`（含 `TUNGETIFF` 取名字、`initFromFlags`）在 app netns 内是否成功，
+   失败即启第 7 条的 netstack 退路。
+
+### 实现形态（2026-09-24）
+
+- **谁建立 VPN**：`WisperService` 的 2s 轮询（原本只拉 `/api/stats`）顺带拉 `/api/entrypoints`：有 tun 入口点
+  且尚未建立 → `VpnService.prepare(this)` 为 null（已授权）就地 `Builder.establish()` 并把 fd 交给 Go；
+  未授权则发一条通知（`prepare()` 的 Intent 做 PendingIntent），点开授权后下一轮轮询自动建立。
+  **不需要改 Activity、不需要改 Web UI**；emulator 上用 appops 免弹窗时全自动。
+- **两个竞态**：
+  ① 恢复运行中的入口点在 backend 起来时就启动，而 VPN 要等轮询（≤2s）→ Go 侧 `WaitTunFD` 等（≤10s），
+  正常情况下首次 start 就能成功；需要用户点通知授权的场景超过等待时间，才需要再点一次 start。
+  ② `onRevoke()`（被系统/其他 VPN 抢走）→ 清 fd、置未建立，轮询重新建立。
+- **一个 VPN、一个 tun 入口点**：Android 一个 app 只有一个 VpnService，两个 tun 入口点会同时读同一块设备。
+  v1 未拦截（UI 也不限制），文档里先记为已知限制。
+- **VPN 的生死跟随「有没有 tun 入口点」，而不是「它跑没跑」**：只要存在一个就建立（否则首次 start 永远
+  等不到设备），于是入口点全部停止时 VPN 也还挂着（系统栏有图标、虚拟网段没有出口）。v1 不在无 tun
+  入口点时主动拆掉，也不在改 net/routes/mtu 后重建（**改了要重启 App 或撤销 VPN 才生效**）。
+- **不做全流量也顺手防了一个坑**：`Builder.addDisallowedApplication(packageName)` 让本进程自己的套接字
+  绕开隧道（等价于给每个 p2p socket 调 `protect()` 的免侵入版），否则一旦有人把 routes 配成 `0.0.0.0/0`，
+  承载隧道的 wss/打洞流量会自己绕回 hub。
+- **前台服务类型**：manifest 声明 `dataSync|systemExempted` + `FOREGROUND_SERVICE_SYSTEM_EXEMPTED`；
+  API 34 上建立 VPN 后重新 `startForeground(..., DATA_SYNC or SYSTEM_EXEMPTED)`（`systemExempted`
+  只有「已经是 VPN」时才被接受）。
+- **MTU**：入口点未配时 Java 侧按 1420（= x 的 `defaultMTU`）设置，避免 Builder 默认 1500 超出 p2p 路径。
+- **设备名**：Android 上由系统命名（`VpnService` 不给名字），入口点的 `device_name` 在 Android 上无效。
 
 不在这一阶段：全流量出口（要 `protect()`，侵入 p2p/x）、tun↔tun 直连的手动链路。
 

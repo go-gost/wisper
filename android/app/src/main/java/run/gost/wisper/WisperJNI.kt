@@ -10,4 +10,11 @@ object WisperJNI {
 
     /** Stop the Go backend (persist state + graceful shutdown). */
     external fun stop()
+
+    /**
+     * Hand over the tun device fd of an established [android.net.VpnService].
+     * The Go side owns it from here, so detach it from the ParcelFileDescriptor
+     * first; pass -1 to release the device.
+     */
+    external fun setTunFd(fd: Int)
 }

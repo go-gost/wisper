@@ -5,4 +5,6 @@
     <string name="notification_channel_description">Shows that Wisper is running tunnels in the background</string>
     <string name="notification_running">Wisper running</string>
     <string name="notification_stop">Stop</string>
+    <string name="vpn_permission_title">Allow Wisper’s VPN</string>
+    <string name="vpn_permission_text">A tun entrypoint needs a VPN connection on this device. Tap to allow it.</string>
 </resources>

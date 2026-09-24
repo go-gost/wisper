@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Android 14: a foreground service that is a VPN must say so. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -52,9 +54,19 @@
             </intent-filter>
         </activity>
 
+        <!-- The backend host is also the app's VpnService: a tun entrypoint's
+             device can only come from one. BIND_VPN_SERVICE is held by the
+             system alone, so only it can drive the service through the VPN
+             intent; "systemExempted" is what an Android 14 VPN is allowed to
+             claim as a foreground type once it is one. -->
         <service
             android:name=".WisperService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:exported="true"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="dataSync|systemExempted">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
