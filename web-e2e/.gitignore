@@ -1,0 +1,8 @@
+# Unlike web-src, these deps are not vendored: the Playwright image provides
+# the browser, and the runner comes from a plain `npm install` (see
+# scripts/ui-test.sh).
+node_modules/
+
+# Run output: traces and the screenshots meant to be looked at.
+test-results/
+playwright-report/

@@ -34,6 +34,13 @@ make web-force
 # Run Go tests
 go test ./... -v
 go test ./api/ -v -run TestListTunnels  # single test suite
+
+# Run UI e2e (Playwright, renders the real page against a real wisper)
+# The browser comes from the official Playwright image via docker: this dev
+# container has no chromium and no root to install its libraries, and its
+# containers have no egress, so the runner is installed on the host instead.
+(cd web-e2e && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install)   # one-time
+make ui-test                        # writes screenshots to web-e2e/test-results/
 ```
 
 ## Architecture

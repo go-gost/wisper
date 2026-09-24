@@ -79,6 +79,15 @@ icons:
 typecheck:
 	cd web-src && npx tsc --noEmit
 
+# ----- UI e2e (Playwright) -----
+# Renders the real UI against a real wisper. The browser comes from the official
+# Playwright image because this container has no chromium and no root to install
+# its libraries; see scripts/ui-test.sh for the full picture. One-time setup:
+#   (cd web-e2e && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install)
+.PHONY: ui-test
+ui-test:
+	scripts/ui-test.sh
+
 # ----- Linux -----
 linux: $(DIST_DIR)/linux-amd64/$(BINARY)
 

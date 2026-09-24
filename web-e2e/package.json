@@ -1,0 +1,8 @@
+{
+  "name": "wisper-web-e2e",
+  "private": true,
+  "description": "Playwright UI tests for the embedded Lit app. Run them with scripts/ui-test.sh — they need a chromium that this dev container cannot host itself.",
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
