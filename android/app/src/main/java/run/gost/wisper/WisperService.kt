@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -255,24 +256,34 @@ class WisperService : VpnService() {
      * that entrypoint needs can only come from here. A tun entrypoint the user
      * has not permitted yet gets a nudge notification instead: establishing
      * needs the user's consent, which only an Activity can ask for.
+     *
+     * Every failure here is logged, never thrown: this runs on the poll thread,
+     * where an uncaught exception takes the whole service (and the backend with
+     * it) down.
      */
     private fun ensureVpn() {
-        if (vpnEstablished) return
+        try {
+            if (vpnEstablished) return
 
-        val ep = fetchTunEntrypoint() ?: return
+            val ep = fetchTunEntrypoint() ?: return
 
-        if (VpnService.prepare(this) != null) {
-            nudgeVpnPermission()
-            return
+            if (VpnService.prepare(this) != null) {
+                nudgeVpnPermission()
+                return
+            }
+
+            establishVpn(ep)
+        } catch (e: Exception) {
+            Log.w(TAG, "VPN poll failed", e)
         }
-
-        establishVpn(ep)
     }
 
     /** The first tun entrypoint the backend knows about, running or not. */
     private fun fetchTunEntrypoint(): JSONObject? {
         val body = httpGet("/api/entrypoints") ?: return null
-        val arr = JSONObject(body).optJSONArray("entrypoints") ?: return null
+        // The list endpoints answer a bare array — the {"entrypoints": …} shape
+        // is /api/stats's, not this one's.
+        val arr = JSONArray(body)
         for (i in 0 until arr.length()) {
             val ep = arr.optJSONObject(i) ?: continue
             if (ep.optString("type") == "tun") return ep
