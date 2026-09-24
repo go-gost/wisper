@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# wisper tun smoke: one hub and one spoke on this host, over a real DERP relay,
-# pinged through their tun devices.
+# wisper tun smoke: a gost tun server as the hub, a wisper p2p tunnel as its
+# outlet, and a wisper tun entrypoint as a spoke — pinged across the devices.
 #
-# Why: the unit tests stop at the metadata the two services describe — the
-# device itself needs /dev/net/tun and CAP_NET_ADMIN, so nothing in `go test`
-# can prove the data path. This script starts a real relay, a hub (a tun tunnel
-# + the p2p tunnel that carries its spokes) and a spoke (a tun entrypoint), then
-# pings across the devices in both directions.
+# Why: the unit tests stop at the metadata the spoke describes — the device
+# itself needs /dev/net/tun and CAP_NET_ADMIN, so nothing in `go test` can prove
+# the data path. This script starts a real relay, the hub (gost holds the
+# device; wisper routes the spokes to it) and a spoke (a wisper tun entrypoint),
+# then pings across the devices in both directions.
+#
+# The hub is deliberately NOT a wisper type: gost owns the device (so the wisper
+# process on the hub needs no privileges), and the existing p2p tunnel type
+# carries the spokes — its peer allowlist is the admission, in front of the tun
+# server's UDP port.
 #
 # The two devices live in ONE network namespace, which is why each side uses a
 # /32 address plus an explicit host route to the peer: two devices claiming the
@@ -14,8 +19,9 @@
 #
 # Usage:
 #   scripts/smoke-tun.sh [workdir]
-# Requires: root + CAP_NET_ADMIN + /dev/net/tun, openssl, ping, curl, and either
-# $DERPER_BIN or docker (to extract the relay from gogost/derper).
+# Requires: root + CAP_NET_ADMIN + /dev/net/tun, openssl, ping, curl, a gost
+# checkout next to this repo (or $GOST_BIN), and either $DERPER_BIN or docker
+# (to extract the relay from gogost/derper).
 # Exit code = number of failed checks; 0 with SKIP when unprivileged.
 
 set -uo pipefail
@@ -51,8 +57,9 @@ for c in curl openssl ping; do
 done
 
 mkdir -p "$W"
-HUB_CFG="$W/hub"; SPOKE_CFG="$W/spoke"
-rm -rf "$HUB_CFG" "$SPOKE_CFG"; mkdir -p "$HUB_CFG" "$SPOKE_CFG"
+HUB_CFG="$W/hub"; SPOKE_CFG="$W/spoke"; HUB_DIR="$W/hub-gost"
+rm -rf "$HUB_CFG" "$SPOKE_CFG" "$HUB_DIR"
+mkdir -p "$HUB_CFG" "$SPOKE_CFG" "$HUB_DIR"
 
 pids=()
 cleanup() {
@@ -70,6 +77,14 @@ if [ -z "$WISPER_BIN" ]; then
   say "building wisper"
   (cd "$ROOT" && CGO_ENABLED=0 go build -o "$W/wisper" .) || { echo "build failed" >&2; exit 1; }
   WISPER_BIN="$W/wisper"
+fi
+
+GOST_BIN="${GOST_BIN:-}"
+if [ -z "$GOST_BIN" ]; then
+  say "building gost (the hub's device)"
+  (cd "$ROOT/../gost" && CGO_ENABLED=0 go build -o "$W/gost" ./cmd/gost/...) \
+    || { echo "gost build failed (set \$GOST_BIN to skip)" >&2; exit 1; }
+  GOST_BIN="$W/gost"
 fi
 
 DERPER_BIN="${DERPER_BIN:-}"
@@ -105,7 +120,7 @@ say "starting derper on $DERP_PORT"
 pids+=($!)
 
 for _ in $(seq 1 50); do
-  if curl -sk --max-time 1 "https://127.0.0.1:$DERP_PORT/" >/dev/null 2>&1; then break; fi
+  curl -sk --max-time 1 "https://127.0.0.1:$DERP_PORT/" >/dev/null 2>&1 && break
   sleep 0.2
 done
 if curl -sk --max-time 2 "https://127.0.0.1:$DERP_PORT/" >/dev/null 2>&1; then
@@ -115,10 +130,36 @@ else
   exit $fail
 fi
 
+# --- the hub: gost holds the device ----------------------------------------
+
+cat >"$HUB_DIR/gost.yml" <<YAML
+services:
+  - name: tun-server
+    addr: $TUN_ADDR
+    handler:
+      type: tun          # no chain and no forwarder: server mode
+      metadata:
+        keepalive: true  # expire the route of a spoke that left (3x ttl)
+        ttl: 10s
+    listener:
+      type: tun
+      metadata:
+        name: whis-hub
+        net: $HUB_IP/32
+        route: $SPOKE_IP/32
+        mtu: 1420
+log:
+  level: info
+YAML
+
+say "starting gost tun server on $TUN_ADDR"
+"$GOST_BIN" -C "$HUB_DIR/gost.yml" >"$HUB_DIR/gost.log" 2>&1 &
+pids+=($!)
+
 # --- instances --------------------------------------------------------------
 
-start_wisper() { # <name> <config-dir> <api-addr>
-  XDG_CONFIG_HOME="$2" "$WISPER_BIN" -addr "$3" >"$2/wisper.log" 2>&1 &
+start_wisper() { # <config-dir> <api-addr>
+  XDG_CONFIG_HOME="$1" "$WISPER_BIN" -addr "$2" >"$1/wisper.log" 2>&1 &
   pids+=($!)
 }
 
@@ -134,9 +175,9 @@ pubkey() { # <api-addr>
   curl -s "http://$1/api/p2p" | sed -n 's/.*"public_key":"\([^"]*\)".*/\1/p'
 }
 
-say "starting the hub ($HUB_API) and the spoke ($SPOKE_API)"
-start_wisper hub "$HUB_CFG" "$HUB_API"
-start_wisper spoke "$SPOKE_CFG" "$SPOKE_API"
+say "starting the hub's wisper ($HUB_API) and the spoke ($SPOKE_API)"
+start_wisper "$HUB_CFG" "$HUB_API"
+start_wisper "$SPOKE_CFG" "$SPOKE_API"
 
 wait_api "$HUB_API" || { bad "hub API did not come up"; exit $fail; }
 wait_api "$SPOKE_API" || { bad "spoke API did not come up"; exit $fail; }
@@ -168,22 +209,18 @@ post() { # <api-addr> <path> <json>
 
 # --- the network ------------------------------------------------------------
 
-say "hub: the device and the tunnel that carries the spokes"
-code=$(post "$HUB_API" /api/tunnels "{
-  \"name\": \"hub\", \"type\": \"tun\", \"endpoint\": \"$TUN_ADDR\",
-  \"net\": \"$HUB_IP/32\", \"routes\": \"$SPOKE_IP/32\",
-  \"keepalive\": true, \"ttl\": 15
-}")
-[ "$code" = 201 ] || { bad "creating the hub's tun tunnel returned $code"; exit $fail; }
-
+# The hub's outlet is a plain p2p tunnel: every inbound datagram stream from an
+# allowlisted key is bridged to the tun server's UDP port, and an unlisted key
+# is refused before any dial happens.
+say "hub: a p2p tunnel whose target is the tun server"
 code=$(post "$HUB_API" /api/tunnels "{
   \"name\": \"hub-spokes\", \"type\": \"p2p\", \"endpoint\": \"$TUN_ADDR\",
   \"peers\": [{\"key\": \"$SPOKE_KEY\"}]
 }")
 [ "$code" = 201 ] || { bad "creating the hub's p2p tunnel returned $code"; exit $fail; }
-ok "hub is serving the tun server on $TUN_ADDR"
+ok "hub is routing allowlisted peers to $TUN_ADDR"
 
-say "spoke: a device that joins it"
+say "spoke: a device that joins the network"
 code=$(post "$SPOKE_API" /api/entrypoints "{
   \"name\": \"spoke\", \"type\": \"tun\", \"peer\": \"$HUB_KEY\",
   \"net\": \"$SPOKE_IP/32\", \"routes\": \"$HUB_IP/32\",
@@ -198,7 +235,7 @@ ok "spoke device is up"
 # registration, so allow a few seconds before judging.
 ping_until() { # <dst> <checks>
   for _ in $(seq 1 "$2"); do
-    if ping -c 1 -W 2 "$1" >/dev/null 2>&1; then return 0; fi
+    ping -c 1 -W 2 "$1" >/dev/null 2>&1 && return 0
     sleep 1
   done
   return 1
@@ -216,20 +253,21 @@ else
   bad "spoke cannot reach the hub ($HUB_IP)"
 fi
 
-# The device carries the packets through the service, so its counters must have
-# moved — a ping that "works" while the tunnel is idle would mean the kernel
-# answered locally instead of the traffic crossing the network.
+# The datagrams crossed the p2p tunnel, so its counters must have moved — a ping
+# that "works" while the tunnel is idle would mean the kernel answered locally
+# instead of the traffic crossing the network.
 if curl -s "http://$HUB_API/api/tunnels" | grep -q '"output_bytes":[1-9]'; then
-  ok "the hub's device counted traffic"
+  ok "the hub's p2p tunnel carried the traffic"
 else
-  bad "the hub's device counted nothing: $(curl -s "http://$HUB_API/api/tunnels")"
+  bad "the hub's p2p tunnel counted nothing: $(curl -s "http://$HUB_API/api/tunnels")"
 fi
 
 if [ "$fail" != 0 ]; then
   # wisper logs under its config dir, not on stdout (the redirect only catches
   # a start-up failure).
-  say "hub log"; tail -n 40 "$HUB_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$HUB_CFG/wisper.log"
+  say "hub wisper log"; tail -n 40 "$HUB_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$HUB_CFG/wisper.log"
   say "spoke log"; tail -n 40 "$SPOKE_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$SPOKE_CFG/wisper.log"
+  say "gost log"; tail -n 20 "$HUB_DIR/gost.log"
   say "derper log"; tail -n 20 "$DERP_DIR/derper.log"
 fi
 

@@ -98,7 +98,6 @@ const zh: Record<string, string> = {
   typeUdpEntryDesc: '将隧道端点暴露为本地 UDP 端口',
   typeP2pEntryDesc: '按公钥把本地流量转发到对端（p2p 入口点）。',
   typeTun: 'TUN',
-  typeTunDesc: '本机持有 tun 设备，为接入的各节点转发',
   typeTunEntryDesc: '加入对端搭建的虚拟网络（tun 设备）',
 
   // Notifications
@@ -156,8 +155,6 @@ const zh: Record<string, string> = {
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
   tunKeepaliveHint:
     '把本机地址注册到 hub 的 tun server 并维持路由；hub 侧用于让已离开 spoke 的路由过期。仅点对点 tun↔tun 链路适合关闭。',
-  tunHubHint:
-    '设备就是网络本身：各 spoke 用标准 tun 客户端接入。再建一条 p2p 隧道，endpoint 填同一地址、允许列表填各 spoke 公钥。',
   tunSpokeHint:
     '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
   peersTitle: '允许的对端',

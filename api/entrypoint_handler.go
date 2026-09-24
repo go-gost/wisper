@@ -3,7 +3,9 @@ package api
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
@@ -50,6 +52,59 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.RoutesOption(r.Routes),
 		tunnel.DNSOption(r.DNS),
 	}
+}
+
+// validateTunNet rejects a device address the tun listener would otherwise
+// skip silently: x splits "net" and drops every entry it cannot parse, so a
+// typo would start a device with no address at all.
+func validateTunNet(netStr string) error {
+	if strings.TrimSpace(netStr) == "" {
+		return fmt.Errorf("net is required: the device address, e.g. 10.10.0.1/24")
+	}
+	for _, s := range strings.Split(netStr, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if _, _, err := net.ParseCIDR(s); err != nil {
+			return fmt.Errorf("invalid net %q: %v", s, err)
+		}
+	}
+	return nil
+}
+
+// validateTunRoutes checks the optional route list ("cidr [gw]" pairs). Like
+// net, an unparseable entry is skipped by the listener, so a typo would leave a
+// subnet unreachable with no error anywhere.
+func validateTunRoutes(routes string) error {
+	for _, s := range strings.Split(routes, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		fields := strings.Fields(s)
+		if _, _, err := net.ParseCIDR(fields[0]); err != nil {
+			return fmt.Errorf("invalid route %q: %v", fields[0], err)
+		}
+		if len(fields) > 1 && net.ParseIP(fields[1]) == nil {
+			return fmt.Errorf("invalid route gateway %q", fields[1])
+		}
+	}
+	return nil
+}
+
+// validateTunDNS checks the optional comma-separated DNS server list.
+func validateTunDNS(dns string) error {
+	for _, s := range strings.Split(dns, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if net.ParseIP(s) == nil {
+			return fmt.Errorf("invalid dns server %q", s)
+		}
+	}
+	return nil
 }
 
 // validateEntryPointRequest rejects a request the runtime cannot honor, before

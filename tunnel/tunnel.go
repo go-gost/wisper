@@ -51,9 +51,6 @@ const (
 	TCPTunnel  = "tcp"
 	UDPTunnel  = "udp"
 	P2PTunnel  = "p2p"
-	// TunTunnel is a hub: this node holds the tun device and the hub kernel
-	// routes between the spokes whose datagrams arrive over a p2p tunnel.
-	TunTunnel = "tun"
 )
 
 var (
@@ -96,11 +93,12 @@ type Options struct {
 	// (and shown on the peers page) but given no route, so their new streams
 	// are closed while established ones drain.
 	PeerDisabled []string
-	// Net is a tun device's address: a CIDR, or several comma-separated.
+	// Net is a tun entrypoint's device address: a CIDR, or several
+	// comma-separated.
 	Net string
-	// MTU is the tun device's MTU (0 leaves the implementation default).
+	// MTU is the device's MTU (0 leaves the implementation default).
 	MTU int
-	// DeviceName is the tun device's name (empty lets the kernel choose).
+	// DeviceName is the device's name (empty lets the kernel choose).
 	DeviceName string
 	// Routes are the subnets routed through the device, comma-separated
 	// "cidr [gw]" pairs.
@@ -473,18 +471,11 @@ func RestartRunning() {
 			EnableTLS:    p.opts.EnableTLS,
 			RewriteHost:  p.opts.RewriteHost,
 			FileUpload:   p.opts.FileUpload,
-			Keepalive:    p.opts.Keepalive,
-			TTL:          p.opts.TTL,
 			RecordMode:   p.opts.RecordMode,
 			Peers:        p.opts.Peers,
 			PeerAliases:  p.opts.PeerAliases,
 			PeerDisabled: p.opts.PeerDisabled,
 			Protocol:     p.opts.Protocol,
-			Net:          p.opts.Net,
-			MTU:          p.opts.MTU,
-			DeviceName:   p.opts.DeviceName,
-			Routes:       p.opts.Routes,
-			DNS:          p.opts.DNS,
 			CreatedAt:    p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -567,19 +558,12 @@ func LoadConfig() {
 			EnableTLS:     cfg.EnableTLS,
 			RewriteHost:   cfg.RewriteHost,
 			FileUpload:    cfg.FileUpload,
-			Keepalive:     cfg.Keepalive,
-			TTL:           cfg.TTL,
 			RecordMode:    cfg.RecordMode,
 			Peer:          cfg.Peer,
 			Protocol:      cfg.Protocol,
 			Peers:         cfg.Peers,
 			PeerAliases:   NormalizePeerAliases(cfg.Peers, cfg.PeerAliases),
 			PeerDisabled:  NormalizePeerDisabled(cfg.Peers, cfg.PeerDisabled),
-			Net:           cfg.Net,
-			MTU:           cfg.MTU,
-			DeviceName:    cfg.DeviceName,
-			Routes:        cfg.Routes,
-			DNS:           cfg.DNS,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -624,19 +608,12 @@ func SaveConfig() error {
 			EnableTLS:     opts.EnableTLS,
 			RewriteHost:   opts.RewriteHost,
 			FileUpload:    opts.FileUpload,
-			Keepalive:     opts.Keepalive,
-			TTL:           opts.TTL,
 			RecordMode:    opts.RecordMode,
 			Peer:          opts.Peer,
 			Protocol:      opts.Protocol,
 			Peers:         opts.Peers,
 			PeerAliases:   opts.PeerAliases,
 			PeerDisabled:  opts.PeerDisabled,
-			Net:           opts.Net,
-			MTU:           opts.MTU,
-			DeviceName:    opts.DeviceName,
-			Routes:        opts.Routes,
-			DNS:           opts.DNS,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -700,8 +677,6 @@ func NewByType(st string, options ...Option) Tunnel {
 		return NewUDPTunnel(options...)
 	case P2PTunnel:
 		return NewP2PTunnel(options...)
-	case TunTunnel:
-		return NewTunTunnel(options...)
 	}
 	return nil
 }

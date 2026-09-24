@@ -1,5 +1,11 @@
 # wisper 集成 tun 组网 评估
 
+> **状态（2026-09-24，实施后修订）**：只落地了 **spoke**（wisper 的 `tun` 入口点）。**hub 没有做成 wisper 类型**：
+> 设备由 gost 进程持有（tun server，见 `play/p2p-tun-hub/gost.yml`），wisper 只跑一条**现有的 p2p 隧道**
+> 把各 spoke 桥到它的 UDP 口（`endpoint` 填 tun server 的地址），**白名单仍是准入**——未列出的 key 在拨号前就被关流。
+> 理由：设备持有者不需要 wisper，因此 hub 上的 wisper 无需特权；hub 类型的实现见提交 `8411554`/`31141c9`，
+> 随后删除（历史里保留）。本文其余部分（含 Android 章节）不受影响。
+
 2026-09-24 评估。**结论：可集成，p2p 侧零改动**。前提是 p2p 侧的 tun hub 已改为 gost 侧实现
 （`udp://` target outlet + gost 的 tun **server** 持有设备，p2p 只当管道、零 per-peer 状态，
 见 `p2p/docs/2026-09-12-p2p-hub-mode.md` 顶部「已被取代」与 `2026-09-13-p2p-udp-target-streams.md`）。
