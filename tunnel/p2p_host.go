@@ -227,8 +227,8 @@ func (m *p2pHostManager) release() {
 	}
 }
 
-// notePending records a refused knock. Safe to call without the lock: dispatch
-// has already dropped it by the time it gets here.
+// notePending records a refused knock. It takes the manager's lock itself, so
+// callers must not hold it.
 func (m *p2pHostManager) notePending(key string) {
 	if key == "" {
 		return
@@ -265,7 +265,7 @@ func (m *p2pHostManager) expirePendingLocked(now time.Time) {
 }
 
 // evictOldestPendingLocked makes room by dropping the least recently seen
-// entry.
+// entry; ties fall to map iteration order, which is fine for a notice list.
 func (m *p2pHostManager) evictOldestPendingLocked() {
 	var oldest string
 	var at time.Time

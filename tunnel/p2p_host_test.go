@@ -471,6 +471,16 @@ func TestPendingPeersRecordAndDismiss(t *testing.T) {
 	if n := len(m.pendingSnapshot()); n != 0 {
 		t.Fatalf("pending = %d entries after dismiss, want 0", n)
 	}
+
+	// Newest first: the page shows the most recent ask at the top.
+	for i, key := range []string{"key-old", "key-mid", "key-new"} {
+		m.notePending(key)
+		m.pending[key].LastSeen = time.Now().Add(time.Duration(i) * time.Second)
+	}
+	ordered := m.pendingSnapshot()
+	if len(ordered) != 3 || ordered[0].Key != "key-new" || ordered[2].Key != "key-old" {
+		t.Fatalf("pending order = %+v, want key-new, key-mid, key-old", ordered)
+	}
 }
 
 // TestPendingPeersExpireAndEvict: the list is a notice, not a log — an entry
