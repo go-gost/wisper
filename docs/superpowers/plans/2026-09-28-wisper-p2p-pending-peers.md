@@ -303,9 +303,10 @@ func TestPendingPeersClearedWithHost(t *testing.T) {
 	}
 }
 
-// TestP2PPendingPeersFiltersListedKeys: a key another tunnel lists — or this
-// one lists as disabled, which keeps it off the host's route table too — is not
-// a requesting peer. It already has a row of its own on the peers page.
+// TestP2PPendingPeersFiltersListedKeys: a key any tunnel lists is not a
+// requesting peer — it already has a row of its own on the peers page. A
+// switched-off key is listed too (the disabled set is a subset of the listed
+// one), so the same pass covers it.
 func TestP2PPendingPeersFiltersListedKeys(t *testing.T) {
 	t.Chdir(t.TempDir()) // Delete/SaveConfig reach for ./wisper.yaml without a config dir
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -384,21 +385,19 @@ Add the two package-level functions next to `P2PHostRunning()`:
 
 ```go
 // P2PPendingPeers returns the keys that knocked and are on no allowlist,
-// newest first. Keys any tunnel lists — enabled or disabled — are dropped: a
-// disabled peer is off the host's route table too, so its streams land in the
-// record path, and it already has a row of its own on the peers page.
+// newest first. Every key any tunnel lists is dropped — enabled or disabled:
+// the disabled set is normalized to a subset of the listed one wherever it is
+// set (see PeerDisabledOption), and the peers page renders its rows from the
+// listed set, so one pass over Peers covers both and a switched-off peer keeps
+// the row it already has instead of gaining a "requesting" one.
 func P2PPendingPeers() []PendingPeer {
 	known := make(map[string]struct{})
-	for i := 0; i < Count(); i++ {
+	for i, n := 0, Count(); i < n; i++ {
 		t := GetIndex(i)
 		if t == nil {
 			continue
 		}
-		opts := t.Options()
-		for _, k := range opts.Peers {
-			known[k] = struct{}{}
-		}
-		for _, k := range opts.PeerDisabled {
+		for _, k := range t.Options().Peers {
 			known[k] = struct{}{}
 		}
 	}
@@ -651,7 +650,7 @@ In `web-src/src/i18n/en.ts`, after the existing `peers*` keys:
   peersPendingJustNow: 'just now',
   peersPendingMinutes: '{n} min ago',
   peersPendingHint:
-    'These keys knocked but are on no allowlist. A p2p stream carries no destination, so which tunnel they wanted is unknown — Add puts the key on this one.',
+    'These keys knocked but are on no allowlist. A p2p stream carries no destination, so which tunnel they wanted is unknown — Add puts the key on this one. Dismiss only clears the notice: a peer that keeps knocking comes back, so add it and switch it off to stop the rows for good.',
 ```
 
 In `web-src/src/i18n/zh.ts`, at the same place:
@@ -664,7 +663,7 @@ In `web-src/src/i18n/zh.ts`, at the same place:
   peersPendingJustNow: '刚刚',
   peersPendingMinutes: '{n} 分钟前',
   peersPendingHint:
-    '这些公钥敲过门，但不在任何白名单里。p2p 流不带目的地，无法得知它想连哪条隧道——「加到这条隧道」就是把它加到这里。',
+    '这些公钥敲过门，但不在任何白名单里。p2p 流不带目的地，无法得知它想连哪条隧道——「加到这条隧道」就是把它加到这里。「忽略」只是清掉记录：对方继续敲门就会再出现，想彻底不再看到它，就把它加进来再禁用。',
 ```
 
 - [ ] **Step 2: Fetch the list with the page's own refresh**
