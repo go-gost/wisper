@@ -294,6 +294,16 @@ export interface InspectorQueryResponse {
 
 export type ProtocolType = 'http' | 'websocket';
 
+// ─── Pending peers ───────────────────────────────────────────────────────────
+
+/** One key that knocked on the p2p host without being on any allowlist. */
+export interface PendingPeer {
+  key: string;
+  first_seen: string;
+  last_seen: string;
+  attempts: number;
+}
+
 // ─── Version ───────────────────────────────────────────────────────────
 
 /** Response from GET /api/version. */

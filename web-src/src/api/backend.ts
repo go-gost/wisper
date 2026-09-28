@@ -3,6 +3,7 @@ import type {
   AppSettingsUpdate,
   Entrypoint,
   EntrypointCreateRequest,
+  PendingPeer,
   StatsSnapshot,
   Tunnel,
   TunnelCreateRequest,
@@ -197,5 +198,18 @@ export class GoBackend {
     error?: string;
   }> {
     return this.request('POST', '/api/p2p/test-stun', req);
+  }
+
+  /** Keys that knocked on the shared host without being on any tunnel's
+   *  allowlist, newest first. The list is process-wide: a p2p stream carries
+   *  no destination, so a knock cannot be attributed to a tunnel. */
+  listPendingPeers(): Promise<{ peers: PendingPeer[] }> {
+    return this.request('GET', '/api/p2p/pending');
+  }
+
+  /** Forget one knock. The peer is refused either way — this only clears the
+   *  notice — so an unknown key is not an error. */
+  dismissPendingPeer(key: string): Promise<void> {
+    return this.request('DELETE', `/api/p2p/pending/${encodeURIComponent(key)}`);
   }
 }
