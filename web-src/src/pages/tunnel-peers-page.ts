@@ -3,10 +3,11 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { getTunnels, subscribe, updatePeers } from '../store/tunnel-store';
+import { GoBackend } from '../api/backend';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, maskKey } from '../utils/format';
 import { transportStyle } from '../utils/transport';
-import type { Peer, Tunnel } from '../api/types';
+import type { Peer, PendingPeer, Tunnel } from '../api/types';
 import '../components/app-scaffold';
 
 /** One allowlist row. */
@@ -64,6 +65,10 @@ export class TunnelPeersPage extends LitElement {
   @state() private _confirmDelete: number | null = null;
   @state() private _showKeys = false;
   @state() private _snackbar = '';
+  private _backend = new GoBackend();
+  /** Keys that knocked and are on no allowlist. Process-wide, so it is fetched
+   *  here rather than read from the tunnel store. */
+  @state() private _pending: PendingPeer[] = [];
   private _unsub: (() => void) | null = null;
 
   connectedCallback() {
@@ -85,6 +90,17 @@ export class TunnelPeersPage extends LitElement {
     const t2 = getTunnels().find(x => x.id === this.tunnelId) ?? null;
     this._tunnel = t2;
     this._rows = rowsOf(t2);
+    void this._loadPending();
+  }
+
+  /** A failed fetch keeps the last list and changes nothing else: the rows this
+   *  page exists for are unaffected. */
+  private async _loadPending() {
+    try {
+      this._pending = (await this._backend.listPendingPeers()).peers ?? [];
+    } catch {
+      // Leave the previous list in place.
+    }
   }
 
   private _startEdit(i: number) {
@@ -111,6 +127,32 @@ export class TunnelPeersPage extends LitElement {
     const next = this._rows.map((r, j) => (j === i ? { ...r, disabled: !r.disabled } : r));
     await this._save(next);
   };
+
+  /** _addPending puts a requesting key on this tunnel's list: the peers page is
+   *  the attribution — the knock itself does not say which tunnel it wanted. */
+  private _addPending = async (key: string) => {
+    if (await this._save([...this._rows, { key, alias: '', disabled: false }])) {
+      this._pending = this._pending.filter(p => p.key !== key);
+    }
+  };
+
+  private _dismissPending = async (key: string) => {
+    try {
+      await this._backend.dismissPendingPeer(key);
+      this._pending = this._pending.filter(p => p.key !== key);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '';
+      this._showSnackbar(`${t('saveFailed')}${msg ? ': ' + msg : ''}`);
+    }
+  };
+
+  /** _ago keeps the row's age coarse: an entry is gone ten minutes after its
+   *  last knock, so minutes are the whole resolution that matters. */
+  private _ago(iso: string): string {
+    const secs = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+    if (secs < 60) return t('peersPendingJustNow');
+    return t('peersPendingMinutes', { n: Math.floor(secs / 60) });
+  }
 
   /** _saveRow persists the draft (replacing or appending) and re-reads the list. */
   private _saveRow = async () => {
@@ -254,6 +296,39 @@ export class TunnelPeersPage extends LitElement {
 
         ${t2
           ? html`
+            ${this._pending.length > 0
+              ? html`
+                <div class="section">
+                  <div class="card">
+                    <div class="pending-head">
+                      ${t('peersPendingTitle')} (${this._pending.length})
+                    </div>
+                    ${this._pending.map(p => html`
+                      <div class="peer-row">
+                        <div class="row-line">
+                          <span class="peer-key">${this._showKeys ? p.key : maskKey(p.key)}</span>
+                          <span class="peer-age">
+                            ${t('peersPendingAttempts', { n: p.attempts })} · ${this._ago(p.last_seen)}
+                          </span>
+                          <span class="row-actions">
+                            <button class="icon-btn accent" title="${t('peersPendingAdd')}"
+                              ?disabled=${this._saving}
+                              @click=${() => this._addPending(p.key)}>
+                              ${icon('plus')}
+                            </button>
+                            <button class="icon-btn" title="${t('peersPendingDismiss')}"
+                              @click=${() => this._dismissPending(p.key)}>
+                              ${icon('close')}
+                            </button>
+                          </span>
+                        </div>
+                      </div>
+                    `)}
+                    <div class="hint">${t('peersPendingHint')}</div>
+                  </div>
+                </div>
+              `
+              : nothing}
             <div class="section">
               <div class="card">
                 ${this._rows.length === 0 && this._editing !== 'new'
@@ -451,6 +526,15 @@ export class TunnelPeersPage extends LitElement {
       color: var(--text-muted);
       overflow-wrap: anywhere;
       line-height: 1.4;
+    }
+    .pending-head {
+      font-weight: 600;
+      padding: 4px 0 8px;
+    }
+    .peer-age {
+      color: var(--text-secondary);
+      font-size: var(--font-xs);
+      white-space: nowrap;
     }
     .peer-stats {
       display: flex;

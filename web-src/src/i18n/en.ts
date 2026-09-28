@@ -184,6 +184,14 @@ const en: Record<string, string> = {
   peersDisabledHint:
     'Disabled: the key stays on the list but takes no new connections; established ones drain.',
   peersNoneHint: 'No peers configured: this tunnel is running but unreachable.',
+  peersPendingTitle: 'Requesting peers',
+  peersPendingAdd: 'Add to this tunnel',
+  peersPendingDismiss: 'Dismiss',
+  peersPendingAttempts: '{n} attempts',
+  peersPendingJustNow: 'just now',
+  peersPendingMinutes: '{n} min ago',
+  peersPendingHint:
+    'These keys knocked but are on no allowlist. A p2p stream carries no destination, so which tunnel they wanted is unknown — Add puts the key on this one.',
   notFound: 'Not found.',
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (the inner protocol is plaintext).',
   p2pIdentity: 'P2P Identity',
