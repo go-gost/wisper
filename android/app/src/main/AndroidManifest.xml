@@ -54,16 +54,25 @@
             </intent-filter>
         </activity>
 
-        <!-- The backend host is also the app's VpnService: a tun entrypoint's
-             device can only come from one. BIND_VPN_SERVICE is held by the
-             system alone, so only it can drive the service through the VPN
-             intent; "systemExempted" is what an Android 14 VPN is allowed to
-             claim as a foreground type once it is one. -->
+        <!-- The backend: a plain foreground service that hosts the Go process
+             and decides whether a VPN device is needed. "systemExempted" is
+             what an Android 14 app with a VPN is allowed to claim as a
+             foreground type, so it is declared here and taken on when a device
+             comes up. -->
         <service
             android:name=".WisperService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|systemExempted" />
+
+        <!-- The VPN device, a VpnService of its own so that it can be stopped:
+             only a stopped VpnService clears the system VPN, and a VPN nobody
+             needs must not stay up (it blackholes traffic once its interface is
+             gone). BIND_VPN_SERVICE is held by the system alone, so only it can
+             drive the service through the VPN intent. -->
+        <service
+            android:name=".TunVpnService"
             android:exported="true"
-            android:permission="android.permission.BIND_VPN_SERVICE"
-            android:foregroundServiceType="dataSync|systemExempted">
+            android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>

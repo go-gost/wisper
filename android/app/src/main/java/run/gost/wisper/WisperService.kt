@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.VpnService
@@ -21,12 +22,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Hosts the Go backend in the foreground and owns the tun device a tun
- * entrypoint needs: on Android an unprivileged app cannot open /dev/net/tun, so
- * the device has to come from a VpnService, and its fd is handed to the Go side
- * (see [WisperJNI.setTunFd]).
+ * Hosts the Go backend in the foreground, and decides whether the app needs a
+ * VPN device: a tun entrypoint is the only thing that wants one, so this
+ * service polls for a running one and asks [TunVpnService] for the device (or
+ * for its release).
+ *
+ * The device itself lives in that other service because only a *stopped*
+ * VpnService clears a VPN — see the note there.
  */
-class WisperService : VpnService() {
+class WisperService : Service() {
 
     companion object {
         private const val TAG = "WisperService"
@@ -35,9 +39,6 @@ class WisperService : VpnService() {
         private const val VPN_NOTIFICATION_ID = 2
         private const val POLL_INTERVAL_MS = 2000L
         private const val BACKEND_URL = "http://127.0.0.1:8900"
-
-        /** Matches the tun listener's default when the entrypoint sets none. */
-        private const val DEFAULT_MTU = 1420
     }
 
     // ---------------------------------------------------------------
@@ -56,33 +57,26 @@ class WisperService : VpnService() {
     // ---------------------------------------------------------------
     // VPN
     // ---------------------------------------------------------------
-    /** Whether a VpnService device is up and its fd handed to the Go side. */
-    @Volatile
-    private var vpnEstablished = false
-
     /**
      * A tun device config the UI handed over before creating or updating its
      * entrypoint. The entrypoint cannot be created before its device exists, and
-     * the device can only come from here, so the form arms the VPN with its own
-     * values. Dropped once the entrypoint carrying those values is running: from
-     * then on the running entrypoint, not the form, decides whether the VPN is
-     * needed.
+     * the device can only come from VpnService, so the form arms the VPN with
+     * its own values. Dropped once the entrypoint carrying those values is
+     * running: from then on the running entrypoint, not the form, decides
+     * whether the VPN is needed.
      */
     @Volatile
     private var armedOptions: JSONObject? = null
 
-    /** The device the running VPN was built from, to notice a changed one. */
+    /** Whether the foreground promotion for a VPN has already been done; the
+     *  service type cannot be taken back, and asking for it twice is noise. */
     @Volatile
-    private var establishedConfig: String? = null
-
-    // ---------------------------------------------------------------
-    // VPN establishment
-    // ---------------------------------------------------------------
+    private var vpnPromoted = false
 
     /**
-     * Remembers the tun device config the UI is about to create, and brings the
-     * VPN up for it. Called from the web UI (through the Activity's bridge)
-     * before it posts a tun entrypoint.
+     * Remembers the tun device config the UI is about to create, so the next
+     * poll can bring the device up for it. Called from the web UI (through the
+     * Activity's bridge) before it posts a tun entrypoint.
      */
     fun armVpn(net: String, routes: String, mtu: Int, dns: String) {
         armedOptions = JSONObject().apply {
@@ -100,7 +94,7 @@ class WisperService : VpnService() {
     }
 
     /** Whether a device is up — what the UI waits for before creating its entrypoint. */
-    fun vpnReady(): Boolean = vpnEstablished
+    fun vpnReady(): Boolean = VpnStatus.established
 
     /**
      * Brings the VPN up for the tun device the app is about to use — the armed
@@ -121,60 +115,62 @@ class WisperService : VpnService() {
             // to be created or updated its device. Once the entrypoint carrying
             // those values is running they are redundant — and they must not
             // outlive it, or a stopped entrypoint would keep the VPN up.
-            if (running != null && armed != null && deviceConfig(armed) == deviceConfig(running)) {
+            if (running != null && armed != null && deviceOf(armed).config() == deviceOf(running).config()) {
                 armedOptions = null
             }
 
             val opts = armedOptions ?: running
             if (opts == null) {
-                teardownVpn()
+                // Nothing wants a device. Releasing is what stops the VPN from
+                // outliving its reason — including the system's idea of it,
+                // which only a stopped VpnService clears.
+                if (VpnStatus.established) {
+                    Log.i(TAG, "no running tun entrypoint: releasing the VPN device")
+                    TunVpnService.release(this)
+                }
                 return
             }
 
-            if (vpnEstablished) {
-                if (establishedConfig == deviceConfig(opts)) return
-                // A changed config needs a new device; the old one goes away
-                // with it, so a running entrypoint has to be started again.
-                Log.i(TAG, "VPN config changed, re-establishing")
+            val device = deviceOf(opts)
+            if (VpnStatus.established && VpnStatus.config == device.config()) {
+                // A device is up: a consent lost since (the user or another VPN
+                // took it away) deserves a fresh nudge, not the old flag.
+                vpnNudged = false
+                promoteForegroundForVpn()
+                return
             }
 
+            // Consent belongs to the Activity (only it can show the dialog), so
+            // a missing one is a nudge, not an attempt.
             if (VpnService.prepare(this) != null) {
                 nudgeVpnPermission()
                 return
             }
 
-            establishVpn(opts)
+            if (VpnStatus.established) {
+                // A changed config needs a new device; the old one goes away
+                // with it, so a running entrypoint has to be started again.
+                Log.i(TAG, "VPN config changed, re-establishing")
+            }
+            TunVpnService.ensure(this, device)
         } catch (e: Exception) {
             Log.w(TAG, "VPN poll failed", e)
         }
     }
 
     /**
-     * Releases the device when nothing needs it any more. The Go side holds the
-     * last copy of the fd (a stopped entrypoint closed its own), so the tun
-     * interface goes away as soon as it lets go — which is the whole point:
-     * wisper is not a VPN app, and a user who runs no tun entrypoint should not
-     * be carrying one.
+     * The fields that define the device. The form's armed values and an
+     * entrypoint's stored options describe the same device with different key
+     * sets, so comparing whole JSON objects would call every swap between the
+     * two a change and rebuild the device — which kills the copy the running
+     * entrypoint holds.
      */
-    private fun teardownVpn() {
-        if (!vpnEstablished) return
-        Log.i(TAG, "no running tun entrypoint: releasing the VPN device")
-        WisperJNI.setTunFd(-1)
-        vpnEstablished = false
-        establishedConfig = null
-    }
-
-    /**
-     * The fields that define the device, in a fixed order. The form's armed
-     * values and an entrypoint's stored options describe the same device with
-     * different key sets, so comparing whole JSON objects would call every swap
-     * between the two a change and rebuild the device — which kills the copy the
-     * running entrypoint holds. mtu is read as a number, so an omitted (zero)
-     * one and an explicit zero compare equal.
-     */
-    private fun deviceConfig(opts: JSONObject): String =
-        listOf("net", "routes", "dns").joinToString("|") { opts.optString(it, "") } +
-            "|" + opts.optInt("mtu", 0)
+    private fun deviceOf(opts: JSONObject): VpnStatus.Device = VpnStatus.Device(
+        net = opts.optString("net"),
+        routes = opts.optString("routes"),
+        mtu = opts.optInt("mtu"),
+        dns = opts.optString("dns"),
+    )
 
     /** The permission nudge is posted once, not on every poll. */
     private var vpnNudged = false
@@ -245,19 +241,6 @@ class WisperService : VpnService() {
         WisperJNI.setTunFd(-1)
         WisperJNI.stop()
         super.onDestroy()
-    }
-
-    /**
-     * The system tore the VPN down (another VPN took over, or the user
-     * disconnected it). The fd is gone with it, so drop it and let the poll
-     * establish it again.
-     */
-    override fun onRevoke() {
-        Log.w(TAG, "VPN revoked by the system")
-        vpnEstablished = false
-        vpnNudged = false
-        WisperJNI.setTunFd(-1)
-        super.onRevoke()
     }
 
     // ---------------------------------------------------------------
@@ -384,68 +367,15 @@ class WisperService : VpnService() {
     }
 
     /**
-     * Builds the device from the entrypoint's own definition — the Java side and
-     * the Go side must not each keep a copy of the addresses, routes, MTU and
-     * DNS — and hands the resulting fd to Go.
-     */
-    private fun establishVpn(opts: JSONObject) {
-        val builder = Builder().setSession(getString(R.string.app_name))
-
-        val addresses = cidrs(opts.optString("net"))
-        if (addresses.isEmpty()) {
-            Log.w(TAG, "tun entrypoint has no usable address")
-            return
-        }
-        for ((addr, prefix) in addresses) {
-            builder.addAddress(addr, prefix)
-        }
-        for ((addr, prefix) in cidrs(opts.optString("routes"))) {
-            builder.addRoute(addr, prefix)
-        }
-        // The listener falls back to 1420 when the entrypoint sets no MTU; the
-        // device has to match that, or packets will not fit the p2p path.
-        val mtu = opts.optInt("mtu")
-        builder.setMtu(if (mtu > 0) mtu else DEFAULT_MTU)
-        for (dns in opts.optString("dns").split(",").map { it.trim() }.filter { it.isNotEmpty() }) {
-            builder.addDnsServer(dns)
-        }
-        // Our own sockets must not enter the tunnel: the p2p link that carries
-        // it would loop back through the hub. (An allowlist alternative to
-        // VpnService.protect, which would need a hook in every p2p socket.)
-        try {
-            builder.addDisallowedApplication(packageName)
-        } catch (e: Exception) {
-            Log.w(TAG, "addDisallowedApplication failed", e)
-        }
-
-        val pfd = try {
-            builder.establish()
-        } catch (e: Exception) {
-            Log.e(TAG, "establish failed", e)
-            null
-        }
-        if (pfd == null) {
-            Log.e(TAG, "establish returned no device")
-            return
-        }
-
-        // The Go side owns the device from here: it copies the fd per tun
-        // device, so an entrypoint restart keeps working without a new VPN.
-        WisperJNI.setTunFd(pfd.detachFd())
-        vpnEstablished = true
-        establishedConfig = deviceConfig(opts)
-        Log.i(TAG, "VPN established for ${opts.optString("net")}")
-
-        promoteForegroundForVpn()
-    }
-
-    /**
      * Android 14 requires the "systemExempted" foreground service type for a
      * VPN, and only accepts it once the app is one, so the type follows the
-     * VPN.
+     * VPN. The type cannot be taken back, so one promotion per process is
+     * enough — and a second one would only repeat the notification.
      */
     private fun promoteForegroundForVpn() {
+        if (vpnPromoted) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        vpnPromoted = true
         try {
             startForeground(
                 NOTIFICATION_ID,
@@ -481,21 +411,6 @@ class WisperService : VpnService() {
 
         getSystemService(NotificationManager::class.java)
             .notify(VPN_NOTIFICATION_ID, notification)
-    }
-
-    /**
-     * Splits a comma-separated "cidr [gw]" list (what "net" and "routes" hold)
-     * into address/prefix pairs. A gateway is ignored: VpnService routes are
-     * on-link.
-     */
-    private fun cidrs(value: String?): List<Pair<String, Int>> {
-        if (value.isNullOrBlank()) return emptyList()
-        return value.split(",").mapNotNull { entry ->
-            val cidr = entry.trim().substringBefore(" ").trim()
-            val addr = cidr.substringBefore("/")
-            val prefix = cidr.substringAfter("/", "").toIntOrNull()
-            if (addr.isEmpty() || prefix == null || prefix !in 0..128) null else addr to prefix
-        }
     }
 
     private fun sumRates(arr: org.json.JSONArray?): Pair<Long, Long> {

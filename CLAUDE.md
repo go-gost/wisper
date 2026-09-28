@@ -252,12 +252,15 @@ and pulled; when the registry is unreachable `make android-image` builds it from
 `android/Dockerfile.android` instead. `make android-release` (signed, CI's path) still builds the
 web UI on the host.
 
-The Android service (`android/app/src/main/java/run/gost/wisper/WisperService.kt`) is a
-`VpnService`: an unprivileged app cannot open `/dev/net/tun`, so a tun entrypoint's device is
-created there and its fd handed to Go (`WisperJNI.setTunFd` → `tunnel.SetTunFD` → the listener's
-`fd` metadata). The 2s stats poll doubles as the VPN driver — it establishes the VPN once a tun
-entrypoint exists, or posts a permission nudge when consent is missing. One VPN, so one tun
-entrypoint.
+The Android side runs two services. `WisperService` hosts the Go backend in the foreground and
+decides whether a VPN is needed: its 2s poll looks for a *running* tun entrypoint (or the values the
+entrypoint form armed for one it is about to create) and drives the device service accordingly.
+`TunVpnService` is a `VpnService` that owns the device itself — an unprivileged app cannot open
+`/dev/net/tun`, so the device comes from it and its fd is handed to Go (`WisperJNI.setTunFd` →
+`tunnel.SetTunFD` → the listener's `fd` metadata). It is separate because only a *stopped*
+VpnService clears a VPN: releasing the fd leaves the system routing through a VPN whose interface is
+gone, which blackholes every app's traffic. It stops itself when nothing needs it, so a user with no
+running tun entrypoint carries no VPN. One VPN, so one tun entrypoint.
 
 The app process has neither `$XDG_CONFIG_HOME` nor `$HOME`: every path it derives must come from the
 config directory the app passes to `config.Init` (`config.Dir()`), not from `os.UserConfigDir()`.
