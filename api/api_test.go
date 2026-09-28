@@ -1034,6 +1034,16 @@ func TestPendingPeersEndpoint(t *testing.T) {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
 
+	raw, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	// The field must be present and empty: that is why the response is a
+	// wrapper object rather than a bare array.
+	if !strings.Contains(string(raw), `"peers":[]`) {
+		t.Fatalf("body = %s, want an empty peers array", raw)
+	}
+
 	var body struct {
 		Peers []struct {
 			Key       string `json:"key"`
@@ -1042,7 +1052,7 @@ func TestPendingPeersEndpoint(t *testing.T) {
 			Attempts  int    `json:"attempts"`
 		} `json:"peers"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+	if err := json.Unmarshal(raw, &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(body.Peers) != 0 {
