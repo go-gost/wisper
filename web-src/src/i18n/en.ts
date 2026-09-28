@@ -192,6 +192,7 @@ const en: Record<string, string> = {
   peersPendingMinutes: '{n} min ago',
   peersPendingHint:
     'These keys knocked but are on no allowlist. A p2p stream carries no destination, so which tunnel they wanted is unknown — Add puts the key on this one. Dismiss only clears the notice: a peer that keeps knocking comes back, so add it and switch it off to stop the rows for good.',
+  peersPendingBadge: '{n} requesting',
   notFound: 'Not found.',
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (the inner protocol is plaintext).',
   p2pIdentity: 'P2P Identity',

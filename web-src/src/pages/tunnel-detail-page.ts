@@ -7,6 +7,7 @@ import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
+import { GoBackend } from '../api/backend';
 import type { Tunnel, TunnelType, TunnelCreateRequest } from '../api/types';
 import '../components/app-scaffold';
 
@@ -51,6 +52,12 @@ export class TunnelDetailPage extends LitElement {
   @state() private _showPassword = false;
   @state() private _recordMode = 'off';
   @state() private _showPeers = false;
+  /** How many keys are knocking on the process-wide host; shown on the peers
+   *  entry. The list is not per-tunnel — a p2p stream carries no destination —
+   *  so this is a count, not a per-tunnel allowlist field. */
+  @state() private _pendingCount = 0;
+
+  private _backend = new GoBackend();
 
   // Native bridge detection
   private get _isNativeDirPicker(): boolean {
@@ -89,7 +96,20 @@ export class TunnelDetailPage extends LitElement {
     this._unsubs = [];
   }
 
+  /** A failed fetch keeps the last count: the entry itself is unaffected. */
+  private async _loadPendingCount() {
+    try {
+      this._pendingCount = (await this._backend.listPendingPeers()).peers?.length ?? 0;
+    } catch {
+      // Leave the previous count in place.
+    }
+  }
+
   private _load() {
+    // Only a p2p tunnel owns an allowlist to answer a knock from, so only that
+    // type asks for the count.
+    if (this.tunnelType === 'p2p') void this._loadPendingCount();
+
     const id = this.tunnelId;
     // Check for ?edit query in URL
     const isEdit = window.location.search.includes('edit');
@@ -1074,6 +1094,11 @@ export class TunnelDetailPage extends LitElement {
                             : t('peersNoneHint')}
                         </div>
                       </div>
+                      ${this._pendingCount > 0
+                        ? html`<span style="font-size:var(--font-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
+                            ${t('peersPendingBadge').replace('{n}', String(this._pendingCount))}
+                          </span>`
+                        : nothing}
                       <span style="color:var(--text-muted);">&rarr;</span>
                     </div>
                   </div>
