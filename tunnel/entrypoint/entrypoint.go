@@ -3,6 +3,7 @@ package entrypoint
 import (
 	"errors"
 	"log/slog"
+	"runtime"
 	"sync"
 
 	"github.com/go-gost/wisper/config"
@@ -24,6 +25,39 @@ var (
 
 // EntryPoint is an alias for tunnel.Tunnel used by entrypoint types.
 type EntryPoint = tunnel.Tunnel
+
+// restore starts one restored entrypoint, and closes it if it cannot start —
+// the same fate a config load has always given a broken entrypoint.
+//
+// The one exception is an Android tun entrypoint, whose device belongs to the
+// app's VpnService. The app learns what device to build by reading this
+// backend's /api/entrypoints, and this backend only starts listening once every
+// restored entrypoint has been started (see Start) — so waiting inline for that
+// device starves the very wait (tun.go's vpnDeviceWait) it depends on, and
+// marks the entrypoint failed on every cold start. Starting it in the
+// background lets the API answer, the VPN come up and the device arrive while
+// the entrypoint is still waiting for it.
+func restore(goos string, ep EntryPoint) {
+	fail := func(err error) {
+		if err != nil {
+			slog.Error("restore entrypoint", "name", ep.Name(), "err", err)
+			ep.Close()
+		}
+	}
+
+	if restoreAsync(goos, ep) {
+		go func() { fail(ep.Run()) }()
+		return
+	}
+	fail(ep.Run())
+}
+
+// restoreAsync reports whether a restored entrypoint starts off the startup
+// path: an Android tun one, and nothing else — a device elsewhere is local, and
+// a p2p entrypoint binds a socket, so both are best reported at boot.
+func restoreAsync(goos string, ep EntryPoint) bool {
+	return goos == "android" && ep.Type() == TunEntryPoint
+}
 
 type entryPointList struct {
 	list []EntryPoint
@@ -219,8 +253,8 @@ func LoadConfig() {
 
 		if cfg.Closed {
 			ep.Close()
-		} else if err := ep.Run(); err != nil {
-			ep.Close()
+		} else {
+			restore(runtime.GOOS, ep)
 		}
 
 		ep.Favorite(cfg.Favorite)

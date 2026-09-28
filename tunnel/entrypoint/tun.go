@@ -275,8 +275,22 @@ func (s *tunEntryPoint) Run() (err error) {
 	}
 
 	s.mu.Lock()
-	s.forward, s.acquired = forward, true
+	// A restored Android entrypoint is started off the startup path, so Close
+	// can land while this Run is still waiting for its device. Under this lock
+	// is the only place that can be told apart: Close closes cclose before it
+	// takes the lock, so a Run that sees it here must not publish its service —
+	// nothing would ever close it.
+	closed := s.IsClosed()
+	if !closed {
+		s.forward, s.acquired = forward, true
+	}
 	s.mu.Unlock()
+
+	if closed {
+		_ = forward.Close()
+		return ErrEntryPointClosed // the deferred rollback releases the rest
+	}
+
 	started = true // the reference and the provider are Close's now
 
 	go func() {
