@@ -50,9 +50,10 @@ type tunEntryPoint struct {
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
 
-	cclose chan struct{}
-	err    error
-	mu     sync.RWMutex
+	cclose    chan struct{}
+	closeOnce sync.Once
+	err       error
+	mu        sync.RWMutex
 }
 
 // NewTunEntryPoint creates a tun entrypoint: a device whose traffic exits
@@ -328,27 +329,27 @@ func (s *tunEntryPoint) SetStatsBaseline(baseline cfg.ServiceStats) {
 // provider and gives the shared host reference back. It is idempotent; the
 // shared identity file is kept so stop/start keeps the same key.
 func (s *tunEntryPoint) Close() error {
-	defer func() {
-		select {
-		case <-s.cclose:
-		default:
-			close(s.cclose)
-		}
-	}()
-
-	s.mu.Lock()
-	forward, acquired := s.forward, s.acquired
-	s.forward, s.acquired = nil, false
-	s.mu.Unlock()
-
 	var err error
-	if forward != nil {
-		err = forward.Close()
-	}
-	registry.P2PRegistry().Unregister(s.provider)
-	if acquired {
-		tunnel.ReleaseP2PHost()
-	}
+	s.closeOnce.Do(func() {
+		close(s.cclose)
+
+		s.mu.Lock()
+		forward, acquired := s.forward, s.acquired
+		s.forward, s.acquired = nil, false
+		s.mu.Unlock()
+
+		if forward != nil {
+			err = forward.Close()
+		}
+		// Only the first Close may touch the shared registry: a replacement
+		// reuses the name (the ID survives an update), and Unregister closes
+		// the value it finds, so a repeat call would take the successor's p2p
+		// host down with the name.
+		registry.P2PRegistry().Unregister(s.provider)
+		if acquired {
+			tunnel.ReleaseP2PHost()
+		}
+	})
 	return err
 }
 

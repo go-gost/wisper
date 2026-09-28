@@ -172,3 +172,41 @@ func TestP2PEntryPointUDPProtocol(t *testing.T) {
 		t.Fatalf("bound address %T is not a UDP address", addr)
 	}
 }
+
+// TestStaleCloseKeepsSuccessorProvider: an update closes the old entrypoint,
+// starts its replacement — same ID, so the same provider name — and closes the
+// old one again on the way out. That second Close must not unregister a name
+// its successor now holds: Unregister closes the value it finds, so it would
+// take the replacement's p2p host down with it, leaving a link that is dead
+// while the entrypoint still reports "running".
+func TestStaleCloseKeepsSuccessorProvider(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+
+	// Same ID before and after the update: an update keeps it, so both
+	// objects claim the same provider name.
+	const provider = "p2p-ep-stale-close"
+	start := func() EntryPoint {
+		ep := NewP2PEntryPoint(
+			tp.IDOption("stale-close"),
+			tp.EndpointOption("127.0.0.1:0"),
+			tp.PeerOption(testPeerKey),
+		)
+		if err := ep.Run(); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		return ep
+	}
+
+	old := start()
+	old.Close()
+
+	next := start()
+	defer next.Close()
+
+	old.Close() // the handler closes the old one again after the swap
+
+	if !registry.P2PRegistry().IsRegistered(provider) {
+		t.Fatal("a stale Close unregistered the successor's provider")
+	}
+}

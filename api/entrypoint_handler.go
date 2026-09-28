@@ -245,8 +245,10 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Swap: only delete old after new is running successfully.
-	old.Close()
+	// Swap: only delete old after new is running successfully. It is already
+	// closed (above), so Delete's own Close is the repeat a second explicit one
+	// would only duplicate — while the replacement is up, every extra Close is
+	// another chance to unregister the name the new entrypoint now holds.
 	entrypoint.Delete(id)
 
 	entrypoint.Add(ep)
