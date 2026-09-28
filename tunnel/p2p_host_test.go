@@ -540,9 +540,10 @@ func TestPendingPeersClearedWithHost(t *testing.T) {
 	}
 }
 
-// TestP2PPendingPeersFiltersListedKeys: a key another tunnel lists — or this
-// one lists as disabled, which keeps it off the host's route table too — is not
-// a requesting peer. It already has a row of its own on the peers page.
+// TestP2PPendingPeersFiltersListedKeys: a key any tunnel lists is not a
+// requesting peer — it already has a row of its own on the peers page. A
+// switched-off key is listed too (the disabled set is a subset of the listed
+// one), so the same pass covers it.
 func TestP2PPendingPeersFiltersListedKeys(t *testing.T) {
 	t.Chdir(t.TempDir()) // Delete/SaveConfig reach for ./wisper.yaml without a config dir
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

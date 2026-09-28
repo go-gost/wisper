@@ -114,21 +114,19 @@ func P2PHostRunning() bool {
 }
 
 // P2PPendingPeers returns the keys that knocked and are on no allowlist,
-// newest first. Keys any tunnel lists — enabled or disabled — are dropped: a
-// disabled peer is off the host's route table too, so its streams land in the
-// record path, and it already has a row of its own on the peers page.
+// newest first.
 func P2PPendingPeers() []PendingPeer {
+	// Every key any tunnel lists, enabled or disabled: the disabled set is
+	// normalized to a subset of the listed one on every write path, so one pass
+	// over Peers covers both — and a switched-off peer has a row of its own on
+	// the peers page rather than a "requesting" one.
 	known := make(map[string]struct{})
-	for i := 0; i < Count(); i++ {
+	for i, n := 0, Count(); i < n; i++ {
 		t := GetIndex(i)
 		if t == nil {
 			continue
 		}
-		opts := t.Options()
-		for _, k := range opts.Peers {
-			known[k] = struct{}{}
-		}
-		for _, k := range opts.PeerDisabled {
+		for _, k := range t.Options().Peers {
 			known[k] = struct{}{}
 		}
 	}
