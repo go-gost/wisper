@@ -1,15 +1,15 @@
-import{a as _,j as s,s as y,g as x,B as m,b as i,A as c,i as w,t as $}from"./index--uHW3G_R.js";import{c as k,a as h,b as f,m as E,n as g,r as p}from"./format-DKlYYG-u.js";import{i as d}from"./app-scaffold-Dieqd4un.js";import{c as z}from"./clipboard-C3x8_sid.js";import{a as D}from"./transport-DmC8uBma.js";var K=Object.defineProperty,C=Object.getOwnPropertyDescriptor,o=(e,t,r,a)=>{for(var l=a>1?void 0:a?C(t,r):t,u=e.length-1,b;u>=0;u--)(b=e[u])&&(l=(a?b(t,r,l):b(l))||l);return a&&l&&K(t,r,l),l};function P(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function v(e){return(e?.options.peers??[]).map(t=>({key:t.key,alias:t.alias??"",disabled:t.disabled===!0}))}let n=class extends _{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:"",disabled:!1},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._unsub=null,this._toggleRow=async e=>{const t=this._rows.map((r,a)=>a===e?{...r,disabled:!r.disabled}:r);await this._save(t)},this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim(),disabled:this._draft.disabled===!0};if(!P(e.key)){this._rowError=s("peersKeyInvalid");return}if(this._rows.filter((a,l)=>l!==this._editing).some(a=>a.key===e.key)){this._rowError=s("peersKeyDuplicate");return}const r=this._editing==="new"?[...this._rows,e]:this._rows.map((a,l)=>l===this._editing?e:a);await this._save(r)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,r)=>r!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=y(()=>this._load())}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=x().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=v(e)}_startEdit(e){this._editing=e,this._draft={...this._rows[e]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:"",disabled:!1},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await m(this.tunnelId,e.map(r=>({key:r.key,alias:r.alias||void 0,disabled:r.disabled||void 0})));return this._tunnel=t,this._rows=v(t),this._showSnackbar(s("saved")),!0}catch(t){const r=t instanceof Error?t.message:"",a=`${s("saveFailed")}${r?": "+r:""}`;return this._editing!==null?this._rowError=a:this._showSnackbar(a),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderStats(e){const t=this._statFor(e);return t?i`
-      <span>${k(t.current_conns)} ${s("p2pColConns")}</span>
-      <span>↓ ${h(t.output_bytes)} <span class="rate">${f(t.output_rate_bytes)}</span></span>
-      <span>↑ ${h(t.input_bytes)} <span class="rate">${f(t.input_rate_bytes)}</span></span>
-    `:i`<span class="muted">${s("peersNoTraffic")}</span>`}_renderTransport(e){const t=D(this._statFor(e)?.transport);return t?i`<span class="peer-badge ${t.tone}" title=${t.hint}>
-      ${d(t.icon)}<span>${t.label}</span>
-    </span>`:c}_renderEditor(){return i`
+import{a as y,G as m,j as s,s as x,g as w,B as $,b as a,A as c,i as k,t as P}from"./index-n54CfwP6.js";import{c as E,a as u,b as g,m as f,n as _,r as p}from"./format-Dv6x1l-2.js";import{i as d}from"./app-scaffold-CmY38wOK.js";import{c as z}from"./clipboard-C3x8_sid.js";import{a as D}from"./transport-mJ-YNvBf.js";var K=Object.defineProperty,C=Object.getOwnPropertyDescriptor,o=(t,e,i,n)=>{for(var l=n>1?void 0:n?C(e,i):e,h=t.length-1,b;h>=0;h--)(b=t[h])&&(l=(n?b(e,i,l):b(l))||l);return n&&l&&K(e,i,l),l};function T(t){if(!/^[A-Za-z0-9_-]{43}$/.test(t))return!1;try{const e=t+"=".repeat((4-t.length%4)%4);return atob(e.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function v(t){return(t?.options.peers??[]).map(e=>({key:e.key,alias:e.alias??"",disabled:e.disabled===!0}))}let r=class extends y{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:"",disabled:!1},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._backend=new m,this._pending=[],this._unsub=null,this._toggleRow=async t=>{const e=this._rows.map((i,n)=>n===t?{...i,disabled:!i.disabled}:i);await this._save(e)},this._addPending=async t=>{await this._save([...this._rows,{key:t,alias:"",disabled:!1}])&&(this._pending=this._pending.filter(e=>e.key!==t))},this._dismissPending=async t=>{try{await this._backend.dismissPendingPeer(t),this._pending=this._pending.filter(e=>e.key!==t)}catch(e){const i=e instanceof Error?e.message:"";this._showSnackbar(`${s("saveFailed")}${i?": "+i:""}`)}},this._saveRow=async()=>{const t={key:this._draft.key.trim(),alias:this._draft.alias.trim(),disabled:this._draft.disabled===!0};if(!T(t.key)){this._rowError=s("peersKeyInvalid");return}if(this._rows.filter((n,l)=>l!==this._editing).some(n=>n.key===t.key)){this._rowError=s("peersKeyDuplicate");return}const i=this._editing==="new"?[...this._rows,t]:this._rows.map((n,l)=>l===this._editing?t:n);await this._save(i)&&(this._editing=null,this._rowError="")},this._deleteRow=async t=>{this._confirmDelete=null,await this._save(this._rows.filter((e,i)=>i!==t))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=x(()=>this._load())}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const t=w().find(e=>e.id===this.tunnelId)??null;this._tunnel=t,this._rows=v(t),this._loadPending()}async _loadPending(){try{this._pending=(await this._backend.listPendingPeers()).peers??[]}catch{}}_startEdit(t){this._editing=t,this._draft={...this._rows[t]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:"",disabled:!1},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}_ago(t){const e=Math.max(0,(Date.now()-Date.parse(t))/1e3);return e<60?s("peersPendingJustNow"):s("peersPendingMinutes",{n:Math.floor(e/60)})}async _save(t){if(this._saving)return!1;this._saving=!0;try{const e=await $(this.tunnelId,t.map(i=>({key:i.key,alias:i.alias||void 0,disabled:i.disabled||void 0})));return this._tunnel=e,this._rows=v(e),this._showSnackbar(s("saved")),!0}catch(e){const i=e instanceof Error?e.message:"",n=`${s("saveFailed")}${i?": "+i:""}`;return this._editing!==null?this._rowError=n:this._showSnackbar(n),!1}finally{this._saving=!1}}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar=""},2500)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(t){return(this._tunnel?.peer_stats??[]).find(e=>e.key===t)}_renderStats(t){const e=this._statFor(t);return e?a`
+      <span>${E(e.current_conns)} ${s("p2pColConns")}</span>
+      <span>↓ ${u(e.output_bytes)} <span class="rate">${g(e.output_rate_bytes)}</span></span>
+      <span>↑ ${u(e.input_bytes)} <span class="rate">${g(e.input_rate_bytes)}</span></span>
+    `:a`<span class="muted">${s("peersNoTraffic")}</span>`}_renderTransport(t){const e=D(this._statFor(t)?.transport);return e?a`<span class="peer-badge ${e.tone}" title=${e.hint}>
+      ${d(e.icon)}<span>${e.label}</span>
+    </span>`:c}_renderEditor(){return a`
       <div class="peer-row editing">
         <div class="row-line">
           <input class="form-input alias grow" .value=${this._draft.alias}
             placeholder=${s("peersAliasPlaceholder")}
-            @input=${e=>{this._draft={...this._draft,alias:e.target.value}}}>
+            @input=${t=>{this._draft={...this._draft,alias:t.target.value}}}>
           <button class="icon-btn" title="${s("btnCancel")}" @click=${()=>this._cancelEdit()}>
             ${d("close")}
           </button>
@@ -20,10 +20,10 @@ import{a as _,j as s,s as y,g as x,B as m,b as i,A as c,i as w,t as $}from"./ind
         </div>
         <input class="form-input key ${this._rowError?"invalid":""}" .value=${this._draft.key}
           placeholder=${s("peersKeyPlaceholder")}
-          @input=${e=>{this._draft={...this._draft,key:e.target.value},this._rowError=""}}>
-        ${this._rowError?i`<div class="row-error">${this._rowError}</div>`:c}
+          @input=${t=>{this._draft={...this._draft,key:t.target.value},this._rowError=""}}>
+        ${this._rowError?a`<div class="row-error">${this._rowError}</div>`:c}
       </div>
-    `}render(){const e=this._tunnel;return i`
+    `}render(){const t=this._tunnel;return a`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`)}>
@@ -36,40 +36,71 @@ import{a as _,j as s,s as y,g as x,B as m,b as i,A as c,i as w,t as $}from"./ind
           </button>
         </div>
 
-        ${e?i`
+        ${t?a`
+            ${this._pending.length>0?a`
+                <div class="section">
+                  <div class="card">
+                    <div class="pending-head">
+                      ${s("peersPendingTitle")} (${this._pending.length})
+                    </div>
+                    ${this._pending.map(e=>a`
+                      <div class="peer-row">
+                        <div class="row-line">
+                          <span class="peer-key">${this._showKeys?e.key:f(e.key)}</span>
+                          <span class="peer-age">
+                            ${s("peersPendingAttempts",{n:e.attempts})} · ${this._ago(e.last_seen)}
+                          </span>
+                          <span class="row-actions">
+                            <button class="icon-btn accent" title="${s("peersPendingAdd")}"
+                              ?disabled=${this._saving}
+                              @click=${()=>this._addPending(e.key)}>
+                              ${d("plus")}
+                            </button>
+                            <button class="icon-btn" title="${s("peersPendingDismiss")}"
+                              @click=${()=>this._dismissPending(e.key)}>
+                              ${d("close")}
+                            </button>
+                          </span>
+                        </div>
+                      </div>
+                    `)}
+                    <div class="hint">${s("peersPendingHint")}</div>
+                  </div>
+                </div>
+              `:c}
             <div class="section">
               <div class="card">
-                ${this._rows.length===0&&this._editing!=="new"?i`<div class="empty">${s("peersEmpty")}</div>`:c}
-                ${this._rows.map((t,r)=>this._editing===r?this._renderEditor():i`
-                    <div class="peer-row ${t.disabled?"off":""}">
+                ${this._rows.length===0&&this._editing!=="new"?a`<div class="empty">${s("peersEmpty")}</div>`:c}
+                ${this._rows.map((e,i)=>this._editing===i?this._renderEditor():a`
+                    <div class="peer-row ${e.disabled?"off":""}">
                       <div class="row-line">
-                        <span class="peer-alias">${t.alias||s("peersNoAlias")}</span>
-                        ${t.disabled?i`<span class="peer-badge" title=${s("peersDisabledHint")}>${s("peersDisabled")}</span>`:this._renderTransport(t.key)}
+                        <span class="peer-alias">${e.alias||s("peersNoAlias")}</span>
+                        ${e.disabled?a`<span class="peer-badge" title=${s("peersDisabledHint")}>${s("peersDisabled")}</span>`:this._renderTransport(e.key)}
                         <span class="row-actions">
-                          <button class="icon-btn" title="${t.disabled?s("peersEnable"):s("peersDisable")}"
+                          <button class="icon-btn" title="${e.disabled?s("peersEnable"):s("peersDisable")}"
                             ?disabled=${this._saving}
-                            @click=${()=>this._toggleRow(r)}>
-                            ${d(t.disabled?"play":"stop")}
+                            @click=${()=>this._toggleRow(i)}>
+                            ${d(e.disabled?"play":"stop")}
                           </button>
-                          <button class="icon-btn" title="${s("btnCopy")}" @click=${()=>z(t.key)}>
+                          <button class="icon-btn" title="${s("btnCopy")}" @click=${()=>z(e.key)}>
                             ${d("copy")}
                           </button>
-                          <button class="icon-btn" title="${s("btnEdit")}" @click=${()=>this._startEdit(r)}>
+                          <button class="icon-btn" title="${s("btnEdit")}" @click=${()=>this._startEdit(i)}>
                             ${d("edit")}
                           </button>
                           <button class="icon-btn danger" title="${s("btnDelete")}"
-                            @click=${()=>{this._confirmDelete=r}}>
+                            @click=${()=>{this._confirmDelete=i}}>
                             ${d("trash")}
                           </button>
                         </span>
                       </div>
-                      <div class="peer-key">${this._showKeys?t.key:E(t.key)}</div>
-                      <div class="peer-stats">${this._renderStats(t.key)}</div>
+                      <div class="peer-key">${this._showKeys?e.key:f(e.key)}</div>
+                      <div class="peer-stats">${this._renderStats(e.key)}</div>
                     </div>
                   `)}
                 ${this._editing==="new"?this._renderEditor():c}
 
-                ${this._editing===null?i`
+                ${this._editing===null?a`
                     <button class="add-row" @click=${()=>this._startAdd()}>
                       ${d("plus")} ${s("peersAdd")}
                     </button>`:c}
@@ -77,13 +108,13 @@ import{a as _,j as s,s as y,g as x,B as m,b as i,A as c,i as w,t as $}from"./ind
 
               <div class="hint">${s("peersHint")}</div>
               <div class="hint">${s("peersRestartHint")}</div>
-              ${this._rows.length===0?i`<div class="hint">${s("peersNoneHint")}</div>`:c}
+              ${this._rows.length===0?a`<div class="hint">${s("peersNoneHint")}</div>`:c}
             </div>
-          `:i`<div class="section"><div class="card"><div class="empty">${s("notFound")}</div></div></div>`}
+          `:a`<div class="section"><div class="card"><div class="empty">${s("notFound")}</div></div></div>`}
 
-        ${this._confirmDelete!==null?i`
+        ${this._confirmDelete!==null?a`
             <div class="dialog-overlay" @click=${()=>{this._confirmDelete=null}}>
-              <div class="dialog-box" @click=${t=>t.stopPropagation()}>
+              <div class="dialog-box" @click=${e=>e.stopPropagation()}>
                 <div class="dialog-title">${s("deleteConfirmTitle")}</div>
                 <div class="dialog-message">${s("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
@@ -98,9 +129,9 @@ import{a as _,j as s,s as y,g as x,B as m,b as i,A as c,i as w,t as $}from"./ind
               </div>
             </div>`:c}
 
-        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:c}
+        ${this._snackbar?a`<div class="toast">${this._snackbar}</div>`:c}
       </app-scaffold>
-    `}};n.styles=w`
+    `}};r.styles=k`
     .back-btn {
       background: none;
       border: none;
@@ -219,6 +250,15 @@ import{a as _,j as s,s as y,g as x,B as m,b as i,A as c,i as w,t as $}from"./ind
       color: var(--text-muted);
       overflow-wrap: anywhere;
       line-height: 1.4;
+    }
+    .pending-head {
+      font-weight: 600;
+      padding: 4px 12px 8px;
+    }
+    .peer-age {
+      color: var(--text-secondary);
+      font-size: var(--font-xs);
+      white-space: nowrap;
     }
     .peer-stats {
       display: flex;
@@ -390,4 +430,4 @@ import{a as _,j as s,s as y,g as x,B as m,b as i,A as c,i as w,t as $}from"./ind
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       z-index: 100;
     }
-  `;o([g()],n.prototype,"tunnelType",2);o([g()],n.prototype,"tunnelId",2);o([p()],n.prototype,"_tunnel",2);o([p()],n.prototype,"_rows",2);o([p()],n.prototype,"_editing",2);o([p()],n.prototype,"_draft",2);o([p()],n.prototype,"_saving",2);o([p()],n.prototype,"_rowError",2);o([p()],n.prototype,"_confirmDelete",2);o([p()],n.prototype,"_showKeys",2);o([p()],n.prototype,"_snackbar",2);n=o([$("tunnel-peers-page")],n);export{n as TunnelPeersPage};
+  `;o([_()],r.prototype,"tunnelType",2);o([_()],r.prototype,"tunnelId",2);o([p()],r.prototype,"_tunnel",2);o([p()],r.prototype,"_rows",2);o([p()],r.prototype,"_editing",2);o([p()],r.prototype,"_draft",2);o([p()],r.prototype,"_saving",2);o([p()],r.prototype,"_rowError",2);o([p()],r.prototype,"_confirmDelete",2);o([p()],r.prototype,"_showKeys",2);o([p()],r.prototype,"_snackbar",2);o([p()],r.prototype,"_pending",2);r=o([P("tunnel-peers-page")],r);export{r as TunnelPeersPage};
