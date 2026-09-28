@@ -459,6 +459,17 @@ func TestPendingPeersEndpoint(t *testing.T) {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
 
+	raw, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	// The field must be present and empty: that is why the response is a
+	// wrapper object rather than a bare array, and decoding into a struct would
+	// accept {"peers":null} just as happily.
+	if !strings.Contains(string(raw), `"peers":[]`) {
+		t.Fatalf("body = %s, want an empty peers array", raw)
+	}
+
 	var body struct {
 		Peers []struct {
 			Key       string `json:"key"`
@@ -467,7 +478,7 @@ func TestPendingPeersEndpoint(t *testing.T) {
 			Attempts  int    `json:"attempts"`
 		} `json:"peers"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+	if err := json.Unmarshal(raw, &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(body.Peers) != 0 {
@@ -508,7 +519,7 @@ Expected: FAIL with `404` — the routes do not exist yet.
 
 - [ ] **Step 3: Implement the handlers**
 
-Append to `api/p2p_handler.go` (add `"time"` to its imports):
+Append to `api/p2p_handler.go` (no new import: the timestamps go through `time.Time` methods, so nothing here names the `time` package — adding it would not compile):
 
 ```go
 // pendingPeerResponse is one refused knock as the UI reads it.
