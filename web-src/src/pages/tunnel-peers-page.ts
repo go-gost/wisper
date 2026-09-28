@@ -529,7 +529,7 @@ export class TunnelPeersPage extends LitElement {
     }
     .pending-head {
       font-weight: 600;
-      padding: 4px 0 8px;
+      padding: 4px 12px 8px;
     }
     .peer-age {
       color: var(--text-secondary);
