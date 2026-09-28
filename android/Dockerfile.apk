@@ -27,6 +27,7 @@ COPY --from=web /web /wisper/web
 RUN --mount=type=cache,target=/root/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/root/.gradle \
+    --mount=type=cache,target=/root/.android \
     set -e; \
     NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"; \
     echo "--- JNI bridge into the package root (cgo compiles it there) ---"; \
@@ -36,13 +37,15 @@ RUN --mount=type=cache,target=/root/go/pkg/mod \
     CC="$NDK_BIN/aarch64-linux-android24-clang" \
     CXX="$NDK_BIN/aarch64-linux-android24-clang++" \
     CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
-      go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+      go build -buildmode=c-shared -buildvcs=false \
+        -ldflags="-s -w -extldflags '-Wl,-z,max-page-size=16384'" \
         -o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
     echo "--- libwisper.so (x86_64) ---"; \
     CC="$NDK_BIN/x86_64-linux-android24-clang" \
     CXX="$NDK_BIN/x86_64-linux-android24-clang++" \
     CGO_ENABLED=1 GOOS=android GOARCH=amd64 \
-      go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+      go build -buildmode=c-shared -buildvcs=false \
+        -ldflags="-s -w -extldflags '-Wl,-z,max-page-size=16384'" \
         -o android/app/src/main/jniLibs/x86_64/libwisper.so .; \
     rm -f lib_jni.c; \
     echo "--- APK ---"; \
