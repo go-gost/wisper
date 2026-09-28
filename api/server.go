@@ -83,6 +83,8 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/p2p", handleGetP2PIdentity)
 	mux.HandleFunc("POST /api/p2p/test", handleTestP2PRelay)
 	mux.HandleFunc("POST /api/p2p/test-stun", handleTestP2PStun)
+	mux.HandleFunc("GET /api/p2p/pending", handleListPendingPeers)
+	mux.HandleFunc("DELETE /api/p2p/pending/{key}", handleDismissPendingPeer)
 
 	// Serve embedded web UI for non-API requests.
 	if webHandler != nil {

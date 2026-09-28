@@ -107,3 +107,41 @@ func handleTestP2PStun(w http.ResponseWriter, r *http.Request) {
 		OK: true, Stun: stun, Mapped: mapped, LatencyMS: latency.Milliseconds(),
 	})
 }
+
+// pendingPeerResponse is one refused knock as the UI reads it.
+type pendingPeerResponse struct {
+	Key       string `json:"key"`
+	FirstSeen string `json:"first_seen"`
+	LastSeen  string `json:"last_seen"`
+	Attempts  int    `json:"attempts"`
+}
+
+// pendingPeersResponse is the whole list; the field is always present, empty or
+// not, so a client can render it without a nil check.
+type pendingPeersResponse struct {
+	Peers []pendingPeerResponse `json:"peers"`
+}
+
+// handleListPendingPeers lists the keys that knocked without being on any
+// tunnel's allowlist, newest first. The list is process-wide: a p2p stream
+// carries no destination, so a knock cannot be attributed to a tunnel.
+func handleListPendingPeers(w http.ResponseWriter, r *http.Request) {
+	peers := tunnel.P2PPendingPeers()
+	out := make([]pendingPeerResponse, 0, len(peers))
+	for _, p := range peers {
+		out = append(out, pendingPeerResponse{
+			Key:       p.Key,
+			FirstSeen: p.FirstSeen.UTC().Format("2006-01-02T15:04:05Z"),
+			LastSeen:  p.LastSeen.UTC().Format("2006-01-02T15:04:05Z"),
+			Attempts:  p.Attempts,
+		})
+	}
+	writeJSON(w, http.StatusOK, pendingPeersResponse{Peers: out})
+}
+
+// handleDismissPendingPeer forgets one knock. Idempotent: an entry that is
+// already gone is still a 200.
+func handleDismissPendingPeer(w http.ResponseWriter, r *http.Request) {
+	tunnel.DismissPendingPeer(r.PathValue("key"))
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}

@@ -1016,3 +1016,59 @@ func TestUpdateRunningEntrypoint(t *testing.T) {
 		t.Errorf("peer after update = %v, want the submitted k2", opts["peer"])
 	}
 }
+
+// TestPendingPeersEndpoint: the handler contract. The recording path itself
+// (a knock reaching dispatch) is covered in the tunnel package — from out here
+// there is no way to make one, so what is checked here is the shape and the
+// dismiss semantics.
+func TestPendingPeersEndpoint(t *testing.T) {
+	ts := setupTestServer(t)
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL + "/api/p2p/pending")
+	if err != nil {
+		t.Fatalf("GET /api/p2p/pending: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+
+	var body struct {
+		Peers []struct {
+			Key       string `json:"key"`
+			FirstSeen string `json:"first_seen"`
+			LastSeen  string `json:"last_seen"`
+			Attempts  int    `json:"attempts"`
+		} `json:"peers"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Peers) != 0 {
+		t.Fatalf("peers = %d, want 0 on a fresh server", len(body.Peers))
+	}
+}
+
+// TestDismissPendingPeerEndpoint: dismissing is idempotent — a key the TTL (or
+// an earlier dismiss) already retired is still a 200, because the caller's
+// intent, that the key not be listed, holds either way.
+func TestDismissPendingPeerEndpoint(t *testing.T) {
+	ts := setupTestServer(t)
+	defer ts.Close()
+
+	for i := 0; i < 2; i++ {
+		req, err := http.NewRequest(http.MethodDelete, ts.URL+"/api/p2p/pending/kQ7Zm0Q0Y2r0k9v2mQm1Z2yq8S5w1Kc3x7bN0rH4tUg", nil)
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("DELETE (attempt %d): %v", i+1, err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("attempt %d: status = %d, want 200", i+1, res.StatusCode)
+		}
+	}
+}
