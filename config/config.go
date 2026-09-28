@@ -26,6 +26,8 @@ var writeMu sync.Mutex
 
 var (
 	configDir string
+	logOutput string
+	logLevel  string
 )
 
 func init() {
@@ -37,6 +39,8 @@ type Option func(*options)
 
 type options struct {
 	configDir string
+	logOutput string
+	logLevel  string
 }
 
 // WithConfigDir sets an explicit config directory for Init().
@@ -44,6 +48,22 @@ type options struct {
 func WithConfigDir(dir string) Option {
 	return func(o *options) {
 		o.configDir = dir
+	}
+}
+
+// WithLogOutput overrides the configured log output for this run: "stderr",
+// "stdout", "none", or a file path. Empty keeps the config file's setting.
+func WithLogOutput(output string) Option {
+	return func(o *options) {
+		o.logOutput = output
+	}
+}
+
+// WithLogLevel overrides the configured log level for this run: debug, info,
+// warn, or error. Empty keeps the config file's setting.
+func WithLogLevel(level string) Option {
+	return func(o *options) {
+		o.logLevel = level
 	}
 }
 
@@ -82,6 +102,8 @@ func Init(opts ...Option) {
 	}
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true})))
+
+	logOutput, logLevel = o.logOutput, o.logLevel
 
 	configDir = resolveConfigDir(o.configDir)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -124,6 +146,19 @@ func initLog() {
 				LocalTime:  true,
 			},
 		}
+	} else {
+		// Get() shares the Log pointer with the stored config, and the
+		// overrides below must not be written back to wisper.yaml.
+		c := *cfg
+		cfg = &c
+	}
+
+	// Per-run overrides for container and debug runs, e.g. docker logs.
+	if logOutput != "" {
+		cfg.Output = logOutput
+	}
+	if logLevel != "" {
+		cfg.Level = logLevel
 	}
 
 	logger.SetDefault(logger_parser.ParseLogger(&xconfig.LoggerConfig{Log: cfg}))

@@ -26,8 +26,9 @@ var (
 //
 //	configDir: path for config/logs (empty = OS user config dir).
 //	addr: listen address, e.g. "127.0.0.1:8900" (Android) or ":8900" (desktop).
-func Start(configDir, addr string) error {
-	config.Init(config.WithConfigDir(configDir))
+//	opts: extra config.Init options, e.g. log output/level overrides.
+func Start(configDir, addr string, opts ...config.Option) error {
+	config.Init(append([]config.Option{config.WithConfigDir(configDir)}, opts...)...)
 	tunnel.LoadConfig()
 	entrypoint.LoadConfig()
 

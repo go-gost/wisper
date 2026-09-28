@@ -76,6 +76,19 @@ Config file: `~/.config/wisper/config.yml` (YAML)
 
 Logs: `~/.config/wisper/logs/wisper.log` (JSON format, 10 MB rotation, 7-day retention)
 
+For containers and manual debugging, `-log.output` and `-log.level` — or the
+`WISPER_LOG_OUTPUT` / `WISPER_LOG_LEVEL` env vars — override the config file for
+that run only (nothing is written back to it). Precedence: flag > env > config.
+
+```bash
+wisper -log.output stderr -log.level debug
+WISPER_LOG_LEVEL=debug wisper
+```
+
+The Docker image sets `WISPER_LOG_OUTPUT=stderr`, so `docker logs` shows output;
+`docker run -e WISPER_LOG_OUTPUT=<path>` (or `-log.output <path>`) sends it back
+to a file.
+
 ## REST API
 
 All routes under `/api/`:

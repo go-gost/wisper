@@ -42,4 +42,8 @@ EXPOSE 8900
 
 VOLUME ["/root/.config/wisper"]
 
+# Log to stderr so `docker logs` works out of the box. It is an env default, not
+# an entrypoint arg, so `-e WISPER_LOG_OUTPUT=...` and `-log.output` both win.
+ENV WISPER_LOG_OUTPUT=stderr
+
 ENTRYPOINT ["wisper"]
