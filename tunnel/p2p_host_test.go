@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -430,5 +431,80 @@ func TestP2PHostKeyPathWithoutHome(t *testing.T) {
 	}
 	if want := filepath.Join("p2p", "host.key"); !strings.HasSuffix(got, want) {
 		t.Fatalf("P2PHostKeyPath() = %q, want it to end in %q", got, want)
+	}
+}
+
+// knock drives one refused inbound stream through the real path: a pipe conn
+// whose RemoteAddr is the peer key, the way the p2p listener presents it.
+func knock(m *p2pHostManager, key string) {
+	inbound, far := peerPipe(key)
+	defer far.Close()
+	m.dispatch(inbound)
+}
+
+// TestPendingPeersRecordAndDismiss: one entry per key, counted across knocks,
+// forgotten on request, and its absence is not an error.
+func TestPendingPeersRecordAndDismiss(t *testing.T) {
+	m := &p2pHostManager{routes: make(map[string]*peerListener)}
+	const key = "kQ7Zm0Q0Y2r0k9v2mQm1Z2yq8S5w1Kc3x7bN0rH4tUg"
+
+	knock(m, key)
+	knock(m, key)
+
+	got := m.pendingSnapshot()
+	if len(got) != 1 {
+		t.Fatalf("pending = %d entries, want 1: one entry per key", len(got))
+	}
+	if got[0].Key != key || got[0].Attempts != 2 {
+		t.Fatalf("pending = %+v, want key %s with 2 attempts", got[0], key)
+	}
+	if got[0].FirstSeen.IsZero() || got[0].LastSeen.Before(got[0].FirstSeen) {
+		t.Fatalf("timestamps = %v/%v, want the first at or before the last", got[0].FirstSeen, got[0].LastSeen)
+	}
+
+	if !m.dismissPending(key) {
+		t.Error("dismissPending = false for a key that knocked")
+	}
+	if m.dismissPending(key) {
+		t.Error("dismissPending = true for a key that is not recorded")
+	}
+	if n := len(m.pendingSnapshot()); n != 0 {
+		t.Fatalf("pending = %d entries after dismiss, want 0", n)
+	}
+}
+
+// TestPendingPeersExpireAndEvict: the list is a notice, not a log — an entry
+// past the TTL is gone, and the list cannot be grown past its bound by anyone
+// who can reach the relay.
+func TestPendingPeersExpireAndEvict(t *testing.T) {
+	m := &p2pHostManager{routes: make(map[string]*peerListener)}
+	now := time.Now()
+
+	m.notePending("stale")
+	m.pending["stale"] = &pendingPeer{
+		Key:       "stale",
+		FirstSeen: now.Add(-2 * p2pPendingTTL),
+		LastSeen:  now.Add(-2 * p2pPendingTTL),
+		Attempts:  1,
+	}
+	if n := len(m.pendingSnapshot()); n != 0 {
+		t.Fatalf("pending = %d entries, want 0: a knock older than the TTL is retired", n)
+	}
+
+	for i := 0; i < p2pPendingMax; i++ {
+		key := fmt.Sprintf("key-%02d", i)
+		m.notePending(key)
+		m.pending[key].LastSeen = now.Add(time.Duration(i) * time.Second)
+	}
+	m.notePending("newest")
+
+	if n := len(m.pending); n != p2pPendingMax {
+		t.Fatalf("pending holds %d entries, want the cap %d", n, p2pPendingMax)
+	}
+	if _, ok := m.pending["key-00"]; ok {
+		t.Error("the least recently seen knock was not evicted")
+	}
+	if _, ok := m.pending["newest"]; !ok {
+		t.Error("the new knock was not recorded")
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,32 @@ import (
 // dropped (the transport is lossy by design).
 var p2pBacklog = 64
 
+const (
+	// p2pPendingTTL is how long a refused knock stays listed after the last
+	// one. The record is a nudge to act on, not a log.
+	p2pPendingTTL = 10 * time.Minute
+	// p2pPendingMax bounds the list. Anyone who can reach the relay can append
+	// to it by connecting, so it must not be able to grow.
+	p2pPendingMax = 32
+)
+
+// pendingPeer is one key that knocked while on no allowlist: the record behind
+// a "requesting peer" row.
+type pendingPeer struct {
+	Key       string
+	FirstSeen time.Time
+	LastSeen  time.Time
+	Attempts  int
+}
+
+// PendingPeer is a refused knock as the API reads it.
+type PendingPeer struct {
+	Key       string
+	FirstSeen time.Time
+	LastSeen  time.Time
+	Attempts  int
+}
+
 // P2PHostKeyPath is the process-wide p2p identity: <config dir>/p2p/host.key
 // (0600, created on first use). One host, one identity, shared by every p2p
 // tunnel and entrypoint. It hangs off the app's config directory rather than
@@ -39,11 +66,12 @@ func P2PHostKeyPath() string {
 // p2pHostManager owns the process-wide host: refcounted lifetime, the inbound
 // accept loop, and the peer-key → tunnel routes.
 type p2pHostManager struct {
-	mu     sync.Mutex
-	host   *endpoint.Endpoint
-	ln     net.Listener
-	routes map[string]*peerListener
-	refs   int
+	mu      sync.Mutex
+	host    *endpoint.Endpoint
+	ln      net.Listener
+	routes  map[string]*peerListener
+	pending map[string]*pendingPeer
+	refs    int
 }
 
 var p2pHost = &p2pHostManager{routes: make(map[string]*peerListener)}
@@ -199,6 +227,88 @@ func (m *p2pHostManager) release() {
 	}
 }
 
+// notePending records a refused knock. Safe to call without the lock: dispatch
+// has already dropped it by the time it gets here.
+func (m *p2pHostManager) notePending(key string) {
+	if key == "" {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	now := time.Now()
+	if m.pending == nil {
+		m.pending = make(map[string]*pendingPeer)
+	}
+	m.expirePendingLocked(now)
+
+	if p := m.pending[key]; p != nil {
+		p.LastSeen, p.Attempts = now, p.Attempts+1
+		return
+	}
+	if len(m.pending) >= p2pPendingMax {
+		m.evictOldestPendingLocked()
+	}
+	m.pending[key] = &pendingPeer{Key: key, FirstSeen: now, LastSeen: now, Attempts: 1}
+}
+
+// expirePendingLocked retires the entries whose last knock is past the TTL.
+// Lazy on read and on write: a sweeper goroutine would outlive every reason to
+// have one.
+func (m *p2pHostManager) expirePendingLocked(now time.Time) {
+	for key, p := range m.pending {
+		if now.Sub(p.LastSeen) > p2pPendingTTL {
+			delete(m.pending, key)
+		}
+	}
+}
+
+// evictOldestPendingLocked makes room by dropping the least recently seen
+// entry.
+func (m *p2pHostManager) evictOldestPendingLocked() {
+	var oldest string
+	var at time.Time
+	for key, p := range m.pending {
+		if oldest == "" || p.LastSeen.Before(at) {
+			oldest, at = key, p.LastSeen
+		}
+	}
+	delete(m.pending, oldest)
+}
+
+// pendingSnapshot copies the refused knocks out, newest first.
+func (m *p2pHostManager) pendingSnapshot() []PendingPeer {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.expirePendingLocked(time.Now())
+
+	out := make([]PendingPeer, 0, len(m.pending))
+	for _, p := range m.pending {
+		out = append(out, PendingPeer{
+			Key:       p.Key,
+			FirstSeen: p.FirstSeen,
+			LastSeen:  p.LastSeen,
+			Attempts:  p.Attempts,
+		})
+	}
+	slices.SortFunc(out, func(a, b PendingPeer) int { return b.LastSeen.Compare(a.LastSeen) })
+	return out
+}
+
+// dismissPending forgets one knock, reporting whether there was one.
+func (m *p2pHostManager) dismissPending(key string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.pending[key]; !ok {
+		return false
+	}
+	delete(m.pending, key)
+	return true
+}
+
 // register routes inbound streams from every peer in the list to the returned
 // listener. It is all-or-nothing: a peer key already claimed by another tunnel
 // (or listed twice) rolls back the peers this call added and fails naming the
@@ -292,6 +402,7 @@ func (m *p2pHostManager) dispatch(conn net.Conn) {
 	m.mu.Unlock()
 	if pl == nil {
 		slog.Warn("p2p inbound stream from unregistered peer: closed", "peer", peer)
+		m.notePending(peer)
 		_ = conn.Close()
 		return
 	}
