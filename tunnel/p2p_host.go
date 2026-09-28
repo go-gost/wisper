@@ -141,8 +141,8 @@ func P2PPendingPeers() []PendingPeer {
 	return kept
 }
 
-// DismissPendingPeer forgets one knock, reporting whether there was one.
-func DismissPendingPeer(key string) bool { return p2pHost.dismissPending(key) }
+// DismissPendingPeer forgets one knock.
+func DismissPendingPeer(key string) { p2pHost.dismissPending(key) }
 
 // warmPeers brings up the relay session for each peer on the running host, so
 // a freshly registered allowlist appears in P2PHostStatus (and on the peers

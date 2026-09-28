@@ -185,7 +185,7 @@ const zh: Record<string, string> = {
   peersPendingJustNow: '刚刚',
   peersPendingMinutes: '{n} 分钟前',
   peersPendingHint:
-    '这些公钥敲过门，但不在任何白名单里。p2p 流不带目的地，无法得知它想连哪条隧道——「加到这条隧道」就是把它加到这里。',
+    '这些公钥敲过门，但不在任何白名单里。p2p 流不带目的地，无法得知它想连哪条隧道——「加到这条隧道」就是把它加到这里。「忽略」只是清掉记录：对方继续敲门就会再出现，想彻底不再看到它，就把它加进来再禁用。',
   notFound: '未找到。',
   p2pEntryHint: '本地客户端连接监听地址；流量经 p2p 隧道到对端公钥，明文（内层协议不加密）。',
   p2pIdentity: 'P2P 身份',

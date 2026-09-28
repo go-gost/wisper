@@ -233,7 +233,10 @@ func PeerAliasesOption(aliases map[string]string) Option {
 }
 
 // PeerDisabledOption sets the allowlisted keys that are switched off. They stay
-// in the allowlist but hold no route.
+// in the allowlist but hold no route. Callers must pass a set already normalized
+// against the listed peers (NormalizePeerDisabled): the listed peers are what the
+// peers page renders and what the requesting-peers filter reads, so a disabled key
+// that is not listed would show up as a requesting peer.
 func PeerDisabledOption(disabled []string) Option {
 	return func(opts *Options) {
 		opts.PeerDisabled = disabled
