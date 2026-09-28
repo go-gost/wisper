@@ -61,14 +61,17 @@ class WisperService : VpnService() {
     private var vpnEstablished = false
 
     /**
-     * A tun device config the UI handed over before creating its entrypoint. The
-     * entrypoint cannot be created before its device exists, and the device can
-     * only come from here, so the form arms the VPN with its own values.
+     * A tun device config the UI handed over before creating or updating its
+     * entrypoint. The entrypoint cannot be created before its device exists, and
+     * the device can only come from here, so the form arms the VPN with its own
+     * values. Dropped once the entrypoint carrying those values is running: from
+     * then on the running entrypoint, not the form, decides whether the VPN is
+     * needed.
      */
     @Volatile
     private var armedOptions: JSONObject? = null
 
-    /** The config the running device was built from, to notice a changed one. */
+    /** The device the running VPN was built from, to notice a changed one. */
     @Volatile
     private var establishedConfig: String? = null
 
@@ -111,12 +114,25 @@ class WisperService : VpnService() {
      */
     private fun ensureVpn() {
         try {
-            val opts = armedOptions
-                ?: fetchTunEntrypoint()?.optJSONObject("options")
-                ?: return
+            val running = runningTunEntrypoint()?.optJSONObject("options")
+            val armed = armedOptions
+
+            // The form's armed values exist to give an entrypoint that is about
+            // to be created or updated its device. Once the entrypoint carrying
+            // those values is running they are redundant — and they must not
+            // outlive it, or a stopped entrypoint would keep the VPN up.
+            if (running != null && armed != null && deviceConfig(armed) == deviceConfig(running)) {
+                armedOptions = null
+            }
+
+            val opts = armedOptions ?: running
+            if (opts == null) {
+                teardownVpn()
+                return
+            }
 
             if (vpnEstablished) {
-                if (establishedConfig == opts.toString()) return
+                if (establishedConfig == deviceConfig(opts)) return
                 // A changed config needs a new device; the old one goes away
                 // with it, so a running entrypoint has to be started again.
                 Log.i(TAG, "VPN config changed, re-establishing")
@@ -132,6 +148,33 @@ class WisperService : VpnService() {
             Log.w(TAG, "VPN poll failed", e)
         }
     }
+
+    /**
+     * Releases the device when nothing needs it any more. The Go side holds the
+     * last copy of the fd (a stopped entrypoint closed its own), so the tun
+     * interface goes away as soon as it lets go — which is the whole point:
+     * wisper is not a VPN app, and a user who runs no tun entrypoint should not
+     * be carrying one.
+     */
+    private fun teardownVpn() {
+        if (!vpnEstablished) return
+        Log.i(TAG, "no running tun entrypoint: releasing the VPN device")
+        WisperJNI.setTunFd(-1)
+        vpnEstablished = false
+        establishedConfig = null
+    }
+
+    /**
+     * The fields that define the device, in a fixed order. The form's armed
+     * values and an entrypoint's stored options describe the same device with
+     * different key sets, so comparing whole JSON objects would call every swap
+     * between the two a change and rebuild the device — which kills the copy the
+     * running entrypoint holds. mtu is read as a number, so an omitted (zero)
+     * one and an explicit zero compare equal.
+     */
+    private fun deviceConfig(opts: JSONObject): String =
+        listOf("net", "routes", "dns").joinToString("|") { opts.optString(it, "") } +
+            "|" + opts.optInt("mtu", 0)
 
     /** The permission nudge is posted once, not on every poll. */
     private var vpnNudged = false
@@ -324,15 +367,18 @@ class WisperService : VpnService() {
     // VPN establishment
     // ---------------------------------------------------------------
 
-    /** The first tun entrypoint the backend knows about, running or not. */
-    private fun fetchTunEntrypoint(): JSONObject? {
+    /** The first *running* tun entrypoint, if any: the VPN exists to serve one,
+     *  so a stopped or failed entrypoint must not hold it up. A restored
+     *  entrypoint counts as running from the moment it is listed — it is
+     *  waiting for this app's device, not the other way round. */
+    private fun runningTunEntrypoint(): JSONObject? {
         val body = httpGet("/api/entrypoints") ?: return null
         // The list endpoints answer a bare array — the {"entrypoints": …} shape
         // is /api/stats's, not this one's.
         val arr = JSONArray(body)
         for (i in 0 until arr.length()) {
             val ep = arr.optJSONObject(i) ?: continue
-            if (ep.optString("type") == "tun") return ep
+            if (ep.optString("type") == "tun" && ep.optString("status") == "running") return ep
         }
         return null
     }
@@ -387,7 +433,7 @@ class WisperService : VpnService() {
         // device, so an entrypoint restart keeps working without a new VPN.
         WisperJNI.setTunFd(pfd.detachFd())
         vpnEstablished = true
-        establishedConfig = opts.toString()
+        establishedConfig = deviceConfig(opts)
         Log.i(TAG, "VPN established for ${opts.optString("net")}")
 
         promoteForegroundForVpn()
