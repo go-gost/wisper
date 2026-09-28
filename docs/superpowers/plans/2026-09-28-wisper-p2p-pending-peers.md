@@ -360,7 +360,7 @@ In `tunnel/p2p_host.go`, in `release()`, drop the records with the routes — th
 	}
 ```
 
-In `dispatch()`, record the knock before closing the conn:
+`dispatch()` already records the knock (Task 1's tests drive that path, so the hook went in with the records). Confirm it reads like this — no edit should be needed here:
 
 ```go
 func (m *p2pHostManager) dispatch(conn net.Conn) {
