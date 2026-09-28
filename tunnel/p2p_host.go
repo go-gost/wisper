@@ -402,6 +402,8 @@ func (m *p2pHostManager) dispatch(conn net.Conn) {
 	m.mu.Unlock()
 	if pl == nil {
 		slog.Warn("p2p inbound stream from unregistered peer: closed", "peer", peer)
+		// The key is the whole of what a knock tells us: a p2p stream carries
+		// no destination, so which tunnel it wanted is unknowable here.
 		m.notePending(peer)
 		_ = conn.Close()
 		return
