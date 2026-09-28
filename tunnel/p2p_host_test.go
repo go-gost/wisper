@@ -518,3 +518,61 @@ func TestPendingPeersExpireAndEvict(t *testing.T) {
 		t.Error("the new knock was not recorded")
 	}
 }
+
+// TestPendingPeersClearedWithHost: with no host running nobody can knock, so
+// the records go with it rather than outliving their reason to exist.
+func TestPendingPeersClearedWithHost(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+
+	if _, err := AcquireP2PHost(); err != nil {
+		t.Fatalf("AcquireP2PHost: %v", err)
+	}
+	p2pHost.notePending("kQ7Zm0Q0Y2r0k9v2mQm1Z2yq8S5w1Kc3x7bN0rH4tUg")
+	if n := len(p2pHost.pendingSnapshot()); n != 1 {
+		t.Fatalf("pending = %d entries before release, want 1", n)
+	}
+
+	ReleaseP2PHost()
+
+	if n := len(p2pHost.pendingSnapshot()); n != 0 {
+		t.Fatalf("pending = %d entries after the host stopped, want 0", n)
+	}
+}
+
+// TestP2PPendingPeersFiltersListedKeys: a key another tunnel lists — or this
+// one lists as disabled, which keeps it off the host's route table too — is not
+// a requesting peer. It already has a row of its own on the peers page.
+func TestP2PPendingPeersFiltersListedKeys(t *testing.T) {
+	t.Chdir(t.TempDir()) // Delete/SaveConfig reach for ./wisper.yaml without a config dir
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp"}}})
+
+	const (
+		listed  = "key-listed"
+		off     = "key-disabled"
+		unknown = "key-unknown"
+	)
+
+	tun := NewP2PTunnel(
+		IDOption("pending-filter"),
+		PeersOption(listed, off),
+		PeerDisabledOption([]string{off}),
+	)
+	Add(tun)
+	defer Delete("pending-filter")
+
+	p2pHost.notePending(listed)
+	p2pHost.notePending(off)
+	p2pHost.notePending(unknown)
+	defer func() {
+		p2pHost.dismissPending(listed)
+		p2pHost.dismissPending(off)
+		p2pHost.dismissPending(unknown)
+	}()
+
+	got := P2PPendingPeers()
+	if len(got) != 1 || got[0].Key != unknown {
+		t.Fatalf("pending = %+v, want only %s", got, unknown)
+	}
+}

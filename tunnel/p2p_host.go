@@ -113,6 +113,39 @@ func P2PHostRunning() bool {
 	return p2pHost.host != nil
 }
 
+// P2PPendingPeers returns the keys that knocked and are on no allowlist,
+// newest first. Keys any tunnel lists — enabled or disabled — are dropped: a
+// disabled peer is off the host's route table too, so its streams land in the
+// record path, and it already has a row of its own on the peers page.
+func P2PPendingPeers() []PendingPeer {
+	known := make(map[string]struct{})
+	for i := 0; i < Count(); i++ {
+		t := GetIndex(i)
+		if t == nil {
+			continue
+		}
+		opts := t.Options()
+		for _, k := range opts.Peers {
+			known[k] = struct{}{}
+		}
+		for _, k := range opts.PeerDisabled {
+			known[k] = struct{}{}
+		}
+	}
+
+	out := p2pHost.pendingSnapshot()
+	kept := out[:0] // same array, filtered in place
+	for _, p := range out {
+		if _, listed := known[p.Key]; !listed {
+			kept = append(kept, p)
+		}
+	}
+	return kept
+}
+
+// DismissPendingPeer forgets one knock, reporting whether there was one.
+func DismissPendingPeer(key string) bool { return p2pHost.dismissPending(key) }
+
 // warmPeers brings up the relay session for each peer on the running host, so
 // a freshly registered allowlist appears in P2PHostStatus (and on the peers
 // page) before any traffic. It does not punch: this side answers its peers,
@@ -221,6 +254,7 @@ func (m *p2pHostManager) release() {
 	}
 	_ = m.host.Close()
 	m.host, m.ln = nil, nil
+	m.pending = nil
 	for k, pl := range m.routes {
 		pl.close()
 		delete(m.routes, k)
