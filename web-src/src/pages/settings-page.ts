@@ -5,6 +5,7 @@ import { icon } from '../utils/icons';
 import { getSettings, updateSettings, subscribe } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { maskKey } from '../utils/format';
+import { renderQrCanvas } from '../utils/qr';
 import { GoBackend } from '../api/backend';
 import type { ThemePreference, LanguagePreference } from '../api/types';
 import '../components/app-scaffold';
@@ -40,6 +41,7 @@ export class SettingsPage extends LitElement {
   @state() private _p2pStun = '';
   @state() private _p2pDirect = true;
   @state() private _showP2PKey = false;
+  @state() private _qrKey = '';
   @state() private _p2pTesting = false;
   @state() private _p2pTest: { ok: boolean; latency?: number; error?: string } | null = null;
   @state() private _p2pStunTesting = false;
@@ -183,6 +185,13 @@ export class SettingsPage extends LitElement {
   private async _copyP2PKey() {
     await copyToClipboard(this._p2pPublicKey);
     this._showSnackbar(t('copiedToClipboard'));
+  }
+
+  updated(changed: Map<string, unknown>) {
+    if (changed.has('_qrKey') && this._qrKey) {
+      const canvas = this.renderRoot.querySelector('#qrCanvas') as HTMLCanvasElement | null;
+      renderQrCanvas(canvas, this._qrKey);
+    }
   }
 
   disconnectedCallback() {
@@ -479,6 +488,73 @@ export class SettingsPage extends LitElement {
     .save-btn:hover { opacity: 0.85; }
     .save-btn:disabled { opacity: 0.5; cursor: default; }
 
+    /* ── QR dialog ── */
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .dialog-box {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      width: min(90vw, 360px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dialog-title {
+      font-size: var(--font-md);
+      font-weight: 600;
+    }
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .dialog-btn {
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      font-size: var(--font-sm);
+      font-family: inherit;
+    }
+    .dialog-btn.cancel {
+      background: var(--border-subtle);
+      color: var(--text);
+    }
+    .qr-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .qr-body canvas {
+      width: 200px;
+      height: 200px;
+      background: #fff;
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      box-sizing: border-box;
+      image-rendering: pixelated;
+    }
+    .qr-text {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-xs);
+      color: var(--text-secondary);
+      text-align: center;
+      word-break: break-all;
+      line-height: 1.4;
+      max-width: 100%;
+    }
+
     /* ── Toast ── */
     .toast {
       position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
@@ -572,6 +648,9 @@ export class SettingsPage extends LitElement {
                 <label class="form-label">${t('p2pIdentity')}</label>
                 <div style="display:flex;align-items:center;gap:8px;">
                   <span class="identity-key">${this._showP2PKey ? this._p2pPublicKey : maskKey(this._p2pPublicKey)}</span>
+                  <button class="copy-btn-mini" title="${t('qrCode')}" @click=${() => { this._qrKey = this._p2pPublicKey; }}>
+                    ${icon('qr')}
+                  </button>
                   <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._copyP2PKey()}>
                     ${icon('copy')}
                   </button>
@@ -718,6 +797,25 @@ export class SettingsPage extends LitElement {
             </div>
           </div>
         </div>
+
+        ${this._qrKey
+          ? html`
+            <div class="dialog-overlay" @click=${() => { this._qrKey = ''; }}>
+              <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="dialog-title">${t('qrCode')}</div>
+                <div class="qr-body">
+                  <canvas id="qrCanvas"></canvas>
+                  <div class="qr-text">${this._qrKey}</div>
+                </div>
+                <div class="dialog-actions">
+                  <button class="dialog-btn cancel" @click=${() => { this._qrKey = ''; }}>
+                    ${t('btnClose')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `
+          : nothing}
 
         ${this._snackbar ? html`<div class="toast">${this._snackbar}</div>` : ''}
       </app-scaffold>

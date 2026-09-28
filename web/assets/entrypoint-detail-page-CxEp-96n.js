@@ -1,42 +1,42 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-Dfc3VEzH.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
-import{a as _,f as y,c as $,A as x,j as t,b as s,_ as u,v as w,w as k,l as T,n as S,x as D,u as z,i as P,t as I}from"./index-Dfc3VEzH.js";import{d as R,m as b,c as v,a as f,b as m,n as g,r}from"./format-BNNKdwYE.js";import{i as p}from"./app-scaffold-DETw0TXR.js";import{a as C}from"./transport-DX2_pzO9.js";import{c as E}from"./clipboard-C3x8_sid.js";var N=Object.defineProperty,F=Object.getOwnPropertyDescriptor,n=(e,i,d,l)=>{for(var a=l>1?void 0:l?F(i,d):i,c=e.length-1,h;c>=0;c--)(h=e[c])&&(a=(l?h(i,d,a):h(a))||a);return l&&a&&N(i,d,a),a};let o=class extends _{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(y(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const e of this._unsubs)e();this._unsubs=[]}_load(){const e=this.entrypointId,i=window.location.search.includes("edit");if(e==="new"||!e){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===e)return;const d=$().find(l=>l.id===e);d&&(this._entrypoint=d,i?(this.mode="edit",this._populateForm(d)):(this.mode!=="edit"||this._entrypoint?.id!==e)&&(this.mode="view",this._populateForm(d)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns=""}_populateForm(e){this._name=e.name,this._endpoint=e.entrypoint,this._tunnelId=e.id??"",this._peer=e.options?.peer??"",this._protocol=e.options?.protocol==="udp"?"udp":"tcp",this._keepalive=e.options?.keepalive??!0,this._ttl=e.options?.ttl||15,this._net=e.options?.net??"",this._mtu=e.options?.mtu??0,this._deviceName=e.options?.device_name??"",this._routes=e.options?.routes??"",this._dns=e.options?.dns??""}_renderTransport(e){const i=C(e);return i?s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index--uHW3G_R.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
+import{a as g,f as y,c as $,A as x,j as e,b as a,_ as u,v as w,w as k,l as T,n as S,x as D,u as P,i as z,t as I}from"./index--uHW3G_R.js";import{d as R,m as b,c as v,a as f,b as m,n as _,r}from"./format-DKlYYG-u.js";import{i as d}from"./app-scaffold-Dieqd4un.js";import{a as C}from"./transport-DmC8uBma.js";import{c as E}from"./clipboard-C3x8_sid.js";var N=Object.defineProperty,F=Object.getOwnPropertyDescriptor,n=(t,i,p,l)=>{for(var s=l>1?void 0:l?F(i,p):i,c=t.length-1,h;c>=0;c--)(h=t[c])&&(s=(l?h(i,p,s):h(s))||s);return l&&s&&N(i,p,s),s};let o=class extends g{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(y(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const p=$().find(l=>l.id===t);p&&(this._entrypoint=p,i?(this.mode="edit",this._populateForm(p)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(p)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??"",this._peer=t.options?.peer??"",this._protocol=t.options?.protocol==="udp"?"udp":"tcp",this._keepalive=t.options?.keepalive??!0,this._ttl=t.options?.ttl||15,this._net=t.options?.net??"",this._mtu=t.options?.mtu??0,this._deviceName=t.options?.device_name??"",this._routes=t.options?.routes??"",this._dns=t.options?.dns??"",this._armVpn()}_armVpn(){const t=window.WisperNative;return this.entrypointType!=="tun"||!t?.armVpn?Promise.resolve(!0):new Promise(i=>{const p=`__wisperArmVpn_${Date.now()}`,l=s=>{delete window[p],i(s)};window[p]=l;try{t.armVpn(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim(),p)}catch(s){console.warn("armVpn failed",s),l(!0)}})}_renderTransport(t){const i=C(t);return i?a`
       <div class="info-row">
-        <span class="info-label">${t("p2pTransport")}</span>
+        <span class="info-label">${e("p2pTransport")}</span>
         <span class="info-value text">
           <span class="peer-badge ${i.tone}" title=${i.hint}>
-            ${p(i.icon)}<span>${i.label}</span>
+            ${d(i.icon)}<span>${i.label}</span>
           </span>
         </span>
       </div>
-    `:x}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(t("requiredField"));return}this._saving=!0;try{const e={name:this._name.trim(),type:this.entrypointType,endpoint:this.entrypointType==="tun"?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="tun"?this._keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,ttl:this.entrypointType==="tun"?this._ttl:void 0,net:this.entrypointType==="tun"&&this._net.trim()||void 0,mtu:this.entrypointType==="tun"&&this._mtu||void 0,device_name:this.entrypointType==="tun"&&this._deviceName.trim()||void 0,routes:this.entrypointType==="tun"&&this._routes.trim()||void 0,dns:this.entrypointType==="tun"&&this._dns.trim()||void 0};this.mode==="create"?(await u(()=>import("./index-Dfc3VEzH.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.create(e)),this._showSnackbar(t("saved")),this._navigate("/")):(await u(()=>import("./index-Dfc3VEzH.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.update(this.entrypointId,e)),this._showSnackbar(t("saved")),this.mode="view",await w())}catch(e){const i=e instanceof Error?e.message:"";this._showSnackbar(`${t("saveFailed")}${i?": "+i:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await k(this.entrypointId),this._showSnackbar(t("deleted")),this._navigate("/")}catch{this._showSnackbar(t("deleteFailed"))}}async _handleStart(){try{await T(this.entrypointId),this._showSnackbar(t("started"))}catch{this._showSnackbar(t("startFailed"))}}async _handleStop(){try{await S(this.entrypointId),this._showSnackbar(t("stopped"))}catch{this._showSnackbar(t("stopFailed"))}}async _handleCopy(e){await E(e),this._showSnackbar(t("copiedToClipboard"))}_handleResetStats(e){this._resetKind=e,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await D(this.entrypointId,this._resetKind),this._entrypoint&&z(this.entrypointId,this._entrypoint.stats),this._showSnackbar(t("saved"))}catch{this._showSnackbar(t("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const e=this._entrypoint,i=e?e.stats:null,d=this._typeLabel(),l=e?.options?.peer??"";return s`
+    `:x}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}if(this.entrypointType==="tun"&&!await this._armVpn()){this._showSnackbar(e("vpnNotReady"));return}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this.entrypointType==="tun"?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="tun"?this._keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,ttl:this.entrypointType==="tun"?this._ttl:void 0,net:this.entrypointType==="tun"&&this._net.trim()||void 0,mtu:this.entrypointType==="tun"&&this._mtu||void 0,device_name:this.entrypointType==="tun"&&this._deviceName.trim()||void 0,routes:this.entrypointType==="tun"&&this._routes.trim()||void 0,dns:this.entrypointType==="tun"&&this._dns.trim()||void 0};this.mode==="create"?(await u(()=>import("./index--uHW3G_R.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await u(()=>import("./index--uHW3G_R.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await w())}catch(t){const i=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${i?": "+i:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await k(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await T(this.entrypointId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await S(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await E(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await D(this.entrypointId,this._resetKind),this._entrypoint&&P(this.entrypointId,this._entrypoint.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,i=t?t.stats:null,p=this._typeLabel(),l=t?.options?.peer??"";return a`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._handleBack()}>
-            ${p("chevron-left")}
+            ${d("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${t("entrypointNewTitle")} — ${d}`:d+" Entrypoint"}
+            ${this.mode==="create"?`${e("entrypointNewTitle")} — ${p}`:p+" Entrypoint"}
           </span>
 
-          ${this.mode==="view"&&e?s`
-              ${e.status==="running"?s`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
-                  ■ ${t("btnStop")}
-                </button>`:s`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
-                  ▶ ${t("btnStart")}
+          ${this.mode==="view"&&t?a`
+              ${t.status==="running"?a`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
+                  ■ ${e("btnStop")}
+                </button>`:a`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
+                  ▶ ${e("btnStart")}
                 </button>`}
-            `:s`
+            `:a`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
-                ${p("check")} ${t("btnSave")}
+                ${d("check")} ${e("btnSave")}
               </button>
             `}
         </div>
 
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
-        ${this.mode==="view"&&e?s`
-            <div class="status-banner ${e.status}">
+        ${this.mode==="view"&&t?a`
+            <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
-              ${e.status==="running"?t("statusRunning"):e.status==="error"?t("statusError"):t("statusStopped")}
-              ${e.error?s` — ${e.error}`:""}
+              ${t.status==="running"?e("statusRunning"):t.status==="error"?e("statusError"):e("statusStopped")}
+              ${t.error?a` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
 
@@ -44,92 +44,92 @@ import{a as _,f as y,c as $,A as x,j as t,b as s,_ as u,v as w,w as k,l as T,n a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${d} Entrypoint</span>
+                  <span class="info-value text">${p} Entrypoint</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Created</span>
-                  <span class="info-value text">${R(e.created_at)}</span>
+                  <span class="info-value text">${R(t.created_at)}</span>
                 </div>
-                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?"":s`
+                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?"":a`
                 <div class="info-row">
                   <span class="info-label">Tunnel ID</span>
-                  <span class="info-value uuid">${e.id??"—"}</span>
-                  ${e.id?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(e.id)}>
-                      ${p("copy")}
+                  <span class="info-value uuid">${t.id??"—"}</span>
+                  ${t.id?a`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
+                      ${d("copy")}
                     </button>`:""}
                 </div>`}
                 <div class="info-row">
                   <span class="info-label">Name</span>
-                  <span class="info-value text">${e.name}</span>
+                  <span class="info-value text">${t.name}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">${this.entrypointType==="tun"?t("fieldNet"):"Bind Address"}</span>
-                  <span class="info-value">${e.entrypoint}</span>
+                  <span class="info-label">${this.entrypointType==="tun"?e("fieldNet"):"Bind Address"}</span>
+                  <span class="info-value">${t.entrypoint}</span>
                 </div>
-                ${this.entrypointType==="tun"?s`
-                    ${e.options?.mtu?s`<div class="info-row"><span class="info-label">${t("fieldMTU")}</span><span class="info-value text">${e.options.mtu}</span></div>`:""}
-                    ${e.options?.device_name?s`<div class="info-row"><span class="info-label">${t("fieldDeviceName")}</span><span class="info-value text">${e.options.device_name}</span></div>`:""}
-                    ${e.options?.routes?s`<div class="info-row"><span class="info-label">${t("fieldRoutes")}</span><span class="info-value text">${e.options.routes}</span></div>`:""}
-                    ${e.options?.dns?s`<div class="info-row"><span class="info-label">${t("fieldDNS")}</span><span class="info-value text">${e.options.dns}</span></div>`:""}
+                ${this.entrypointType==="tun"?a`
+                    ${t.options?.mtu?a`<div class="info-row"><span class="info-label">${e("fieldMTU")}</span><span class="info-value text">${t.options.mtu}</span></div>`:""}
+                    ${t.options?.device_name?a`<div class="info-row"><span class="info-label">${e("fieldDeviceName")}</span><span class="info-value text">${t.options.device_name}</span></div>`:""}
+                    ${t.options?.routes?a`<div class="info-row"><span class="info-label">${e("fieldRoutes")}</span><span class="info-value text">${t.options.routes}</span></div>`:""}
+                    ${t.options?.dns?a`<div class="info-row"><span class="info-label">${e("fieldDNS")}</span><span class="info-value text">${t.options.dns}</span></div>`:""}
                     <div class="info-row">
-                      <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value">${this._showPeer?l:b(l)}</span>
-                      ${l?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
-                          ${p("copy")}
+                      <span class="info-label">${e("entrypointPeerKey")}</span>
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?l:b(l)}</span>
+                      ${l?a`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
+                          ${d("copy")}
                         </button>
-                        <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
+                        <button class="copy-btn-mini" title="${this._showPeer?e("hideKey"):e("revealKey")}"
                           @click=${()=>{this._showPeer=!this._showPeer}}>
-                          ${p(this._showPeer?"eye-off":"eye")}
+                          ${d(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
-                    ${this._renderTransport(e.peer_transport)}
+                    ${this._renderTransport(t.peer_transport)}
                     <div class="info-row">
-                      <span class="info-label">${t("switchKeepalive")}</span>
-                      <span class="info-value text">${e.options?.keepalive?t("statusRunning"):t("statusStopped")}${e.options?.ttl?` · ${e.options.ttl}s`:""}</span>
+                      <span class="info-label">${e("switchKeepalive")}</span>
+                      <span class="info-value text">${t.options?.keepalive?e("statusRunning"):e("statusStopped")}${t.options?.ttl?` · ${t.options.ttl}s`:""}</span>
                     </div>
-                    <div class="p2p-hint">${t("tunSpokeHint")}</div>
-                  `:this.entrypointType==="p2p"?s`
+                    <div class="p2p-hint">${e("tunSpokeHint")}</div>
+                  `:this.entrypointType==="p2p"?a`
                     <div class="info-row">
-                      <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value">${this._showPeer?l:b(l)}</span>
-                      ${l?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
-                          ${p("copy")}
+                      <span class="info-label">${e("entrypointPeerKey")}</span>
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?l:b(l)}</span>
+                      ${l?a`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
+                          ${d("copy")}
                         </button>
-                        <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
+                        <button class="copy-btn-mini" title="${this._showPeer?e("hideKey"):e("revealKey")}"
                           @click=${()=>{this._showPeer=!this._showPeer}}>
-                          ${p(this._showPeer?"eye-off":"eye")}
+                          ${d(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
-                    ${this._renderTransport(e.peer_transport)}
+                    ${this._renderTransport(t.peer_transport)}
                     <div class="info-row">
-                      <span class="info-label">${t("fieldProtocol")}</span>
+                      <span class="info-label">${e("fieldProtocol")}</span>
                       <span class="info-value text">
-                        ${(e.options?.protocol==="udp"?"udp":"tcp").toUpperCase()}
+                        ${(t.options?.protocol==="udp"?"udp":"tcp").toUpperCase()}
                       </span>
                     </div>
-                    <div class="p2p-hint">${t("p2pEntryHint")}</div>
+                    <div class="p2p-hint">${e("p2pEntryHint")}</div>
                   `:""}
               </div>
 
               <!-- Stats grid -->
-              ${i?s`
+              ${i?a`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${t("btnResetStats")}">${p("rotate-cw")}</span></div>
+                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
                       <div class="stat-value">${v(i.total_conns)}</div>
                       <div class="stat-rate">${v(i.current_conns)} active · ${i.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${t("btnResetStats")}">${p("rotate-cw")}</span></div>
+                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
                       <div class="stat-value">${v(i.total_errs)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${t("btnResetOutput")}">${p("rotate-cw")}</span></div>
+                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${d("rotate-cw")}</span></div>
                       <div class="stat-value">${f(i.output_bytes)}</div>
                       <div class="stat-rate">${m(i.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${t("btnResetInput")}">${p("rotate-cw")}</span></div>
+                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${d("rotate-cw")}</span></div>
                       <div class="stat-value">${f(i.input_bytes)}</div>
                       <div class="stat-rate">${m(i.input_rate_bytes)}</div>
                     </div>
@@ -139,127 +139,127 @@ import{a as _,f as y,c as $,A as x,j as t,b as s,_ as u,v as w,w as k,l as T,n a
 
             <div class="section">
               <button class="btn-edit-bottom" @click=${()=>this._enterEdit()}>
-                ${p("edit")} ${t("btnEdit")}
+                ${d("edit")} ${e("btnEdit")}
               </button>
             </div>
           `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
-        ${this.mode!=="view"?s`
+        ${this.mode!=="view"?a`
             <div class="section">
               <div class="card" style="padding:16px;">
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${d+" Entrypoint"}>
+                  <input class="form-input" readonly .value=${p+" Entrypoint"}>
                 </div>
 
                 <!-- What a tun entrypoint is and what it needs, before the fields
                      it implies: the device is the one thing here that can make
                      the save fail. -->
-                ${this.entrypointType==="tun"?s`
-                    <div class="p2p-hint warn">${t("tunPrivilegeHint")}</div>
-                    <div class="p2p-hint">${t("tunSpokeHint")}</div>
-                    <div class="p2p-hint">${t("tunKeepaliveHint")}</div>
+                ${this.entrypointType==="tun"?a`
+                    <div class="p2p-hint warn">${e("tunPrivilegeHint")}</div>
+                    <div class="p2p-hint">${e("tunSpokeHint")}</div>
+                    <div class="p2p-hint">${e("tunKeepaliveHint")}</div>
                   `:""}
 
                 <!-- A p2p or tun entrypoint has no tunnel id to route by. -->
-                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?"":s`
+                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?"":a`
                 <div class="form-group">
                   <label class="form-label">Tunnel ID</label>
                   <input class="form-input"
                     ?readonly=${this.mode==="edit"}
                     .value=${this._tunnelId}
                     placeholder="Paste tunnel UUID"
-                    @input=${a=>{this._tunnelId=a.target.value}}>
+                    @input=${s=>{this._tunnelId=s.target.value}}>
                 </div>`}
 
                 <div class="form-group">
-                  <label class="form-label">${t("fieldName")}</label>
+                  <label class="form-label">${e("fieldName")}</label>
                   <input class="form-input" .value=${this._name} placeholder="My Entrypoint"
-                    @input=${a=>{this._name=a.target.value}}>
+                    @input=${s=>{this._name=s.target.value}}>
                 </div>
 
-                ${this.entrypointType==="tun"?s`
+                ${this.entrypointType==="tun"?a`
                     <div class="form-group">
-                      <label class="form-label">${t("fieldNet")}</label>
+                      <label class="form-label">${e("fieldNet")}</label>
                       <input class="form-input" .value=${this._net} placeholder="10.10.0.2/24"
-                        @input=${a=>{this._net=a.target.value}}>
-                      <div class="p2p-hint">${t("fieldNetHint")}</div>
+                        @input=${s=>{this._net=s.target.value}}>
+                      <div class="p2p-hint">${e("fieldNetHint")}</div>
                     </div>
                     <div class="form-group">
-                      <label class="form-label">${t("fieldMTU")}</label>
+                      <label class="form-label">${e("fieldMTU")}</label>
                       <input class="form-input" type="number" .value=${this._mtu?String(this._mtu):""} placeholder="1420"
-                        @input=${a=>{this._mtu=parseInt(a.target.value,10)||0}}>
+                        @input=${s=>{this._mtu=parseInt(s.target.value,10)||0}}>
                     </div>
                     <div class="form-group">
-                      <label class="form-label">${t("fieldDeviceName")}</label>
+                      <label class="form-label">${e("fieldDeviceName")}</label>
                       <input class="form-input" .value=${this._deviceName} placeholder="wisper0"
-                        @input=${a=>{this._deviceName=a.target.value}}>
-                      <div class="p2p-hint">${t("fieldDeviceNameHint")}</div>
+                        @input=${s=>{this._deviceName=s.target.value}}>
+                      <div class="p2p-hint">${e("fieldDeviceNameHint")}</div>
                     </div>
                     <div class="form-group">
-                      <label class="form-label">${t("fieldRoutes")}</label>
+                      <label class="form-label">${e("fieldRoutes")}</label>
                       <input class="form-input" .value=${this._routes} placeholder="0.0.0.0/0"
-                        @input=${a=>{this._routes=a.target.value}}>
-                      <div class="p2p-hint">${t("fieldRoutesHint")}</div>
+                        @input=${s=>{this._routes=s.target.value}}>
+                      <div class="p2p-hint">${e("fieldRoutesHint")}</div>
                     </div>
                     <div class="form-group">
-                      <label class="form-label">${t("fieldDNS")}</label>
+                      <label class="form-label">${e("fieldDNS")}</label>
                       <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
-                        @input=${a=>{this._dns=a.target.value}}>
+                        @input=${s=>{this._dns=s.target.value}}>
                     </div>
-                  `:s`
+                  `:a`
                 <div class="form-group">
-                  <label class="form-label">${t("fieldBindAddress")}</label>
+                  <label class="form-label">${e("fieldBindAddress")}</label>
                   <input class="form-input" .value=${this._endpoint} placeholder="0.0.0.0:9090"
-                    @input=${a=>{this._endpoint=a.target.value}}>
+                    @input=${s=>{this._endpoint=s.target.value}}>
                 </div>`}
 
-                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?s`
+                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?a`
                     <div class="form-group">
-                      <label class="form-label">${t("entrypointPeerKey")}</label>
+                      <label class="form-label">${e("entrypointPeerKey")}</label>
                       <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
-                        @input=${a=>{this._peer=a.target.value}}>
+                        @input=${s=>{this._peer=s.target.value}}>
                     </div>
-                    ${this.entrypointType==="tun"?s`
+                    ${this.entrypointType==="tun"?a`
                         <div class="switch-row">
-                          <span class="switch-label">${t("switchKeepalive")}</span>
+                          <span class="switch-label">${e("switchKeepalive")}</span>
                           <div class="switch ${this._keepalive?"on":""}"
                             @click=${()=>{this._keepalive=!this._keepalive}}>
                             <div class="switch-knob"></div>
                           </div>
                         </div>
                         <div class="form-group">
-                          <label class="form-label">${t("fieldTTL")}</label>
+                          <label class="form-label">${e("fieldTTL")}</label>
                           <input class="form-input" type="number" .value=${this._ttl?String(this._ttl):""} placeholder="15"
-                            @input=${a=>{this._ttl=parseInt(a.target.value,10)||0}}>
+                            @input=${s=>{this._ttl=parseInt(s.target.value,10)||0}}>
                         </div>
                       `:""}
-                    ${this.entrypointType==="p2p"?s`
+                    ${this.entrypointType==="p2p"?a`
                     <div class="switch-row" @click=${()=>{this._protocol=this._protocol==="tcp"?"udp":"tcp"}}>
-                      <span class="switch-label">${t("fieldProtocol")}</span>
+                      <span class="switch-label">${e("fieldProtocol")}</span>
                       <span class="protocol-value">
-                        ${this._protocol==="udp"?t("protocolUdp"):t("protocolTcp")}
-                        ${p("chevron-right")}
+                        ${this._protocol==="udp"?e("protocolUdp"):e("protocolTcp")}
+                        ${d("chevron-right")}
                       </span>
                     </div>
-                    ${this._protocol==="udp"?s`
+                    ${this._protocol==="udp"?a`
                     <div class="switch-row">
-                      <span class="switch-label">${t("switchKeepalive")}</span>
+                      <span class="switch-label">${e("switchKeepalive")}</span>
                       <div class="switch ${this._keepalive?"on":""}"
                         @click=${()=>{this._keepalive=!this._keepalive}}>
                         <div class="switch-knob"></div>
                       </div>
                     </div>
-                    <div class="p2p-hint">${t("keepaliveHint")}</div>`:""}
+                    <div class="p2p-hint">${e("keepaliveHint")}</div>`:""}
                   `:""}
                   `:""}
 
-                ${this.mode==="edit"?s`
+                ${this.mode==="edit"?a`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
-                        ${p("trash")} ${t("btnDelete")}
+                        ${d("trash")} ${e("btnDelete")}
                       </button>
                     </div>
                   `:""}
@@ -267,43 +267,43 @@ import{a as _,f as y,c as $,A as x,j as t,b as s,_ as u,v as w,w as k,l as T,n a
             </div>
           `:""}
 
-        ${this._snackbar?s`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?a`<div class="toast">${this._snackbar}</div>`:""}
 
-        ${this._showResetDialog?s`
+        ${this._showResetDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
-              <div class="dialog-box" @click=${a=>a.stopPropagation()}>
-                <div class="dialog-title">${t("resetStatsConfirmTitle")}</div>
-                <div class="dialog-message">${t("resetStatsConfirm")}</div>
+              <div class="dialog-box" @click=${s=>s.stopPropagation()}>
+                <div class="dialog-title">${e("resetStatsConfirmTitle")}</div>
+                <div class="dialog-message">${e("resetStatsConfirm")}</div>
                 <div class="dialog-actions">
                   <button class="dialog-btn cancel" @click=${()=>{this._showResetDialog=!1}}>
-                    ${t("btnCancel")}
+                    ${e("btnCancel")}
                   </button>
                   <button class="dialog-btn danger" @click=${()=>this._doResetStats()}>
-                    ${t("btnResetStats")}
+                    ${e("btnResetStats")}
                   </button>
                 </div>
               </div>
             </div>
           `:""}
 
-        ${this._showDeleteDialog?s`
+        ${this._showDeleteDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
-              <div class="dialog-box" @click=${a=>a.stopPropagation()}>
-                <div class="dialog-title">${t("deleteConfirmTitle")}</div>
-                <div class="dialog-message">${t("deleteConfirmMessage")}</div>
+              <div class="dialog-box" @click=${s=>s.stopPropagation()}>
+                <div class="dialog-title">${e("deleteConfirmTitle")}</div>
+                <div class="dialog-message">${e("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
                   <button class="dialog-btn cancel" @click=${()=>{this._showDeleteDialog=!1}}>
-                    ${t("btnCancel")}
+                    ${e("btnCancel")}
                   </button>
                   <button class="dialog-btn danger" @click=${()=>this._handleDelete()}>
-                    ${t("btnDelete")}
+                    ${e("btnDelete")}
                   </button>
                 </div>
               </div>
             </div>
           `:""}
       </app-scaffold>
-    `}};o.styles=P`
+    `}};o.styles=z`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -413,6 +413,13 @@ import{a as _,f as y,c as $,A as x,j as t,b as s,_ as u,v as w,w as k,l as T,n a
     }
     .info-value.text {
       font-family: inherit; font-size: var(--font-md);
+    }
+    /* A hidden key stays one line however long it is (a masked key is as long as
+       the key, which is three lines on a phone); revealed, it wraps in full.
+       min-width:0 is what lets the flex item shrink enough to ellipsize. */
+    .info-value.masked {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      min-width: 0;
     }
     .info-value.uuid {
       font-size: var(--font-sm);
@@ -630,4 +637,4 @@ import{a as _,f as y,c as $,A as x,j as t,b as s,_ as u,v as w,w as k,l as T,n a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;n([g()],o.prototype,"entrypointType",2);n([g()],o.prototype,"entrypointId",2);n([r()],o.prototype,"mode",2);n([r()],o.prototype,"_entrypoint",2);n([r()],o.prototype,"_saving",2);n([r()],o.prototype,"_snackbar",2);n([r()],o.prototype,"_showDeleteDialog",2);n([r()],o.prototype,"_showResetDialog",2);n([r()],o.prototype,"_name",2);n([r()],o.prototype,"_endpoint",2);n([r()],o.prototype,"_tunnelId",2);n([r()],o.prototype,"_peer",2);n([r()],o.prototype,"_showPeer",2);n([r()],o.prototype,"_protocol",2);n([r()],o.prototype,"_keepalive",2);n([r()],o.prototype,"_ttl",2);n([r()],o.prototype,"_net",2);n([r()],o.prototype,"_mtu",2);n([r()],o.prototype,"_deviceName",2);n([r()],o.prototype,"_routes",2);n([r()],o.prototype,"_dns",2);o=n([I("entrypoint-detail-page")],o);export{o as EntrypointDetailPage};
+  `;n([_()],o.prototype,"entrypointType",2);n([_()],o.prototype,"entrypointId",2);n([r()],o.prototype,"mode",2);n([r()],o.prototype,"_entrypoint",2);n([r()],o.prototype,"_saving",2);n([r()],o.prototype,"_snackbar",2);n([r()],o.prototype,"_showDeleteDialog",2);n([r()],o.prototype,"_showResetDialog",2);n([r()],o.prototype,"_name",2);n([r()],o.prototype,"_endpoint",2);n([r()],o.prototype,"_tunnelId",2);n([r()],o.prototype,"_peer",2);n([r()],o.prototype,"_showPeer",2);n([r()],o.prototype,"_protocol",2);n([r()],o.prototype,"_keepalive",2);n([r()],o.prototype,"_ttl",2);n([r()],o.prototype,"_net",2);n([r()],o.prototype,"_mtu",2);n([r()],o.prototype,"_deviceName",2);n([r()],o.prototype,"_routes",2);n([r()],o.prototype,"_dns",2);o=n([I("entrypoint-detail-page")],o);export{o as EntrypointDetailPage};
