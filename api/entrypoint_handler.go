@@ -172,12 +172,11 @@ func handleCreateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := ep.Run(); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to start entrypoint: "+err.Error())
-		return
-	}
-
+	// Add before starting: an Android tun entrypoint waits for a device the
+	// app's poll hands over only once the entrypoint is listed, so it has to be
+	// in the list before Start goes looking for one.
 	entrypoint.Add(ep)
+	entrypoint.Start(ep)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -245,13 +244,15 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Swap: only delete old after new is running successfully. It is already
-	// closed (above), so Delete's own Close is the repeat a second explicit one
-	// would only duplicate — while the replacement is up, every extra Close is
-	// another chance to unregister the name the new entrypoint now holds.
+	// Swap, then start: the replacement has to be listed for an Android tun
+	// device to be handed over (see Start). Delete's own Close is the repeat a
+	// second explicit old.Close() would only duplicate — while the replacement
+	// is up, every extra Close is another chance to unregister the name it now
+	// holds.
 	entrypoint.Delete(id)
 
 	entrypoint.Add(ep)
+	entrypoint.Start(ep)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -313,12 +314,9 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	newEP.SetStatsBaseline(ep.StatsBaseline())
 	newEP.Favorite(ep.IsFavorite())
 
-	if err := newEP.Run(); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to start entrypoint: "+err.Error())
-		return
-	}
-
+	// Same as create: listed first, then started (see Start).
 	entrypoint.Set(newEP)
+	entrypoint.Start(newEP)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}

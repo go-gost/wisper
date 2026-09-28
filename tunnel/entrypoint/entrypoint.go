@@ -40,7 +40,7 @@ type EntryPoint = tunnel.Tunnel
 func restore(goos string, ep EntryPoint) {
 	fail := func(err error) {
 		if err != nil {
-			slog.Error("restore entrypoint", "name", ep.Name(), "err", err)
+			slog.Error("start entrypoint", "name", ep.Name(), "err", err)
 			ep.Close()
 		}
 	}
@@ -57,6 +57,21 @@ func restore(goos string, ep EntryPoint) {
 // a p2p entrypoint binds a socket, so both are best reported at boot.
 func restoreAsync(goos string, ep EntryPoint) bool {
 	return goos == "android" && ep.Type() == TunEntryPoint
+}
+
+// Start begins an entrypoint that was just created, updated or started. It is
+// restore's contract for that case: inline everywhere but an Android tun
+// entrypoint, which runs in the background so the caller — an API handler, or
+// the app's own restore — returns while the entrypoint is already listed. The
+// app brings the device up for a *running* tun entrypoint, and it cannot see
+// one that has not been added yet, so a caller that blocks on the device
+// starves the very wait it is in: Run's device wait expires and the start
+// fails with "no device fd".
+//
+// A start that cannot complete closes the entrypoint, which is how the callers'
+// own Run error path reported it.
+func Start(ep EntryPoint) {
+	restore(runtime.GOOS, ep)
 }
 
 type entryPointList struct {
@@ -204,12 +219,8 @@ func RestartRunning() {
 		newEP.SetStatsBaseline(p.statsBaseline)
 		newEP.Favorite(p.fav)
 
-		if err := newEP.Run(); err != nil {
-			slog.Error("restart entrypoint", "name", p.opts.Name, "err", err)
-			continue
-		}
-
 		Set(newEP)
+		Start(newEP)
 	}
 
 	if err := SaveConfig(); err != nil {
