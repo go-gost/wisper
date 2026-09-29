@@ -172,6 +172,13 @@ func handleCreateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A second tun entrypoint cannot run (one VPN device, see CheckTunDeviceFree),
+	// so the create is refused before it leaves a stopped entrypoint behind.
+	if err := entrypoint.CheckTunDeviceFree(ep.ID()); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
 	// Add before starting: an Android tun entrypoint waits for a device the
 	// app's poll hands over only once the entrypoint is listed, so it has to be
 	// in the list before Start goes looking for one.
@@ -215,6 +222,13 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 
 	if err := validateEntryPointRequest(epType, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Refused before the old entrypoint is closed: a replacement that cannot get
+	// the device would otherwise take the running one down with it.
+	if err := entrypoint.CheckTunDeviceFree(id); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
 
@@ -289,6 +303,11 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	ep := entrypoint.Get(id)
 	if ep == nil {
 		writeError(w, http.StatusNotFound, "entrypoint not found")
+		return
+	}
+
+	if err := entrypoint.CheckTunDeviceFree(id); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
 

@@ -2,6 +2,7 @@ package entrypoint
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"runtime"
 	"sync"
@@ -72,6 +73,20 @@ func restoreAsync(goos string, ep EntryPoint) bool {
 // own Run error path reported it.
 func Start(ep EntryPoint) {
 	restore(runtime.GOOS, ep)
+}
+
+// CheckTunDeviceFree reports whether an entrypoint with this ID may use the tun
+// device. Android gives an app a single VPN device, so a second tun entrypoint
+// cannot work: both would read the same device and take each other's packets.
+// The web API checks this before an answer, so a request that cannot work is
+// refused with the name of the entrypoint holding the device — instead of being
+// accepted and leaving the running one broken.
+func CheckTunDeviceFree(id string) error {
+	ownerID, ownerName := tunnel.TunDeviceOwner()
+	if ownerID == "" || ownerID == id {
+		return nil
+	}
+	return fmt.Errorf("another tun entrypoint (%s) is already running: stop it first", ownerName)
 }
 
 type entryPointList struct {

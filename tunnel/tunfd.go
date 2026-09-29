@@ -38,6 +38,51 @@ func SetTunFD(fd int) {
 	}
 }
 
+// The device above is one device for the whole app, and every tun entrypoint
+// built from its fd reads the same packet stream: two of them would take each
+// other's packets instead of getting a link each. So the device is held by one
+// entrypoint at a time, claimed for as long as that entrypoint runs.
+var (
+	tunDeviceMu   sync.Mutex
+	tunDeviceID   string
+	tunDeviceName string
+)
+
+// ClaimTunDevice gives id — named name — the right to use the device, unless
+// another entrypoint already holds it. It returns the holder's name when the
+// claim fails, so the caller can say who to stop.
+func ClaimTunDevice(id, name string) (owner string, ok bool) {
+	tunDeviceMu.Lock()
+	defer tunDeviceMu.Unlock()
+
+	if tunDeviceID != "" && tunDeviceID != id {
+		return tunDeviceName, false
+	}
+	tunDeviceID, tunDeviceName = id, name
+	return "", true
+}
+
+// ReleaseTunDevice gives the device back if id holds it. A holder that has
+// already lost it — a replacement reusing the ID claimed it first — keeps
+// nothing.
+func ReleaseTunDevice(id string) {
+	tunDeviceMu.Lock()
+	defer tunDeviceMu.Unlock()
+
+	if tunDeviceID == id {
+		tunDeviceID, tunDeviceName = "", ""
+	}
+}
+
+// TunDeviceOwner names the entrypoint holding the device, both empty when
+// nobody does. Callers that can answer a request with an error use it to refuse
+// a second tun entrypoint up front instead of starting one that cannot work.
+func TunDeviceOwner() (id, name string) {
+	tunDeviceMu.Lock()
+	defer tunDeviceMu.Unlock()
+	return tunDeviceID, tunDeviceName
+}
+
 // WaitTunFD returns the device fd, waiting up to d for one to be handed over,
 // and -1 if none arrived. An entrypoint started by a restored config runs long
 // before the app can establish the VPN, so it waits instead of failing.

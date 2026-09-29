@@ -3,6 +3,7 @@ package entrypoint
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
 
 	cfg "github.com/go-gost/wisper/config"
@@ -153,5 +154,27 @@ func TestSaveConfigKeepsTunDevice(t *testing.T) {
 		if !bytes.Contains(raw, []byte(key)) {
 			t.Errorf("wisper.yaml carries no %s key:\n%s", key, raw)
 		}
+	}
+}
+
+// TestCheckTunDeviceFree: the web API refuses a second tun entrypoint on the
+// device's holder, and only on it — a replacement carries the same ID, so it
+// has to pass.
+func TestCheckTunDeviceFree(t *testing.T) {
+	if err := CheckTunDeviceFree("mine"); err != nil {
+		t.Fatalf("an unclaimed device should be free: %v", err)
+	}
+	if _, ok := tp.ClaimTunDevice("mine", "tun-pi"); !ok {
+		t.Fatal("claim failed")
+	}
+	defer tp.ReleaseTunDevice("mine")
+
+	if err := CheckTunDeviceFree("other"); err == nil {
+		t.Fatal("a second tun entrypoint should be refused")
+	} else if !strings.Contains(err.Error(), "tun-pi") {
+		t.Errorf("error %q should name the holder", err)
+	}
+	if err := CheckTunDeviceFree("mine"); err != nil {
+		t.Errorf("the holder's own ID should pass: %v", err)
 	}
 }

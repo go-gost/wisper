@@ -162,6 +162,17 @@ export class EntrypointDetailPage extends LitElement {
     });
   }
 
+  /** _tunDeviceHolder is the running tun entrypoint that holds the app's VPN
+   *  device, if it is not this one. There is one device, so a second tun
+   *  entrypoint cannot work — and arming the VPN for it would take the device
+   *  away from the entrypoint that is using it. */
+  private _tunDeviceHolder(): Entrypoint | undefined {
+    if (this.entrypointType !== 'tun') return undefined;
+    return getEntrypoints().find(
+      (ep) => ep.type === 'tun' && ep.status === 'running' && ep.id !== this.entrypointId,
+    );
+  }
+
   /** _renderTransport is the peer's path: one word, with the reason on hover. */
   private _renderTransport(value?: string) {
     const st = transportStyle(value);
@@ -214,6 +225,15 @@ export class EntrypointDetailPage extends LitElement {
   private async _handleSave() {
     if (!this._name.trim()) {
       this._showSnackbar(t('requiredField'));
+      return;
+    }
+
+    // Refused before the arm: the device can only serve one tun entrypoint, so
+    // arming the VPN for this one would take it away from the entrypoint holding
+    // it — for a save the backend refuses anyway.
+    const holder = this._tunDeviceHolder();
+    if (holder) {
+      this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
       return;
     }
 
@@ -278,11 +298,17 @@ export class EntrypointDetailPage extends LitElement {
   }
 
   private async _handleStart() {
+    const holder = this._tunDeviceHolder();
+    if (holder) {
+      this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
+      return;
+    }
     try {
       await start(this.entrypointId);
       this._showSnackbar(t('started'));
-    } catch {
-      this._showSnackbar(t('startFailed'));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '';
+      this._showSnackbar(`${t('startFailed')}${msg ? ': ' + msg : ''}`);
     }
   }
 

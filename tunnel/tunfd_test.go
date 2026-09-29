@@ -86,3 +86,32 @@ func TestWaitTunFDTimeout(t *testing.T) {
 		t.Fatalf("returned after %v, before the timeout", elapsed)
 	}
 }
+
+func TestClaimTunDeviceIsExclusive(t *testing.T) {
+	defer ReleaseTunDevice("first")
+
+	if owner, ok := ClaimTunDevice("first", "one"); !ok || owner != "" {
+		t.Fatalf("first claim = (%q, %v), want (\"\", true)", owner, ok)
+	}
+	// The device is one device: a second entrypoint is told who holds it.
+	if owner, ok := ClaimTunDevice("second", "two"); ok || owner != "one" {
+		t.Fatalf("second claim = (%q, %v), want (\"one\", false)", owner, ok)
+	}
+	// A replacement reuses the ID, so the holder may claim its own device again.
+	if _, ok := ClaimTunDevice("first", "one"); !ok {
+		t.Fatal("the holder should be able to claim again")
+	}
+	// Only the holder's release frees it: a stranger's is a no-op.
+	ReleaseTunDevice("second")
+	if id, _ := TunDeviceOwner(); id != "first" {
+		t.Fatalf("owner after stranger's release = %q, want \"first\"", id)
+	}
+	ReleaseTunDevice("first")
+	if id, name := TunDeviceOwner(); id != "" || name != "" {
+		t.Fatalf("owner after release = (%q, %q), want (\"\", \"\")", id, name)
+	}
+	if _, ok := ClaimTunDevice("second", "two"); !ok {
+		t.Fatal("the released device should be claimable again")
+	}
+	ReleaseTunDevice("second")
+}

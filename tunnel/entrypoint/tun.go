@@ -2,6 +2,7 @@ package entrypoint
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"runtime"
 	"sync"
@@ -195,8 +196,19 @@ func (s *tunEntryPoint) Run() (err error) {
 		if !started {
 			registry.P2PRegistry().Unregister(s.provider)
 			tunnel.ReleaseP2PHost()
+			tunnel.ReleaseTunDevice(s.opts.ID)
 		}
 	}()
+
+	// One tun entrypoint at a time on Android: the app has a single VPN device,
+	// and every device built from its fd reads the same packets, so a second
+	// entrypoint would take them from the first instead of adding a link. The
+	// web API checks the same thing before it answers a start.
+	if runtime.GOOS == "android" {
+		if owner, ok := tunnel.ClaimTunDevice(s.opts.ID, s.opts.Name); !ok {
+			return fmt.Errorf("tun device is in use by entrypoint %q: stop it first", owner)
+		}
+	}
 
 	// Register the provider before parsing the chain: the chain node resolves
 	// metadata.p2p by name at parse time. The Unregister clears a stale
@@ -363,6 +375,9 @@ func (s *tunEntryPoint) Close() error {
 		if acquired {
 			tunnel.ReleaseP2PHost()
 		}
+		// The device is free for the next tun entrypoint; a no-op when this one
+		// never held it (another platform, or a start that was refused).
+		tunnel.ReleaseTunDevice(s.opts.ID)
 	})
 	return err
 }
