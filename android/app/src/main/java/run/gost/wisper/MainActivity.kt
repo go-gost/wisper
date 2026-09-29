@@ -452,15 +452,6 @@ class MainActivity : AppCompatActivity() {
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
             progressBar.visibility = View.GONE
-
-            // Inject dark theme class if system is in dark mode.
-            // The Lit web app uses :root.dark selector for dark theme.
-            if (isSystemDarkTheme()) {
-                view?.evaluateJavascript(
-                    "document.documentElement.classList.add('dark')",
-                    null
-                )
-            }
         }
 
         override fun onReceivedError(
