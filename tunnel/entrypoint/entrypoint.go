@@ -159,7 +159,10 @@ func Get(id string) EntryPoint {
 	return nil
 }
 
-// Delete removes and closes the entrypoint with the given ID.
+// Delete removes and closes the entrypoint with the given ID. Event history is
+// kept: the update path reuses Delete to swap the old entrypoint out, so
+// clearing here would wipe the history of one merely being replaced. The delete
+// handler clears it.
 func Delete(id string) {
 	entryPoints.mux.Lock()
 	defer entryPoints.mux.Unlock()
@@ -168,7 +171,6 @@ func Delete(id string) {
 		if s != nil && s.ID() == id {
 			s.Close()
 			entryPoints.list = append(entryPoints.list[:i], entryPoints.list[i+1:]...)
-			event.Seed(id, nil)
 			return
 		}
 	}

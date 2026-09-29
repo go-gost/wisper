@@ -458,6 +458,7 @@ func handleDeleteTunnel(w http.ResponseWriter, r *http.Request) {
 
 	name := t.Name()
 	tunnel.Delete(id)
+	event.Seed(id, nil)
 	event.Global(event.LevelWarn, "%s: deleted", name)
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)

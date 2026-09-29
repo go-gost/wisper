@@ -417,7 +417,9 @@ func Get(id string) Tunnel {
 
 // Delete removes and closes the tunnel with the given ID. The p2p key file is
 // left intact (the API's delete handler removes it), so an update/replace keeps
-// the tunnel's identity.
+// the tunnel's identity. Event history is kept too — the update path reuses
+// Delete to swap the old tunnel out, so clearing here would wipe the history of
+// a tunnel that is merely being replaced. The delete handler clears it.
 func Delete(id string) {
 	tunnels.mux.Lock()
 	defer tunnels.mux.Unlock()
@@ -426,7 +428,6 @@ func Delete(id string) {
 		if s != nil && s.ID() == id {
 			s.Close()
 			tunnels.list = append(tunnels.list[:i], tunnels.list[i+1:]...)
-			event.Seed(id, nil)
 			return
 		}
 	}

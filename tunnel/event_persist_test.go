@@ -28,7 +28,10 @@ func TestEventHistoryPersists(t *testing.T) {
 	tun.Close() // closed: nothing is started, so the test needs no network
 	Add(tun)
 	id := tun.ID()
-	t.Cleanup(func() { Delete(id) })
+	t.Cleanup(func() {
+		Delete(id)
+		event.Seed(id, nil)
+	})
 
 	event.Record(id, event.LevelWarn, "service failed: dial tcp: timeout")
 	event.Global(event.LevelInfo, "p2p host started")
@@ -63,12 +66,15 @@ func TestEventHistoryPersists(t *testing.T) {
 		t.Fatalf("global events not persisted: %+v", onDisk.Events)
 	}
 
-	// Delete forgets the object's history; LoadConfig must seed it back from
-	// what was persisted. LoadConfig reads the in-memory config, which the
-	// SaveConfig above has already replaced.
+	// The delete handler forgets the object's history (Delete itself keeps it —
+	// the update path reuses Delete); removing the object here makes LoadConfig
+	// re-add it. LoadConfig must seed the history back from what was persisted.
+	// LoadConfig reads the in-memory config, which the SaveConfig above has
+	// already replaced.
 	Delete(id)
+	event.Seed(id, nil)
 	if n := len(event.List(id)); n != 0 {
-		t.Fatalf("Delete left %d events", n)
+		t.Fatalf("history not forgotten: %d events left", n)
 	}
 	LoadConfig()
 
