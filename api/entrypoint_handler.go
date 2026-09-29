@@ -253,16 +253,15 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	ep.SetStatsBaseline(old.StatsBaseline())
 	ep.Favorite(old.IsFavorite())
 
-	if err := ep.Run(); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to restart entrypoint: "+err.Error())
-		return
-	}
-
-	// Swap, then start: the replacement has to be listed for an Android tun
-	// device to be handed over (see Start). Delete's own Close is the repeat a
-	// second explicit old.Close() would only duplicate — while the replacement
-	// is up, every extra Close is another chance to unregister the name it now
-	// holds.
+	// Swap, then start — the same order create and start use, and the only one
+	// that works: the replacement has to be listed for an Android tun device to
+	// be handed over (see Start). Starting it here *and* through Start would run
+	// it twice: the second Run replaces the first's service (leaving it serving
+	// forever with nobody to close it) and unregisters the provider name the
+	// first one registered, closing the shared p2p host on the way out.
+	// Delete's own Close is the repeat a second explicit old.Close() would only
+	// duplicate — while the replacement is up, every extra Close is another
+	// chance to unregister the name it now holds.
 	entrypoint.Delete(id)
 
 	entrypoint.Add(ep)
