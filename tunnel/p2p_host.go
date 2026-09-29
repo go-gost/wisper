@@ -73,6 +73,9 @@ type p2pHostManager struct {
 	routes  map[string]*peerListener
 	pending map[string]*pendingPeer
 	refs    int
+	// sig is the settings signature the host was built with; a change rebuilds
+	// it (see p2pHostSig).
+	sig string
 }
 
 var p2pHost = &p2pHostManager{routes: make(map[string]*peerListener)}
@@ -209,8 +212,18 @@ func (m *p2pHostManager) ensurePublicKey() (string, error) {
 func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	settings := cfg.Get().Settings
+	sig := p2pHostSig(settings)
+	// The host captures its settings when it is built, so a changed relay,
+	// STUN or direct path must replace it. A settings update restarts every
+	// running consumer (RestartRunning in both packages), so a holder left here
+	// is about to re-acquire; refs is left alone — each still gives its
+	// reference back.
+	if m.host != nil && m.sig != sig {
+		m.teardownLocked()
+	}
 	if m.host == nil {
-		settings := cfg.Get().Settings
 		direct := P2PDirect(settings)
 		conf := &p2p.Config{
 			Derp:   P2PDerpURL(settings),
@@ -231,11 +244,30 @@ func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 		if cerr := host.Connect(); cerr != nil {
 			slog.Warn("p2p derp connect", "err", cerr)
 		}
-		m.host, m.ln = host, ln
+		m.host, m.ln, m.sig = host, ln, sig
 		go m.acceptLoop(ln)
 	}
 	m.refs++
 	return m.host, nil
+}
+
+// teardownLocked stops the host, its accept loop and every peer route, and
+// clears the slot so the next acquire rebuilds. The caller holds m.mu and must
+// not touch refs: a settings rebuild keeps them, release has already counted
+// down to zero.
+func (m *p2pHostManager) teardownLocked() {
+	if m.ln != nil {
+		_ = m.ln.Close()
+	}
+	if m.host != nil {
+		_ = m.host.Close()
+	}
+	m.host, m.ln, m.sig = nil, nil, ""
+	m.pending = nil
+	for k, pl := range m.routes {
+		pl.close()
+		delete(m.routes, k)
+	}
 }
 
 // release drops one reference; the last one stops the host and every route.
@@ -248,15 +280,31 @@ func (m *p2pHostManager) release() {
 	if m.refs > 0 || m.host == nil {
 		return
 	}
-	if m.ln != nil {
-		_ = m.ln.Close()
+	m.teardownLocked()
+}
+
+// p2pHostSig is the host's build inputs, so a changed setting is caught on the
+// next acquire and the host is rebuilt. It reads the configured values, not the
+// probed ones (p2pHostStun probes the relay), so it is side-effect free.
+func p2pHostSig(s *cfg.Settings) string {
+	if s == nil || s.P2P == nil {
+		return ""
 	}
-	_ = m.host.Close()
-	m.host, m.ln = nil, nil
-	m.pending = nil
-	for k, pl := range m.routes {
-		pl.close()
-		delete(m.routes, k)
+	p := s.P2P
+	return fmt.Sprintf("derp=%s|stun=%s|direct=%s|secure=%s|ca=%s",
+		p.Derp, p.Stun, triState(p.Direct), triState(p.Secure), p.CAFile)
+}
+
+// triState renders an optional bool so a nil (unset, meaning the default) is
+// distinguishable from an explicit false.
+func triState(p *bool) string {
+	switch {
+	case p == nil:
+		return "nil"
+	case *p:
+		return "true"
+	default:
+		return "false"
 	}
 }
 

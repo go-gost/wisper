@@ -577,3 +577,49 @@ func TestP2PPendingPeersFiltersListedKeys(t *testing.T) {
 		t.Fatalf("pending = %+v, want only %s", got, unknown)
 	}
 }
+
+// TestP2PHostRebuildsOnSettingsChange covers the shared host's settings
+// lifetime: the host captures its build settings once, so a changed direct
+// path (or relay/STUN) must replace it — otherwise the settings toggle is dead
+// while any consumer holds a reference. Unchanged settings keep the host, so a
+// save that does not touch p2p does not churn it.
+func TestP2PHostRebuildsOnSettingsChange(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	const derp = "wss://127.0.0.1:1/derp"
+	on := true
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: derp, Direct: &on}}})
+
+	m := p2pHost
+	if m.refs != 0 || m.host != nil {
+		t.Fatal("manager is not idle: a previous test leaked a reference")
+	}
+	defer func() {
+		for m.refs > 0 {
+			m.release()
+		}
+	}()
+
+	host1, err := m.acquire()
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+
+	off := false
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: derp, Direct: &off}}})
+
+	host2, err := m.acquire()
+	if err != nil {
+		t.Fatalf("acquire after a settings change: %v", err)
+	}
+	if host2 == host1 {
+		t.Fatal("acquire reused the host after the p2p settings changed")
+	}
+
+	host3, err := m.acquire()
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	if host3 != host2 {
+		t.Fatal("acquire rebuilt the host with unchanged settings")
+	}
+}
