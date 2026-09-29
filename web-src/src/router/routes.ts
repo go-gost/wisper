@@ -11,6 +11,7 @@ const entrypointDetailPage = () => import('../pages/entrypoint-detail-page');
 const settingsPage = () => import('../pages/settings-page');
 const inspectorPage = () => import('../pages/inspector-page');
 const tunnelPeersPage = () => import('../pages/tunnel-peers-page');
+const eventsPage = () => import('../pages/events-page');
 
 /**
  * Create the Lit router with all application routes.
@@ -106,6 +107,41 @@ export function createRouter(host: ReactiveControllerHost & HTMLElement) {
           ></tunnel-peers-page>`,
         enter: async () => {
           await tunnelPeersPage();
+          return true;
+        },
+      },
+      {
+        path: '/tunnel/:type/:id/events',
+        render: (params: { type?: string; id?: string }) =>
+          html`<events-page
+            .kind=${'tunnel'}
+            .parentType=${params.type ?? ''}
+            .parentId=${params.id ?? ''}
+          ></events-page>`,
+        enter: async () => {
+          await eventsPage();
+          return true;
+        },
+      },
+      {
+        path: '/entrypoint/:type/:id/events',
+        render: (params: { type?: string; id?: string }) =>
+          html`<events-page
+            .kind=${'entrypoint'}
+            .parentType=${params.type ?? ''}
+            .parentId=${params.id ?? ''}
+          ></events-page>`,
+        enter: async () => {
+          await eventsPage();
+          return true;
+        },
+      },
+      {
+        path: '/settings/events',
+        render: () =>
+          html`<events-page .kind=${'global'}></events-page>`,
+        enter: async () => {
+          await eventsPage();
           return true;
         },
       },

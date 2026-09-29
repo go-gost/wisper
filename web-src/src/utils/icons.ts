@@ -6,8 +6,10 @@ import { html, svg, type TemplateResult } from 'lit';
  *
  * Usage: ${icon('star')}  ${icon('star-filled')}
  *
- * Supported names:
- *   star, star-filled, settings, trash, copy,
+ * Names: the common ones are listed below, and ICON_PATHS is the full table
+ * (it also holds the p2p transport set — zap, hub, rotate-cw). An unknown name
+ * renders an empty box.
+ *   star, star-filled, settings, trash, copy, activity,
  *   chevron-left, chevron-right, chevron-up, chevron-down, users,
  *   folder, globe, link, broadcast, plus, edit, back-arrow,
  *   check, close, search
@@ -72,6 +74,11 @@ const ICON_PATHS: Record<string, SVGInner> = {
   hub: svg`<circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />`,
 
   network: svg`<rect x="9" y="3" width="6" height="6" rx="1" /><rect x="2" y="15" width="6" height="6" rx="1" /><rect x="16" y="15" width="6" height="6" rx="1" /><path d="M12 9v3" /><path d="M5 15v-1.5h14V15" />`,
+
+  // Event history: a pulse line, for a timeline of occurrences (a service
+  // dropping or recovering, a peer changing path). Not the bolt below — that
+  // one means a *direct* p2p path, and the two must not be confused.
+  activity: svg`<polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />`,
 
   // p2p transport states: a bolt for a direct path, the hub (above) for every
   // relay state.

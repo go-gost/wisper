@@ -857,6 +857,28 @@ export class EntrypointDetailPage extends LitElement {
                 : ''}
             </div>
 
+            ${this.mode === 'view' && this._entrypoint
+              ? html`
+                <div class="section">
+                  <div class="card" style="padding:0;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
+                      @click=${() => this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`)}>
+                      <span style="color:var(--accent);">${icon('activity')}</span>
+                      <div style="flex:1;">
+                        <div style="font-size:var(--font-sm);font-weight:600;">${t('eventsEntryTitle')}</div>
+                        <div style="font-size:var(--font-sm);color:var(--text-muted);">
+                          ${(this._entrypoint.events ?? []).length
+                            ? (this._entrypoint.events ?? [])[0].message
+                            : t('eventsEntryDesc')}
+                        </div>
+                      </div>
+                      <span style="color:var(--text-muted);">&rarr;</span>
+                    </div>
+                  </div>
+                </div>
+              `
+              : nothing}
+
             <div class="section">
               <button class="btn-edit-bottom" @click=${() => this._enterEdit()}>
                 ${icon('edit')} ${t('btnEdit')}

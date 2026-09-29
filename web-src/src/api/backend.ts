@@ -9,6 +9,7 @@ import type {
   TunnelCreateRequest,
   TunnelPeersRequest,
   VersionInfo,
+  WisperEvent,
 } from './types';
 
 export class BackendError extends Error {
@@ -211,5 +212,16 @@ export class GoBackend {
    *  notice — so an unknown key is not an error. */
   dismissPendingPeer(key: string): Promise<void> {
     return this.request('DELETE', `/api/p2p/pending/${encodeURIComponent(key)}`);
+  }
+
+  /** The host's global event history (relay/STUN failures, host start/stop,
+   *  deletions), newest first. */
+  getEvents(): Promise<{ events: WisperEvent[] }> {
+    return this.request('GET', '/api/events');
+  }
+
+  /** Forget the global event history. */
+  clearEvents(): Promise<void> {
+    return this.request('DELETE', '/api/events');
   }
 }

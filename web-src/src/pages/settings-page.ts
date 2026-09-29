@@ -602,6 +602,17 @@ export class SettingsPage extends LitElement {
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.94 4.6L3.2 11.37c-1.06.43-1.05 1.95.02 2.36l4.46 1.7 1.72 5.45c.36 1.13 1.78 1.31 2.4.31l2.45-3.87 4.36 3.23c.83.61 2.01.13 2.13-.92l1.9-13.94c.13-1-.76-1.77-1.7-1.42z"/></svg>
               <span>Telegram</span>
             </a>
+            <a
+              href="/settings/events"
+              title=${t('eventsGlobalTitle')}
+              @click=${(e: Event) => {
+                e.preventDefault();
+                this._navigate('/settings/events');
+              }}
+            >
+              ${icon('activity')}
+              <span>${t('eventsGlobalTitle')}</span>
+            </a>
           </div>
         </div>
 

@@ -90,6 +90,15 @@ export interface PeerStats {
   output_rate_bytes: number;
 }
 
+/** One recorded occurrence in a tunnel's, entrypoint's, or the host's history.
+ *  Named WisperEvent rather than Event: the DOM's global Event type would be
+ *  shadowed in every module that imports this. */
+export interface WisperEvent {
+  time: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
 export interface Tunnel {
   id: string;
   name: string;
@@ -106,6 +115,8 @@ export interface Tunnel {
   peer_stats?: PeerStats[];
   /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
   peer_transport?: string;
+  /** This object's recent history, newest first. */
+  events?: WisperEvent[];
 }
 
 export interface TunnelCreateRequest {
@@ -159,6 +170,8 @@ export interface Entrypoint {
   stats: ServiceStats;
   /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
   peer_transport?: string;
+  /** This object's recent history, newest first. */
+  events?: WisperEvent[];
 }
 
 /** TunnelPeersRequest replaces a p2p tunnel's allowlist on its own. */

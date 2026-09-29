@@ -194,6 +194,18 @@ const en: Record<string, string> = {
   peersPendingHint:
     'These keys knocked but are on no allowlist. A p2p stream carries no destination, so which tunnel they wanted is unknown — Add puts the key on this one. Dismiss only clears the notice: a peer that keeps knocking comes back, so add it and switch it off to stop the rows for good.',
   peersPendingBadge: '{n} requesting',
+  // Event history
+  eventsTunnelTitle: 'History',
+  eventsEntrypointTitle: 'History',
+  eventsGlobalTitle: 'Host events',
+  eventsEntryTitle: 'History',
+  eventsEntryDesc: 'Recent drops, recoveries and lifecycle events',
+  eventsEmpty: 'Nothing recorded yet',
+  eventsClear: 'Clear',
+  eventsClearConfirm: 'Clear the host event history?',
+  eventsLevelInfo: 'Info',
+  eventsLevelWarn: 'Warning',
+  eventsLevelError: 'Error',
   notFound: 'Not found.',
   p2pEntryHint: 'Local clients connect to the listen address; traffic exits through the p2p tunnel to the peer key, unencrypted (the inner protocol is plaintext).',
   p2pIdentity: 'P2P Identity',

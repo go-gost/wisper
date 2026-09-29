@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-D6HUiMMg.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
-import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q as z,u as R,b as s,A as h,o as C,i as E,t as F}from"./index-D6HUiMMg.js";import{m as L,c as u,d as M,a as g,b as m,n as x,r as l}from"./format-CqizGvEb.js";import{i as d}from"./app-scaffold-BkyXbNdo.js";import{c as I}from"./clipboard-C3x8_sid.js";var H=Object.defineProperty,A=Object.getOwnPropertyDescriptor,r=(t,i,o,p)=>{for(var a=p>1?void 0:p?A(i,o):i,v=t.length-1,f;v>=0;v--)(f=t[v])&&(a=(p?f(i,o,a):f(a))||a);return p&&a&&H(i,o,a),a};const c=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function _(t){return c.find(i=>i.value===t)??c[2]}let n=class extends w{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._showPeers=!1,this._pendingCount=0,this._backend=new y,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=i=>{this._endpoint=i,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push($(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){this.tunnelType==="p2p"&&this._loadPendingCount();const t=this.tunnelId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const o=k().find(p=>p.id===t);o&&(this._tunnel=o,i?(this.mode="edit",this._populateForm(o)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(o)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off"}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off"}_peerLabels(){return(this._tunnel?.options.peers??[]).map(t=>this._showPeers?t.key:t.alias||L(t.key)).join(", ")}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const i={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="p2p"&&this.mode==="edit"&&(i.peers=this._tunnel?.options.peers??[]),this._showAuth&&(i.username=this._username.trim()||void 0,i.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-D6HUiMMg.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.create(i)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-D6HUiMMg.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.update(this.tunnelId,i)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(i){const o=i instanceof Error?i.message:"";this._showSnackbar(`${e("saveFailed")}${o?": "+o:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await D(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await P(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.tunnelId,this._resetKind),this._tunnel&&R(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,i){const o=i.indexOf(t);return i[(o+1)%i.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}render(){const t=this._tunnel,i=t?t.stats:null,o=this._typeLabel(),p=t?.peer_stats??[];return s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DYudh1jL.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
+import{a as y,G as w,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q as z,u as R,b as s,A as c,o as C,i as E,t as F}from"./index-DYudh1jL.js";import{m as L,c as u,d as I,a as g,b as m,n as x,r as l}from"./format-B570lS7p.js";import{i as d}from"./app-scaffold-CE0_zgyG.js";import{c as M}from"./clipboard-C3x8_sid.js";var H=Object.defineProperty,A=Object.getOwnPropertyDescriptor,r=(t,i,n,p)=>{for(var a=p>1?void 0:p?A(i,n):i,v=t.length-1,f;v>=0;v--)(f=t[v])&&(a=(p?f(i,n,a):f(a))||a);return p&&a&&H(i,n,a),a};const h=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function _(t){return h.find(i=>i.value===t)??h[2]}let o=class extends y{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._showPeers=!1,this._pendingCount=0,this._backend=new w,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=i=>{this._endpoint=i,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push($(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){this.tunnelType==="p2p"&&this._loadPendingCount();const t=this.tunnelId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const n=k().find(p=>p.id===t);n&&(this._tunnel=n,i?(this.mode="edit",this._populateForm(n)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(n)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off"}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off"}_peerLabels(){return(this._tunnel?.options.peers??[]).map(t=>this._showPeers?t.key:t.alias||L(t.key)).join(", ")}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const i={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="p2p"&&this.mode==="edit"&&(i.peers=this._tunnel?.options.peers??[]),this._showAuth&&(i.username=this._username.trim()||void 0,i.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-DYudh1jL.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.create(i)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-DYudh1jL.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.update(this.tunnelId,i)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(i){const n=i instanceof Error?i.message:"";this._showSnackbar(`${e("saveFailed")}${n?": "+n:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await D(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await P(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await M(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.tunnelId,this._resetKind),this._tunnel&&R(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,i){const n=i.indexOf(t);return i[(n+1)%i.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}render(){const t=this._tunnel,i=t?t.stats:null,n=this._typeLabel(),p=t?.peer_stats??[];return s`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -7,7 +7,7 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
             ${d("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${e("tunnelNewTitle")} — ${o}`:o+" Tunnel"}
+            ${this.mode==="create"?`${e("tunnelNewTitle")} — ${n}`:n+" Tunnel"}
           </span>
 
           ${this.mode==="view"&&t?s`
@@ -38,11 +38,11 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${o} Tunnel</span>
+                  <span class="info-value text">${n} Tunnel</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Created</span>
-                  <span class="info-value text">${M(t.created_at)}</span>
+                  <span class="info-value text">${I(t.created_at)}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Target</span>
@@ -73,8 +73,8 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
                           ${d("copy")}
                         </button>
                       </div>
-                    `:h}
-                ${this.tunnelType==="p2p"?s`<div class="p2p-hint">${e("p2pHint")}</div>`:h}
+                    `:c}
+                ${this.tunnelType==="p2p"?s`<div class="p2p-hint">${e("p2pHint")}</div>`:c}
                 ${t.options.prefix?s`
                     <div class="info-row">
                       <span class="info-label">${e("fieldPrefix")}</span>
@@ -110,7 +110,7 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
                 ${this.tunnelType==="p2p"?"":s`
                 <div class="info-row">
                   <span class="info-label">Recording</span>
-                  <span class="info-value text">${e(c.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
+                  <span class="info-value text">${e(h.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
                 </div>
                 <div class="info-row" style="margin-top:-8px;">
                   <span class="info-label"></span>
@@ -169,12 +169,32 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
                       </div>
                       ${this._pendingCount>0?s`<span style="font-size:var(--font-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
                             ${e("peersPendingBadge").replace("{n}",String(this._pendingCount))}
-                          </span>`:h}
+                          </span>`:c}
                       <span style="color:var(--text-muted);">&rarr;</span>
                     </div>
                   </div>
                 </div>
-              `:h}
+              `:c}
+
+            <!-- History: drops, recoveries and lifecycle events, on their own
+                 page — a list this long does not belong inline. -->
+            ${this.mode==="view"&&t?s`
+                <div class="section">
+                  <div class="card" style="padding:0;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
+                      @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/events`)}>
+                      <span style="color:var(--accent);">${d("activity")}</span>
+                      <div style="flex:1;">
+                        <div style="font-size:var(--font-sm);font-weight:600;">${e("eventsEntryTitle")}</div>
+                        <div style="font-size:var(--font-sm);color:var(--text-muted);">
+                          ${(t.events??[]).length?(t.events??[])[0].message:e("eventsEntryDesc")}
+                        </div>
+                      </div>
+                      <span style="color:var(--text-muted);">&rarr;</span>
+                    </div>
+                  </div>
+                </div>
+              `:c}
 
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
                  inspecting, and only when an inspector URL is configured. -->
@@ -213,7 +233,7 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
                 <!-- Type (readonly) -->
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${o+" Tunnel"}>
+                  <input class="form-input" readonly .value=${n+" Tunnel"}>
                 </div>
 
                 <!-- Name -->
@@ -271,10 +291,10 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
 
                 <!-- Recording mode: p2p has no recorder to attach it to. -->
                 ${this.tunnelType==="p2p"?"":s`
-                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,c.map(a=>a.value)))}>
+                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,h.map(a=>a.value)))}>
                   <span class="switch-label">${e("settingsRecordMode")}</span>
                   <span style="font-size:var(--font-sm);color:var(--text-muted);display:flex;align-items:center;gap:4px;">
-                    ${e(c.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}
+                    ${e(h.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}
                     ${d("chevron-right")}
                   </span>
                 </div>
@@ -374,7 +394,7 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
             </div>
           `:""}
       </app-scaffold>
-    `}};n.styles=E`
+    `}};o.styles=E`
     /* ── AppBar ── */
     .back-btn {
       background: none;
@@ -912,4 +932,4 @@ import{a as w,G as y,s as $,g as k,j as e,_ as b,r as T,p as S,k as D,m as P,q a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;r([x()],n.prototype,"tunnelType",2);r([x()],n.prototype,"tunnelId",2);r([l()],n.prototype,"mode",2);r([l()],n.prototype,"_tunnel",2);r([l()],n.prototype,"_saving",2);r([l()],n.prototype,"_snackbar",2);r([l()],n.prototype,"_showDeleteDialog",2);r([l()],n.prototype,"_showResetDialog",2);r([l()],n.prototype,"_name",2);r([l()],n.prototype,"_endpoint",2);r([l()],n.prototype,"_hostname",2);r([l()],n.prototype,"_prefix",2);r([l()],n.prototype,"_username",2);r([l()],n.prototype,"_password",2);r([l()],n.prototype,"_enableTLS",2);r([l()],n.prototype,"_rewriteHost",2);r([l()],n.prototype,"_fileUpload",2);r([l()],n.prototype,"_showAuth",2);r([l()],n.prototype,"_showPassword",2);r([l()],n.prototype,"_recordMode",2);r([l()],n.prototype,"_showPeers",2);r([l()],n.prototype,"_pendingCount",2);n=r([F("tunnel-detail-page")],n);export{n as TunnelDetailPage};
+  `;r([x()],o.prototype,"tunnelType",2);r([x()],o.prototype,"tunnelId",2);r([l()],o.prototype,"mode",2);r([l()],o.prototype,"_tunnel",2);r([l()],o.prototype,"_saving",2);r([l()],o.prototype,"_snackbar",2);r([l()],o.prototype,"_showDeleteDialog",2);r([l()],o.prototype,"_showResetDialog",2);r([l()],o.prototype,"_name",2);r([l()],o.prototype,"_endpoint",2);r([l()],o.prototype,"_hostname",2);r([l()],o.prototype,"_prefix",2);r([l()],o.prototype,"_username",2);r([l()],o.prototype,"_password",2);r([l()],o.prototype,"_enableTLS",2);r([l()],o.prototype,"_rewriteHost",2);r([l()],o.prototype,"_fileUpload",2);r([l()],o.prototype,"_showAuth",2);r([l()],o.prototype,"_showPassword",2);r([l()],o.prototype,"_recordMode",2);r([l()],o.prototype,"_showPeers",2);r([l()],o.prototype,"_pendingCount",2);o=r([F("tunnel-detail-page")],o);export{o as TunnelDetailPage};

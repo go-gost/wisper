@@ -1106,6 +1106,30 @@ export class TunnelDetailPage extends LitElement {
               `
               : nothing}
 
+            <!-- History: drops, recoveries and lifecycle events, on their own
+                 page — a list this long does not belong inline. -->
+            ${this.mode === 'view' && t2
+              ? html`
+                <div class="section">
+                  <div class="card" style="padding:0;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
+                      @click=${() => this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/events`)}>
+                      <span style="color:var(--accent);">${icon('activity')}</span>
+                      <div style="flex:1;">
+                        <div style="font-size:var(--font-sm);font-weight:600;">${t('eventsEntryTitle')}</div>
+                        <div style="font-size:var(--font-sm);color:var(--text-muted);">
+                          ${(t2.events ?? []).length
+                            ? (t2.events ?? [])[0].message
+                            : t('eventsEntryDesc')}
+                        </div>
+                      </div>
+                      <span style="color:var(--text-muted);">&rarr;</span>
+                    </div>
+                  </div>
+                </div>
+              `
+              : nothing}
+
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
                  inspecting, and only when an inspector URL is configured. -->
             ${this.mode === 'view' && t2 && (this.tunnelType === 'http' || this.tunnelType === 'file') && getSettings().inspector_url

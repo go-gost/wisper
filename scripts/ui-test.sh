@@ -118,6 +118,13 @@ tunnels:
       sLWN_c1IDB50J7lu1xvbme_ZQHDtcpSdUZYs87ys-JY: phone
     peer_disabled:
       - sLWN_c1IDB50J7lu1xvbme_ZQHDtcpSdUZYs87ys-JY
+    events:
+      - time: 2026-01-15T11:00:00Z
+        level: info
+        message: "peer laptop: connected (direct)"
+      - time: 2026-01-15T11:05:00Z
+        level: warn
+        message: "peer laptop: direct session dropped (2)"
     created_at: 2026-01-15T10:30:00Z
 entrypoints:
   - id: e2e-entrypoint
@@ -126,6 +133,13 @@ entrypoints:
     endpoint: 127.0.0.1:9
     closed: true
     created_at: 2026-01-15T10:30:00Z
+events:
+  - time: 2026-01-15T11:10:00Z
+    level: error
+    message: "relay disconnected: connection refused"
+  - time: 2026-01-15T11:12:00Z
+    level: info
+    message: relay restored
 YAML
 
 if ! (cd "$ROOT" && go build -o "$WORK/wisper" .); then
