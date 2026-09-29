@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/wisper/event"
 	xconfig "github.com/go-gost/x/config"
 	logger_parser "github.com/go-gost/x/config/parsing/logger"
 	"gopkg.in/yaml.v3"
@@ -122,6 +123,7 @@ func Init(opts ...Option) {
 		}
 	}
 	Set(cfg)
+	event.SeedGlobal(cfg.Events)
 
 	initLog()
 }
@@ -283,6 +285,10 @@ type Tunnel struct {
 	// DNS is the device's DNS servers, comma-separated.
 	DNS string `yaml:",omitempty" json:"dns,omitempty"`
 
+	// Events is this object's recent history, oldest first. Runtime state, like
+	// Stats: SaveConfig rewrites it on every stats tick.
+	Events []event.Event `yaml:"events,omitempty"`
+
 	Stats         ServiceStats
 	StatsBaseline ServiceStats `yaml:"stats_baseline,omitempty"`
 	Favorite      bool
@@ -295,7 +301,12 @@ type Config struct {
 	Settings    *Settings
 	Tunnels     []*Tunnel
 	EntryPoints []*Tunnel
-	Log         *xconfig.LogConfig
+
+	// Events is the global history: host-level events and deletions, shown on
+	// the settings page's events sub-page.
+	Events []event.Event `yaml:"events,omitempty"`
+
+	Log *xconfig.LogConfig
 }
 
 func (c *Config) load() error {
@@ -340,6 +351,7 @@ func deepCopyConfig(c *Config) *Config {
 		for i, t := range c.Tunnels {
 			if t != nil {
 				clone := *t
+				clone.Events = append([]event.Event(nil), t.Events...)
 				cfg.Tunnels[i] = &clone
 			}
 		}
@@ -350,9 +362,14 @@ func deepCopyConfig(c *Config) *Config {
 		for i, t := range c.EntryPoints {
 			if t != nil {
 				clone := *t
+				clone.Events = append([]event.Event(nil), t.Events...)
 				cfg.EntryPoints[i] = &clone
 			}
 		}
+	}
+
+	if len(c.Events) > 0 {
+		cfg.Events = append([]event.Event(nil), c.Events...)
 	}
 
 	return cfg

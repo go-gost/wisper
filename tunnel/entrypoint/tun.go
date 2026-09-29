@@ -15,6 +15,7 @@ import (
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
 	xchain "github.com/go-gost/x/chain"
 	xconfig "github.com/go-gost/x/config"
@@ -229,6 +230,7 @@ func (s *tunEntryPoint) Run() (err error) {
 	// logged, never fatal.
 	if err := host.Punch(s.peer); err != nil {
 		slog.Warn("tun entrypoint: punch peer", "peer", s.peer, "err", err)
+		event.Record(s.ID(), event.LevelWarn, "punch %s failed: %v", s.peer, err)
 	}
 
 	var forward service.Service

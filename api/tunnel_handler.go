@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
 )
 
@@ -30,6 +31,8 @@ type tunnelResponse struct {
 	// PeerTransport is where a p2p entrypoint's peer traffic goes right now:
 	// "direct" or "derp". Empty when it is not connected, or not a p2p object.
 	PeerTransport string `json:"peer_transport,omitempty"`
+	// Events is this object's recent history, newest first.
+	Events []eventResponse `json:"events"`
 }
 
 // peerStatsJSON is one peer's traffic in the tunnel's current run.
@@ -211,6 +214,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	if opts.Peer != "" {
 		resp.PeerTransport = transports[opts.Peer]
 	}
+	resp.Events = toEventResponses(event.List(t.ID()))
 	return resp
 }
 
@@ -350,6 +354,7 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tunnel.Add(t)
+	event.Record(t.ID(), event.LevelInfo, "created")
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -427,6 +432,7 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	tunnel.Delete(id)
 
 	tunnel.Add(t)
+	event.Record(t.ID(), event.LevelInfo, "updated")
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -450,7 +456,9 @@ func handleDeleteTunnel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	name := t.Name()
 	tunnel.Delete(id)
+	event.Global(event.LevelWarn, "%s: deleted", name)
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -494,6 +502,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tunnel.Set(newT)
+	event.Record(newT.ID(), event.LevelInfo, "started")
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -515,6 +524,7 @@ func handleStopTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t.Close()
+	event.Record(id, event.LevelInfo, "stopped")
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}

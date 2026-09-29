@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
 )
 
@@ -42,6 +43,7 @@ func restore(goos string, ep EntryPoint) {
 	fail := func(err error) {
 		if err != nil {
 			slog.Error("start entrypoint", "name", ep.Name(), "err", err)
+			event.Record(ep.ID(), event.LevelError, "start failed: %v", err)
 			ep.Close()
 		}
 	}
@@ -166,6 +168,7 @@ func Delete(id string) {
 		if s != nil && s.ID() == id {
 			s.Close()
 			entryPoints.list = append(entryPoints.list[:i], entryPoints.list[i+1:]...)
+			event.Seed(id, nil)
 			return
 		}
 	}
@@ -277,6 +280,8 @@ func LoadConfig() {
 			continue
 		}
 
+		event.Seed(cfg.ID, cfg.Events)
+
 		if cfg.Closed {
 			ep.Close()
 		} else {
@@ -325,8 +330,11 @@ func SaveConfig() error {
 			CreatedAt:     opts.CreatedAt,
 			Stats:         ep.Stats(),
 			StatsBaseline: ep.StatsBaseline(),
+			Events:        event.List(ep.ID()),
 		})
 	}
+
+	cfg.Events = event.ListGlobal()
 
 	config.Set(cfg)
 

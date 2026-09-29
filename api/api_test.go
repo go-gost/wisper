@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
 	"github.com/go-gost/wisper/tunnel/entrypoint"
 )
@@ -40,6 +41,10 @@ func setupTestServer(t *testing.T) *httptest.Server {
 	}
 
 	config.Set(&config.Config{})
+
+	// Global event history is process-wide and outlives a run of cases, so it
+	// is dropped here too: a case asserting on it must not see an earlier one's.
+	event.ClearGlobal()
 
 	return httptest.NewServer(NewHandler(nil))
 }
@@ -1080,5 +1085,93 @@ func TestDismissPendingPeerEndpoint(t *testing.T) {
 		if res.StatusCode != http.StatusOK {
 			t.Fatalf("attempt %d: status = %d, want 200", i+1, res.StatusCode)
 		}
+	}
+}
+
+func TestLifecycleRecordsEvents(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	// Registered open (not closed): this case is about the stop path, and
+	// preRegisterTunnel leaves its object closed — stopping that one answers 409.
+	tun := tunnel.NewByType("tcp",
+		tunnel.NameOption("lifecycle"),
+		tunnel.EndpointOption("127.0.0.1:0"),
+	)
+	if tun == nil {
+		t.Fatal("unknown tunnel type: tcp")
+	}
+	tunnel.Add(tun)
+	id := tun.ID()
+
+	// Stop: a per-object event.
+	resp, _ := postJSON(t, srv.URL+"/api/tunnels/"+id+"/stop", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("stop: status %d", resp.StatusCode)
+	}
+	if got := event.List(id); len(got) != 1 || got[0].Message != "stopped" {
+		t.Fatalf("stop recorded %+v, want one \"stopped\"", got)
+	}
+
+	// Delete: a global event, since the object it described is gone.
+	resp, _ = deleteJSON(t, srv.URL+"/api/tunnels/"+id)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("delete: status %d", resp.StatusCode)
+	}
+	globals := event.ListGlobal()
+	if len(globals) == 0 || !strings.Contains(globals[len(globals)-1].Message, "deleted") {
+		t.Fatalf("delete recorded %+v, want a global \"deleted\"", globals)
+	}
+}
+
+func TestGlobalEventsEndpoint(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	event.Global(event.LevelWarn, "relay connect failed: timeout")
+
+	resp, body := getJSON(t, srv.URL+"/api/events")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET: status %d", resp.StatusCode)
+	}
+	list, _ := body["events"].([]any)
+	if len(list) != 1 {
+		t.Fatalf("GET returned %v", body["events"])
+	}
+	first, _ := list[0].(map[string]any)
+	if first["message"] != "relay connect failed: timeout" || first["level"] != event.LevelWarn {
+		t.Errorf("event = %v", first)
+	}
+
+	resp, _ = deleteJSON(t, srv.URL+"/api/events")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("DELETE: status %d", resp.StatusCode)
+	}
+	if n := len(event.ListGlobal()); n != 0 {
+		t.Errorf("DELETE left %d events", n)
+	}
+}
+
+func TestTunnelResponseCarriesEvents(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	tun := preRegisterTunnel(t, "tcp", "with history", "127.0.0.1:0")
+	event.Record(tun.ID(), event.LevelError, "service failed: boom")
+
+	resp, body := getJSON(t, srv.URL+"/api/tunnels/"+tun.ID())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	list, _ := body["events"].([]any)
+	if len(list) != 1 {
+		t.Fatalf("events = %v", body["events"])
+	}
+	first, _ := list[0].(map[string]any)
+	if first["message"] != "service failed: boom" {
+		t.Errorf("message = %v", first["message"])
+	}
+	if first["level"] != event.LevelError {
+		t.Errorf("level = %v, want %q", first["level"], event.LevelError)
 	}
 }

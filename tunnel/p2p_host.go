@@ -20,6 +20,7 @@ import (
 	"github.com/go-gost/p2p"
 	"github.com/go-gost/p2p/endpoint"
 	cfg "github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	xstats "github.com/go-gost/x/observer/stats"
 	stats_wrapper "github.com/go-gost/x/observer/stats/wrapper"
 )
@@ -695,6 +696,7 @@ func p2pHostStun(settings *cfg.Settings) string {
 		// Say so: the address was a guess from the relay, and a silent guess
 		// would leave a user wondering why direct never comes up.
 		slog.Warn("p2p: derived STUN does not answer, direct (IPv4) stays off; set settings.p2p.stun to enable it", "stun", addr)
+		event.Global(event.LevelWarn, "STUN %s does not answer: direct (IPv4) stays off", addr)
 		return ""
 	}
 	return addr

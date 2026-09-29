@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-gost/core/service"
 	"github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	xconfig "github.com/go-gost/x/config"
 	_ "github.com/go-gost/x/connector/tunnel"
 	_ "github.com/go-gost/x/dialer/ws"
@@ -425,6 +426,7 @@ func Delete(id string) {
 		if s != nil && s.ID() == id {
 			s.Close()
 			tunnels.list = append(tunnels.list[:i], tunnels.list[i+1:]...)
+			event.Seed(id, nil)
 			return
 		}
 	}
@@ -550,6 +552,8 @@ func LoadConfig() {
 			continue
 		}
 
+		event.Seed(cfg.ID, cfg.Events)
+
 		tun := createTunnel(cfg.Type, Options{
 			ID:            cfg.ID,
 			Name:          cfg.Name,
@@ -622,8 +626,11 @@ func SaveConfig() error {
 			CreatedAt:     opts.CreatedAt,
 			Stats:         tun.Stats(),
 			StatsBaseline: tun.StatsBaseline(),
+			Events:        event.List(tun.ID()),
 		})
 	}
+
+	cfg.Events = event.ListGlobal()
 
 	config.Set(cfg)
 

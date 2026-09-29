@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
 	"github.com/go-gost/wisper/tunnel/entrypoint"
 )
@@ -183,6 +184,7 @@ func handleCreateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	// app's poll hands over only once the entrypoint is listed, so it has to be
 	// in the list before Start goes looking for one.
 	entrypoint.Add(ep)
+	event.Record(ep.ID(), event.LevelInfo, "created")
 	entrypoint.Start(ep)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
@@ -265,6 +267,7 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	entrypoint.Delete(id)
 
 	entrypoint.Add(ep)
+	event.Record(ep.ID(), event.LevelInfo, "updated")
 	entrypoint.Start(ep)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
@@ -289,7 +292,9 @@ func handleDeleteEntrypoint(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	name := ep.Name()
 	entrypoint.Delete(id)
+	event.Global(event.LevelWarn, "%s: deleted", name)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -334,6 +339,7 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 
 	// Same as create: listed first, then started (see Start).
 	entrypoint.Set(newEP)
+	event.Record(newEP.ID(), event.LevelInfo, "started")
 	entrypoint.Start(newEP)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
@@ -356,6 +362,7 @@ func handleStopEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ep.Close()
+	event.Record(id, event.LevelInfo, "stopped")
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}

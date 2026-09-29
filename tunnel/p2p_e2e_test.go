@@ -558,7 +558,7 @@ func TestP2PTunnelSetPeersAppliesInPlace(t *testing.T) {
 	if !ok {
 		t.Fatalf("p2p tunnel %T does not take a peer list in place", tn)
 	}
-	if err := setter.SetPeers([]string{peerA.PublicKey(), peerB.PublicKey()}, nil); err != nil {
+	if err := setter.SetPeers([]string{peerA.PublicKey(), peerB.PublicKey()}, nil, nil); err != nil {
 		t.Fatalf("SetPeers: %v", err)
 	}
 
