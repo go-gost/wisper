@@ -133,6 +133,14 @@ class WisperService : Service() {
 
             val device = deviceOf(opts)
             if (VpnStatus.established && VpnStatus.config == device.config()) {
+                // The device now exists for exactly the values that were asked
+                // for, so a form's armed values have served their purpose: they
+                // exist only to get an entrypoint its device before it starts.
+                // Keeping them would keep the VPN up after that entrypoint is
+                // stopped — a page that arms on load, a save whose entrypoint is
+                // then deleted, anything. From here the running entrypoint (or
+                // nothing) decides, and nothing means release.
+                armedOptions = null
                 // A device is up: a consent lost since (the user or another VPN
                 // took it away) deserves a fresh nudge, not the old flag.
                 vpnNudged = false

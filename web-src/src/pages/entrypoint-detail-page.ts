@@ -127,10 +127,6 @@ export class EntrypointDetailPage extends LitElement {
     this._deviceName = ep.options?.device_name ?? '';
     this._routes = ep.options?.routes ?? '';
     this._dns = ep.options?.dns ?? '';
-
-    // An existing tun entrypoint's device may not be up yet (a fresh app
-    // start): arm it now, so editing and saving works.
-    void this._armVpn();
   }
 
   /**
