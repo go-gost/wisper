@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { transportStyle } from '../utils/transport';
+import { armVpn, tunDeviceHolder } from '../utils/vpn';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
@@ -129,50 +130,6 @@ export class EntrypointDetailPage extends LitElement {
     this._dns = ep.options?.dns ?? '';
   }
 
-  /**
-   * Ask the Android app to bring the VPN up for these tun values, and resolve
-   * once its device exists: the entrypoint cannot be created before that, and
-   * only the app can create the device. A no-op elsewhere (desktop, browser) —
-   * there is no bridge, and nothing to arm.
-   */
-  private _armVpn(): Promise<boolean> {
-    const bridge = (window as any).WisperNative;
-    if (this.entrypointType !== 'tun' || !bridge?.armVpn) {
-      return Promise.resolve(true);
-    }
-    return new Promise((resolve) => {
-      const cb = `__wisperArmVpn_${Date.now()}`;
-      const done = (ok: boolean) => {
-        delete (window as any)[cb];
-        resolve(ok);
-      };
-      (window as any)[cb] = done;
-      try {
-        bridge.armVpn(
-          this._net.trim(),
-          this._routes.trim(),
-          this._mtu || 0,
-          this._dns.trim(),
-          cb,
-        );
-      } catch (e) {
-        console.warn('armVpn failed', e);
-        done(true); // no bridge to wait for: let the save report the real error
-      }
-    });
-  }
-
-  /** _tunDeviceHolder is the running tun entrypoint that holds the app's VPN
-   *  device, if it is not this one. There is one device, so a second tun
-   *  entrypoint cannot work — and arming the VPN for it would take the device
-   *  away from the entrypoint that is using it. */
-  private _tunDeviceHolder(): Entrypoint | undefined {
-    if (this.entrypointType !== 'tun') return undefined;
-    return getEntrypoints().find(
-      (ep) => ep.type === 'tun' && ep.status === 'running' && ep.id !== this.entrypointId,
-    );
-  }
-
   /** _renderTransport is the peer's path: one word, with the reason on hover. */
   private _renderTransport(value?: string) {
     const st = transportStyle(value);
@@ -238,20 +195,20 @@ export class EntrypointDetailPage extends LitElement {
       return;
     }
 
-    // Refused before the arm: the device can only serve one tun entrypoint, so
-    // arming the VPN for this one would take it away from the entrypoint holding
-    // it — for a save the backend refuses anyway.
-    const holder = this._tunDeviceHolder();
-    if (holder) {
-      this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
-      return;
-    }
-
     // A tun entrypoint's device must exist before it can be created, and only
-    // the app can create it: arm the VPN with these values and wait for it.
-    if (this.entrypointType === 'tun' && !(await this._armVpn())) {
-      this._showSnackbar(t('vpnNotReady'));
-      return;
+    // the app can create it: arm the VPN with the form's values and wait for it.
+    // Refused before the arm when another tun entrypoint holds the one device —
+    // arming would take it away from the entrypoint using it.
+    if (this.entrypointType === 'tun') {
+      const holder = tunDeviceHolder(this.entrypointId);
+      if (holder) {
+        this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
+        return;
+      }
+      if (!(await armVpn(this._net.trim(), this._routes.trim(), this._mtu || 0, this._dns.trim()))) {
+        this._showSnackbar(t('vpnNotReady'));
+        return;
+      }
     }
 
     this._saving = true;
@@ -308,10 +265,21 @@ export class EntrypointDetailPage extends LitElement {
   }
 
   private async _handleStart() {
-    const holder = this._tunDeviceHolder();
-    if (holder) {
-      this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
-      return;
+    // A tun entrypoint's device must exist before it can start, and only the app
+    // can create it. The form path arms on save, but a stopped entrypoint
+    // started from here has no save in between — this is where it is asked for,
+    // using the entrypoint's own stored values (not the form's).
+    if (this.entrypointType === 'tun') {
+      const holder = tunDeviceHolder(this.entrypointId);
+      if (holder) {
+        this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
+        return;
+      }
+      const o = this._entrypoint?.options;
+      if (!(await armVpn(o?.net ?? '', o?.routes ?? '', o?.mtu ?? 0, o?.dns ?? ''))) {
+        this._showSnackbar(t('vpnNotReady'));
+        return;
+      }
     }
     try {
       await start(this.entrypointId);

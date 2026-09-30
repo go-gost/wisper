@@ -5,6 +5,7 @@ import { icon } from '../utils/icons';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatNumber } from '../utils/format';
 import { transportView, type TransportView } from '../utils/transport';
+import { armVpn, tunDeviceHolder } from '../utils/vpn';
 import {
   getTunnels,
   isLoading as tunnelsLoading,
@@ -669,6 +670,21 @@ export class HomePage extends LitElement {
   }
 
   private async _handleStart(item: Item) {
+    // A tun entrypoint's device must exist before it can start, and only the
+    // Android app can create it: arm the VPN with the entrypoint's stored
+    // values, then start. A no-op on desktop, where armVpn resolves true.
+    if (item.kind === 'entrypoint' && item.data.type === 'tun') {
+      const holder = tunDeviceHolder(item.data.id);
+      if (holder) {
+        this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
+        return;
+      }
+      const o = item.data.options;
+      if (!(await armVpn(o?.net ?? '', o?.routes ?? '', o?.mtu ?? 0, o?.dns ?? ''))) {
+        this._showSnackbar(t('vpnNotReady'));
+        return;
+      }
+    }
     try {
       if (item.kind === 'tunnel') {
         await startTunnel(item.data.id);
