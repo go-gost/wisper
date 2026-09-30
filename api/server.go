@@ -47,6 +47,19 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// logMutations records every non-GET request at debug. One line covers all of
+// the state-changing endpoints — including the ones that record no event (a
+// settings change, a peers edit, a stats reset), so a state change visible in
+// neither the events nor the object history can still be traced to a request.
+func logMutations(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			slog.Debug("api", "method", r.Method, "path", r.URL.Path)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // NewHandler returns the root HTTP handler with all API routes registered.
 // If webHandler is non-nil, non-API requests are served by it (embedded Lit web UI).
 func NewHandler(webHandler http.Handler) http.Handler {
@@ -99,5 +112,5 @@ func NewHandler(webHandler http.Handler) http.Handler {
 		mux.Handle("/", webHandler)
 	}
 
-	return corsMiddleware(mux)
+	return corsMiddleware(logMutations(mux))
 }
