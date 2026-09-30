@@ -64,6 +64,8 @@ export class TunnelPeersPage extends LitElement {
   @state() private _rowError = '';
   @state() private _confirmDelete: number | null = null;
   @state() private _showKeys = false;
+  /** Key of the row whose diagnostics are expanded, if any — one at a time. */
+  @state() private _expandedKey: string | null = null;
   @state() private _snackbar = '';
   private _backend = new GoBackend();
   /** Keys that knocked and are on no allowlist. Process-wide, so it is fetched
@@ -250,6 +252,89 @@ export class TunnelPeersPage extends LitElement {
     </span>`;
   }
 
+  /** A row can expand when it has a live session: only then does the host
+   *  report a per-peer diagnostic to show. */
+  private _canExpand(key: string): boolean {
+    return !!this._statFor(key)?.transport;
+  }
+
+  private _toggleExpand(key: string) {
+    this._expandedKey = this._expandedKey === key ? null : key;
+  }
+
+  /** _ageMs renders a millisecond age compactly; an em dash when unset (0). */
+  private _ageMs(ms?: number): string {
+    if (!ms || ms <= 0) return '—';
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${s % 60}s`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+  }
+
+  /** _renderDiag is the row's expand: the raw per-peer state the host reports,
+   *  verbatim (p2p's own values), so the badge's one word is explained — which
+   *  endpoint was dialled, why the last round failed, how long the session and
+   *  the silence have been. */
+  private _renderDiag(key: string) {
+    const s = this._statFor(key);
+    if (!s) return nothing;
+    const caps = s.caps && s.caps.length > 0 ? s.caps.join(', ') : '';
+    return html`
+      <div class="peer-diag">
+        <div class="diag-row">
+          <span class="diag-label">${t('peersDiagPath')}</span>
+          <span class="diag-value">${s.transport ?? '—'}</span>
+        </div>
+        ${s.reason
+          ? html`<div class="diag-row">
+              <span class="diag-label">${t('peersDiagReason')}</span>
+              <span class="diag-value">${s.reason}</span>
+            </div>`
+          : nothing}
+        <div class="diag-row">
+          <span class="diag-label">${t('peersDiagState')}</span>
+          <span class="diag-value">${s.state ?? '—'}</span>
+        </div>
+        ${s.failed
+          ? html`<div class="diag-row">
+              <span class="diag-label">${t('peersDiagFailed')}</span>
+              <span class="diag-value">${t('peersDiagYes')}</span>
+            </div>`
+          : nothing}
+        ${s.last_error
+          ? html`<div class="diag-row">
+              <span class="diag-label">${t('peersDiagLastError')}</span>
+              <span class="diag-value">${s.last_error}</span>
+            </div>`
+          : nothing}
+        <div class="diag-row">
+          <span class="diag-label">${t('peersDiagEndpoint')}</span>
+          <span class="diag-value">${s.peer_addr || '—'}</span>
+        </div>
+        <div class="diag-row">
+          <span class="diag-label">${t('peersDiagCandidates')}</span>
+          <span class="diag-value">${s.candidates ?? 0}</span>
+        </div>
+        ${caps
+          ? html`<div class="diag-row">
+              <span class="diag-label">${t('peersDiagCaps')}</span>
+              <span class="diag-value">${caps}</span>
+            </div>`
+          : nothing}
+        <div class="diag-row">
+          <span class="diag-label">${t('peersDiagSession')}</span>
+          <span class="diag-value">${this._ageMs(s.session_age_ms)}</span>
+        </div>
+        <div class="diag-row">
+          <span class="diag-label">${t('peersDiagSilence')}</span>
+          <span class="diag-value">${this._ageMs(s.last_recv_age_ms)}</span>
+        </div>
+      </div>
+    `;
+  }
+
   private _renderEditor() {
     return html`
       <div class="peer-row editing">
@@ -343,6 +428,12 @@ export class TunnelPeersPage extends LitElement {
                         ${row.disabled
                           ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
                           : this._renderTransport(row.key)}
+                        ${this._canExpand(row.key)
+                          ? html`<button class="icon-btn" title="${t('peersDiagDetails')}"
+                              @click=${() => this._toggleExpand(row.key)}>
+                              ${icon(this._expandedKey === row.key ? 'chevron-up' : 'chevron-down')}
+                            </button>`
+                          : nothing}
                         <span class="row-actions">
                           <button class="icon-btn" title="${row.disabled ? t('peersEnable') : t('peersDisable')}"
                             ?disabled=${this._saving}
@@ -363,6 +454,7 @@ export class TunnelPeersPage extends LitElement {
                       </div>
                       <div class="peer-key">${this._showKeys ? row.key : maskKey(row.key)}</div>
                       <div class="peer-stats">${this._renderStats(row.key)}</div>
+                      ${this._expandedKey === row.key ? this._renderDiag(row.key) : nothing}
                     </div>
                   `;
                 })}
@@ -553,6 +645,30 @@ export class TunnelPeersPage extends LitElement {
       display: block;
       color: var(--text-muted);
       opacity: 0.8;
+    }
+    /* The row's expand: the raw per-peer state, one label/value line each. */
+    .peer-diag {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: var(--font-xs);
+    }
+    .diag-row {
+      display: flex;
+      gap: 8px;
+    }
+    .diag-label {
+      flex: none;
+      width: 84px;
+      color: var(--text-muted);
+    }
+    .diag-value {
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
     }
 
     .form-input {

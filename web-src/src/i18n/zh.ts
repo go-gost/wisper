@@ -188,6 +188,18 @@ const zh: Record<string, string> = {
   peersPendingHint:
     '这些公钥敲过门，但不在任何白名单里。p2p 流不带目的地，无法得知它想连哪条隧道——「加到这条隧道」就是把它加到这里。「忽略」只是清掉记录：对方继续敲门就会再出现，想彻底不再看到它，就把它加进来再禁用。',
   peersPendingBadge: '{n} 个请求接入',
+  peersDiagDetails: '显示详情',
+  peersDiagPath: '路径',
+  peersDiagReason: '原因',
+  peersDiagState: '打洞状态',
+  peersDiagFailed: '打洞失败',
+  peersDiagYes: '是',
+  peersDiagLastError: '最近错误',
+  peersDiagEndpoint: '对端地址',
+  peersDiagCandidates: '候选数',
+  peersDiagCaps: '能力',
+  peersDiagSession: '会话',
+  peersDiagSilence: '静默',
   // Event history
   eventsTunnelTitle: '历史事件',
   eventsEntrypointTitle: '历史事件',

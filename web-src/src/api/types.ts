@@ -75,13 +75,34 @@ export interface TunnelOptions {
   peers?: Peer[];
 }
 
-/** One peer's traffic during the tunnel's current run. */
+/** One peer's traffic during the tunnel's current run, plus the p2p host's
+ *  live diagnostic for it. The diagnostic fields are absent until the peer has
+ *  a session (and on an older p2p that does not report them). */
 export interface PeerStats {
   key: string;
   alias?: string;
   /** Where this peer's traffic goes now: 'direct' or 'derp'; absent when it
    *  has no session at all. */
   transport?: string;
+  /** Host-wide cause when it outranks the peer's own round ('no-candidates',
+   *  'stun-unreachable', 'disabled'); verbatim p2p wire values. */
+  reason?: string;
+  /** The punch state machine: 'none' | 'attempting' | 'up' | 'backoff'. */
+  state?: string;
+  /** A punch round has failed (sticky); independent of the current state. */
+  failed?: boolean;
+  /** The last punch failure's reason (absent after a success). */
+  last_error?: string;
+  /** The endpoint dialled for the direct path (absent until a round dials). */
+  peer_addr?: string;
+  /** How many candidates the peer announced. */
+  candidates?: number;
+  /** The peer's advertised capabilities ('ipv6', 'tightKeepalive'). */
+  caps?: string[];
+  /** How long the live direct session has been up (0 when none). */
+  session_age_ms?: number;
+  /** How long since the last frame from the peer. */
+  last_recv_age_ms?: number;
   current_conns: number;
   total_conns: number;
   input_bytes: number;

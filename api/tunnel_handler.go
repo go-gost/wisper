@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/go-gost/p2p"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
@@ -35,17 +36,28 @@ type tunnelResponse struct {
 	Events []eventResponse `json:"events"`
 }
 
-// peerStatsJSON is one peer's traffic in the tunnel's current run.
+// peerStatsJSON is one peer's traffic in the tunnel's current run, plus the
+// p2p host's live diagnostic for it (path, punch state, last error, dialled
+// endpoint, ages) so the peers page can expand a row without a second call.
 type peerStatsJSON struct {
-	Key             string `json:"key"`
-	Alias           string `json:"alias,omitempty"`
-	Transport       string `json:"transport,omitempty"`
-	CurrentConns    uint64 `json:"current_conns"`
-	TotalConns      uint64 `json:"total_conns"`
-	InputBytes      uint64 `json:"input_bytes"`
-	OutputBytes     uint64 `json:"output_bytes"`
-	InputRateBytes  uint64 `json:"input_rate_bytes"`
-	OutputRateBytes uint64 `json:"output_rate_bytes"`
+	Key             string   `json:"key"`
+	Alias           string   `json:"alias,omitempty"`
+	Transport       string   `json:"transport,omitempty"`
+	Reason          string   `json:"reason,omitempty"`
+	State           string   `json:"state,omitempty"`
+	Failed          bool     `json:"failed,omitempty"`
+	LastError       string   `json:"last_error,omitempty"`
+	PeerAddr        string   `json:"peer_addr,omitempty"`
+	Candidates      int      `json:"candidates,omitempty"`
+	Caps            []string `json:"caps,omitempty"`
+	SessionAgeMs    int64    `json:"session_age_ms,omitempty"`
+	LastRecvAgeMs   int64    `json:"last_recv_age_ms,omitempty"`
+	CurrentConns    uint64   `json:"current_conns"`
+	TotalConns      uint64   `json:"total_conns"`
+	InputBytes      uint64   `json:"input_bytes"`
+	OutputBytes     uint64   `json:"output_bytes"`
+	InputRateBytes  uint64   `json:"input_rate_bytes"`
+	OutputRateBytes uint64   `json:"output_rate_bytes"`
 }
 
 // peerJSON is one allowlist entry: the key is the credential, the alias its
@@ -190,18 +202,32 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			OutputRateBytes: s.OutputRateBytes,
 		},
 	}
-	// The p2p host's current path per peer, when this object has p2p peers —
-	// for a p2p tunnel's allowlist and for a p2p entrypoint's single peer.
+	// The p2p host's current state per peer, when this object has p2p peers —
+	// for a p2p tunnel's allowlist and for a p2p entrypoint's single peer. One
+	// snapshot read serves both the path word and the per-peer diagnostics.
 	var transports map[string]string
+	var diagnostics map[string]p2p.PeerDiagnostic
 	if opts.Peer != "" || t.Type() == tunnel.P2PTunnel {
-		transports = tunnel.P2PHostStatus().PeerTransports
+		st := tunnel.P2PHostStatus()
+		transports = st.PeerTransports
+		diagnostics = st.PeerDiagnostics
 	}
 	if ps, ok := t.(tunnel.PeerStatsReporter); ok {
 		for _, p := range ps.PeerStats() {
+			d := diagnostics[p.Key]
 			resp.PeerStats = append(resp.PeerStats, peerStatsJSON{
 				Key:             p.Key,
 				Alias:           opts.PeerAliases[p.Key],
 				Transport:       transports[p.Key],
+				Reason:          d.Reason,
+				State:           d.State,
+				Failed:          d.Failed,
+				LastError:       d.LastError,
+				PeerAddr:        d.PeerAddr,
+				Candidates:      d.Candidates,
+				Caps:            d.Caps,
+				SessionAgeMs:    d.SessionAge.Milliseconds(),
+				LastRecvAgeMs:   d.LastRecvAge.Milliseconds(),
 				CurrentConns:    p.CurrentConns,
 				TotalConns:      p.TotalConns,
 				InputBytes:      p.InputBytes,

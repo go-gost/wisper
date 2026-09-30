@@ -194,6 +194,18 @@ const en: Record<string, string> = {
   peersPendingHint:
     'These keys knocked but are on no allowlist. A p2p stream carries no destination, so which tunnel they wanted is unknown — Add puts the key on this one. Dismiss only clears the notice: a peer that keeps knocking comes back, so add it and switch it off to stop the rows for good.',
   peersPendingBadge: '{n} requesting',
+  peersDiagDetails: 'Show details',
+  peersDiagPath: 'Path',
+  peersDiagReason: 'Reason',
+  peersDiagState: 'Punch state',
+  peersDiagFailed: 'Punch failed',
+  peersDiagYes: 'Yes',
+  peersDiagLastError: 'Last error',
+  peersDiagEndpoint: 'Endpoint',
+  peersDiagCandidates: 'Candidates',
+  peersDiagCaps: 'Capabilities',
+  peersDiagSession: 'Session',
+  peersDiagSilence: 'Silence',
   // Event history
   eventsTunnelTitle: 'History',
   eventsEntrypointTitle: 'History',

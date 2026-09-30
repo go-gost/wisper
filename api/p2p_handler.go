@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/go-gost/p2p"
 	"github.com/go-gost/wisper/tunnel"
 )
 
@@ -20,6 +21,55 @@ type p2pIdentityResponse struct {
 	DerpPeers     int   `json:"derp_peers"`
 	PunchAttempts int64 `json:"punch_attempts"`
 	PunchSuccess  int64 `json:"punch_success"`
+	// PeerDiagnostics is each connected peer's live state, keyed by its base64
+	// public key — the per-peer detail behind the counters above, for a CLI or
+	// another client that has no tunnel object.
+	PeerDiagnostics map[string]peerDiagnosticJSON `json:"peer_diagnostics,omitempty"`
+}
+
+// peerDiagnosticJSON is one connected peer's live state in the /api/p2p
+// response. It is the same snapshot a tunnel's peer_stats carries, minus the
+// traffic counters.
+type peerDiagnosticJSON struct {
+	Path          string   `json:"path,omitempty"`
+	Reason        string   `json:"reason,omitempty"`
+	State         string   `json:"state,omitempty"`
+	Failed        bool     `json:"failed,omitempty"`
+	LastError     string   `json:"last_error,omitempty"`
+	PeerAddr      string   `json:"peer_addr,omitempty"`
+	Candidates    int      `json:"candidates,omitempty"`
+	Caps          []string `json:"caps,omitempty"`
+	SessionAgeMs  int64    `json:"session_age_ms,omitempty"`
+	LastRecvAgeMs int64    `json:"last_recv_age_ms,omitempty"`
+	Attempts      int64    `json:"attempts,omitempty"`
+	Ups           int64    `json:"ups,omitempty"`
+	Drops         int64    `json:"drops,omitempty"`
+}
+
+// peerDiagnosticsJSON maps the status snapshot onto the wire form.
+func peerDiagnosticsJSON(in map[string]p2p.PeerDiagnostic) map[string]peerDiagnosticJSON {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]peerDiagnosticJSON, len(in))
+	for k, d := range in {
+		out[k] = peerDiagnosticJSON{
+			Path:          d.Path,
+			Reason:        d.Reason,
+			State:         d.State,
+			Failed:        d.Failed,
+			LastError:     d.LastError,
+			PeerAddr:      d.PeerAddr,
+			Candidates:    d.Candidates,
+			Caps:          d.Caps,
+			SessionAgeMs:  d.SessionAge.Milliseconds(),
+			LastRecvAgeMs: d.LastRecvAge.Milliseconds(),
+			Attempts:      d.Attempts,
+			Ups:           d.Ups,
+			Drops:         d.Drops,
+		}
+	}
+	return out
 }
 
 // handleGetP2PIdentity returns the shared p2p host's base64 public key. The
@@ -29,12 +79,13 @@ type p2pIdentityResponse struct {
 func handleGetP2PIdentity(w http.ResponseWriter, r *http.Request) {
 	st := tunnel.P2PHostStatus()
 	writeJSON(w, http.StatusOK, p2pIdentityResponse{
-		PublicKey:     tunnel.P2PHostPublicKey(),
-		Running:       tunnel.P2PHostRunning(),
-		DirectPeers:   st.DirectPeers,
-		DerpPeers:     st.DerpPeers,
-		PunchAttempts: st.PunchAttempts,
-		PunchSuccess:  st.PunchSuccess,
+		PublicKey:       tunnel.P2PHostPublicKey(),
+		Running:         tunnel.P2PHostRunning(),
+		DirectPeers:     st.DirectPeers,
+		DerpPeers:       st.DerpPeers,
+		PunchAttempts:   st.PunchAttempts,
+		PunchSuccess:    st.PunchSuccess,
+		PeerDiagnostics: peerDiagnosticsJSON(st.PeerDiagnostics),
 	})
 }
 

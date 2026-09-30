@@ -20,7 +20,7 @@ type updateStatsTask struct {
 	// whose observation of anything is seeded rather than reported.
 	service   map[string]serviceState
 	peers     map[string]string
-	punches   map[string]p2p.PeerPunch
+	punches   map[string]p2p.PeerDiagnostic
 	relay     relaySample
 	relaySeen bool
 	hostOn    bool
@@ -228,7 +228,7 @@ func (t *updateStatsTask) observeTransitions() {
 	// counter survives a gap between samples — though not a peer whose
 	// directConn is torn down before this tick looks, which takes its counters
 	// with it.
-	for _, d := range diffPunchDrops(t.punches, st.PeerPunches) {
+	for _, d := range diffPunchDrops(t.punches, st.PeerDiagnostics) {
 		msg := fmt.Sprintf("peer %s: direct session dropped (%d)", peerDisplayOf(d.Key, cands), d.Drops)
 		recordFor(d.Key, cands, event.LevelWarn, msg)
 	}
@@ -236,8 +236,8 @@ func (t *updateStatsTask) observeTransitions() {
 	// A failed-round counter moving is a punch that did not reach a direct
 	// session and will be retried on the engine's backoff — the retries a peer
 	// that cannot punch keeps making, invisible in the one-shot "failed" gauge.
-	recordPunchFailures(diffPunchFailures(t.punches, st.PeerPunches), cands)
-	t.punches = st.PeerPunches
+	recordPunchFailures(diffPunchFailures(t.punches, st.PeerDiagnostics), cands)
+	t.punches = st.PeerDiagnostics
 
 	relay := relaySample{connected: st.RelayConnected, err: st.RelayError}
 	for _, c := range diffRelay(t.relay, t.relaySeen, relay) {

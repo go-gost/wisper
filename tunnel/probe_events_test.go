@@ -117,7 +117,7 @@ func TestProbeEventSignals(t *testing.T) {
 	sample := func(label string) {
 		st := wtunnel.P2PHostStatus()
 		var punches []string
-		for k, v := range st.PeerPunches {
+		for k, v := range st.PeerDiagnostics {
 			punches = append(punches, fmt.Sprintf("%s=%+v", k[:8], v))
 		}
 		sort.Strings(punches)

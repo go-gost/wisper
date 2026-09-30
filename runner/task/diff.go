@@ -138,7 +138,7 @@ type punchDrop struct {
 // be missed between samples. Attempts and Ups moving on their own are still not
 // reported here; the rounds that failed (attempts minus ups) are, by
 // diffPunchFailures.
-func diffPunchDrops(prev, cur map[string]p2p.PeerPunch) []punchDrop {
+func diffPunchDrops(prev, cur map[string]p2p.PeerDiagnostic) []punchDrop {
 	var out []punchDrop
 	for key, c := range cur {
 		p, seen := prev[key]
@@ -168,7 +168,7 @@ type punchFailure struct {
 // into a count. A peer absent from prev is seeded, never reported (its history
 // predates this tick); a peer whose failures stop moving — it ups-ed, or simply
 // did not retry — reports nothing.
-func diffPunchFailures(prev, cur map[string]p2p.PeerPunch) []punchFailure {
+func diffPunchFailures(prev, cur map[string]p2p.PeerDiagnostic) []punchFailure {
 	var out []punchFailure
 	for key, c := range cur {
 		p, seen := prev[key]

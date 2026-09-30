@@ -122,11 +122,11 @@ func TestPeerDisplay(t *testing.T) {
 }
 
 func TestDiffPunchDrops(t *testing.T) {
-	prev := map[string]p2p.PeerPunch{
+	prev := map[string]p2p.PeerDiagnostic{
 		"a": {Attempts: 1, Ups: 1, Drops: 0},
 		"b": {Attempts: 3, Ups: 0, Drops: 0},
 	}
-	cur := map[string]p2p.PeerPunch{
+	cur := map[string]p2p.PeerDiagnostic{
 		"a": {Attempts: 2, Ups: 2, Drops: 1}, // died and rebuilt: a drop
 		"b": {Attempts: 4, Ups: 0, Drops: 0}, // still cannot punch: attempts move, drops do not
 		"c": {Attempts: 1, Ups: 1, Drops: 0}, // first observation: seeded
@@ -142,20 +142,20 @@ func TestDiffPunchDrops(t *testing.T) {
 }
 
 func TestDiffPunchDropsSeedsFirstObservation(t *testing.T) {
-	got := diffPunchDrops(nil, map[string]p2p.PeerPunch{"a": {Attempts: 9, Ups: 4, Drops: 3}})
+	got := diffPunchDrops(nil, map[string]p2p.PeerDiagnostic{"a": {Attempts: 9, Ups: 4, Drops: 3}})
 	if len(got) != 0 {
 		t.Errorf("a first observation must be seeded, not reported: %+v", got)
 	}
 }
 
 func TestDiffPunchFailures(t *testing.T) {
-	prev := map[string]p2p.PeerPunch{
+	prev := map[string]p2p.PeerDiagnostic{
 		"a": {Attempts: 1, Ups: 1}, // was healthy
 		"b": {Attempts: 3, Ups: 0}, // two failures so far
 		"c": {Attempts: 2, Ups: 2}, // healthy, unchanged below
 		"d": {Attempts: 4, Ups: 1}, // failing, ups again below
 	}
-	cur := map[string]p2p.PeerPunch{
+	cur := map[string]p2p.PeerDiagnostic{
 		"a": {Attempts: 2, Ups: 1}, // one new failure
 		"b": {Attempts: 5, Ups: 0}, // two more failures
 		"c": {Attempts: 2, Ups: 2}, // unchanged: nothing
@@ -174,13 +174,13 @@ func TestDiffPunchFailures(t *testing.T) {
 }
 
 func TestDiffPunchFailuresSeedsFirstObservation(t *testing.T) {
-	got := diffPunchFailures(nil, map[string]p2p.PeerPunch{"a": {Attempts: 9, Ups: 0}})
+	got := diffPunchFailures(nil, map[string]p2p.PeerDiagnostic{"a": {Attempts: 9, Ups: 0}})
 	if len(got) != 0 {
 		t.Errorf("a first observation must be seeded, not reported: %+v", got)
 	}
 
 	// An unchanged pair reports nothing.
-	p := map[string]p2p.PeerPunch{"a": {Attempts: 4, Ups: 1}}
+	p := map[string]p2p.PeerDiagnostic{"a": {Attempts: 4, Ups: 1}}
 	if got := diffPunchFailures(p, p); len(got) != 0 {
 		t.Errorf("unchanged counters must report nothing: %+v", got)
 	}
