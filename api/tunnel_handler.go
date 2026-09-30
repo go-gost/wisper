@@ -378,7 +378,9 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := t.Run(); err != nil {
+	// The request's action id rides the p2p seam calls Run makes (Listen,
+	// Warm), so this click can be joined with the p2p log line it produced.
+	if err := tunnel.RunWithContext(r.Context(), t); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to start tunnel: "+err.Error())
 		return
 	}
@@ -452,7 +454,7 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	t.SetStatsBaseline(old.StatsBaseline())
 	t.Favorite(old.IsFavorite())
 
-	if err := t.Run(); err != nil {
+	if err := tunnel.RunWithContext(r.Context(), t); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to restart tunnel: "+err.Error())
 		return
 	}
@@ -527,7 +529,7 @@ func handleStartTunnel(w http.ResponseWriter, r *http.Request) {
 	newT.SetStatsBaseline(t.StatsBaseline())
 	newT.Favorite(t.IsFavorite())
 
-	if err := newT.Run(); err != nil {
+	if err := tunnel.RunWithContext(r.Context(), newT); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to start tunnel: "+err.Error())
 		return
 	}
@@ -661,7 +663,7 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "tunnel does not take a peer list")
 		return
 	}
-	if err := setter.SetPeers(peers, aliases, disabled); err != nil {
+	if err := setter.SetPeers(r.Context(), peers, aliases, disabled); err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}

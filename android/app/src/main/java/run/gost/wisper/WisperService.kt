@@ -265,6 +265,9 @@ class WisperService : Service() {
         Log.i(TAG, "onDestroy")
         pollHandler.removeCallbacks(pollRunnable)
         pollThread.quitSafely()
+        // The backend is stopping, so nothing will read the device again: the
+        // release is named here, or a stopped backend would read like a revoke.
+        Log.i(TUNFD_TAG, "release: WisperService.onDestroy fd=-1 (backend stopping)")
         WisperJNI.setTunFd(-1)
         WisperJNI.stop()
         super.onDestroy()

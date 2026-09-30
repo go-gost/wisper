@@ -84,7 +84,12 @@ var p2pHost = &p2pHostManager{routes: make(map[string]*peerListener)}
 // (key + relay + accept loop), and takes a reference on it. Every
 // AcquireP2PHost must be matched by exactly one ReleaseP2PHost, or the host
 // never shuts down.
-func AcquireP2PHost() (*endpoint.Endpoint, error) { return p2pHost.acquire() }
+//
+// ctx carries the caller's action id (an HTTP request's, or Background on a
+// path with no action), so the host's Listen seam call names it in its log
+// line. The host outlives the call: ctx is read for that label only, never for
+// cancellation.
+func AcquireP2PHost(ctx context.Context) (*endpoint.Endpoint, error) { return p2pHost.acquire(ctx) }
 
 // ReleaseP2PHost gives one reference back; the last one stops the host, its
 // accept loop and every peer route. Releasing without a matching acquire
@@ -155,7 +160,10 @@ func DismissPendingPeer(key string) { p2pHost.dismissPending(key) }
 // with a failure that looks the same as a punch that cannot work. A failure is
 // the peer's business, so it is logged, never returned. No-op while no host
 // runs.
-func (m *p2pHostManager) warmPeers(peers []string) {
+//
+// ctx is the action's: each Warm names it in the p2p seam log line, so a peer
+// added by a click is traceable to that click.
+func (m *p2pHostManager) warmPeers(ctx context.Context, peers []string) {
 	m.mu.Lock()
 	host := m.host
 	m.mu.Unlock()
@@ -163,7 +171,7 @@ func (m *p2pHostManager) warmPeers(peers []string) {
 		return
 	}
 	for _, peer := range peers {
-		if err := host.Warm(peer); err != nil {
+		if err := host.WarmContext(ctx, peer); err != nil {
 			if log := logger.Default(); log != nil {
 				log.Warnf("p2p: warm peer %s: %v", peer, err)
 			}
@@ -208,8 +216,9 @@ func (m *p2pHostManager) ensurePublicKey() (string, error) {
 
 // acquire starts the host on first use (key + relay + Listen + accept loop) and
 // takes a reference. A failed relay connection is not fatal: the engine retries
-// in the background, so it is logged, never returned.
-func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
+// in the background, so it is logged, never returned. ctx carries the action id
+// the Listen seam call names (Background on a path with no action).
+func (m *p2pHostManager) acquire(ctx context.Context) (*endpoint.Endpoint, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -236,7 +245,7 @@ func (m *p2pHostManager) acquire() (*endpoint.Endpoint, error) {
 		if err != nil {
 			return nil, fmt.Errorf("p2p host: %w", err)
 		}
-		ln, err := host.Listen()
+		ln, err := host.ListenContext(ctx)
 		if err != nil {
 			_ = host.Close()
 			return nil, err

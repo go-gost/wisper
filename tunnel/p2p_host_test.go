@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -51,7 +52,7 @@ func TestP2PHostManagerRefcount(t *testing.T) {
 		}
 	}()
 
-	host, err := m.acquire()
+	host, err := m.acquire(context.Background())
 	if err != nil {
 		t.Fatalf("first acquire: %v", err)
 	}
@@ -62,7 +63,7 @@ func TestP2PHostManagerRefcount(t *testing.T) {
 		t.Fatalf("refs after first acquire = %d, want 1", m.refs)
 	}
 
-	h2, err := m.acquire()
+	h2, err := m.acquire(context.Background())
 	if err != nil {
 		t.Fatalf("second acquire: %v", err)
 	}
@@ -525,7 +526,7 @@ func TestPendingPeersClearedWithHost(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
 
-	if _, err := AcquireP2PHost(); err != nil {
+	if _, err := AcquireP2PHost(context.Background()); err != nil {
 		t.Fatalf("AcquireP2PHost: %v", err)
 	}
 	p2pHost.notePending("kQ7Zm0Q0Y2r0k9v2mQm1Z2yq8S5w1Kc3x7bN0rH4tUg")
@@ -599,7 +600,7 @@ func TestP2PHostRebuildsOnSettingsChange(t *testing.T) {
 		}
 	}()
 
-	host1, err := m.acquire()
+	host1, err := m.acquire(context.Background())
 	if err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
@@ -607,7 +608,7 @@ func TestP2PHostRebuildsOnSettingsChange(t *testing.T) {
 	off := false
 	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: derp, Direct: &off}}})
 
-	host2, err := m.acquire()
+	host2, err := m.acquire(context.Background())
 	if err != nil {
 		t.Fatalf("acquire after a settings change: %v", err)
 	}
@@ -615,7 +616,7 @@ func TestP2PHostRebuildsOnSettingsChange(t *testing.T) {
 		t.Fatal("acquire reused the host after the p2p settings changed")
 	}
 
-	host3, err := m.acquire()
+	host3, err := m.acquire(context.Background())
 	if err != nil {
 		t.Fatalf("acquire: %v", err)
 	}

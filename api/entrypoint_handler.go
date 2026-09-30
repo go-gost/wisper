@@ -185,7 +185,7 @@ func handleCreateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	// in the list before Start goes looking for one.
 	entrypoint.Add(ep)
 	event.Record(ep.ID(), event.LevelInfo, "created")
-	entrypoint.Start(ep)
+	entrypoint.Start(r.Context(), ep)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -268,7 +268,7 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 
 	entrypoint.Add(ep)
 	event.Record(ep.ID(), event.LevelInfo, "updated")
-	entrypoint.Start(ep)
+	entrypoint.Start(r.Context(), ep)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -341,7 +341,7 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	// Same as create: listed first, then started (see Start).
 	entrypoint.Set(newEP)
 	event.Record(newEP.ID(), event.LevelInfo, "started")
-	entrypoint.Start(newEP)
+	entrypoint.Start(r.Context(), newEP)
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}

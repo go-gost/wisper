@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -28,6 +29,17 @@ func SetTunFD(fd int) {
 	close(tunFDSet)
 	tunFDSet = make(chan struct{})
 	tunFDMu.Unlock()
+
+	// One line per hand-off, so the Go timeline reads beside logcat's
+	// wisper-tunfd lines and "who has the device" has an answer on both sides:
+	// the Android side says which site gave it up, this says what arrived here
+	// (and which earlier copy it replaced). Released as well as set, because a
+	// release is what stops the Go reader.
+	if fd > 0 {
+		slog.Info("tunfd", "op", "set", "fd", fd, "prev", prev)
+	} else {
+		slog.Info("tunfd", "op", "release", "fd", fd, "prev", prev)
+	}
 
 	// Closed through os, not syscall.Close: that one takes a Windows Handle on
 	// a Windows build, and this descriptor is only ever an Android one.

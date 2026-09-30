@@ -143,6 +143,23 @@ GET    /api/config                   get app settings (server, entrypoint, lang,
 PUT    /api/config                   update app settings
 ```
 
+### Request correlation (`Wisper-Id`)
+
+Every API request may carry a short opaque `Wisper-Id` header (the web UI sends
+a fresh one per request; the middleware generates 8 hex chars when it is
+absent, so a curl is still correlatable). `logMutations` logs it as `id=` and
+puts it in the request context via `endpoint.WithAction`; the tunnel/entrypoint
+`Run` paths thread that context into the p2p seam (`ListenContext`,
+`WarmContext`, `PunchContext`), which logs `action=<id>`. The id is a **label,
+never auth** — never parsed, never in a decision path.
+
+Only the calls an action *initiates* are correlated (the handler's goroutine:
+the host's `Listen`, each peer's `Warm`/`Punch`). p2p's background logs stay
+action-free. On the Android side the tun-fd hand-offs log to logcat under
+`wisper-tunfd` (`adb logcat -s wisper-tunfd`) and the Go side logs `tunfd` in
+the wisper log, so both timelines of "who released the device" can be read
+together.
+
 ### Lit web app structure
 
 ```

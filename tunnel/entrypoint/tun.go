@@ -1,6 +1,7 @@
 package entrypoint
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -163,7 +164,15 @@ func (s *tunEntryPoint) init() error {
 	return nil
 }
 
-func (s *tunEntryPoint) Run() (err error) {
+func (s *tunEntryPoint) Run() error { return s.RunContext(context.Background()) }
+
+// RunContext is Run carrying the caller's action id: the shared host's
+// acquisition (Listen) and the peer's punch name it in their p2p seam log
+// lines, so a start that came from the UI can be joined with the p2p work it
+// set in motion. Run is this with no action, for the config-load and restart
+// paths (an Android restore starts from a background goroutine, where the id is
+// still only ever read for a log field).
+func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	if s.IsClosed() {
 		return ErrEntryPointClosed
 	}
@@ -185,7 +194,7 @@ func (s *tunEntryPoint) Run() (err error) {
 	// The identity is process-wide: take a reference on the shared host. A
 	// failed relay connection is not fatal: the engine retries in the
 	// background and the entrypoint keeps running, so it is logged.
-	host, err := tunnel.AcquireP2PHost()
+	host, err := tunnel.AcquireP2PHost(ctx)
 	if err != nil {
 		return
 	}
@@ -228,7 +237,7 @@ func (s *tunEntryPoint) Run() (err error) {
 	// bring its path up and punch now: the direct path is being arranged (and
 	// visible in the status) before the first packet. Punch failures are
 	// logged, never fatal.
-	if err := host.Punch(s.peer); err != nil {
+	if err := host.PunchContext(ctx, s.peer); err != nil {
 		slog.Warn("tun entrypoint: punch peer", "peer", s.peer, "err", err)
 		event.Record(s.ID(), event.LevelWarn, "punch %s failed: %v", s.peer, err)
 	}

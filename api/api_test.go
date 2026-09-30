@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -1205,5 +1207,56 @@ func TestTunnelResponseCarriesEvents(t *testing.T) {
 	}
 	if first["level"] != event.LevelError {
 		t.Errorf("level = %v, want %q", first["level"], event.LevelError)
+	}
+}
+
+// actionIDRe pulls the id field out of a text-handler log line.
+var actionIDRe = regexp.MustCompile(`\bid=([0-9a-f]+)\b`)
+
+// TestMutationLogCarriesActionID: the mutation line carries the request's action
+// id — the one the UI sent, or a generated one when the header is absent — so
+// it can be joined with the p2p seam line for the work the action started. The
+// generated id is 8 hex chars and never repeats: two requests must be told
+// apart in one log tail.
+func TestMutationLogCarriesActionID(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	h := NewHandler(nil)
+
+	// The UI's id is logged as given.
+	buf.Reset()
+	req := httptest.NewRequest(http.MethodDelete, "/api/tunnels/missing", nil)
+	req.Header.Set(actionHeader, "abc123")
+	h.ServeHTTP(httptest.NewRecorder(), req)
+	if got := buf.String(); !strings.Contains(got, "id=abc123") {
+		t.Fatalf("log = %q, want the sent id (id=abc123)", got)
+	}
+
+	// No header: a generated id, still correlatable.
+	var ids []string
+	for i := 0; i < 2; i++ {
+		buf.Reset()
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodDelete, "/api/tunnels/missing", nil))
+		m := actionIDRe.FindStringSubmatch(buf.String())
+		if m == nil {
+			t.Fatalf("log = %q, want a generated id field", buf.String())
+		}
+		if len(m[1]) != 8 {
+			t.Fatalf("generated id = %q, want 8 hex chars", m[1])
+		}
+		ids = append(ids, m[1])
+	}
+	if ids[0] == ids[1] {
+		t.Fatalf("two requests share the generated id %q, want one each", ids[0])
+	}
+
+	// A GET mutates nothing, so it is not part of this trail.
+	buf.Reset()
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/tunnels", nil))
+	if got := buf.String(); strings.Contains(got, "id=") {
+		t.Fatalf("GET log = %q, want no mutation line", got)
 	}
 }

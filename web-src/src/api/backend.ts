@@ -22,6 +22,19 @@ export class BackendError extends Error {
   }
 }
 
+/** A fresh short id per request. The backend logs it on its mutation line and
+ *  the p2p seam logs it on the calls the action started, so a click can be
+ *  joined with the p2p work it set in motion. It is a label and never auth —
+ *  nothing parses it or decides on it. `crypto.randomUUID` needs a secure
+ *  context, which an older webview may not give, hence the fallback. */
+function actionId(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === 'function') {
+    return c.randomUUID().slice(0, 8);
+  }
+  return Math.random().toString(16).slice(2, 10).padEnd(8, '0');
+}
+
 /** HTTP client for the Wisper Go backend API.
  *  When `baseUrl` is empty, uses relative paths (same-origin — embedded mode).
  */
@@ -43,6 +56,9 @@ export class GoBackend {
   ): Promise<T> {
     const headers: Record<string, string> = {
       'Cache-Control': 'no-cache',
+      // Every request, not only mutations: the GET path costs nothing (the
+      // backend logs mutations only) and one rule is one place to keep right.
+      'Wisper-Id': actionId(),
     };
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json';

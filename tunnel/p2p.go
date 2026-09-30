@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -40,9 +41,10 @@ var (
 
 // PeerSetter is implemented by a tunnel whose inbound allowlist can change
 // without a restart. disabled names the allowlisted keys that are switched off:
-// they keep their place in the list but are given no route.
+// they keep their place in the list but are given no route. ctx carries the
+// action id of the save, so the warm-up it triggers is named in the p2p log.
 type PeerSetter interface {
-	SetPeers(peers []string, aliases map[string]string, disabled []string) error
+	SetPeers(ctx context.Context, peers []string, aliases map[string]string, disabled []string) error
 }
 
 // p2pTunnel exposes a local service to peers over the process-wide p2p host:
@@ -230,7 +232,13 @@ func P2PTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
 // and serves them with a standard gost service forwarding to Endpoint. Peers
 // is an allowlist, not a requirement: an empty list runs the tunnel, it just
 // never receives a stream.
-func (s *p2pTunnel) Run() (err error) {
+func (s *p2pTunnel) Run() error { return s.RunContext(context.Background()) }
+
+// RunContext is Run carrying the caller's action id: the host acquisition
+// (Listen) and every peer warm-up name it in their p2p seam log lines, so a
+// start that came from the UI can be joined with the p2p work it set in motion.
+// Run is this with no action, for the config-load and restart paths.
+func (s *p2pTunnel) RunContext(ctx context.Context) (err error) {
 	if s.IsClosed() {
 		return ErrTunnelClosed
 	}
@@ -242,7 +250,7 @@ func (s *p2pTunnel) Run() (err error) {
 
 	// The manager owns the host (identity, DERP connection, accept loop); this
 	// tunnel holds one reference and its routes on it.
-	if _, err = p2pHost.acquire(); err != nil {
+	if _, err = p2pHost.acquire(ctx); err != nil {
 		return
 	}
 	// A disabled peer keeps its place in the allowlist but gets no route.
@@ -266,7 +274,7 @@ func (s *p2pTunnel) Run() (err error) {
 	// only once a peer dials in — which, for the reverse direction, may be
 	// never until traffic.
 	if err == nil {
-		p2pHost.warmPeers(enabled)
+		p2pHost.warmPeers(ctx, enabled)
 	}
 
 	// Stats carry over across a restart, like the other tunnel types.
@@ -526,8 +534,9 @@ func rate(current, previous uint64, d time.Duration) uint64 {
 // cut. The allowlist gates NEW streams: a removed peer's established streams
 // run until they end on their own, and its counters leave the list. A disabled
 // peer is the same thing with its place in the list kept — no route, no
-// warming, still on the peers page, so it can be switched back on.
-func (s *p2pTunnel) SetPeers(peers []string, aliases map[string]string, disabled []string) error {
+// warming, still on the peers page, so it can be switched back on. ctx carries
+// the action id of the save, named in the warm-up's p2p seam log line.
+func (s *p2pTunnel) SetPeers(ctx context.Context, peers []string, aliases map[string]string, disabled []string) error {
 	if s.IsClosed() {
 		return ErrTunnelClosed
 	}
@@ -554,7 +563,7 @@ func (s *p2pTunnel) SetPeers(peers []string, aliases map[string]string, disabled
 
 	// A peer added here must get the same head start a peer configured at Run
 	// time does, or its row would stay blank until it happens to dial in.
-	p2pHost.warmPeers(enabled)
+	p2pHost.warmPeers(ctx, enabled)
 	return nil
 }
 

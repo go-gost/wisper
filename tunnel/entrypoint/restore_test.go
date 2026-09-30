@@ -1,6 +1,7 @@
 package entrypoint
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func TestRestoreAsyncOnAndroidTun(t *testing.T) {
 	ep := newFakeRestoreEP(TunEntryPoint)
 
 	// The assertion is the call returning at all: Run is still blocked.
-	restore("android", ep)
+	restore(context.Background(), "android", ep)
 
 	select {
 	case <-ep.started:
@@ -69,7 +70,7 @@ func TestRestoreWaitsEverywhereElse(t *testing.T) {
 		ep := newFakeRestoreEP(tc.typeName)
 		done := make(chan struct{})
 		go func() {
-			restore(tc.goos, ep)
+			restore(context.Background(), tc.goos, ep)
 			close(done)
 		}()
 

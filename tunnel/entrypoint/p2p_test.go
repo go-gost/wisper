@@ -1,6 +1,7 @@
 package entrypoint
 
 import (
+	"context"
 	"net"
 	"os"
 	"path/filepath"
@@ -40,7 +41,7 @@ func TestP2PEntryPointLifecycle(t *testing.T) {
 
 	// The host is refcounted: a foreign acquire/release pair must leave it
 	// running because the entrypoint still holds a reference.
-	if _, err := tp.AcquireP2PHost(); err != nil {
+	if _, err := tp.AcquireP2PHost(context.Background()); err != nil {
 		t.Fatalf("AcquireP2PHost: %v", err)
 	}
 	tp.ReleaseP2PHost()

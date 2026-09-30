@@ -159,6 +159,28 @@ All routes under `/api/`:
 | `GET` | `/api/config` | Get app settings |
 | `PUT` | `/api/config` | Update app settings |
 
+### Request correlation: `Wisper-Id`
+
+A client may send a short opaque id on any request:
+
+```
+Wisper-Id: 3f9a1c2b
+```
+
+The backend logs it on the mutation line (`id=…`, at debug level) and the p2p
+seam logs it (`action=…`) on the calls that action started — the host's
+`Listen`, and each peer's `Warm`/`Punch` — so a UI click can be joined with the
+p2p work it set in motion. The web UI sends a fresh id on every request.
+
+An absent header gets a generated id (8 hex chars), so a `curl`, the CLI, or an
+older bundle is still correlatable. The value is a **label only**: it is never
+authentication, never parsed, and never able to change behaviour.
+
+Correlation covers the calls an action *initiates*. p2p's background logs
+(punch rounds, session death, keepalive) stay action-free: one punch serves
+every caller and a session outlives any click, so tagging them would be a
+fabricated join.
+
 ## Build
 
 ### Prerequisites

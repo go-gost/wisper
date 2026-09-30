@@ -7,6 +7,17 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 
 /**
+ * The logcat tag every tun-fd hand-off and release carries, on both services.
+ *
+ * Why a tag of its own, and logcat rather than the wisper log: the device is
+ * given up on the Android side (four sites across two services, one of them a
+ * system revoke), and "who took the device" is asked while reading logcat
+ * adb-side. One tag means one filter — `adb logcat -s wisper-tunfd` reads the
+ * whole fd timeline in order, which the Go side's own tunfd lines join.
+ */
+internal const val TUNFD_TAG = "wisper-tunfd"
+
+/**
  * The app's VPN device, as a VpnService of its own so that it can be stopped.
  *
  * Android clears a VPN when its VpnService stops, and by nothing else: handing
@@ -88,7 +99,9 @@ class TunVpnService : VpnService() {
 
         // The Go side owns the device from here: it copies the fd per tun
         // device, so an entrypoint restart keeps working without a new VPN.
-        WisperJNI.setTunFd(pfd.detachFd())
+        val fd = pfd.detachFd()
+        Log.i(TUNFD_TAG, "set: TunVpnService.establish fd=$fd (device established)")
+        WisperJNI.setTunFd(fd)
         VpnStatus.established = true
         VpnStatus.config = device.config()
         Log.i(TAG, "VPN established for ${device.net}")
@@ -102,6 +115,7 @@ class TunVpnService : VpnService() {
     private fun release() {
         if (VpnStatus.established) {
             Log.i(TAG, "releasing the VPN device")
+            Log.i(TUNFD_TAG, "release: TunVpnService.release fd=-1 (device no longer needed)")
             WisperJNI.setTunFd(-1)
         }
         VpnStatus.established = false
@@ -116,6 +130,7 @@ class TunVpnService : VpnService() {
      */
     override fun onRevoke() {
         Log.w(TAG, "VPN revoked by the system")
+        Log.w(TUNFD_TAG, "release: TunVpnService.onRevoke fd=-1 (system revoked)")
         VpnStatus.established = false
         VpnStatus.config = null
         WisperJNI.setTunFd(-1)

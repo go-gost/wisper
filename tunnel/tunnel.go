@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net"
@@ -346,6 +347,25 @@ type Tunnel interface {
 	Close() error
 	IsClosed() bool
 	Err() error
+}
+
+// ContextRunner is implemented by a tunnel or entrypoint whose Run reaches the
+// shared p2p host: the action id an HTTP request carried is in ctx, so the seam
+// calls that run makes (the host's Listen/Warm/Punch) name it in their log
+// line. A type that does not implement it makes no p2p seam call, so there is
+// nothing to correlate.
+type ContextRunner interface {
+	RunContext(ctx context.Context) error
+}
+
+// RunWithContext starts s carrying ctx's action id into the p2p seam calls its
+// run makes. A type with no context-aware run falls back to Run: its lifecycle
+// opens no p2p seam call, so an id would have nothing to join.
+func RunWithContext(ctx context.Context, s Tunnel) error {
+	if cr, ok := s.(ContextRunner); ok {
+		return cr.RunContext(ctx)
+	}
+	return s.Run()
 }
 
 type tunnelList struct {

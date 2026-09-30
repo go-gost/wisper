@@ -1,6 +1,7 @@
 package entrypoint
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -29,7 +30,9 @@ var (
 type EntryPoint = tunnel.Tunnel
 
 // restore starts one restored entrypoint, and closes it if it cannot start —
-// the same fate a config load has always given a broken entrypoint.
+// the same fate a config load has always given a broken entrypoint. ctx carries
+// the action id (Background on the config-load path, where no click exists) so
+// a start's p2p seam calls can be joined with the action that caused it.
 //
 // The one exception is an Android tun entrypoint, whose device belongs to the
 // app's VpnService. The app learns what device to build by reading this
@@ -39,7 +42,7 @@ type EntryPoint = tunnel.Tunnel
 // marks the entrypoint failed on every cold start. Starting it in the
 // background lets the API answer, the VPN come up and the device arrive while
 // the entrypoint is still waiting for it.
-func restore(goos string, ep EntryPoint) {
+func restore(ctx context.Context, goos string, ep EntryPoint) {
 	fail := func(err error) {
 		if err != nil {
 			slog.Error("start entrypoint", "name", ep.Name(), "err", err)
@@ -49,10 +52,10 @@ func restore(goos string, ep EntryPoint) {
 	}
 
 	if restoreAsync(goos, ep) {
-		go func() { fail(ep.Run()) }()
+		go func() { fail(tunnel.RunWithContext(ctx, ep)) }()
 		return
 	}
-	fail(ep.Run())
+	fail(tunnel.RunWithContext(ctx, ep))
 }
 
 // restoreAsync reports whether a restored entrypoint starts off the startup
@@ -71,10 +74,15 @@ func restoreAsync(goos string, ep EntryPoint) bool {
 // starves the very wait it is in: Run's device wait expires and the start
 // fails with "no device fd".
 //
+// ctx is the request's when the start came from the API: its action id rides
+// the p2p seam calls the entrypoint makes. The Android tun run is started off
+// the request goroutine and outlives it, which is safe here — the seam reads
+// the id for a log field and never honours cancellation.
+//
 // A start that cannot complete closes the entrypoint, which is how the callers'
 // own Run error path reported it.
-func Start(ep EntryPoint) {
-	restore(runtime.GOOS, ep)
+func Start(ctx context.Context, ep EntryPoint) {
+	restore(ctx, runtime.GOOS, ep)
 }
 
 // CheckTunDeviceFree reports whether an entrypoint with this ID may use the tun
@@ -240,7 +248,7 @@ func RestartRunning() {
 		newEP.Favorite(p.fav)
 
 		Set(newEP)
-		Start(newEP)
+		Start(context.Background(), newEP)
 	}
 
 	if err := SaveConfig(); err != nil {
@@ -287,7 +295,7 @@ func LoadConfig() {
 		if cfg.Closed {
 			ep.Close()
 		} else {
-			restore(runtime.GOOS, ep)
+			restore(context.Background(), runtime.GOOS, ep)
 		}
 
 		ep.Favorite(cfg.Favorite)

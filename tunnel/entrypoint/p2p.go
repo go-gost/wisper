@@ -1,6 +1,7 @@
 package entrypoint
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -175,7 +176,14 @@ func (s *p2pEntryPoint) init() error {
 	return nil
 }
 
-func (s *p2pEntryPoint) Run() (err error) {
+func (s *p2pEntryPoint) Run() error { return s.RunContext(context.Background()) }
+
+// RunContext is Run carrying the caller's action id: the shared host's
+// acquisition (Listen) and the peer's punch name it in their p2p seam log
+// lines, so a start that came from the UI can be joined with the p2p work it
+// set in motion. Run is this with no action, for the config-load and restart
+// paths.
+func (s *p2pEntryPoint) RunContext(ctx context.Context) (err error) {
 	if s.IsClosed() {
 		return ErrEntryPointClosed
 	}
@@ -197,7 +205,7 @@ func (s *p2pEntryPoint) Run() (err error) {
 	// failed relay connection is not fatal: the engine retries in the
 	// background and the entrypoint keeps running, so the manager logs it
 	// rather than failing the Run.
-	host, err := tunnel.AcquireP2PHost()
+	host, err := tunnel.AcquireP2PHost(ctx)
 	if err != nil {
 		return
 	}
@@ -230,7 +238,7 @@ func (s *p2pEntryPoint) Run() (err error) {
 	// visible in the status) before the first local client arrives, instead of
 	// waiting for traffic. Punch failures are logged, never fatal.
 	if peer := s.opts.Peer; peer != "" {
-		if err := host.Punch(peer); err != nil {
+		if err := host.PunchContext(ctx, peer); err != nil {
 			slog.Warn("p2p entrypoint: punch peer", "peer", peer, "err", err)
 		}
 	}

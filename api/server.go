@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+
+	"github.com/go-gost/p2p/endpoint"
 )
 
 // writeJSON writes a JSON response with the given status code.
@@ -36,7 +38,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+actionHeader)
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusNoContent)
@@ -51,10 +53,21 @@ func corsMiddleware(next http.Handler) http.Handler {
 // the state-changing endpoints — including the ones that record no event (a
 // settings change, a peers edit, a stats reset), so a state change visible in
 // neither the events nor the object history can still be traced to a request.
+//
+// The line carries the request's action id: the UI's (or a generated one), so
+// it can be joined with the log line the p2p seam writes for the work this
+// action started (a start's Listen/Warm/Punch). The id is put in the request
+// context for exactly that, and it is a label throughout — read for a log
+// field, never for a decision.
 func logMutations(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			slog.Debug("api", "method", r.Method, "path", r.URL.Path)
+			id := r.Header.Get(actionHeader)
+			if id == "" {
+				id = newActionID()
+			}
+			slog.Debug("api", "method", r.Method, "path", r.URL.Path, "id", id)
+			r = r.WithContext(endpoint.WithAction(r.Context(), id))
 		}
 		next.ServeHTTP(w, r)
 	})
