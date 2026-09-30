@@ -200,6 +200,7 @@ const zh: Record<string, string> = {
   peersDiagCaps: '能力',
   peersDiagSession: '会话',
   peersDiagSilence: '静默',
+  peersDiagTrace: '最近记录',
   // Event history
   eventsTunnelTitle: '历史事件',
   eventsEntrypointTitle: '历史事件',
@@ -228,6 +229,11 @@ const zh: Record<string, string> = {
   p2pTransportRelay: '中继',
   p2pTransportPunch: '打洞',
   p2pTransportPunching: '打洞中',
+  doctorTitle: '诊断',
+  doctorDesc:
+    '可粘贴的诊断报告：中继状态、传输计数、每个对端的路径与最近的打洞记录，并给出结论。此处在本进程内渲染，中继的连通状态真实可查。',
+  doctorRun: '运行诊断',
+  doctorRunning: '运行中…',
   p2pTransportHint: '两端直连（打洞成功），流量不经过中继。',
   p2pTransportWhyRelay: '当前走中继，未使用直连',
   p2pTransportWhyPunching: '正在协商直连',

@@ -331,6 +331,14 @@ export class TunnelPeersPage extends LitElement {
           <span class="diag-label">${t('peersDiagSilence')}</span>
           <span class="diag-value">${this._ageMs(s.last_recv_age_ms)}</span>
         </div>
+        ${s.trace && s.trace.length > 0
+          ? html`<div class="diag-trace">
+              <span class="diag-label">${t('peersDiagTrace')}</span>
+              <div class="trace-lines">
+                ${s.trace.map(line => html`<div class="trace-line">${line}</div>`)}
+              </div>
+            </div>`
+          : nothing}
       </div>
     `;
   }
@@ -668,6 +676,24 @@ export class TunnelPeersPage extends LitElement {
     }
     .diag-value {
       color: var(--text-secondary);
+      overflow-wrap: anywhere;
+    }
+    /* The peer's recent punch history: one monospace line per step, oldest
+       first (newest last). */
+    .diag-trace {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .trace-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+      font-family: var(--font-mono, monospace);
+      color: var(--text-secondary);
+    }
+    .trace-line {
       overflow-wrap: anywhere;
     }
 

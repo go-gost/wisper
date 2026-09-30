@@ -49,6 +49,8 @@ export class SettingsPage extends LitElement {
   @state() private _p2pPublicKey = '';
   @state() private _p2pRunning = false;
   @state() private _p2pTransport: { direct: number; derp: number; attempts: number; success: number } | null = null;
+  @state() private _doctor = '';
+  @state() private _doctorLoading = false;
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 3;
@@ -184,6 +186,23 @@ export class SettingsPage extends LitElement {
 
   private async _copyP2PKey() {
     await copyToClipboard(this._p2pPublicKey);
+    this._showSnackbar(t('copiedToClipboard'));
+  }
+
+  /** _runDoctor fetches the diagnostic report. In-process, so the relay's
+   *  liveness and the per-peer snapshot are complete — unlike the CLI's. */
+  private async _runDoctor() {
+    this._doctorLoading = true;
+    try {
+      this._doctor = await this._backend.getP2PDoctor();
+    } catch (e) {
+      this._doctor = String(e);
+    }
+    this._doctorLoading = false;
+  }
+
+  private async _copyDoctor() {
+    await copyToClipboard(this._doctor);
     this._showSnackbar(t('copiedToClipboard'));
   }
 
@@ -435,6 +454,22 @@ export class SettingsPage extends LitElement {
       border-radius: 3px;
     }
     .copy-btn-mini:hover { background: var(--border-subtle); color: var(--text); }
+
+    /* ── Doctor report ── */
+    .doctor-output {
+      margin: 12px 0 0;
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-xs);
+      line-height: 1.4;
+      color: var(--text);
+      white-space: pre;
+      overflow: auto;
+      max-height: 420px;
+    }
 
     /* ── Switch ── */
     .switch-row {
@@ -741,6 +776,29 @@ export class SettingsPage extends LitElement {
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagnostics -->
+        <div class="section">
+          <div class="section-title">${t('doctorTitle')}</div>
+          <div class="card">
+            <div class="card-padded">
+              <p class="hint" style="margin-top:0;">${t('doctorDesc')}</p>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+                <button class="save-btn" style="width:auto;padding:6px 16px;margin:0;"
+                  ?disabled=${this._doctorLoading} @click=${this._runDoctor}>
+                  ${this._doctorLoading ? t('doctorRunning') : t('doctorRun')}
+                </button>
+                ${this._doctor
+                  ? html`<button class="copy-btn-mini" style="border:1px solid var(--border);padding:6px;"
+                      title="${t('btnCopy')}" @click=${this._copyDoctor}>
+                      ${icon('copy')}
+                    </button>`
+                  : nothing}
+              </div>
+              ${this._doctor ? html`<pre class="doctor-output">${this._doctor}</pre>` : nothing}
             </div>
           </div>
         </div>

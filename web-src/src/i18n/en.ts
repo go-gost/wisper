@@ -206,6 +206,7 @@ const en: Record<string, string> = {
   peersDiagCaps: 'Capabilities',
   peersDiagSession: 'Session',
   peersDiagSilence: 'Silence',
+  peersDiagTrace: 'Recent rounds',
   // Event history
   eventsTunnelTitle: 'History',
   eventsEntrypointTitle: 'History',
@@ -234,6 +235,11 @@ const en: Record<string, string> = {
   p2pTransportRelay: 'relay',
   p2pTransportPunch: 'punched',
   p2pTransportPunching: 'punching',
+  doctorTitle: 'Diagnostics',
+  doctorDesc:
+    'A pasteable diagnostic report: the relay state, the transport counters, each peer\'s path and recent punch rounds, with verdicts. Rendered in-process here, so the relay\'s liveness is real.',
+  doctorRun: 'Run diagnostic',
+  doctorRunning: 'Running…',
   p2pTransportHint: 'Peers reach each other directly (hole-punched): no traffic through the relay.',
   p2pTransportWhyRelay: 'on the relay — no direct path is in use',
   p2pTransportWhyPunching: 'negotiating a direct path',
