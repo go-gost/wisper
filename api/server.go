@@ -83,6 +83,10 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("GET /api/events", handleGetEvents)
 	mux.HandleFunc("DELETE /api/events", handleClearEvents)
 
+	// Log tail, and the level override that lasts one run
+	mux.HandleFunc("GET /api/logs", handleGetLogs)
+	mux.HandleFunc("PUT /api/log/level", handleSetLogLevel)
+
 	// Process-wide p2p identity, and the relay/STUN connectivity probes
 	mux.HandleFunc("GET /api/p2p", handleGetP2PIdentity)
 	mux.HandleFunc("POST /api/p2p/test", handleTestP2PRelay)

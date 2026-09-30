@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -169,6 +170,59 @@ func initLog() {
 	// everything written with slog (wisper's own code and the embedded p2p
 	// library) lands in the same place, at the same level.
 	setDefaultSlog(logger.Default())
+}
+
+// LogFile returns the path the process logs to, or "" when the output is not a
+// file (stderr, stdout, none). Rotation keeps the current file at this path;
+// older segments sit next to it.
+func LogFile() string {
+	output := logOutput
+	if output == "" {
+		cfg := Get().Log
+		if cfg == nil {
+			// What initLog() falls back to when nothing is configured.
+			return filepath.Join(Dir(), "logs", logFile)
+		}
+		output = cfg.Output
+	}
+
+	switch output {
+	case "", "none", "null", "stdout", "stderr":
+		return ""
+	}
+	return output
+}
+
+// LogLevel returns the level the running logger filters at: the per-run
+// override when there is one, otherwise the configured level.
+func LogLevel() string {
+	if logLevel != "" {
+		return logLevel
+	}
+	if cfg := Get().Log; cfg != nil && cfg.Level != "" {
+		return cfg.Level
+	}
+	return string(logger.InfoLevel)
+}
+
+// SetLogLevel switches the running logger's level for this process only: the
+// stored config keeps its own value, the way the -log.level override does, so
+// a restart returns to the level in wisper.yaml.
+func SetLogLevel(level string) error {
+	lvl := strings.ToLower(strings.TrimSpace(level))
+	switch logger.LogLevel(lvl) {
+	case logger.TraceLevel, logger.DebugLevel, logger.InfoLevel,
+		logger.WarnLevel, logger.ErrorLevel, logger.FatalLevel:
+	default:
+		return fmt.Errorf("invalid log level %q", level)
+	}
+
+	logLevel = lvl
+	// ponytail: this builds a second writer on the same file. Two rotating
+	// writers can misplace a segment, they do not lose lines; flip the level
+	// in place if x/logger ever exposes its LevelVar.
+	initLog()
+	return nil
 }
 
 var (
