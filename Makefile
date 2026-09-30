@@ -310,6 +310,18 @@ macos-installer: web macos-sidecar
 ANDROID_IMAGE ?= docker-registry.home.pi/wisper-android:latest
 ANDROID_OUT ?= dist/android
 
+# A debug APK is not a release, so its versionName carries the build time (local
+# clock — the one you read on the phone): "1.5.2-dev.260930-0801" tells two debug
+# builds apart at a glance, in `dumpsys` and in the app's own /api/version. The
+# versionCode stays on the release line (major*10000+minor*100+patch) so a
+# release APK still installs over a debug one as an upgrade; a date-based code
+# would sit above every release and turn that into a downgrade.
+ANDROID_VERSION := $(if $(filter 0.0.0-dev,$(VERSION)),dev,$(VERSION)-dev).$(shell date +%y%m%d-%H%M)
+ANDROID_VERSION_CODE := $(shell echo $(VERSION) | awk -F. '{print $$1*10000+$$2*100+$$3+0}')
+ifeq ($(ANDROID_VERSION_CODE),0)
+ANDROID_VERSION_CODE := 1
+endif
+
 .PHONY: android-image
 android-image:
 	@docker pull $(ANDROID_IMAGE) 2>/dev/null \
@@ -319,9 +331,12 @@ android-image:
 .PHONY: android
 android: android-image
 	@echo "==> Building the APK in Docker (web UI + libwisper.so + Gradle)..."
+	@echo "==> version $(ANDROID_VERSION) (versionCode $(ANDROID_VERSION_CODE))"
 	DOCKER_BUILDKIT=1 docker build \
 		-f android/Dockerfile.apk \
 		--build-arg TOOLCHAIN=$(ANDROID_IMAGE) \
+		--build-arg WISPER_VERSION=$(ANDROID_VERSION) \
+		--build-arg WISPER_VERSION_CODE=$(ANDROID_VERSION_CODE) \
 		--target apk \
 		--output type=local,dest=$(ANDROID_OUT) \
 		.

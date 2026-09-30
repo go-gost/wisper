@@ -24,11 +24,21 @@ COPY . .
 # committed web/ can never end up inside libwisper.so.
 COPY --from=web /web /wisper/web
 
+# What the APK reports as its version, and the same string inside libwisper.so
+# (the app's /api/version). `make android` passes a timestamped debug version
+# ("1.5.2-dev.260930-0801", with the release line's versionCode); the defaults
+# keep a bare `docker build -f android/Dockerfile.apk` working.
+ARG WISPER_VERSION=0.0.0-dev
+ARG WISPER_VERSION_CODE=1
+
 RUN --mount=type=cache,target=/root/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/root/.gradle \
     --mount=type=cache,target=/root/.android \
     set -e; \
+    echo "--- version ${WISPER_VERSION} (versionCode ${WISPER_VERSION_CODE}) ---"; \
+    sed -i "s/versionName = \"[^\"]*\"/versionName = \"${WISPER_VERSION}\"/; \
+            s/versionCode = [0-9][0-9]*/versionCode = ${WISPER_VERSION_CODE}/" android/app/build.gradle.kts; \
     NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"; \
     echo "--- JNI bridge into the package root (cgo compiles it there) ---"; \
     cp android/lib_jni.c .; \
@@ -38,14 +48,14 @@ RUN --mount=type=cache,target=/root/go/pkg/mod \
     CXX="$NDK_BIN/aarch64-linux-android24-clang++" \
     CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
       go build -buildmode=c-shared -buildvcs=false \
-        -ldflags="-s -w -extldflags '-Wl,-z,max-page-size=16384'" \
+        -ldflags="-s -w -X github.com/go-gost/wisper/version.Version=${WISPER_VERSION} -extldflags '-Wl,-z,max-page-size=16384'" \
         -o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
     echo "--- libwisper.so (x86_64) ---"; \
     CC="$NDK_BIN/x86_64-linux-android24-clang" \
     CXX="$NDK_BIN/x86_64-linux-android24-clang++" \
     CGO_ENABLED=1 GOOS=android GOARCH=amd64 \
       go build -buildmode=c-shared -buildvcs=false \
-        -ldflags="-s -w -extldflags '-Wl,-z,max-page-size=16384'" \
+        -ldflags="-s -w -X github.com/go-gost/wisper/version.Version=${WISPER_VERSION} -extldflags '-Wl,-z,max-page-size=16384'" \
         -o android/app/src/main/jniLibs/x86_64/libwisper.so .; \
     rm -f lib_jni.c; \
     echo "--- APK ---"; \
