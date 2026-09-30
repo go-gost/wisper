@@ -135,9 +135,9 @@ type punchDrop struct {
 
 // diffPunchDrops reports the peers whose drop counter moved. A drop is the
 // literal end of a live hole-punched session, so — unlike a gauge — it cannot
-// be missed between samples. Attempts and Ups moving on their own are not
-// reported: a peer that cannot punch at all (a symmetric NAT) retries forever,
-// and PeerTransports already reads "failed" for it.
+// be missed between samples. Attempts and Ups moving on their own are still not
+// reported here; the rounds that failed (attempts minus ups) are, by
+// diffPunchFailures.
 func diffPunchDrops(prev, cur map[string]p2p.PeerPunch) []punchDrop {
 	var out []punchDrop
 	for key, c := range cur {
@@ -147,6 +147,36 @@ func diffPunchDrops(prev, cur map[string]p2p.PeerPunch) []punchDrop {
 		}
 		if d := c.Drops - p.Drops; d > 0 {
 			out = append(out, punchDrop{Key: key, Drops: d})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
+}
+
+// punchFailure is one peer's newly counted failed punch rounds since the last
+// sample.
+type punchFailure struct {
+	Key      string
+	Failures int64 // the delta
+}
+
+// diffPunchFailures reports the peers whose failed-round counter moved. One
+// round's failures is Attempts minus Ups: the rounds that did not reach a live
+// direct session. A peer that cannot punch at all (a symmetric NAT) shows only
+// once as the "failed" gauge, but the engine keeps retrying on its backoff —
+// this delta is where those retries become visible, so the caller can fold them
+// into a count. A peer absent from prev is seeded, never reported (its history
+// predates this tick); a peer whose failures stop moving — it ups-ed, or simply
+// did not retry — reports nothing.
+func diffPunchFailures(prev, cur map[string]p2p.PeerPunch) []punchFailure {
+	var out []punchFailure
+	for key, c := range cur {
+		p, seen := prev[key]
+		if !seen {
+			continue // this peer's first observation: seed, never report
+		}
+		if d := (c.Attempts - c.Ups) - (p.Attempts - p.Ups); d > 0 {
+			out = append(out, punchFailure{Key: key, Failures: d})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })

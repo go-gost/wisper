@@ -232,6 +232,11 @@ func (t *updateStatsTask) observeTransitions() {
 		msg := fmt.Sprintf("peer %s: direct session dropped (%d)", peerDisplayOf(d.Key, cands), d.Drops)
 		recordFor(d.Key, cands, event.LevelWarn, msg)
 	}
+
+	// A failed-round counter moving is a punch that did not reach a direct
+	// session and will be retried on the engine's backoff — the retries a peer
+	// that cannot punch keeps making, invisible in the one-shot "failed" gauge.
+	recordPunchFailures(diffPunchFailures(t.punches, st.PeerPunches), cands)
 	t.punches = st.PeerPunches
 
 	relay := relaySample{connected: st.RelayConnected, err: st.RelayError}
@@ -267,6 +272,18 @@ func recordFor(key string, cands []peerCand, level, msg string) {
 		return
 	}
 	event.Global(level, "%s", msg)
+}
+
+// recordPunchFailures files one warning per failed round. The message is
+// constant — the count must not be in it — so that consecutive rounds coalesce
+// into a single "×N" row instead of a flood.
+func recordPunchFailures(failures []punchFailure, cands []peerCand) {
+	for _, f := range failures {
+		msg := fmt.Sprintf("peer %s: punch failed", peerDisplayOf(f.Key, cands))
+		for i := int64(0); i < f.Failures; i++ {
+			recordFor(f.Key, cands, event.LevelWarn, msg)
+		}
+	}
 }
 
 // observeObject samples one tunnel or entrypoint into cur, and adds it to this

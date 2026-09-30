@@ -148,6 +148,44 @@ func TestDiffPunchDropsSeedsFirstObservation(t *testing.T) {
 	}
 }
 
+func TestDiffPunchFailures(t *testing.T) {
+	prev := map[string]p2p.PeerPunch{
+		"a": {Attempts: 1, Ups: 1}, // was healthy
+		"b": {Attempts: 3, Ups: 0}, // two failures so far
+		"c": {Attempts: 2, Ups: 2}, // healthy, unchanged below
+		"d": {Attempts: 4, Ups: 1}, // failing, ups again below
+	}
+	cur := map[string]p2p.PeerPunch{
+		"a": {Attempts: 2, Ups: 1}, // one new failure
+		"b": {Attempts: 5, Ups: 0}, // two more failures
+		"c": {Attempts: 2, Ups: 2}, // unchanged: nothing
+		"d": {Attempts: 5, Ups: 2}, // one more attempt and one more up: failures steady
+		"e": {Attempts: 9, Ups: 0}, // first observation: seeded
+	}
+
+	got := diffPunchFailures(prev, cur)
+	byKey := map[string]int64{}
+	for _, c := range got {
+		byKey[c.Key] = c.Failures
+	}
+	if len(got) != 2 || byKey["a"] != 1 || byKey["b"] != 2 {
+		t.Fatalf("got %+v, want a=1 and b=2 only (no unchanged, ups-ed, or first-observation peer)", got)
+	}
+}
+
+func TestDiffPunchFailuresSeedsFirstObservation(t *testing.T) {
+	got := diffPunchFailures(nil, map[string]p2p.PeerPunch{"a": {Attempts: 9, Ups: 0}})
+	if len(got) != 0 {
+		t.Errorf("a first observation must be seeded, not reported: %+v", got)
+	}
+
+	// An unchanged pair reports nothing.
+	p := map[string]p2p.PeerPunch{"a": {Attempts: 4, Ups: 1}}
+	if got := diffPunchFailures(p, p); len(got) != 0 {
+		t.Errorf("unchanged counters must report nothing: %+v", got)
+	}
+}
+
 func TestDiffRelay(t *testing.T) {
 	cases := []struct {
 		name          string
