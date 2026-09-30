@@ -1088,6 +1088,38 @@ func TestDismissPendingPeerEndpoint(t *testing.T) {
 	}
 }
 
+// TestP2PDoctorEndpoint: the endpoint renders the shared doctor report as
+// plain text. No host runs in this test, so the snapshot is empty — what is
+// checked is that the handler produces a real (non-empty) report with the
+// report's section headers, not a JSON error.
+func TestP2PDoctorEndpoint(t *testing.T) {
+	ts := setupTestServer(t)
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL + "/api/p2p/doctor")
+	if err != nil {
+		t.Fatalf("GET /api/p2p/doctor: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	if ct := res.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
+		t.Fatalf("content-type = %q, want text/plain", ct)
+	}
+
+	raw, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	body := string(raw)
+	for _, want := range []string{"p2p doctor", "summary:", "peers:", "verdicts:"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("report missing %q\n---\n%s", want, body)
+		}
+	}
+}
+
 func TestLifecycleRecordsEvents(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()

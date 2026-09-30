@@ -40,18 +40,21 @@ type tunnelResponse struct {
 // p2p host's live diagnostic for it (path, punch state, last error, dialled
 // endpoint, ages) so the peers page can expand a row without a second call.
 type peerStatsJSON struct {
-	Key             string   `json:"key"`
-	Alias           string   `json:"alias,omitempty"`
-	Transport       string   `json:"transport,omitempty"`
-	Reason          string   `json:"reason,omitempty"`
-	State           string   `json:"state,omitempty"`
-	Failed          bool     `json:"failed,omitempty"`
-	LastError       string   `json:"last_error,omitempty"`
-	PeerAddr        string   `json:"peer_addr,omitempty"`
-	Candidates      int      `json:"candidates,omitempty"`
-	Caps            []string `json:"caps,omitempty"`
-	SessionAgeMs    int64    `json:"session_age_ms,omitempty"`
-	LastRecvAgeMs   int64    `json:"last_recv_age_ms,omitempty"`
+	Key           string   `json:"key"`
+	Alias         string   `json:"alias,omitempty"`
+	Transport     string   `json:"transport,omitempty"`
+	Reason        string   `json:"reason,omitempty"`
+	State         string   `json:"state,omitempty"`
+	Failed        bool     `json:"failed,omitempty"`
+	LastError     string   `json:"last_error,omitempty"`
+	PeerAddr      string   `json:"peer_addr,omitempty"`
+	Candidates    int      `json:"candidates,omitempty"`
+	Caps          []string `json:"caps,omitempty"`
+	SessionAgeMs  int64    `json:"session_age_ms,omitempty"`
+	LastRecvAgeMs int64    `json:"last_recv_age_ms,omitempty"`
+	// Trace is the peer's recent punch history: short lines, oldest first
+	// (newest kept), capped by the p2p host's ring.
+	Trace           []string `json:"trace,omitempty"`
 	CurrentConns    uint64   `json:"current_conns"`
 	TotalConns      uint64   `json:"total_conns"`
 	InputBytes      uint64   `json:"input_bytes"`
@@ -228,6 +231,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 				Caps:            d.Caps,
 				SessionAgeMs:    d.SessionAge.Milliseconds(),
 				LastRecvAgeMs:   d.LastRecvAge.Milliseconds(),
+				Trace:           d.Trace,
 				CurrentConns:    p.CurrentConns,
 				TotalConns:      p.TotalConns,
 				InputBytes:      p.InputBytes,

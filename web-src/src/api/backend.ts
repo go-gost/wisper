@@ -201,6 +201,19 @@ export class GoBackend {
     return this.request('POST', '/api/p2p/test-stun', req);
   }
 
+  /** The p2p diagnostic report as plain text, rendered in-process where the
+   *  relay's liveness is real. An optional peer key narrows it to one peer. */
+  async getP2PDoctor(peer?: string): Promise<string> {
+    const q = peer ? `?peer=${encodeURIComponent(peer)}` : '';
+    const res = await fetch(this.url(`/api/p2p/doctor${q}`), {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    if (!res.ok) {
+      throw new BackendError(res.status, res.statusText);
+    }
+    return res.text();
+  }
+
   /** Keys that knocked on the shared host without being on any tunnel's
    *  allowlist, newest first. The list is process-wide: a p2p stream carries
    *  no destination, so a knock cannot be attributed to a tunnel. */

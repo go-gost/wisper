@@ -4,7 +4,10 @@ import (
 	"net/http"
 
 	"github.com/go-gost/p2p"
+	"github.com/go-gost/p2p/doctor"
+	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
+	"github.com/go-gost/wisper/version"
 )
 
 // p2pIdentityResponse is the JSON representation of the process-wide p2p identity.
@@ -87,6 +90,27 @@ func handleGetP2PIdentity(w http.ResponseWriter, r *http.Request) {
 		PunchSuccess:    st.PunchSuccess,
 		PeerDiagnostics: peerDiagnosticsJSON(st.PeerDiagnostics),
 	})
+}
+
+// handleGetP2PDoctor renders the shared doctor report as plain text. In-process,
+// so it is complete where the CLI's is not: the relay's liveness (RelayConnected)
+// and the full per-peer snapshot are real here, not inferred from a frozen proto.
+// An optional ?peer=<base64-key> narrows it to one peer.
+func handleGetP2PDoctor(w http.ResponseWriter, r *http.Request) {
+	opts := doctor.Options{
+		Version:  version.Version,
+		Identity: tunnel.P2PHostPublicKey(),
+		Peer:     r.URL.Query().Get("peer"),
+	}
+	if s := config.Get().Settings; s != nil && s.P2P != nil {
+		opts.RelayURL = tunnel.P2PDerpURL(s)
+		opts.STUN = tunnel.P2PStunAddr(s)
+		opts.Direct = s.P2P.Direct
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(doctor.Report(tunnel.P2PHostStatus(), opts)))
 }
 
 // p2pRelayTestRequest is the body of POST /api/p2p/test: the relay values as

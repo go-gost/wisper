@@ -103,6 +103,9 @@ export interface PeerStats {
   session_age_ms?: number;
   /** How long since the last frame from the peer. */
   last_recv_age_ms?: number;
+  /** The peer's recent punch history: short lines, oldest first (newest kept),
+   *  capped by the p2p host's ring. */
+  trace?: string[];
   current_conns: number;
   total_conns: number;
   input_bytes: number;
