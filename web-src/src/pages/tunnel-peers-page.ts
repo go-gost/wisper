@@ -250,6 +250,24 @@ export class TunnelPeersPage extends LitElement {
     </span>`;
   }
 
+  /** _renderEncryption marks whether this peer's session settled encrypted. A
+   *  "plaintext" peer one predates encryption: a warning, with the reason in
+   *  the tooltip. Nothing when the state is unknown or there is no session. */
+  private _renderEncryption(key: string) {
+    const enc = this._statFor(key)?.encryption;
+    if (enc === 'secure') {
+      return html`<span class="peer-badge secure" title=${t('peerEncrypted')}>
+        ${icon('lock')}<span>${t('peerEncrypted')}</span>
+      </span>`;
+    }
+    if (enc === 'plaintext') {
+      return html`<span class="peer-badge warn" title=${`${t('peerPlaintext')} · ${t('peerPlaintextWhy')}`}>
+        ${icon('unlock')}<span>${t('peerPlaintext')}</span>
+      </span>`;
+    }
+    return nothing;
+  }
+
   private _renderEditor() {
     return html`
       <div class="peer-row editing">
@@ -342,7 +360,7 @@ export class TunnelPeersPage extends LitElement {
                         <span class="peer-alias">${row.alias || t('peersNoAlias')}</span>
                         ${row.disabled
                           ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
-                          : this._renderTransport(row.key)}
+                          : html`${this._renderTransport(row.key)}${this._renderEncryption(row.key)}`}
                         <span class="row-actions">
                           <button class="icon-btn" title="${row.disabled ? t('peersEnable') : t('peersDisable')}"
                             ?disabled=${this._saving}
@@ -500,7 +518,8 @@ export class TunnelPeersPage extends LitElement {
       width: 12px;
       height: 12px;
     }
-    .peer-badge.direct {
+    .peer-badge.direct,
+    .peer-badge.secure {
       color: var(--green-text);
       background: var(--green-bg);
     }

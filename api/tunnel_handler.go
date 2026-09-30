@@ -40,6 +40,7 @@ type peerStatsJSON struct {
 	Key             string `json:"key"`
 	Alias           string `json:"alias,omitempty"`
 	Transport       string `json:"transport,omitempty"`
+	Encryption      string `json:"encryption,omitempty"`
 	CurrentConns    uint64 `json:"current_conns"`
 	TotalConns      uint64 `json:"total_conns"`
 	InputBytes      uint64 `json:"input_bytes"`
@@ -190,11 +191,13 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			OutputRateBytes: s.OutputRateBytes,
 		},
 	}
-	// The p2p host's current path per peer, when this object has p2p peers —
-	// for a p2p tunnel's allowlist and for a p2p entrypoint's single peer.
-	var transports map[string]string
+	// The p2p host's current path and session encryption per peer, when this
+	// object has p2p peers — for a p2p tunnel's allowlist and for a p2p
+	// entrypoint's single peer.
+	var transports, encryptions map[string]string
 	if opts.Peer != "" || t.Type() == tunnel.P2PTunnel {
-		transports = tunnel.P2PHostStatus().PeerTransports
+		st := tunnel.P2PHostStatus()
+		transports, encryptions = st.PeerTransports, st.PeerEncryption
 	}
 	if ps, ok := t.(tunnel.PeerStatsReporter); ok {
 		for _, p := range ps.PeerStats() {
@@ -202,6 +205,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 				Key:             p.Key,
 				Alias:           opts.PeerAliases[p.Key],
 				Transport:       transports[p.Key],
+				Encryption:      encryptions[p.Key],
 				CurrentConns:    p.CurrentConns,
 				TotalConns:      p.TotalConns,
 				InputBytes:      p.InputBytes,

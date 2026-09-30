@@ -82,6 +82,10 @@ export interface PeerStats {
   /** Where this peer's traffic goes now: 'direct' or 'derp'; absent when it
    *  has no session at all. */
   transport?: string;
+  /** This peer's session encryption: 'secure' when every live session settled
+   *  encrypted, 'plaintext' when the peer predates encryption; absent when it
+   *  has no session at all. */
+  encryption?: string;
   current_conns: number;
   total_conns: number;
   input_bytes: number;

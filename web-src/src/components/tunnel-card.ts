@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { formatBytes, formatRate, formatRelativeTime } from '../utils/format';
 import { icon } from '../utils/icons';
+import { t } from '../i18n/i18n';
 import type { TransportView } from '../utils/transport';
 import type { ServiceStatus } from '../api/types';
 
@@ -46,6 +47,10 @@ export class TunnelCard extends LitElement {
 
   /** Error message — displayed in an inline banner when non-empty. */
   @property() error = '';
+
+  /** Whether this object is end-to-end encrypted — a static, type-based fact
+   *  (a p2p tunnel, or a p2p/tun entrypoint). Draws a lock badge. */
+  @property({ type: Boolean }) secure = false;
 
   static styles = css`
     :host {
@@ -138,6 +143,15 @@ export class TunnelCard extends LitElement {
     }
     .transport.warn {
       color: var(--amber);
+    }
+    .secure {
+      display: inline-flex;
+      align-items: center;
+      color: var(--green-text);
+    }
+    .secure svg {
+      width: 12px;
+      height: 12px;
     }
 
     /* ── Right column: created-at + traffic ── */
@@ -234,6 +248,9 @@ export class TunnelCard extends LitElement {
 
         <div class="right-col">
           <div class="right-top">
+            ${this.secure
+              ? html`<span class="secure" title=${t('e2eEncrypted')}>${icon('lock')}</span>`
+              : nothing}
             ${this.transport
               ? html`<span class="transport ${this.transport.tone}" title=${this.transport.hint}>
                   ${icon(this.transport.icon)}

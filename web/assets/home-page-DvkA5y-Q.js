@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DYudh1jL.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
-import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f as D,h as S,j as e,k as z,l as F,m as j,n as R,_ as C,o as I}from"./index-DYudh1jL.js";import{n as l,f as B,a as E,b as q,c as N,r as b}from"./format-B570lS7p.js";import{i as u}from"./app-scaffold-CE0_zgyG.js";import{c as A}from"./clipboard-C3x8_sid.js";import{t as O}from"./transport-BMKnVFU3.js";import{r as U}from"./qr-B9waFAF2.js";var H=Object.defineProperty,Q=Object.getOwnPropertyDescriptor,_=(t,r,n,a)=>{for(var o=a>1?void 0:a?Q(r,n):r,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(r,n,o):i(o))||o);return a&&o&&H(r,n,o),o};let g=class extends y{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DxovVP7w.js","assets/index-nwYGvLm_.css"])))=>i.map(i=>d[i]);
+import{i as x,a as y,b as s,t as m,A as $,c as e,g as w,d as k,e as T,f as C,s as P,h as D,j as S,k as z,l as F,m as j,n as R,_ as E,o as B}from"./index-DxovVP7w.js";import{n as l,f as I,a as q,b as L,c as N,r as b}from"./format-Drw40smI.js";import{i as u}from"./app-scaffold-BlWqbruY.js";import{c as A}from"./clipboard-C3x8_sid.js";import{t as O}from"./transport-9B_MWpz4.js";import{r as U}from"./qr-B9waFAF2.js";var H=Object.defineProperty,Q=Object.getOwnPropertyDescriptor,_=(t,r,n,a)=>{for(var o=a>1?void 0:a?Q(r,n):r,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(r,n,o):i(o))||o);return a&&o&&H(r,n,o),o};let g=class extends y{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return s`
       <div class="pill-group">
         ${this.tabs.map((t,r)=>s`
             <button class=${r===this.activeIndex?"active":""} @click=${()=>this._handleClick(r)}>
@@ -43,7 +43,7 @@ import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f a
       font-weight: 600;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
-  `;_([l({type:Array})],g.prototype,"tabs",2);_([l({type:Number})],g.prototype,"activeIndex",2);g=_([m("nav-tabs")],g);var M=Object.defineProperty,V=Object.getOwnPropertyDescriptor,p=(t,r,n,a)=>{for(var o=a>1?void 0:a?V(r,n):r,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(r,n,o):i(o))||o);return a&&o&&M(r,n,o),o};let d=class extends y{constructor(){super(...arguments),this.name="",this.typeLabel="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.transport=null,this.createdAt="",this.expanded=!1,this.compact=!0,this.error=""}_onRowClick(){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return s`
+  `;_([l({type:Array})],g.prototype,"tabs",2);_([l({type:Number})],g.prototype,"activeIndex",2);g=_([m("nav-tabs")],g);var M=Object.defineProperty,V=Object.getOwnPropertyDescriptor,p=(t,r,n,a)=>{for(var o=a>1?void 0:a?V(r,n):r,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(r,n,o):i(o))||o);return a&&o&&M(r,n,o),o};let d=class extends y{constructor(){super(...arguments),this.name="",this.typeLabel="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.transport=null,this.createdAt="",this.expanded=!1,this.compact=!0,this.error="",this.secure=!1}_onRowClick(){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return s`
       <div class="row ${t?"stopped":""}" @click=${this._onRowClick}>
         <span class="dot ${this.status}"></span>
 
@@ -55,20 +55,21 @@ import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f a
 
         <div class="right-col">
           <div class="right-top">
+            ${this.secure?s`<span class="secure" title=${e("e2eEncrypted")}>${u("lock")}</span>`:$}
             ${this.transport?s`<span class="transport ${this.transport.tone}" title=${this.transport.hint}>
                   ${u(this.transport.icon)}
-                </span>`:L}
-            ${this.createdAt?s`<span class="created-at">${B(this.createdAt)}</span>`:""}
+                </span>`:$}
+            ${this.createdAt?s`<span class="created-at">${I(this.createdAt)}</span>`:""}
           </div>
           ${this.status==="running"?s`
             <div class="traffic">
               <div class="traffic-row">
-                <span class="traffic-total">${E(this.inputBytes)}</span>
-                <span>↑ ${q(this.inputRate)}</span>
+                <span class="traffic-total">${q(this.inputBytes)}</span>
+                <span>↑ ${L(this.inputRate)}</span>
               </div>
               <div class="traffic-row">
-                <span class="traffic-total">${E(this.outputBytes)}</span>
-                <span>↓ ${q(this.outputRate)}</span>
+                <span class="traffic-total">${q(this.outputBytes)}</span>
+                <span>↓ ${L(this.outputRate)}</span>
               </div>
             </div>
           `:""}
@@ -172,6 +173,15 @@ import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f a
     .transport.warn {
       color: var(--amber);
     }
+    .secure {
+      display: inline-flex;
+      align-items: center;
+      color: var(--green-text);
+    }
+    .secure svg {
+      width: 12px;
+      height: 12px;
+    }
 
     /* ── Right column: created-at + traffic ── */
     .right-col {
@@ -241,7 +251,7 @@ import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f a
       font-size: var(--font-sm);
       color: var(--red-text);
     }
-  `;p([l()],d.prototype,"name",2);p([l()],d.prototype,"typeLabel",2);p([l()],d.prototype,"meta",2);p([l()],d.prototype,"status",2);p([l()],d.prototype,"endpoint",2);p([l({type:Number})],d.prototype,"currentConns",2);p([l({type:Number})],d.prototype,"totalConns",2);p([l({type:Number})],d.prototype,"requestRate",2);p([l({type:Number})],d.prototype,"inputBytes",2);p([l({type:Number})],d.prototype,"outputBytes",2);p([l({type:Number})],d.prototype,"inputRate",2);p([l({type:Number})],d.prototype,"outputRate",2);p([l({attribute:!1})],d.prototype,"transport",2);p([l()],d.prototype,"createdAt",2);p([l({type:Boolean})],d.prototype,"expanded",2);p([l({type:Boolean})],d.prototype,"compact",2);p([l()],d.prototype,"error",2);d=p([m("tunnel-card")],d);var X=Object.defineProperty,W=Object.getOwnPropertyDescriptor,v=(t,r,n,a)=>{for(var o=a>1?void 0:a?W(r,n):r,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(r,n,o):i(o))||o);return a&&o&&X(r,n,o),o};let f=0,h=class extends y{constructor(){super(...arguments),this._activeTab=f,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null,this._qrUrl=""}connectedCallback(){super.connectedCallback(),this._tunnels=$(),this._entrypoints=w(),this._tunnelsLoading=k(),this._entrypointsLoading=T(),this._unsubs.push(P(()=>{this._tunnels=$(),this._tunnelsLoading=k(),this.requestUpdate()}),D(()=>{this._entrypoints=w(),this._entrypointsLoading=T(),this.requestUpdate()}),S(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return[...this.showFavorites?this._tunnels.filter(r=>r.favorite):this._tunnels].sort((r,n)=>new Date(n.created_at).getTime()-new Date(r.created_at).getTime())}get _filteredEntrypoints(){return[...this.showFavorites?this._entrypoints.filter(r=>r.favorite):this._entrypoints].sort((r,n)=>new Date(n.created_at).getTime()-new Date(r.created_at).getTime())}get _items(){return this._activeTab===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this._activeTab===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){return t.data.status==="running"?`${N(t.data.stats.current_conns)} ${e("conns")}`:this._statusLabel(t.data.status)}_transport(t){return t.kind==="entrypoint"?O(t.data.peer_transport):null}_typeLabel(t){return t.data.type.toUpperCase()}_renderEmptyState(){const t=this._activeTab===0,r=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return s`
+  `;p([l()],d.prototype,"name",2);p([l()],d.prototype,"typeLabel",2);p([l()],d.prototype,"meta",2);p([l()],d.prototype,"status",2);p([l()],d.prototype,"endpoint",2);p([l({type:Number})],d.prototype,"currentConns",2);p([l({type:Number})],d.prototype,"totalConns",2);p([l({type:Number})],d.prototype,"requestRate",2);p([l({type:Number})],d.prototype,"inputBytes",2);p([l({type:Number})],d.prototype,"outputBytes",2);p([l({type:Number})],d.prototype,"inputRate",2);p([l({type:Number})],d.prototype,"outputRate",2);p([l({attribute:!1})],d.prototype,"transport",2);p([l()],d.prototype,"createdAt",2);p([l({type:Boolean})],d.prototype,"expanded",2);p([l({type:Boolean})],d.prototype,"compact",2);p([l()],d.prototype,"error",2);p([l({type:Boolean})],d.prototype,"secure",2);d=p([m("tunnel-card")],d);var X=Object.defineProperty,W=Object.getOwnPropertyDescriptor,v=(t,r,n,a)=>{for(var o=a>1?void 0:a?W(r,n):r,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(r,n,o):i(o))||o);return a&&o&&X(r,n,o),o};let f=0,h=class extends y{constructor(){super(...arguments),this._activeTab=f,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._snackbar="",this._deleteTarget=null,this._qrUrl=""}connectedCallback(){super.connectedCallback(),this._tunnels=w(),this._entrypoints=k(),this._tunnelsLoading=T(),this._entrypointsLoading=C(),this._unsubs.push(P(()=>{this._tunnels=w(),this._tunnelsLoading=T(),this.requestUpdate()}),D(()=>{this._entrypoints=k(),this._entrypointsLoading=C(),this.requestUpdate()}),S(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}get _filteredTunnels(){return[...this.showFavorites?this._tunnels.filter(r=>r.favorite):this._tunnels].sort((r,n)=>new Date(n.created_at).getTime()-new Date(r.created_at).getTime())}get _filteredEntrypoints(){return[...this.showFavorites?this._entrypoints.filter(r=>r.favorite):this._entrypoints].sort((r,n)=>new Date(n.created_at).getTime()-new Date(r.created_at).getTime())}get _items(){return this._activeTab===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this._activeTab===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return e("statusRunning");case"stopped":return e("statusStopped");case"error":return e("statusError")}}_metaLine(t){return t.data.status==="running"?`${N(t.data.stats.current_conns)} ${e("conns")}`:this._statusLabel(t.data.status)}_transport(t){return t.kind==="entrypoint"?O(t.data.peer_transport):null}_secure(t){return t.kind==="tunnel"?t.data.type==="p2p":t.data.type==="p2p"||t.data.type==="tun"}_typeLabel(t){return t.data.type.toUpperCase()}_renderEmptyState(){const t=this._activeTab===0,r=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return s`
         <div class="empty">
           <div class="empty-icon-wrap">${u("star")}</div>
           <div class="empty-title">${e("homeNoFavorites")}</div>
@@ -259,7 +269,7 @@ import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f a
             ${t?e("tunnelNewTitle"):e("entrypointNewTitle")}
           </button>
         </div>
-      `}return s``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await z(t.data.id):await F(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await j(t.data.id):await R(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,r,n){this._deleteTarget={kind:t,id:r,name:n}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:r}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await C(()=>import("./index-DYudh1jL.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.remove(r)):await C(()=>import("./index-DYudh1jL.js").then(n=>n.H),__vite__mapDeps([0,1])).then(n=>n.remove(r)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}_openQrDialog(t){this._qrUrl=t}_closeQrDialog(){this._qrUrl=""}updated(t){if(t.has("_qrUrl")&&this._qrUrl){const r=this.renderRoot.querySelector("#qrCanvas");U(r,this._qrUrl)}}render(){const t=this._items,r=this._isLoading(),n=this._activeTab===0?"/tunnel/new":"/entrypoint/new";return s`
+      `}return s``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){try{t.kind==="tunnel"?await z(t.data.id):await F(t.data.id),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await j(t.data.id):await R(t.data.id),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}_confirmDelete(t,r,n){this._deleteTarget={kind:t,id:r,name:n}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:r}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await E(()=>import("./index-DxovVP7w.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.remove(r)):await E(()=>import("./index-DxovVP7w.js").then(n=>n.H),__vite__mapDeps([0,1])).then(n=>n.remove(r)),this._expandedId=null,this._showSnackbar(e("deleted"))}catch{this._showSnackbar(e("deleteFailed"))}}_openQrDialog(t){this._qrUrl=t}_closeQrDialog(){this._qrUrl=""}updated(t){if(t.has("_qrUrl")&&this._qrUrl){const r=this.renderRoot.querySelector("#qrCanvas");U(r,this._qrUrl)}}render(){const t=this._items,r=this._isLoading(),n=this._activeTab===0?"/tunnel/new":"/entrypoint/new";return s`
       <app-scaffold>
         <!-- Appbar -->
         <div slot="appBar" class="home-header">
@@ -288,6 +298,7 @@ import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f a
                       <tunnel-card
                         .name=${a.data.name}
                         .typeLabel=${this._typeLabel(a)}
+                        .secure=${this._secure(a)}
                         .transport=${this._transport(a)}
                         .meta=${this._metaLine(a)}
                         .status=${a.data.status}
@@ -341,7 +352,7 @@ import{i as x,a as y,b as s,t as m,A as L,g as $,c as w,d as k,e as T,s as P,f a
                                     @click=${i=>{i.stopPropagation(),this._openQrDialog(a.data.entrypoint)}}>
                                     ${u("qr")}
                                   </button>`:""}
-                              ${a.kind==="tunnel"&&(a.data.type==="http"||a.data.type==="file")&&I().inspector_url?s`<button class="action-btn inspect" title="${e("inspectorEntryTitle")}"
+                              ${a.kind==="tunnel"&&(a.data.type==="http"||a.data.type==="file")&&B().inspector_url?s`<button class="action-btn inspect" title="${e("inspectorEntryTitle")}"
                                     style="${a.data.entrypoint?"":"margin-left:auto;"}"
                                     @click=${i=>{i.stopPropagation(),this._navigate(`/tunnel/${a.data.type}/${a.data.id}/inspector`)}}>
                                     ${u("search")}

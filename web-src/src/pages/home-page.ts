@@ -143,6 +143,14 @@ export class HomePage extends LitElement {
     return item.kind === 'entrypoint' ? transportView(item.data.peer_transport) : null;
   }
 
+  /** _secure is the static "end-to-end encrypted" badge: a p2p tunnel, or a
+   *  p2p/tun entrypoint, is encrypted by construction — no live status needed. */
+  private _secure(item: Item): boolean {
+    return item.kind === 'tunnel'
+      ? item.data.type === 'p2p'
+      : item.data.type === 'p2p' || item.data.type === 'tun';
+  }
+
   private _typeLabel(item: Item): string {
     return item.data.type.toUpperCase();
   }
@@ -775,6 +783,7 @@ export class HomePage extends LitElement {
                       <tunnel-card
                         .name=${item.data.name}
                         .typeLabel=${this._typeLabel(item)}
+                        .secure=${this._secure(item)}
                         .transport=${this._transport(item)}
                         .meta=${this._metaLine(item)}
                         .status=${item.data.status}

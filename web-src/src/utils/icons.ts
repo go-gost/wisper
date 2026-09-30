@@ -12,7 +12,7 @@ import { html, svg, type TemplateResult } from 'lit';
  *   star, star-filled, settings, trash, copy, activity,
  *   chevron-left, chevron-right, chevron-up, chevron-down, users,
  *   folder, globe, link, broadcast, plus, edit, back-arrow,
- *   check, close, search
+ *   check, close, search, lock, unlock
  */
 export function icon(name: string): TemplateResult {
   const inner = ICON_PATHS[name];
@@ -83,4 +83,9 @@ const ICON_PATHS: Record<string, SVGInner> = {
   // p2p transport states: a bolt for a direct path, the hub (above) for every
   // relay state.
   zap: svg`<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />`,
+
+  // Encryption: the lock for a session that settled encrypted, the open lock
+  // for a peer that predates encryption.
+  lock: svg`<rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />`,
+  unlock: svg`<rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" />`,
 };

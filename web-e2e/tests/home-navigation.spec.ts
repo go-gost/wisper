@@ -42,3 +42,13 @@ test('back from the entrypoint editor returns to the entrypoint', async ({ page 
   await page.locator('.back-btn').click();
   await expect(page).toHaveURL(/\/entrypoint\/tcp\/e2e-entrypoint$/);
 });
+
+/** The static e2e-encryption badge: the p2p tunnel card carries a lock, the
+ *  plain tcp entrypoint does not. A screenshot for a human (or an agent). */
+test('the p2p tunnel card carries the encryption badge', async ({ page }) => {
+  await page.goto('/');
+  const card = page.locator('tunnel-card').filter({ hasText: 'Private' });
+  await expect(card.locator('.secure')).toHaveAttribute('title', 'End-to-end encrypted');
+
+  await page.screenshot({ path: 'test-results/home-list.png', fullPage: true });
+});
