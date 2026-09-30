@@ -132,6 +132,13 @@ POST   /api/entrypoints/{id}/start   start a stopped entrypoint
 POST   /api/entrypoints/{id}/stop    stop a running entrypoint
 
 GET    /api/stats                    aggregated stats for all tunnels + entrypoints
+GET    /api/p2p                      this host's p2p identity (public key, status)
+POST   /api/p2p/test                 probe the configured DERP relay
+POST   /api/p2p/test-stun            probe the STUN server
+GET    /api/p2p/pending              peers that knocked but are not allowlisted
+DELETE /api/p2p/pending/{key}        dismiss a pending peer
+GET    /api/p2p/doctor               the p2p diagnostic report, plain text (?peer= narrows it)
+
 GET    /api/config                   get app settings (server, entrypoint, lang, theme)
 PUT    /api/config                   update app settings
 ```
@@ -176,9 +183,10 @@ web-src/
       home-page.ts                — Tabbed list + FAB
       tunnel-type-select-page.ts  — 4 tunnel type cards
       tunnel-detail-page.ts       — View/edit/create form + stats
+      tunnel-peers-page.ts        — A p2p tunnel's peers: per-row expand with the peer's diagnostics (path/reason/ages + punch trace)
       entrypoint-type-select-page.ts — 2 entrypoint type cards
       entrypoint-detail-page.ts   — View/edit/create form + stats
-      settings-page.ts            — Server/theme/language settings
+      settings-page.ts            — Server/theme/language settings, and the "Run diagnostic" panel (the p2p report from `/api/p2p/doctor`)
 
     i18n/
       en.ts               — English strings (~55 keys)

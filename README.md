@@ -154,6 +154,7 @@ All routes under `/api/`:
 | `POST` | `/api/p2p/test-stun` | Probe the STUN server |
 | `GET` | `/api/p2p/pending` | Peers that knocked but are not allowlisted |
 | `DELETE` | `/api/p2p/pending/{key}` | Dismiss a pending peer |
+| `GET` | `/api/p2p/doctor` | The p2p diagnostic report as plain text (`?peer=` narrows it to one peer) |
 | `GET` | `/api/version` | Version info |
 | `GET` | `/api/config` | Get app settings |
 | `PUT` | `/api/config` | Update app settings |
