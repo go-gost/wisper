@@ -48,5 +48,8 @@ test('the settings page renders the p2p diagnostic report', async ({ page }) => 
   const light = await scrollbarColor();
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   expect(await scrollbarColor()).not.toBe(light);
+  // ...and the UA's own chrome follows it (color-scheme is the app's only switch
+  // for the native scrollbars and form controls outside a shadow root).
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe('dark');
   await page.screenshot({ path: 'test-results/settings-doctor-dark.png', fullPage: true });
 });

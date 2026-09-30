@@ -10,6 +10,10 @@
 /* ── Light theme (default) ───────────────────────────────────────────────── */
 
 :root {
+  /* The app paints its own palette, so the UA must not second-guess it — this
+     is what colours the native scrollbars and form controls. */
+  color-scheme: light;
+
   /* Neutral */
   --bg: #fafafa;
   --surface: #fff;
@@ -116,6 +120,7 @@
 /* ── Dark theme ──────────────────────────────────────────────────────────── */
 
 :root.dark {
+  color-scheme: dark;
   --bg: #1a1a2e;
   --surface: #222240;
   --border: #3a3a5c;
