@@ -34,5 +34,19 @@ test('the settings page renders the p2p diagnostic report', async ({ page }) => 
     })
     .toMatch(/relay:\s+UNREACHABLE/);
 
+  // No sideways scrolling: the long relay error above wraps instead of widening
+  // the box (the vertical bar is the themed one, not Chromium's default).
+  expect(await out.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+
   await page.screenshot({ path: 'test-results/settings-doctor.png', fullPage: true });
+
+  // The box follows the theme — dark is a class on the root (the app sets no
+  // color-scheme, so the browser's own bar is light). The scrollbar's colour
+  // comes from a theme variable, so it must differ between the two.
+  const scrollbarColor = () =>
+    out.evaluate(el => getComputedStyle(el).getPropertyValue('scrollbar-color'));
+  const light = await scrollbarColor();
+  await page.evaluate(() => document.documentElement.classList.add('dark'));
+  expect(await scrollbarColor()).not.toBe(light);
+  await page.screenshot({ path: 'test-results/settings-doctor-dark.png', fullPage: true });
 });

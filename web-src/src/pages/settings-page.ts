@@ -466,10 +466,26 @@ export class SettingsPage extends LitElement {
       font-size: var(--font-xs);
       line-height: 1.4;
       color: var(--text);
-      white-space: pre;
-      overflow: auto;
+      /* Wrap instead of scrolling sideways: a long relay error or a peer key
+         must not widen the box (pre-wrap keeps the leading spaces, so the
+         report's label alignment survives). */
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      overflow-x: hidden;
+      overflow-y: auto;
       max-height: 420px;
+      /* A shadow root inherits no global scrollbar styling, so the browser
+         default (a light strip on the dark theme) is overridden here. */
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
     }
+    .doctor-output::-webkit-scrollbar { width: 8px; height: 8px; }
+    .doctor-output::-webkit-scrollbar-track { background: transparent; }
+    .doctor-output::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .doctor-output::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
     /* ── Switch ── */
     .switch-row {
