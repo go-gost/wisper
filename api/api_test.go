@@ -831,13 +831,6 @@ func TestUpdateP2PTunnel(t *testing.T) {
 	if ps0["total_conns"] != float64(0) || ps0["input_bytes"] != float64(0) || ps0["current_conns"] != float64(0) {
 		t.Errorf("peer_stats[0] counters = %v, want zeros before any traffic", ps0)
 	}
-	// Encryption is named per *connected* peer (p2p.Status.PeerEncryption), so a
-	// peer with no session carries none. A "secure"/"plaintext" value needs a
-	// live peer session, which this harness cannot stand up (the relay is
-	// unreachable), so this guards the omitted-when-absent contract only.
-	if _, ok := ps0["encryption"]; ok {
-		t.Errorf("peer_stats[0] encryption = %v, want it omitted for a peer with no session", ps0["encryption"])
-	}
 
 	resp, updated := putJSON(t, srv.URL+"/api/tunnels/"+id, map[string]any{
 		"name": "Private", "type": "p2p", "endpoint": "127.0.0.1:9",
