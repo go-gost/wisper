@@ -30,11 +30,16 @@ const (
 	maxGlobalEvents = 200
 )
 
-// Event is one recorded occurrence.
+// Event is one recorded occurrence. A run of identical events (same level and
+// message, nothing in between) is folded into one Event carrying a Count, so a
+// repeating condition reads as a single row with "×N" rather than a flood; the
+// Time is the run's first occurrence. A stored event written before coalescing
+// existed has Count 0 and stands for one occurrence.
 type Event struct {
 	Time    time.Time `yaml:"time" json:"time"`
 	Level   string    `yaml:"level" json:"level"`
 	Message string    `yaml:"message" json:"message"`
+	Count   int       `yaml:"count" json:"count"`
 }
 
 var store = &storeT{objects: make(map[string][]Event)}
@@ -47,22 +52,33 @@ type storeT struct {
 
 // Record appends one per-object event, dropping the oldest once the object
 // holds maxObjectEvents. An empty id is ignored: an event belonging to no
-// object would be invisible.
+// object would be invisible. A repeat of the object's last event (same level
+// and message) is folded into it instead of appended.
 func Record(id, level, format string, args ...any) {
 	if id == "" {
 		return
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	store.objects[id] = appendCapped(store.objects[id], newEvent(level, format, args...), maxObjectEvents)
+	ev := newEvent(level, format, args...)
+	if last := lastOf(store.objects[id]); last != nil && last.Level == ev.Level && last.Message == ev.Message {
+		last.Count = repeatCount(last.Count) + 1
+		return
+	}
+	store.objects[id] = appendCapped(store.objects[id], ev, maxObjectEvents)
 }
 
 // Global appends one global event, dropping the oldest once the list holds
-// maxGlobalEvents.
+// maxGlobalEvents. A repeat of the newest global event is folded into it.
 func Global(level, format string, args ...any) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	store.global = appendCapped(store.global, newEvent(level, format, args...), maxGlobalEvents)
+	ev := newEvent(level, format, args...)
+	if last := lastOf(store.global); last != nil && last.Level == ev.Level && last.Message == ev.Message {
+		last.Count = repeatCount(last.Count) + 1
+		return
+	}
+	store.global = appendCapped(store.global, ev, maxGlobalEvents)
 }
 
 func newEvent(level, format string, args ...any) Event {
@@ -72,7 +88,26 @@ func newEvent(level, format string, args ...any) Event {
 		// literal % must survive untouched.
 		msg = fmt.Sprintf(format, args...)
 	}
-	return Event{Time: time.Now(), Level: level, Message: msg}
+	return Event{Time: time.Now(), Level: level, Message: msg, Count: 1}
+}
+
+// lastOf returns the newest event in list, or nil when list is empty. The
+// pointer aliases the slice's storage, so a bump through it is seen by whoever
+// holds the slice.
+func lastOf(list []Event) *Event {
+	if len(list) == 0 {
+		return nil
+	}
+	return &list[len(list)-1]
+}
+
+// repeatCount reads a stored count as occurrences: a pre-count event (persisted
+// before coalescing existed) has 0 and stands for one occurrence.
+func repeatCount(n int) int {
+	if n < 1 {
+		return 1
+	}
+	return n
 }
 
 // appendCapped appends ev and, past max, returns a fresh slice holding only the

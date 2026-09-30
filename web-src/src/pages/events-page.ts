@@ -119,6 +119,15 @@ export class EventsPage extends LitElement {
     return rel ? `${abs} · ${rel}` : abs;
   }
 
+  /** A small "×N" badge after the message of a coalesced run (count > 1). A
+   *  one-off — or a pre-count event, which reads as 1 — gets nothing. Bare, so
+   *  it needs no translation. */
+  private _renderCount(e: WisperEvent) {
+    const n = e.count || 1;
+    if (n <= 1) return nothing;
+    return html`<span class="count">×${n}</span>`;
+  }
+
   static styles = css`
     .back-btn {
       background: none; border: none; cursor: pointer;
@@ -143,6 +152,11 @@ export class EventsPage extends LitElement {
     .dot.error { background: #f85149; }
     .body { flex: 1; min-width: 0; }
     .message { font-size: var(--font-sm); color: var(--text); word-break: break-word; }
+    .count {
+      margin-left: 6px; padding: 1px 6px; border-radius: var(--radius-pill);
+      background: var(--border-subtle); color: var(--text-muted);
+      font-size: var(--font-xs); white-space: nowrap;
+    }
     .time { font-size: var(--font-xs); color: var(--text-muted); white-space: nowrap; }
     .empty {
       display: flex; align-items: center; justify-content: center;
@@ -197,7 +211,7 @@ export class EventsPage extends LitElement {
           <div class="row">
             <span class="dot ${e.level}" title=${this._levelLabel(e.level)}></span>
             <div class="body">
-              <div class="message">${e.message}</div>
+              <div class="message">${e.message}${this._renderCount(e)}</div>
               <div class="time">${this._timeLabel(e)}</div>
             </div>
           </div>

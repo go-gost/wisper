@@ -8,7 +8,7 @@ import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import { GoBackend } from '../api/backend';
-import type { Tunnel, TunnelType, TunnelCreateRequest } from '../api/types';
+import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent } from '../api/types';
 import '../components/app-scaffold';
 
 type PageMode = 'view' | 'edit' | 'create';
@@ -184,6 +184,16 @@ export class TunnelDetailPage extends LitElement {
   private _navigate(path: string) {
     window.history.pushState({}, '', path);
     window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+
+  /** The history card's teaser line: the newest event's message, with its
+   *  coalesced repeat count appended (×N) when the run repeated; the hint when
+   *  there is no history. */
+  private _latestEventLine(events?: WisperEvent[]): string {
+    const e = (events ?? [])[0];
+    if (!e) return t('eventsEntryDesc');
+    const n = e.count || 1;
+    return n > 1 ? `${e.message} ×${n}` : e.message;
   }
 
   private _enterEdit() {
@@ -1118,9 +1128,7 @@ export class TunnelDetailPage extends LitElement {
                       <div style="flex:1;">
                         <div style="font-size:var(--font-sm);font-weight:600;">${t('eventsEntryTitle')}</div>
                         <div style="font-size:var(--font-sm);color:var(--text-muted);">
-                          ${(t2.events ?? []).length
-                            ? (t2.events ?? [])[0].message
-                            : t('eventsEntryDesc')}
+                          ${this._latestEventLine(t2.events)}
                         </div>
                       </div>
                       <span style="color:var(--text-muted);">&rarr;</span>

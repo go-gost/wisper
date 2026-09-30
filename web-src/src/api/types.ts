@@ -97,6 +97,9 @@ export interface WisperEvent {
   time: string;
   level: 'info' | 'warn' | 'error';
   message: string;
+  /** Run length of a coalesced repeat (1 for a one-off). A pre-count event
+   *  carries 0 and should be read as 1. */
+  count?: number;
 }
 
 export interface Tunnel {

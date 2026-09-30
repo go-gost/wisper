@@ -12,7 +12,7 @@ import { expect, test } from '@playwright/test';
  * which is invisible everywhere except as layout).
  */
 
-/** Seeded by scripts/ui-test.sh: the p2p tunnel carries two events and the
+/** Seeded by scripts/ui-test.sh: the p2p tunnel carries three events and the
  *  config a global pair. */
 const TUNNEL_ID = 'e2e-p2p-tunnel';
 const DETAIL = `/tunnel/p2p/${TUNNEL_ID}`;
@@ -20,6 +20,8 @@ const DETAIL = `/tunnel/p2p/${TUNNEL_ID}`;
 /** Newest first, so the drop sits above the connection it followed. */
 const NEWEST = 'peer laptop: direct session dropped (2)';
 const OLDER = 'peer laptop: connected (direct)';
+/** A coalesced run (count 4 in the fixture): its row must show the ×N badge. */
+const COALESCED = 'peer phone: punch failed (24)';
 
 /** A sub-pixel difference is layout rounding, not a layout bug. */
 const SAME_WIDTH = 0.5;
@@ -72,6 +74,12 @@ test('the events page lists the object history, newest first', async ({ page }) 
   await expect(
     page.locator('.row').filter({ hasText: NEWEST }).locator('.dot.warn'),
   ).toBeVisible();
+
+  // A coalesced run carries its count: the seeded event has count 4, so its row
+  // shows ×4 — the count reaching the DOM, not just the API.
+  await expect(
+    page.locator('.row').filter({ hasText: COALESCED }).locator('.count'),
+  ).toHaveText('×4');
 
   await page.screenshot({ path: 'test-results/events-tunnel.png', fullPage: true });
 });

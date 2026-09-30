@@ -122,6 +122,10 @@ tunnels:
       - time: 2026-01-15T11:00:00Z
         level: info
         message: "peer laptop: connected (direct)"
+      - time: 2026-01-15T11:02:00Z
+        level: warn
+        message: "peer phone: punch failed (24)"
+        count: 4
       - time: 2026-01-15T11:05:00Z
         level: warn
         message: "peer laptop: direct session dropped (2)"
