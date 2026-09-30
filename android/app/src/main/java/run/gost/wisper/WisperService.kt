@@ -38,6 +38,10 @@ class WisperService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val VPN_NOTIFICATION_ID = 2
         private const val POLL_INTERVAL_MS = 2000L
+        // How long an armed (but unclaimed) device is held before it expires:
+        // longer than the UI's own 20s arm wait, so a start that is in flight
+        // is never cut off, short enough that an abandoned arm releases.
+        private const val ARM_TTL_MS = 60_000L
         private const val BACKEND_URL = "http://127.0.0.1:8900"
     }
 
@@ -68,6 +72,10 @@ class WisperService : Service() {
     @Volatile
     private var armedOptions: JSONObject? = null
 
+    /** When [armedOptions] was set, so an arm nothing ever claims expires. */
+    @Volatile
+    private var armedAt = 0L
+
     /** Whether the foreground promotion for a VPN has already been done; the
      *  service type cannot be taken back, and asking for it twice is noise. */
     @Volatile
@@ -85,6 +93,7 @@ class WisperService : Service() {
             put("mtu", mtu)
             put("dns", dns)
         }
+        armedAt = System.currentTimeMillis()
         kickVpn()
     }
 
@@ -109,6 +118,17 @@ class WisperService : Service() {
     private fun ensureVpn() {
         try {
             val running = runningTunEntrypoint()?.optJSONObject("options")
+
+            // An arm nothing claims must not pin the device forever: the UI arms
+            // and then starts the entrypoint within its own wait, so a longer
+            // gap means the arm was abandoned (a form that armed but was never
+            // saved, a start that failed).
+            if (armedOptions != null && running == null &&
+                System.currentTimeMillis() - armedAt > ARM_TTL_MS
+            ) {
+                armedOptions = null
+            }
+
             val armed = armedOptions
 
             // The form's armed values exist to give an entrypoint that is about
@@ -133,14 +153,13 @@ class WisperService : Service() {
 
             val device = deviceOf(opts)
             if (VpnStatus.established && VpnStatus.config == device.config()) {
-                // The device now exists for exactly the values that were asked
-                // for, so a form's armed values have served their purpose: they
-                // exist only to get an entrypoint its device before it starts.
-                // Keeping them would keep the VPN up after that entrypoint is
-                // stopped — a page that arms on load, a save whose entrypoint is
-                // then deleted, anything. From here the running entrypoint (or
-                // nothing) decides, and nothing means release.
-                armedOptions = null
+                // The armed values stay while the device is up: they are what
+                // holds it here until the entrypoint they were armed for is
+                // running. Clearing them as soon as the device existed released
+                // it on the next tick — before the UI's start reached the
+                // backend — so a stopped tun entrypoint could not start at all.
+                // They are cleared when the running entrypoint matches them, or
+                // by the TTL above.
                 // A device is up: a consent lost since (the user or another VPN
                 // took it away) deserves a fresh nudge, not the old flag.
                 vpnNudged = false
