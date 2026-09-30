@@ -539,6 +539,7 @@ export class TunnelPeersPage extends LitElement {
     .peer-stats {
       display: flex;
       gap: 16px;
+      align-items: flex-start;
       padding-top: 6px;
       font-size: var(--font-xs);
       color: var(--text-muted);
@@ -546,7 +547,10 @@ export class TunnelPeersPage extends LitElement {
     .peer-stats .muted {
       font-style: italic;
     }
+    /* The rate sits on its own line under the byte count: on a narrow screen a
+       single line of "↓ 400.2 KB 0 B/s" has no room and wraps awkwardly. */
     .peer-stats .rate {
+      display: block;
       color: var(--text-muted);
       opacity: 0.8;
     }
