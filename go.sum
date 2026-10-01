@@ -54,6 +54,8 @@ github.com/go-gost/tls-dissector v0.3.1 h1:gvOteWog5pjY/HCpc8l+gngmSi8Q6zl5rRrfK
 github.com/go-gost/tls-dissector v0.3.1/go.mod h1:vGfog053fIm93iXBtvmVzMQqEJo5YwbbNaPNVDjbiOc=
 github.com/go-gost/x v0.19.1 h1:Kw7bBEo5MCMHaPKRKF5fdzn9dCozjVwjx7Z26Fxd7yw=
 github.com/go-gost/x v0.19.1/go.mod h1:YknNANia9Jzp5/TgPzGN6tcVir0WbapexBOird+4s0U=
+github.com/go-gost/x v0.19.2 h1:js67iGg3s6xXbb9pmMaNvbcaTHxFtLL8G6E46lM4EZs=
+github.com/go-gost/x v0.19.2/go.mod h1:YknNANia9Jzp5/TgPzGN6tcVir0WbapexBOird+4s0U=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
