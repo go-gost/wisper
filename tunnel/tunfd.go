@@ -22,7 +22,13 @@ var (
 // Android VpnService) and wakes anything waiting for one. The fd becomes ours:
 // it is closed when it is replaced or cleared, so the caller must have given up
 // its own copy. Pass a negative fd to release the device.
-func SetTunFD(fd int) {
+//
+// reason names the call site that handed the fd over (an Android service
+// method — "onRevoke", "TunVpnService.release", …). It is carried through the
+// JNI so the Go line reads beside logcat's wisper-tunfd lines and "who released
+// the device" has an answer on both sides; the logcat record proved unreliable
+// on the device, this one did not. Empty when the caller has no name to give.
+func SetTunFD(fd int, reason string) {
 	tunFDMu.Lock()
 	prev := tunFD
 	tunFD = fd
@@ -34,12 +40,17 @@ func SetTunFD(fd int) {
 	// wisper-tunfd lines and "who has the device" has an answer on both sides:
 	// the Android side says which site gave it up, this says what arrived here
 	// (and which earlier copy it replaced). Released as well as set, because a
-	// release is what stops the Go reader.
+	// release is what stops the Go reader. The reason is appended only when
+	// there is one, so a caller that names nothing reads exactly as before.
+	op := "release"
 	if fd > 0 {
-		slog.Info("tunfd", "op", "set", "fd", fd, "prev", prev)
-	} else {
-		slog.Info("tunfd", "op", "release", "fd", fd, "prev", prev)
+		op = "set"
 	}
+	attrs := []any{"op", op, "fd", fd, "prev", prev}
+	if reason != "" {
+		attrs = append(attrs, "reason", reason)
+	}
+	slog.Info("tunfd", attrs...)
 
 	// Closed through os, not syscall.Close: that one takes a Windows Handle on
 	// a Windows build, and this descriptor is only ever an Android one.

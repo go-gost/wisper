@@ -7,7 +7,12 @@ package main
 */
 import "C"
 
-import "github.com/go-gost/wisper/tunnel"
+import (
+	"log/slog"
+
+	"github.com/go-gost/wisper/api"
+	"github.com/go-gost/wisper/tunnel"
+)
 
 //export wisperStartGo
 func wisperStartGo(configDirC *C.char, addrC *C.char) C.int {
@@ -23,8 +28,17 @@ func wisperStopGo() {
 }
 
 //export wisperSetTunFdGo
-func wisperSetTunFdGo(fd C.int) {
-	tunnel.SetTunFD(int(fd))
+func wisperSetTunFdGo(fd C.int, reason *C.char) {
+	// C.GoString(nil) is "", so an older caller that sends no reason logs exactly
+	// as it did before the reason existed.
+	tunnel.SetTunFD(int(fd), C.GoString(reason))
+}
+
+//export wisperVpnTakenGo
+func wisperVpnTakenGo() {
+	if name, ok := api.StopForVpnTaken(); ok {
+		slog.Info("vpn taken by another app: stopped tun entrypoint", "name", name)
+	}
 }
 
 // main is required by -buildmode=c-shared; never called directly.

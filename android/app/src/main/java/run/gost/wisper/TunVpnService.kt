@@ -2,6 +2,8 @@ package run.gost.wisper
 
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -101,7 +103,7 @@ class TunVpnService : VpnService() {
         // device, so an entrypoint restart keeps working without a new VPN.
         val fd = pfd.detachFd()
         Log.i(TUNFD_TAG, "set: TunVpnService.establish fd=$fd (device established)")
-        WisperJNI.setTunFd(fd)
+        WisperJNI.setTunFd(fd, "TunVpnService.establish")
         VpnStatus.established = true
         VpnStatus.config = device.config()
         Log.i(TAG, "VPN established for ${device.net}")
@@ -116,7 +118,7 @@ class TunVpnService : VpnService() {
         if (VpnStatus.established) {
             Log.i(TAG, "releasing the VPN device")
             Log.i(TUNFD_TAG, "release: TunVpnService.release fd=-1 (device no longer needed)")
-            WisperJNI.setTunFd(-1)
+            WisperJNI.setTunFd(-1, "TunVpnService.release")
         }
         VpnStatus.established = false
         VpnStatus.config = null
@@ -124,17 +126,46 @@ class TunVpnService : VpnService() {
     }
 
     /**
-     * The system tore the VPN down (another VPN took over, or the user
-     * disconnected it). The fd is gone with it, so drop it: the backend's poll
-     * asks for a new device while a tun entrypoint is running.
+     * The system tore the VPN down. Two cases, and this is the one moment they
+     * can be told apart: if a VPN is still up it belongs to another app, so the
+     * user switched — we yield and stop the entrypoint that held the device;
+     * otherwise our own VPN was switched off (system settings, a killed
+     * service) and the backend's poll is left to bring it back.
      */
     override fun onRevoke() {
-        Log.w(TAG, "VPN revoked by the system")
-        Log.w(TUNFD_TAG, "release: TunVpnService.onRevoke fd=-1 (system revoked)")
+        // Android revoked *our* VPN, so any VPN still up belongs to another app.
+        val takenByOther = otherVpnActive()
+        Log.w(TAG, "VPN revoked by the system (another VPN active: $takenByOther)")
+        Log.w(TUNFD_TAG, "release: TunVpnService.onRevoke fd=-1 (revoked, otherVpn=$takenByOther)")
         VpnStatus.established = false
         VpnStatus.config = null
-        WisperJNI.setTunFd(-1)
+        WisperJNI.setTunFd(-1, "onRevoke")
+        if (takenByOther) {
+            // A deliberate switch: racing it back would undo the user's choice
+            // and ping-pong with the other app (each establish() revokes the
+            // other). The stamp invalidates any arm that predates the takeover,
+            // so the poller cannot re-establish from it; the backend stops the
+            // entrypoint that held the device, and with the arm dropped nothing
+            // wants a device again.
+            VpnStatus.takenAt = System.currentTimeMillis()
+            WisperJNI.vpnTaken()
+        }
         super.onRevoke()
+    }
+
+    /**
+     * True when another app holds a VPN right now. A revoked VPN must never
+     * take the process down, so every failure reads as "no".
+     */
+    private fun otherVpnActive(): Boolean = try {
+        getSystemService(ConnectivityManager::class.java)?.let { cm ->
+            cm.allNetworks.any {
+                cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            }
+        } ?: false
+    } catch (e: Exception) {
+        Log.w(TAG, "vpn probe failed", e)
+        false
     }
 
     /**
@@ -200,6 +231,14 @@ object VpnStatus {
     /** The device the running VPN was built from, to notice a changed one. */
     @Volatile
     var config: String? = null
+
+    /**
+     * When the VPN was taken by another app (onRevoke saw one active), as
+     * System.currentTimeMillis(); 0 = never. It dates the takeover so an arm
+     * older than it can be dropped — see WisperService.ensureVpn.
+     */
+    @Volatile
+    var takenAt = 0L
 
     /**
      * The fields that define a device. The form's armed values and an

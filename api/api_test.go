@@ -1158,6 +1158,59 @@ func TestLifecycleRecordsEvents(t *testing.T) {
 	}
 }
 
+// TestStopForVpnTakenStopsTheHolder: a VPN handed to another app takes the
+// device with it, so the entrypoint that held it must stop — with a warn event
+// saying why — and a second call must find nobody left to stop.
+func TestStopForVpnTakenStopsTheHolder(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	// Created but not started: the seam only needs the entrypoint to be
+	// registered and to hold the device, which the claim below does exactly as
+	// a running Android tun entrypoint would.
+	ep := entrypoint.NewTunEntryPoint(
+		tunnel.NameOption("spoke"),
+		tunnel.PeerOption("dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"),
+	)
+	entrypoint.Add(ep)
+	id := ep.ID()
+	defer tunnel.ReleaseTunDevice(id)
+
+	if owner, ok := tunnel.ClaimTunDevice(id, ep.Name()); !ok {
+		t.Fatalf("claim device: already held by %q", owner)
+	}
+
+	name, ok := StopForVpnTaken()
+	if !ok || name != ep.Name() {
+		t.Fatalf("StopForVpnTaken = (%q, %v), want (%q, true)", name, ok, ep.Name())
+	}
+	if holder := entrypoint.Get(id); holder == nil || !holder.IsClosed() {
+		t.Fatal("the holder is still running")
+	}
+	if evs := event.List(id); len(evs) == 0 || evs[len(evs)-1].Level != event.LevelWarn {
+		t.Fatalf("events = %+v, want a trailing warn", evs)
+	}
+
+	// The holder let the device go on the way out, so there is nobody to report.
+	if name, ok := StopForVpnTaken(); ok || name != "" {
+		t.Fatalf("second StopForVpnTaken = (%q, %v), want (\"\", false)", name, ok)
+	}
+}
+
+// TestStopForVpnTakenNoHolder: with no device claimed, the taken path is a
+// no-op rather than a stop of some unrelated entrypoint.
+func TestStopForVpnTakenNoHolder(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	if id, _ := tunnel.TunDeviceOwner(); id != "" {
+		t.Fatalf("a previous case left the device claimed by %q", id)
+	}
+	if name, ok := StopForVpnTaken(); ok || name != "" {
+		t.Fatalf("StopForVpnTaken with no holder = (%q, %v), want (\"\", false)", name, ok)
+	}
+}
+
 func TestGlobalEventsEndpoint(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()

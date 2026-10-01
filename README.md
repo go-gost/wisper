@@ -245,6 +245,10 @@ make android-release
 web UI, the toolchain image builds `libwisper.so` via the NDK and the APK via
 Gradle, and a `scratch` stage hands back just the APK.
 
+A VPN handed to another app (the user switching to it) stops the tun entrypoint
+that held the device instead of racing the other app for it; a revoke with no
+other VPN keeps the automatic re-establish.
+
 ## Architecture
 
 ```

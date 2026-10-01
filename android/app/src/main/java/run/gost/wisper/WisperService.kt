@@ -119,6 +119,14 @@ class WisperService : Service() {
         try {
             val running = runningTunEntrypoint()?.optJSONObject("options")
 
+            // An arm that predates a takeover is stale: its device was taken
+            // from under it, so re-establishing from it would race the app the
+            // user switched to. A *newer* arm (the user starting an entrypoint)
+            // is what the user wants and survives.
+            if (armedOptions != null && VpnStatus.takenAt > armedAt) {
+                armedOptions = null
+            }
+
             // An arm nothing claims must not pin the device forever: the UI arms
             // and then starts the entrypoint within its own wait, so a longer
             // gap means the arm was abandoned (a form that armed but was never
@@ -268,7 +276,7 @@ class WisperService : Service() {
         // The backend is stopping, so nothing will read the device again: the
         // release is named here, or a stopped backend would read like a revoke.
         Log.i(TUNFD_TAG, "release: WisperService.onDestroy fd=-1 (backend stopping)")
-        WisperJNI.setTunFd(-1)
+        WisperJNI.setTunFd(-1, "WisperService.onDestroy")
         WisperJNI.stop()
         super.onDestroy()
     }

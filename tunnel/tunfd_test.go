@@ -3,7 +3,10 @@
 package tunnel
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -29,10 +32,10 @@ func isOpen(fd int) bool {
 }
 
 func TestTunFDPresentAndReplaced(t *testing.T) {
-	defer SetTunFD(-1)
+	defer SetTunFD(-1, "")
 
 	first := openTestFD(t)
-	SetTunFD(first)
+	SetTunFD(first, "test.establish")
 	if got := WaitTunFD(time.Second); got != first {
 		t.Fatalf("WaitTunFD = %d, want %d", got, first)
 	}
@@ -40,7 +43,7 @@ func TestTunFDPresentAndReplaced(t *testing.T) {
 	// A replaced fd is the platform's to hand back: the old one is dead, so a
 	// running device cannot be fooled into reading it.
 	second := openTestFD(t)
-	SetTunFD(second)
+	SetTunFD(second, "test.establish")
 	if got := WaitTunFD(time.Second); got != second {
 		t.Fatalf("WaitTunFD after replace = %d, want %d", got, second)
 	}
@@ -52,17 +55,41 @@ func TestTunFDPresentAndReplaced(t *testing.T) {
 	}
 }
 
-func TestWaitTunFDWakesOnSet(t *testing.T) {
-	defer SetTunFD(-1)
+// TestSetTunFDLogsReason: the hand-off line names the call site that caused it,
+// so a release can be attributed from the Go log alone — and a caller with no
+// name to give reads exactly as before (no reason field).
+func TestSetTunFDLogsReason(t *testing.T) {
+	defer SetTunFD(-1, "")
 
-	SetTunFD(-1)
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	buf.Reset()
+	SetTunFD(-1, "onRevoke")
+	if got := buf.String(); !strings.Contains(got, "op=release") || !strings.Contains(got, "reason=onRevoke") {
+		t.Fatalf("log = %q, want a release naming onRevoke", got)
+	}
+
+	buf.Reset()
+	SetTunFD(-1, "")
+	if got := buf.String(); strings.Contains(got, "reason=") {
+		t.Fatalf("log = %q, want no reason field when none was given", got)
+	}
+}
+
+func TestWaitTunFDWakesOnSet(t *testing.T) {
+	defer SetTunFD(-1, "")
+
+	SetTunFD(-1, "")
 
 	got := make(chan int, 1)
 	go func() { got <- WaitTunFD(5 * time.Second) }()
 
 	time.Sleep(50 * time.Millisecond)
 	fd := openTestFD(t)
-	SetTunFD(fd)
+	SetTunFD(fd, "test.establish")
 
 	select {
 	case n := <-got:
@@ -75,9 +102,9 @@ func TestWaitTunFDWakesOnSet(t *testing.T) {
 }
 
 func TestWaitTunFDTimeout(t *testing.T) {
-	defer SetTunFD(-1)
+	defer SetTunFD(-1, "")
 
-	SetTunFD(-1)
+	SetTunFD(-1, "")
 	start := time.Now()
 	if got := WaitTunFD(50 * time.Millisecond); got != -1 {
 		t.Fatalf("WaitTunFD = %d, want -1", got)
