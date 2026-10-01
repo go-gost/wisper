@@ -447,6 +447,12 @@ export class SettingsPage extends LitElement {
       color: var(--text);
       word-break: break-all;
     }
+    /* A hidden key stays one line however long it is (a masked key is as long as
+       the key it hides), the way the entrypoint detail page already shows a
+       masked peer. Revealed, it wraps: that is when it is meant to be read. */
+    .identity-key.masked {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .identity-key.muted { color: var(--text-muted); }
     .copy-btn-mini {
       background: none; border: none; cursor: pointer;
@@ -698,7 +704,7 @@ export class SettingsPage extends LitElement {
               <div class="form-group">
                 <label class="form-label">${t('p2pIdentity')}</label>
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <span class="identity-key">${this._showP2PKey ? this._p2pPublicKey : maskKey(this._p2pPublicKey)}</span>
+                  <span class="identity-key ${this._showP2PKey ? '' : 'masked'}">${this._showP2PKey ? this._p2pPublicKey : maskKey(this._p2pPublicKey)}</span>
                   <button class="copy-btn-mini" title="${t('qrCode')}" @click=${() => { this._qrKey = this._p2pPublicKey; }}>
                     ${icon('qr')}
                   </button>
