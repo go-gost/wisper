@@ -190,10 +190,13 @@ func (s *udpEntryPoint) Run() (err error) {
 
 	go func() {
 		serveErr := s.forward.Serve()
-		if serveErr != nil {
-			log.Error("udp entrypoint serve error", "err", serveErr)
+		if tunnel.CleanStop(serveErr) {
+			log.Info("udp entrypoint stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("udp entrypoint stopped with error: %v", serveErr)
+			s.setErr(serveErr)
 		}
-		s.setErr(serveErr)
 	}()
 
 	return nil

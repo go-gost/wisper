@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-gost/core/listener"
 	"github.com/go-gost/core/service"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
@@ -721,4 +722,14 @@ func createTunnel(st string, opts Options) (t Tunnel) {
 	t.SetStats(opts.Stats)
 	t.SetStatsBaseline(opts.StatsBaseline)
 	return
+}
+
+// CleanStop reports whether a service's Serve returned because it was closed
+// rather than because it failed. Stopping a tunnel or an entrypoint closes its
+// listener, and a closed listener answers with core's listener.ErrClosed;
+// net.ErrClosed covers the paths that wrap the socket instead. A deliberate stop
+// must not leave an error behind — neither in the log, where it reads like a
+// failure, nor in the entrypoint's error field, which the UI shows.
+func CleanStop(err error) bool {
+	return err == nil || errors.Is(err, listener.ErrClosed) || errors.Is(err, net.ErrClosed)
 }

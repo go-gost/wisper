@@ -318,10 +318,13 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 
 	go func() {
 		serveErr := forward.Serve()
-		if serveErr != nil {
-			log.Error("tun entrypoint serve error", "err", serveErr)
+		if tunnel.CleanStop(serveErr) {
+			log.Info("tun entrypoint stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("tun entrypoint stopped with error: %v", serveErr)
+			s.setErr(serveErr)
 		}
-		s.setErr(serveErr)
 	}()
 
 	return nil

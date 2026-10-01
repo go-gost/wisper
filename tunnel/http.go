@@ -227,12 +227,13 @@ func (s *httpTunnel) Run() (err error) {
 
 	go func() {
 		serveErr := s.forward.Serve()
-		if serveErr != nil {
-			log.Error("http tunnel forwarder stopped with error", "err", serveErr)
-		} else {
+		if CleanStop(serveErr) {
 			log.Info("http tunnel forwarder stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("http tunnel forwarder stopped with error: %v", serveErr)
+			s.setErr(serveErr)
 		}
-		s.setErr(serveErr)
 	}()
 
 	// Wait for the initial relay bind so the entrypoint URL reflects the

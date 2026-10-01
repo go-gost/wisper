@@ -319,10 +319,13 @@ func (s *p2pTunnel) RunContext(ctx context.Context) (err error) {
 
 	go func() {
 		serveErr := forward.Serve()
-		if serveErr != nil {
-			log.Error("p2p tunnel serve error", "err", serveErr)
+		if CleanStop(serveErr) {
+			log.Info("p2p tunnel stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("p2p tunnel stopped with error: %v", serveErr)
+			s.setErr(serveErr)
 		}
-		s.setErr(serveErr)
 	}()
 
 	return nil

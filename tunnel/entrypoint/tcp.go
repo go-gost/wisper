@@ -186,10 +186,13 @@ func (s *tcpEntryPoint) Run() (err error) {
 
 	go func() {
 		serveErr := s.forward.Serve()
-		if serveErr != nil {
-			log.Error("tcp entrypoint serve error", "err", serveErr)
+		if tunnel.CleanStop(serveErr) {
+			log.Info("tcp entrypoint stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("tcp entrypoint stopped with error: %v", serveErr)
+			s.setErr(serveErr)
 		}
-		s.setErr(serveErr)
 	}()
 
 	return nil

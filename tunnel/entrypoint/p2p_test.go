@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	cfg "github.com/go-gost/wisper/config"
 	tp "github.com/go-gost/wisper/tunnel"
@@ -64,6 +65,15 @@ func TestP2PEntryPointLifecycle(t *testing.T) {
 	}
 	if err := ep.Close(); err != nil {
 		t.Fatalf("second Close: %v", err)
+	}
+	// A closed listener is how a deliberate stop ends, not a failure: the field
+	// behind the entrypoint's error line must stay empty. The serve goroutine
+	// stores it asynchronously, so give it the moment it needs — with the
+	// classification removed this shows up within it, which is what makes the
+	// assertion mean something.
+	time.Sleep(50 * time.Millisecond)
+	if err := ep.Err(); err != nil {
+		t.Fatalf("a stopped entrypoint carries an error: %v", err)
 	}
 	if registry.P2PRegistry().IsRegistered("p2p-ep-test-p2p-ep") {
 		t.Fatal("provider still registered after Close")

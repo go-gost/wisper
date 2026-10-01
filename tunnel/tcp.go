@@ -187,10 +187,13 @@ func (s *tcpTunnel) Run() (err error) {
 
 	go func() {
 		serveErr := s.forward.Serve()
-		if serveErr != nil {
-			log.Error("tcp tunnel serve error", "err", serveErr)
+		if CleanStop(serveErr) {
+			log.Info("tcp tunnel stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("tcp tunnel stopped with error: %v", serveErr)
+			s.setErr(serveErr)
 		}
-		s.setErr(serveErr)
 	}()
 
 	return nil

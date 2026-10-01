@@ -237,20 +237,21 @@ func (s *fileTunnel) Run() (err error) {
 
 	go func() {
 		serveErr := s.file.Serve()
-		if serveErr != nil {
-			log.Error("file server stopped with error", "err", serveErr)
-		} else {
+		if CleanStop(serveErr) {
 			log.Info("file server stopped")
+		} else {
+			log.Errorf("file server stopped with error: %v", serveErr)
 		}
 	}()
 	go func() {
 		serveErr := s.forward.Serve()
-		if serveErr != nil {
-			log.Error("file tunnel forwarder stopped with error", "err", serveErr)
-		} else {
+		if CleanStop(serveErr) {
 			log.Info("file tunnel forwarder stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("file tunnel forwarder stopped with error: %v", serveErr)
+			s.setErr(serveErr)
 		}
-		s.setErr(serveErr)
 	}()
 
 	// Wait for the initial relay bind so the entrypoint URL reflects the
