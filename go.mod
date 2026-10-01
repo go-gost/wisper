@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/go-gost/core v0.6.1
-	github.com/go-gost/p2p v0.9.1
+	github.com/go-gost/p2p v0.10.0
 	github.com/go-gost/x v0.19.1
 	github.com/google/uuid v1.6.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -19,7 +19,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-gost/gosocks5 v0.5.0 // indirect
-	github.com/go-gost/plugin v0.9.0 // indirect
+	github.com/go-gost/plugin v0.10.0 // indirect
 	github.com/go-gost/quic-dissector v0.1.0 // indirect
 	github.com/go-gost/relay v0.7.0 // indirect
 	github.com/go-gost/tls-dissector v0.3.1 // indirect
