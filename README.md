@@ -245,9 +245,12 @@ make android-release
 web UI, the toolchain image builds `libwisper.so` via the NDK and the APK via
 Gradle, and a `scratch` stage hands back just the APK.
 
-A VPN handed to another app (the user switching to it) stops the tun entrypoint
-that held the device instead of racing the other app for it; a revoke with no
-other VPN keeps the automatic re-establish.
+A revoked VPN — another app replaced it, or the user or the system disconnected
+it — stops the tun entrypoint that held the device instead of racing it back;
+wisper does not try to tell the two apart (the probe for "is another app's VPN
+up?" answered yes on a manual disconnect, seeing its own network still tearing
+down). Starting the entrypoint again is one tap, and that is what preempts the
+other app.
 
 ## Architecture
 

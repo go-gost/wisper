@@ -287,16 +287,18 @@ VpnService clears a VPN: releasing the fd leaves the system routing through a VP
 gone, which blackholes every app's traffic. It stops itself when nothing needs it, so a user with no
 running tun entrypoint carries no VPN. One VPN, so one tun entrypoint.
 
-A VPN handed to another app is a deliberate switch and yields. `TunVpnService.onRevoke` asks
-`ConnectivityManager` for `TRANSPORT_VPN` on the active networks: if another VPN is up, the entrypoint
-that held the device is stopped (`WisperJNI.vpnTaken` → `api.StopForVpnTaken`, which records a warn
-event) instead of racing the other app back — racing undoes the user's switch and ping-pongs with it,
-since each `establish()` revokes the other side; a revoke with no other VPN keeps the automatic
-re-establish (a transient hiccup). The resulting `VpnStatus.takenAt` stamp invalidates any
+A revoked VPN stops the tun entrypoint that held the device: `TunVpnService.onRevoke` hands the
+device back and calls `WisperJNI.vpnTaken` → `api.StopForVpnRevoke`, which stops that entrypoint and
+records a warn event. Racing the revoke back would undo whichever choice produced it and ping-pong
+with another VPN app (each `establish()` revokes the other side). The two cases — another app
+replaced ours, or the user or the system disconnected it — are deliberately **not** told apart: the
+probe for "is another app's VPN up?" (`TRANSPORT_VPN` over the active networks) was measured to
+answer yes on a manual disconnect, reporting wisper's own network while it was still tearing down, so
+the permission and the probe are gone and the revoke itself is the signal. Restarting the entrypoint
+is one tap and is what preempts another app. The `VpnStatus.takenAt` stamp invalidates any
 `armedOptions` older than it, so the poller cannot re-establish from a dead arm, while a *newer* arm
-(the user starting an entrypoint) survives and legitimately preempts the other app. `setTunFd(fd,
-reason)` carries the Kotlin call site through the JNI into the Go `tunfd` log line, so a release can
-be attributed from the app log alone.
+(the user starting an entrypoint) survives. `setTunFd(fd, reason)` carries the Kotlin call site
+through the JNI into the Go `tunfd` log line, so a release can be attributed from the app log alone.
 
 The app process has neither `$XDG_CONFIG_HOME` nor `$HOME`: every path it derives must come from the
 config directory the app passes to `config.Init` (`config.Dir()`), not from `os.UserConfigDir()`.

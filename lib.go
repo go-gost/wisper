@@ -36,8 +36,8 @@ func wisperSetTunFdGo(fd C.int, reason *C.char) {
 
 //export wisperVpnTakenGo
 func wisperVpnTakenGo() {
-	if name, ok := api.StopForVpnTaken(); ok {
-		slog.Info("vpn taken by another app: stopped tun entrypoint", "name", name)
+	if name, ok := api.StopForVpnRevoke(); ok {
+		slog.Info("vpn revoked by the system: stopped tun entrypoint", "name", name)
 	}
 }
 

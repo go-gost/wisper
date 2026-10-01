@@ -8,22 +8,23 @@ import (
 	"github.com/go-gost/wisper/tunnel/entrypoint"
 )
 
-// StopForVpnTaken stops the tun entrypoint that holds the VPN device, because
-// the device was taken from under it: another app now owns the VPN. Android
-// reports that as a revoke of ours while the other app's VPN is up, and it is
-// the one moment the question — did we lose the device to someone else, or was
-// our own VPN switched off — has an unambiguous answer.
+// StopForVpnRevoke stops the tun entrypoint that holds the VPN device, because
+// the device was taken from under it: Android revoked our VPN — another app
+// replaced it, or the user or the system disconnected it. The two are not told
+// apart, because they cannot be: the probe for "is another app's VPN up?" was
+// measured to answer yes on a manual disconnect, seeing our own network still
+// tearing down. The revoke itself is unambiguous, and it is enough.
 //
-// Racing the other app back would undo the user's switch and ping-pong with it
-// (every establish() revokes the other side), so the entrypoint stops and its
-// history says why; the user starts it again when they want it. With the
-// entrypoint gone nothing wants a device, which is what keeps the poller from
-// re-establishing.
+// Racing the revoke back would undo whichever choice produced it and ping-pong
+// with another VPN app (every establish() revokes the other side), so the
+// entrypoint stops and its history says why; the user starts it again when they
+// want the tunnel. With the entrypoint gone nothing wants a device, which is
+// what keeps the poller from re-establishing.
 //
 // It returns the holder's name and true when it stopped one, and ("", false)
 // when nobody holds the device — either nothing was running or a holder already
 // stopped. The only caller is the Android JNI shim.
-func StopForVpnTaken() (string, bool) {
+func StopForVpnRevoke() (string, bool) {
 	id, name := tunnel.TunDeviceOwner()
 	if id == "" {
 		return "", false
@@ -40,7 +41,7 @@ func StopForVpnTaken() (string, bool) {
 	// Close releases the device, so a second call finds nobody — the loop
 	// cannot restart itself.
 	ep.Close()
-	event.Record(id, event.LevelWarn, "VPN handed to another app — stopped")
+	event.Record(id, event.LevelWarn, "VPN revoked by the system — stopped")
 	if err := entrypoint.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}

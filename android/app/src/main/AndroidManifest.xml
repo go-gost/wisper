@@ -8,9 +8,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- onRevoke asks ConnectivityManager whether another VPN is up
-         (TRANSPORT_VPN); a normal permission, no prompt. -->
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Storage: READ_EXTERNAL_STORAGE for API < 33; MANAGE_EXTERNAL_STORAGE
          for API 30+ (full file access, needed by File tunnel to serve

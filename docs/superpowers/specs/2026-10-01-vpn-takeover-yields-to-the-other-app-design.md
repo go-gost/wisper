@@ -89,3 +89,19 @@ Two supporting pieces, both small:
   `release … reason=onRevoke` once, then **no** `set` until the user starts the
   entrypoint again, plus a warn event on the entrypoint explaining the stop.
   Before the change the same experiment showed `release → set` three times.
+
+## Revision (2026-10-01, after the first real revoke)
+
+The two-branch rule above was wrong in practice. On a **manual disconnect** the
+probe for "is another VPN up?" answered **yes** — it saw wisper's own network
+while it was still tearing down — so the case the branch was written for (our own
+VPN switched off, recover automatically) never reached it, and the branch it did
+reach was chosen for the wrong reason. Measured on the Pixel: `VPN revoked by the
+system (another VPN active: true)` with no other VPN present.
+
+Since the two cases cannot be told apart, they are no longer distinguished:
+**every revoke stops the entrypoint** and records why, and the user starts it
+again when they want the tunnel — which is also the behaviour asked for after the
+shadowsocks experiment. `ACCESS_NETWORK_STATE`, the probe and `otherVpnActive()`
+are gone; `api.StopForVpnTaken` became `api.StopForVpnRevoke`, whose event reads
+"VPN revoked by the system — stopped".

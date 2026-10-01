@@ -1158,10 +1158,11 @@ func TestLifecycleRecordsEvents(t *testing.T) {
 	}
 }
 
-// TestStopForVpnTakenStopsTheHolder: a VPN handed to another app takes the
-// device with it, so the entrypoint that held it must stop — with a warn event
-// saying why — and a second call must find nobody left to stop.
-func TestStopForVpnTakenStopsTheHolder(t *testing.T) {
+// TestStopForVpnRevokeStopsTheHolder: a revoked VPN takes the device with it —
+// another app replaced it, or the user or the system disconnected it — so the
+// entrypoint that held it must stop, with a warn event saying why, and a second
+// call must find nobody left to stop.
+func TestStopForVpnRevokeStopsTheHolder(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
 
@@ -1180,9 +1181,9 @@ func TestStopForVpnTakenStopsTheHolder(t *testing.T) {
 		t.Fatalf("claim device: already held by %q", owner)
 	}
 
-	name, ok := StopForVpnTaken()
+	name, ok := StopForVpnRevoke()
 	if !ok || name != ep.Name() {
-		t.Fatalf("StopForVpnTaken = (%q, %v), want (%q, true)", name, ok, ep.Name())
+		t.Fatalf("StopForVpnRevoke = (%q, %v), want (%q, true)", name, ok, ep.Name())
 	}
 	if holder := entrypoint.Get(id); holder == nil || !holder.IsClosed() {
 		t.Fatal("the holder is still running")
@@ -1192,22 +1193,22 @@ func TestStopForVpnTakenStopsTheHolder(t *testing.T) {
 	}
 
 	// The holder let the device go on the way out, so there is nobody to report.
-	if name, ok := StopForVpnTaken(); ok || name != "" {
-		t.Fatalf("second StopForVpnTaken = (%q, %v), want (\"\", false)", name, ok)
+	if name, ok := StopForVpnRevoke(); ok || name != "" {
+		t.Fatalf("second StopForVpnRevoke = (%q, %v), want (\"\", false)", name, ok)
 	}
 }
 
-// TestStopForVpnTakenNoHolder: with no device claimed, the taken path is a
+// TestStopForVpnRevokeNoHolder: with no device claimed, the revoke path is a
 // no-op rather than a stop of some unrelated entrypoint.
-func TestStopForVpnTakenNoHolder(t *testing.T) {
+func TestStopForVpnRevokeNoHolder(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
 
 	if id, _ := tunnel.TunDeviceOwner(); id != "" {
 		t.Fatalf("a previous case left the device claimed by %q", id)
 	}
-	if name, ok := StopForVpnTaken(); ok || name != "" {
-		t.Fatalf("StopForVpnTaken with no holder = (%q, %v), want (\"\", false)", name, ok)
+	if name, ok := StopForVpnRevoke(); ok || name != "" {
+		t.Fatalf("StopForVpnRevoke with no holder = (%q, %v), want (\"\", false)", name, ok)
 	}
 }
 

@@ -2,8 +2,6 @@ package run.gost.wisper
 
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -126,46 +124,30 @@ class TunVpnService : VpnService() {
     }
 
     /**
-     * The system tore the VPN down. Two cases, and this is the one moment they
-     * can be told apart: if a VPN is still up it belongs to another app, so the
-     * user switched — we yield and stop the entrypoint that held the device;
-     * otherwise our own VPN was switched off (system settings, a killed
-     * service) and the backend's poll is left to bring it back.
+     * The system took the VPN away: another app replaced it, or the user (or the
+     * system) disconnected it. The device is gone either way, so the backend is
+     * told to stop the entrypoint that held it — racing the revoke back would
+     * undo whatever choice produced it, and ping-pong with another VPN app
+     * (every establish() revokes the other side).
+     *
+     * The two cases are deliberately not told apart. The obvious probe (is a VPN
+     * still up? then it is someone else's) was measured to be wrong: on a manual
+     * disconnect it reported our own network, still tearing down, as another
+     * app's. The user starts the entrypoint again when they want the tunnel
+     * back, which is one tap and needs no guessing.
      */
     override fun onRevoke() {
-        // Android revoked *our* VPN, so any VPN still up belongs to another app.
-        val takenByOther = otherVpnActive()
-        Log.w(TAG, "VPN revoked by the system (another VPN active: $takenByOther)")
-        Log.w(TUNFD_TAG, "release: TunVpnService.onRevoke fd=-1 (revoked, otherVpn=$takenByOther)")
+        Log.w(TAG, "VPN revoked by the system")
+        Log.w(TUNFD_TAG, "release: TunVpnService.onRevoke fd=-1 (revoked)")
         VpnStatus.established = false
         VpnStatus.config = null
         WisperJNI.setTunFd(-1, "onRevoke")
-        if (takenByOther) {
-            // A deliberate switch: racing it back would undo the user's choice
-            // and ping-pong with the other app (each establish() revokes the
-            // other). The stamp invalidates any arm that predates the takeover,
-            // so the poller cannot re-establish from it; the backend stops the
-            // entrypoint that held the device, and with the arm dropped nothing
-            // wants a device again.
-            VpnStatus.takenAt = System.currentTimeMillis()
-            WisperJNI.vpnTaken()
-        }
+        // The stamp invalidates an arm that predates the revoke, so the poller
+        // cannot re-establish from one; the backend stops the entrypoint, and
+        // with the arm dropped nothing wants a device again.
+        VpnStatus.takenAt = System.currentTimeMillis()
+        WisperJNI.vpnTaken()
         super.onRevoke()
-    }
-
-    /**
-     * True when another app holds a VPN right now. A revoked VPN must never
-     * take the process down, so every failure reads as "no".
-     */
-    private fun otherVpnActive(): Boolean = try {
-        getSystemService(ConnectivityManager::class.java)?.let { cm ->
-            cm.allNetworks.any {
-                cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-            }
-        } ?: false
-    } catch (e: Exception) {
-        Log.w(TAG, "vpn probe failed", e)
-        false
     }
 
     /**
