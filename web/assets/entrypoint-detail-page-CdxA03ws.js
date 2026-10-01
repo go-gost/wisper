@@ -1,21 +1,34 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BZqqL6wR.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
-import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n as z,x as I,u as P,i as E,t as R}from"./index-BZqqL6wR.js";import{d as C,m as f,c as v,a as m,b as y,n as $,r}from"./format-D1ol0cWo.js";import{i as p}from"./app-scaffold-6Qo0KGhe.js";import{a as N}from"./transport-C44s7tI8.js";import{t as g,a as _}from"./vpn-DyEdLeZb.js";import{c as F}from"./clipboard-C3x8_sid.js";var K=Object.defineProperty,H=Object.getOwnPropertyDescriptor,o=(t,i,l,d)=>{for(var a=d>1?void 0:d?H(i,l):i,c=t.length-1,h;c>=0;c--)(h=t[c])&&(a=(d?h(i,l,a):h(a))||a);return d&&a&&K(i,l,a),a};let n=class extends x{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(w(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const l=k().find(d=>d.id===t);l&&(this._entrypoint=l,i?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??"",this._peer=t.options?.peer??"",this._protocol=t.options?.protocol==="udp"?"udp":"tcp",this._keepalive=t.options?.keepalive??!0,this._ttl=t.options?.ttl||15,this._net=t.options?.net??"",this._mtu=t.options?.mtu??0,this._deviceName=t.options?.device_name??"",this._routes=t.options?.routes??"",this._dns=t.options?.dns??""}_renderTransport(t){const i=N(t);return i?s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-C6DHg4MC.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
+import{a as x,h as w,d as k,A as v,c as e,b as s,_ as b,v as T,w as D,l as S,n as I,x as z,u as P,i as E,t as R}from"./index-C6DHg4MC.js";import{d as C,m as f,c as u,a as m,b as g,n as $,r}from"./format-KdCqoWfE.js";import{i as l}from"./app-scaffold-iRJjnjLT.js";import{a as N}from"./transport-Bb6A82xL.js";import{t as y,a as _}from"./vpn-CZU9Dfu7.js";import{c as F}from"./clipboard-C3x8_sid.js";var K=Object.defineProperty,H=Object.getOwnPropertyDescriptor,o=(t,i,p,d)=>{for(var a=d>1?void 0:d?H(i,p):i,c=t.length-1,h;c>=0;c--)(h=t[c])&&(a=(d?h(i,p,a):h(a))||a);return d&&a&&K(i,p,a),a};let n=class extends x{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._showTransportDetail=!1,this._formId="",this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(w(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_load(){const t=this.entrypointId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===t)return;const p=k().find(d=>d.id===t);p&&(this._entrypoint=p,i?(this.mode="edit",this._populateForm(p)):(this.mode!=="edit"||this._entrypoint?.id!==t)&&(this.mode="view",this._populateForm(p)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._formId="",this._showTransportDetail=!1,this._protocol="tcp",this._keepalive=!0,this._ttl=15,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns=""}_populateForm(t){this._name=t.name,this._endpoint=t.entrypoint,this._tunnelId=t.id??"",this._peer=t.options?.peer??"",this._formId!==t.id&&(this._formId=t.id??"",this._showTransportDetail=!1),this._protocol=t.options?.protocol==="udp"?"udp":"tcp",this._keepalive=t.options?.keepalive??!0,this._ttl=t.options?.ttl||15,this._net=t.options?.net??"",this._mtu=t.options?.mtu??0,this._deviceName=t.options?.device_name??"",this._routes=t.options?.routes??"",this._dns=t.options?.dns??""}_renderTransport(t){const i=N(t);return i?s`
       <div class="info-row">
         <span class="info-label">${e("p2pTransport")}</span>
-        <span class="info-value text">
+        <span class="info-value text transport-value">
           <span class="peer-badge ${i.tone}" title=${i.hint}>
-            ${p(i.icon)}<span>${i.label}</span>
+            ${l(i.icon)}<span>${i.label}</span>
           </span>
+          <button class="detail-btn" title=${e("p2pTransportDetail")}
+            aria-label=${e("p2pTransportDetail")} aria-expanded=${this._showTransportDetail?"true":"false"}
+            @click=${()=>{this._showTransportDetail=!this._showTransportDetail}}>
+            ${l("info")}
+          </button>
         </span>
       </div>
-    `:u}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const i=(t??[])[0];if(!i)return e("eventsEntryDesc");const l=i.count||1;return l>1?`${i.message} ×${l}`:i.message}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}if(this.entrypointType==="tun"){const t=g(this.entrypointId);if(t){this._showSnackbar(`${e("tunDeviceBusy")}: ${t.name}`);return}if(!await _(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(e("vpnNotReady"));return}}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this.entrypointType==="tun"?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="tun"?this._keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,ttl:this.entrypointType==="tun"?this._ttl:void 0,net:this.entrypointType==="tun"&&this._net.trim()||void 0,mtu:this.entrypointType==="tun"&&this._mtu||void 0,device_name:this.entrypointType==="tun"&&this._deviceName.trim()||void 0,routes:this.entrypointType==="tun"&&this._routes.trim()||void 0,dns:this.entrypointType==="tun"&&this._dns.trim()||void 0};this.mode==="create"?(await b(()=>import("./index-BZqqL6wR.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-BZqqL6wR.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(t){const i=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${i?": "+i:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){if(this.entrypointType==="tun"){const t=g(this.entrypointId);if(t){this._showSnackbar(`${e("tunDeviceBusy")}: ${t.name}`);return}const i=this._entrypoint?.options;if(!await _(i?.net??"",i?.routes??"",i?.mtu??0,i?.dns??"")){this._showSnackbar(e("vpnNotReady"));return}}try{await D(this.entrypointId),this._showSnackbar(e("started"))}catch(t){const i=t instanceof Error?t.message:"";this._showSnackbar(`${e("startFailed")}${i?": "+i:""}`)}}async _handleStop(){try{await z(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await F(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await I(this.entrypointId,this._resetKind),this._entrypoint&&P(this.entrypointId,this._entrypoint.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,i=t?t.stats:null,l=this._typeLabel(),d=t?.options?.peer??"";return s`
+      ${this._showTransportDetail?s`
+          <div class="info-row detail-row">
+            <span class="info-label"></span>
+            <span class="info-value text detail-text">
+              ${e("p2pTransportConnected")}${i.why?` · ${i.why}`:` · ${e("p2pTransportHint")}`}
+            </span>
+          </div>
+        `:v}
+    `:v}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const i=(t??[])[0];if(!i)return e("eventsEntryDesc");const p=i.count||1;return p>1?`${i.message} ×${p}`:i.message}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}if(this.entrypointType==="tun"){const t=y(this.entrypointId);if(t){this._showSnackbar(`${e("tunDeviceBusy")}: ${t.name}`);return}if(!await _(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(e("vpnNotReady"));return}}this._saving=!0;try{const t={name:this._name.trim(),type:this.entrypointType,endpoint:this.entrypointType==="tun"?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="tun"?this._keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,ttl:this.entrypointType==="tun"?this._ttl:void 0,net:this.entrypointType==="tun"&&this._net.trim()||void 0,mtu:this.entrypointType==="tun"&&this._mtu||void 0,device_name:this.entrypointType==="tun"&&this._deviceName.trim()||void 0,routes:this.entrypointType==="tun"&&this._routes.trim()||void 0,dns:this.entrypointType==="tun"&&this._dns.trim()||void 0};this.mode==="create"?(await b(()=>import("./index-C6DHg4MC.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.create(t)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-C6DHg4MC.js").then(i=>i.H),__vite__mapDeps([0,1])).then(i=>i.update(this.entrypointId,t)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(t){const i=t instanceof Error?t.message:"";this._showSnackbar(`${e("saveFailed")}${i?": "+i:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await D(this.entrypointId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){if(this.entrypointType==="tun"){const t=y(this.entrypointId);if(t){this._showSnackbar(`${e("tunDeviceBusy")}: ${t.name}`);return}const i=this._entrypoint?.options;if(!await _(i?.net??"",i?.routes??"",i?.mtu??0,i?.dns??"")){this._showSnackbar(e("vpnNotReady"));return}}try{await S(this.entrypointId),this._showSnackbar(e("started"))}catch(t){const i=t instanceof Error?t.message:"";this._showSnackbar(`${e("startFailed")}${i?": "+i:""}`)}}async _handleStop(){try{await I(this.entrypointId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await F(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.entrypointId,this._resetKind),this._entrypoint&&P(this.entrypointId,this._entrypoint.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return this.entrypointType.toUpperCase()}render(){const t=this._entrypoint,i=t?t.stats:null,p=this._typeLabel(),d=t?.options?.peer??"";return s`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._handleBack()}>
-            ${p("chevron-left")}
+            ${l("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${e("entrypointNewTitle")} — ${l}`:l+" Entrypoint"}
+            ${this.mode==="create"?`${e("entrypointNewTitle")} — ${p}`:p+" Entrypoint"}
           </span>
 
           ${this.mode==="view"&&t?s`
@@ -26,7 +39,7 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                 </button>`}
             `:s`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
-                ${p("check")} ${e("btnSave")}
+                ${l("check")} ${e("btnSave")}
               </button>
             `}
         </div>
@@ -44,7 +57,7 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${l} Entrypoint</span>
+                  <span class="info-value text">${p} Entrypoint</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Created</span>
@@ -55,7 +68,7 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                   <span class="info-label">Tunnel ID</span>
                   <span class="info-value uuid">${t.id??"—"}</span>
                   ${t.id?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(t.id)}>
-                      ${p("copy")}
+                      ${l("copy")}
                     </button>`:""}
                 </div>`}
                 <div class="info-row">
@@ -75,11 +88,11 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                       <span class="info-label">${e("entrypointPeerKey")}</span>
                       <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?d:f(d)}</span>
                       ${d?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(d)}>
-                          ${p("copy")}
+                          ${l("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?e("hideKey"):e("revealKey")}"
                           @click=${()=>{this._showPeer=!this._showPeer}}>
-                          ${p(this._showPeer?"eye-off":"eye")}
+                          ${l(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
                     ${this._renderTransport(t.peer_transport)}
@@ -93,11 +106,11 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                       <span class="info-label">${e("entrypointPeerKey")}</span>
                       <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?d:f(d)}</span>
                       ${d?s`<button class="copy-btn-mini" @click=${()=>this._handleCopy(d)}>
-                          ${p("copy")}
+                          ${l("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?e("hideKey"):e("revealKey")}"
                           @click=${()=>{this._showPeer=!this._showPeer}}>
-                          ${p(this._showPeer?"eye-off":"eye")}
+                          ${l(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
                     ${this._renderTransport(t.peer_transport)}
@@ -115,23 +128,23 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
               ${i?s`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${p("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(i.total_conns)}</div>
-                      <div class="stat-rate">${v(i.current_conns)} active · ${i.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${u(i.total_conns)}</div>
+                      <div class="stat-rate">${u(i.current_conns)} active · ${i.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${p("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(i.total_errs)}</div>
+                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${l("rotate-cw")}</span></div>
+                      <div class="stat-value">${u(i.total_errs)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${p("rotate-cw")}</span></div>
+                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${l("rotate-cw")}</span></div>
                       <div class="stat-value">${m(i.output_bytes)}</div>
-                      <div class="stat-rate">${y(i.output_rate_bytes)}</div>
+                      <div class="stat-rate">${g(i.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${p("rotate-cw")}</span></div>
+                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${l("rotate-cw")}</span></div>
                       <div class="stat-value">${m(i.input_bytes)}</div>
-                      <div class="stat-rate">${y(i.input_rate_bytes)}</div>
+                      <div class="stat-rate">${g(i.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
@@ -142,7 +155,7 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
                       @click=${()=>this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`)}>
-                      <span style="color:var(--accent);">${p("activity")}</span>
+                      <span style="color:var(--accent);">${l("activity")}</span>
                       <div style="flex:1;">
                         <div style="font-size:var(--font-sm);font-weight:600;">${e("eventsEntryTitle")}</div>
                         <div style="font-size:var(--font-sm);color:var(--text-muted);">
@@ -153,11 +166,11 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                     </div>
                   </div>
                 </div>
-              `:u}
+              `:v}
 
             <div class="section">
               <button class="btn-edit-bottom" @click=${()=>this._enterEdit()}>
-                ${p("edit")} ${e("btnEdit")}
+                ${l("edit")} ${e("btnEdit")}
               </button>
             </div>
           `:""}
@@ -168,7 +181,7 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
               <div class="card" style="padding:16px;">
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${l+" Entrypoint"}>
+                  <input class="form-input" readonly .value=${p+" Entrypoint"}>
                 </div>
 
                 <!-- What a tun entrypoint is and what it needs, before the fields
@@ -258,7 +271,7 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                       <span class="switch-label">${e("fieldProtocol")}</span>
                       <span class="protocol-value">
                         ${this._protocol==="udp"?e("protocolUdp"):e("protocolTcp")}
-                        ${p("chevron-right")}
+                        ${l("chevron-right")}
                       </span>
                     </div>
                     ${this._protocol==="udp"?s`
@@ -277,7 +290,7 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
-                        ${p("trash")} ${e("btnDelete")}
+                        ${l("trash")} ${e("btnDelete")}
                       </button>
                     </div>
                   `:""}
@@ -418,6 +431,21 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
     .peer-badge.warn {
       color: var(--amber);
     }
+
+    /* The badge and its ⓘ on one centered line. */
+    .transport-value { display: flex; align-items: center; gap: 6px; }
+
+    /* The badge's ⓘ: what the word means for the connection, shown on tap
+       because a phone has no hover for the badge's own tooltip. */
+    .detail-btn {
+      background: none; border: none; cursor: pointer;
+      padding: 2px; color: var(--text-muted);
+      display: inline-flex; border-radius: 3px;
+    }
+    .detail-btn:hover { background: var(--border-subtle); color: var(--text); }
+    .detail-btn svg { width: 14px; height: 14px; }
+    .detail-row { padding-top: 0; border-bottom: none; }
+    .detail-text { color: var(--text-muted); font-size: var(--font-xs); line-height: 1.5; }
 
     .info-label {
       font-size: var(--font-sm); font-weight: 600; color: var(--text-muted);
@@ -655,4 +683,4 @@ import{a as x,h as w,d as k,A as u,c as e,b as s,_ as b,v as T,w as S,l as D,n a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([$()],n.prototype,"entrypointType",2);o([$()],n.prototype,"entrypointId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_entrypoint",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_tunnelId",2);o([r()],n.prototype,"_peer",2);o([r()],n.prototype,"_showPeer",2);o([r()],n.prototype,"_protocol",2);o([r()],n.prototype,"_keepalive",2);o([r()],n.prototype,"_ttl",2);o([r()],n.prototype,"_net",2);o([r()],n.prototype,"_mtu",2);o([r()],n.prototype,"_deviceName",2);o([r()],n.prototype,"_routes",2);o([r()],n.prototype,"_dns",2);n=o([R("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
+  `;o([$()],n.prototype,"entrypointType",2);o([$()],n.prototype,"entrypointId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_entrypoint",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_tunnelId",2);o([r()],n.prototype,"_peer",2);o([r()],n.prototype,"_showPeer",2);o([r()],n.prototype,"_showTransportDetail",2);o([r()],n.prototype,"_protocol",2);o([r()],n.prototype,"_keepalive",2);o([r()],n.prototype,"_ttl",2);o([r()],n.prototype,"_net",2);o([r()],n.prototype,"_mtu",2);o([r()],n.prototype,"_deviceName",2);o([r()],n.prototype,"_routes",2);o([r()],n.prototype,"_dns",2);n=o([R("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};

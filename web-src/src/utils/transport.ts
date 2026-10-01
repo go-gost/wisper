@@ -75,6 +75,9 @@ export interface TransportStyle {
   label: string;
   /** The tooltip: the state, and why it is on the relay. */
   hint: string;
+  /** Why this peer is not on a direct path — empty when it is one. Shown as a
+   *  tappable detail, because a phone has no hover for the tooltip. */
+  why: string;
 }
 
 /** transportStyle maps a transport value to what to draw; null when unknown
@@ -90,6 +93,7 @@ export function transportStyle(value?: string): TransportStyle | null {
     tone: spec.tone,
     label,
     hint: why ? `${label} · ${why}` : t('p2pTransportHint'),
+    why,
   };
 }
 

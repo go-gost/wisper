@@ -34,6 +34,11 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _tunnelId = '';
   @state() private _peer = '';
   @state() private _showPeer = false;
+  /** Whether the transport's ⓘ detail is open. */
+  @state() private _showTransportDetail = false;
+  /** The entrypoint _populateForm last ran for. The form is repopulated on every
+   *  poll, so only a *different* entrypoint may close the transport detail. */
+  private _formId = '';
   /** A p2p entrypoint's inner protocol: 'tcp' (default) or 'udp'. */
   @state() private _protocol = 'tcp';
   /** A udp p2p entrypoint's listener keepalive: hold a client's session
@@ -105,6 +110,8 @@ export class EntrypointDetailPage extends LitElement {
     this._endpoint = '';
     this._tunnelId = '';
     this._peer = '';
+    this._formId = '';
+    this._showTransportDetail = false;
     this._protocol = 'tcp';
     this._keepalive = true;
     this._ttl = 15;
@@ -120,6 +127,10 @@ export class EntrypointDetailPage extends LitElement {
     this._endpoint = ep.entrypoint;
     this._tunnelId = ep.id ?? '';
     this._peer = ep.options?.peer ?? '';
+    if (this._formId !== ep.id) {
+      this._formId = ep.id ?? '';
+      this._showTransportDetail = false;
+    }
     this._protocol = ep.options?.protocol === 'udp' ? 'udp' : 'tcp';
     this._keepalive = ep.options?.keepalive ?? true;
     this._ttl = ep.options?.ttl || 15;
@@ -130,19 +141,37 @@ export class EntrypointDetailPage extends LitElement {
     this._dns = ep.options?.dns ?? '';
   }
 
-  /** _renderTransport is the peer's path: one word, with the reason on hover. */
+  /** _renderTransport is the peer's path: one word, plus a tappable ⓘ whose
+   *  detail says what the word means for the connection. The badge's reason
+   *  also lives in its tooltip — but a phone has no hover, so without the tap a
+   *  grey 中继 reads as "not connected" rather than "connected, on the relay". */
   private _renderTransport(value?: string) {
     const st = transportStyle(value);
     if (!st) return nothing;
     return html`
       <div class="info-row">
         <span class="info-label">${t('p2pTransport')}</span>
-        <span class="info-value text">
+        <span class="info-value text transport-value">
           <span class="peer-badge ${st.tone}" title=${st.hint}>
             ${icon(st.icon)}<span>${st.label}</span>
           </span>
+          <button class="detail-btn" title=${t('p2pTransportDetail')}
+            aria-label=${t('p2pTransportDetail')} aria-expanded=${this._showTransportDetail ? 'true' : 'false'}
+            @click=${() => { this._showTransportDetail = !this._showTransportDetail; }}>
+            ${icon('info')}
+          </button>
         </span>
       </div>
+      ${this._showTransportDetail
+        ? html`
+          <div class="info-row detail-row">
+            <span class="info-label"></span>
+            <span class="info-value text detail-text">
+              ${t('p2pTransportConnected')}${st.why ? ` · ${st.why}` : ` · ${t('p2pTransportHint')}`}
+            </span>
+          </div>
+        `
+        : nothing}
     `;
   }
 
@@ -426,6 +455,21 @@ export class EntrypointDetailPage extends LitElement {
     .peer-badge.warn {
       color: var(--amber);
     }
+
+    /* The badge and its ⓘ on one centered line. */
+    .transport-value { display: flex; align-items: center; gap: 6px; }
+
+    /* The badge's ⓘ: what the word means for the connection, shown on tap
+       because a phone has no hover for the badge's own tooltip. */
+    .detail-btn {
+      background: none; border: none; cursor: pointer;
+      padding: 2px; color: var(--text-muted);
+      display: inline-flex; border-radius: 3px;
+    }
+    .detail-btn:hover { background: var(--border-subtle); color: var(--text); }
+    .detail-btn svg { width: 14px; height: 14px; }
+    .detail-row { padding-top: 0; border-bottom: none; }
+    .detail-text { color: var(--text-muted); font-size: var(--font-xs); line-height: 1.5; }
 
     .info-label {
       font-size: var(--font-sm); font-weight: 600; color: var(--text-muted);

@@ -45,6 +45,7 @@ const ICON_PATHS: Record<string, SVGInner> = {
   'chevron-up': svg`<polyline points="18 15 12 9 6 15" />`,
   'chevron-down': svg`<polyline points="6 9 12 15 18 9" />`,
   'back-arrow': svg`<line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />`,
+  'info': svg`<circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />`,
 
   /* ── Actions ── */
   star: svg`<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />`,
