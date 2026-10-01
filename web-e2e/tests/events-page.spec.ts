@@ -85,14 +85,14 @@ test('the events page lists the object history, newest first', async ({ page }) 
 });
 
 test('the host events page is reachable from settings and can be cleared', async ({ page }) => {
-  // Clicked, not goto'd: this link is the only way in from the UI, so asserting
+  // Clicked, not goto'd: this row is the only way in from the UI, so asserting
   // the destination alone would leave the entry point uncovered.
   await page.goto('/settings');
-  const link = page.locator('.settings-links a').filter({ hasText: 'Host events' });
+  const link = page.locator('.selector-row').filter({ hasText: 'Host events' });
   await expect(link).toBeVisible();
   await expect(link.locator('svg')).toBeVisible();
 
-  await page.screenshot({ path: 'test-results/settings-links.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/settings-diagnostics.png', fullPage: true });
 
   await link.click();
   await page.waitForURL('**/settings/events');
