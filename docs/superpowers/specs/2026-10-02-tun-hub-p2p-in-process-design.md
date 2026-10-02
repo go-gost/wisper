@@ -39,12 +39,43 @@ one.
 This is the load-bearing requirement. The p2p hub is a router with the same
 semantics as the socket server, not a bridge:
 
-- **Keepalive registration.** A spoke's keepalive frame registers its IP in the
-  route table, and the route expires `3 × ttl` after its last keepalive. A spoke
-  that leaves ages out. Unchanged.
-- **Authentication.** The auther is consulted on every keepalive against the
-  registering IP. An unauthenticated spoke is refused and never gets a route.
-  Unchanged — p2p holds no admission of its own, so this is the only gate.
+## Keepalive declares an address; it does not keep the route alive
+
+The keepalive frame stays, and it stays because it carries something p2p cannot
+know. The route table is keyed by an IP **on the peer's device**; p2p knows a
+peer's public key. Nothing else in the system knows which tun-network address
+that peer configured, so the spoke has to say so — and that is what the keepalive
+frame does.
+
+What changes is everything else the keepalive was doing on the socket server.
+
+| | socket server | p2p hub |
+|---|---|---|
+| keepalive declares the peer's IP | yes | yes |
+| keepalive refreshes a route's TTL | yes | **no** |
+| a departed peer is noticed by | a TTL guessing it is gone | the stream closing |
+| `keepalive` / `ttl` options | meaningful | **meaningless** |
+
+p2p reports a peer's departure exactly, when the stream closes, rather than
+inferring it from silence. A stream carries its peer's key in its remote address
+(`peerOf`, `tunnel/p2p_host.go:506`), so closing one identifies exactly which
+routes to drop.
+
+So on a p2p hub `keepalive` and `ttl` are not configuration: the frame is always
+sent because it is an address declaration, and there is no interval to tune. The
+UI does not offer them.
+
+### Route reclamation is now mandatory
+
+The socket server reclaims lazily: `liveRoute` expires a route when it is next
+consulted and the TTL has passed. The p2p hub has no TTL, so a route lives until
+its stream closes — which makes **closing a stream and dropping every route that
+peer registered the only reclamation path**.
+
+This is a real constraint, not a detail. If that cleanup does not happen, the
+route table grows for the life of the process; there is no TTL to catch it. The
+stream teardown is where it goes, and it is the one thing a test must cover:
+close a peer's stream, assert its routes are gone and another peer's are not.
 - **Destination routing.** A datagram from the device is parsed, its
   destination looked up, and delivered to the route for it. A packet with no
   route is discarded and logged. Unchanged.
@@ -136,9 +167,13 @@ weakened by this change.
 ## Testing
 
 - **Unit (x, routing/auth)** — keepalive registers a route; an unauthenticated
-  keepalive registers none; a route expires after `3 × ttl`; a packet with an
-  unknown destination is discarded. These are the shared logic and they run once,
-  against both delivery implementations.
+  keepalive registers none; a packet with an unknown destination is discarded.
+  These are the shared logic and they run once, against both delivery
+  implementations. TTL expiry is asserted separately, against the socket
+  implementation only — the p2p implementation has no TTL.
+- **Unit (x, p2p reclamation)** — close a peer's stream and assert its routes
+  are dropped while another peer's are not. This is the p2p implementation's
+  only reclamation path.
 - **Unit (x, p2p delivery)** — a fake peer conn; a datagram read from the device
   reaches the peer named by its destination IP, and a peer's datagram reaches
   the device.
@@ -156,6 +191,8 @@ weakened by this change.
 - **Single reader throughput.** One loop reads the device and delivers. The
   socket server has the same shape, so this is not a regression, but it is the
   thing to watch under load.
-- **Route table lifetime.** TTL expiry is the only way a departed spoke ages
-  out, and it depends on the spoke continuing to send keepalives. This is
-  unchanged from the socket server and inherits its behavior.
+- **Route table lifetime.** A p2p hub has no TTL, so reclamation rests entirely
+  on the stream-teardown path. That path is more accurate than the TTL it
+  replaces — it drops a peer's routes when the peer is known to be gone rather
+  than up to `3 × ttl` later — but it is also the only mechanism, so a missed
+  teardown grows the table unbounded rather than merely lagging.
