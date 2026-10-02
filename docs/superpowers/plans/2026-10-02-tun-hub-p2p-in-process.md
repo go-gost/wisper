@@ -21,6 +21,84 @@
 
 Do not commit wisper's `go.mod` bump before the tag exists — CI checks out the module alone and a pin to an unpublished tag fails at test.
 
+## Execution log
+
+Implementation is running under subagent-driven development. **This section is the
+record of what actually happened, which is not always what the task below said.**
+
+### Done
+
+**Task 1 — `peerTable` extracted.** `x` commit `70b5269` (two files, additive; `server.go` untouched).
+`peerTable` owns the keepalive protocol, the auther check, the route table with TTL, and destination
+lookup. A route's value is a `string`. 16 tests / 27 with subtests.
+
+Two findings that survived review and changed the code:
+
+- `auth.WithService` was dropped in the first cut. `auth/plugin/grpc.go:64` puts `options.Service`
+  on the gRPC wire, so an external plugin auther would have received `""`. `peerTable` carries the
+  service name now; `TestTransportRouterAuthenticatesWithService` pins it.
+- Four tests passed while proving something other than what they claimed. Each was found by
+  mutation — deleting or changing the guard and watching the test stay green:
+  - the TTL test did not pin the `3×` factor (`3×→1×` passed)
+  - the ownNets self-loop test was **vacuous**: the auther refused the frame before the guard ran,
+    so disabling the guard left it green
+  - **the multi-address path had no coverage at all** — and it is the *common* path, since
+    `client.go:31-34` sends every address in `config.Net`. Mutating "authenticate only
+    `peerIPs[0]`" stayed green, leaving the "never half-trust a registration" invariant untested
+
+**Task 2 — socket server moved onto `peerTable`.** `x` commit `64b1493` (`server.go` −102/+78,
+`handler.go`, plus the concurrency fix below).
+
+The baseline is weaker than it looks and the implementer said so unprompted: **no test in this
+package exercises `server.go`**. They target `peerTable` and `selectTarget` directly. So "existing
+tests pass unchanged" is not evidence about the socket path — the line-by-line behavioral diff is.
+Reported differences, both accepted as improvements:
+
+- a route is now registered *before* the keepalive reply rather than after (only observable if the
+  reply write fails, where the peer is gone anyway)
+- the own-network refusal gains one Debug line
+
+Everything else is reported byte-identical: reply bytes and both warn paths, expiry arithmetic
+(`3×`, the `ttl > 0` guard, `CompareAndDelete`, the same Infof), gateway fallback, both discard
+paths, and the route-changed log condition.
+
+The `h.md.p2p` collapse (`ip = net.IPv6zero`) survived the swap — it is transport behavior with no
+counterpart in `peerTable`, so deleting `updateRoute` would have silently broken p2p routing. It now
+lives inline in `server.go`'s keepalive block, at the call site that used to be `updateRoute`.
+
+### Changed during implementation
+
+**The reverse index was deleted, not locked.** `peerTable` had a second `sync.Map` (`owners`) so
+`dropPeer` could find a peer's routes without scanning. It was a second copy of a fact already in
+`peerRoute.name`, and two maps cannot be made consistent: concurrent `set` calls could leave
+`owners` naming one peer while `routes` belonged to another, and `dropPeer(loser)` would delete the
+winner's route. Proven with a probe (200 rounds broke the invariant at round 3), then fixed by
+removing the index — `dropPeer` scans `routes` and uses `CompareAndDelete`, which is *stricter* than
+the `routes.Delete` it replaced.
+
+A lock was the wrong fix: `lookup` runs per delivered packet, `dropPeer` once per stream close, so
+the cost would have landed on the hot path to settle a race that only matters at reclamation.
+`dropPeer` was already O(n) over the same key space, so the deletion is free.
+
+Covered by `TestTransportRouterConcurrentSetKeepsRouteWithItsOwner` (fails at round 155 plain,
+round 13 under `-race`, before the fix).
+
+### Carried into Task 3
+
+- **`h.md.p2p` is dead in shipped configs** — no config sets `tun.p2p`/`p2p` on a tun handler
+  (`play/p2p-tun-hub/gost.yml` has no such key). So the collapse Task 2 preserved has no test today,
+  for want of a `net.PacketConn` harness. Task 3 builds that seam.
+- **`resolveUDPAddr` must not appear on the p2p path** — a p2p route name is a peer key, not an
+  address. It is socket-only by construction today.
+- **`golangci-lint` cannot run here** (v1.64.8 vs go1.27 export-data mismatch). `x`'s verification
+  path is build + vet.
+
+### In progress
+
+**Task 3 — the p2p delivery implementation.** Dispatched.
+
+---
+
 ## File structure
 
 **`x/handler/tun/`** (the new code is `router.go`, `p2p.go`, `peerstream.go`, `p2phandler.go`; `server.go` shrinks):
@@ -53,7 +131,7 @@ The table's value becomes a `string` — a name, not an address. This is what le
 - Create: `x/handler/tun/router.go`
 - Test: `x/handler/tun/router_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `x/handler/tun/router_test.go`:
 
@@ -173,7 +251,7 @@ func newTestAuther(passphrase string) auth.Authenticator {
 
 and add `context` plus `github.com/go-gost/core/auth` and `xauth "github.com/go-gost/x/auth"` to the imports.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestTransportRouter 2>&1 | head -20
@@ -181,7 +259,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestTransportRoute
 
 Expected: compile failure — `undefined: newPeerTable`, `keepAliveFrame`, `newTestAuther`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `x/handler/tun/router.go`:
 
@@ -338,7 +416,7 @@ func (r *peerTable) infof(format string, args ...any) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 ```bash
 cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestTransportRouter -v 2>&1 | tail -20
@@ -346,7 +424,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestTransportRoute
 
 Expected: PASS — 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /config/workspace/go-gost/x && git add handler/tun/router.go handler/tun/router_test.go && git commit -m "tun: the route table holds a name, not an address
@@ -373,7 +451,7 @@ The socket server keeps every behavior it has. This task only changes where its 
 - Modify: `x/handler/tun/server.go`
 - Test: `x/handler/tun/handler_test.go` (existing, must stay green)
 
-- [ ] **Step 1: Run the existing tests first — this is the guard**
+- [x] **Step 1: Run the existing tests first — this is the guard**
 
 ```bash
 cd /config/workspace/go-gost/x && go test ./handler/tun/ -v 2>&1 | tail -25
@@ -381,7 +459,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -v 2>&1 | tail -25
 
 Expected: PASS. Record the test names — after Step 4 they must still pass, identically.
 
-- [ ] **Step 2: Point the handler at the router**
+- [x] **Step 2: Point the handler at the router**
 
 In `x/handler/tun/handler.go`, replace the `routes sync.Map` field with a pointer built in `Init`:
 
@@ -404,7 +482,7 @@ h.router = newPeerTable(
 )
 ```
 
-- [ ] **Step 3: Replace the keepalive block in `server.go`**
+- [x] **Step 3: Replace the keepalive block in `server.go`**
 
 Replace lines 139-195 (the whole `if n > keepAliveHeaderLength && bytes.Equal(...)` block) with:
 
@@ -434,7 +512,7 @@ Replace lines 139-195 (the whole `if n > keepAliveHeaderLength && bytes.Equal(..
 				}
 ```
 
-- [ ] **Step 4: Replace route lookups**
+- [x] **Step 4: Replace route lookups**
 
 `updateRoute`, `liveRoute` and the `findRouteFor` body move to the router. Delete those three functions from `server.go`, and rewrite `findRouteFor`:
 
@@ -466,7 +544,7 @@ func (h *tunHandler) findRouteFor(ctx context.Context, dst net.IP, router router
 }
 ```
 
-- [ ] **Step 5: Resolve the name at the two call sites**
+- [x] **Step 5: Resolve the name at the two call sites**
 
 The two delivery loops used a `net.Addr`. Each now resolves the name first. In the tun→transport goroutine:
 
@@ -520,7 +598,7 @@ func resolveUDPAddr(name string) (net.Addr, error) {
 }
 ```
 
-- [ ] **Step 6: Build, vet, and run the existing tests**
+- [x] **Step 6: Build, vet, and run the existing tests**
 
 ```bash
 cd /config/workspace/go-gost/x && go build ./... && go vet ./...
@@ -529,7 +607,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -v 2>&1 | tail -25
 
 Expected: build and vet clean; **every test from Step 1 still passes, same names.** If any does not, the socket path changed behavior — that is the failure this task exists to prevent. Stop and fix rather than updating the test.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /config/workspace/go-gost/x && git add handler/tun/handler.go handler/tun/server.go && git commit -m "tun: the socket server keeps its behavior, on the shared router
