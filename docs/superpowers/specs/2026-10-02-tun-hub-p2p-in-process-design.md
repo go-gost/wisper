@@ -76,6 +76,32 @@ This is a real constraint, not a detail. If that cleanup does not happen, the
 route table grows for the life of the process; there is no TTL to catch it. The
 stream teardown is where it goes, and it is the one thing a test must cover:
 close a peer's stream, assert its routes are gone and another peer's are not.
+
+## A spoke cannot tell which hub it reached
+
+The point of the p2p hub is that it is a drop-in for the socket one, so a spoke
+configured against either behaves the same. That constrains the implementation
+in two places that are easy to miss.
+
+**The keepalive must be answered, not just parsed.** A spoke running with
+`keepalive:true` sets a read deadline of `3 × keepAlivePeriod`
+(`client.go:88`) and expects the hub to answer each keepalive with a 20-byte
+magic header (`server.go:181`). A hub that registers the route and stays silent
+looks healthy until the spoke's own deadline expires and it tears the session
+down — so an identical spoke config would work against the socket hub and fail
+against this one. The p2p hub answers keepalives exactly as the socket server
+does; this is part of the shared logic, not a new feature.
+
+**The registration handshake does not depend on the keepalive setting.** The
+spoke sends its registration on any `udp` link regardless of `keepalive`
+(`client.go:47`), and only the repeating ticker is gated on it. So a spoke left
+at the socket server's defaults still registers here, and a spoke with
+`keepalive:true` sends repeats the hub tolerates and does not need. Neither
+setting changes what a spoke has to be configured with.
+
+What this buys: **the spoke entrypoint ships zero changes.** Not "no changes
+needed" as an argument — the compatibility tests below are what make that
+claim hold, and they run against both hub implementations.
 - **Destination routing.** A datagram from the device is parsed, its
   destination looked up, and delivered to the route for it. A packet with no
   route is discarded and logged. Unchanged.
@@ -177,11 +203,23 @@ weakened by this change.
 - **Unit (x, p2p delivery)** — a fake peer conn; a datagram read from the device
   reaches the peer named by its destination IP, and a peer's datagram reaches
   the device.
+- **Compatibility (x, run twice)** — the same suite drives both hub
+  implementations: a registration handshake with `keepalive` off registers a
+  route; one with it on registers and is answered; an unauthenticated
+  registration registers nothing; a peer-to-peer datagram is routed by its
+  destination IP. One suite, two implementations, no per-implementation fork —
+  this is what makes "the spoke cannot tell which hub it reached" a tested
+  property rather than a claim. The socket implementation additionally asserts
+  TTL expiry and the `WriteTo` address round-trip; the p2p implementation
+  asserts route reclamation on stream close.
 - **Unit (wisper)** — the hub type accepts from the p2p listener and reports
   status; the existing `TestTunTunnel*` suite still passes.
 - **e2e** — privileged container, two real devices, a real p2p link, ping both
-  ways, and a spoke joining and leaving to exercise registration and expiry.
-  This is the only check that proves real IP routing works; unit tests cannot.
+  ways. The spoke is the unmodified `tunnel/entrypoint/tun.go` with
+  `keepalive:true` and with it off — the two settings the socket hub already
+  has to support. A spoke joining and leaving exercises registration and
+  reclamation. This is the only check that proves real IP routing works; unit
+  tests cannot.
 
 ## Risks
 
