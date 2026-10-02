@@ -451,49 +451,68 @@ type PeerStat struct {
 // the ones UpdatePeerStats derived for its last window (zero until it ticks).
 // Nil while the tunnel is not running (there is no route to count on).
 func (s *p2pTunnel) PeerStats() []PeerStat {
-	s.mu.RLock()
-	ln, snapshot := s.ln, s.peerStats
-	peers := append([]string(nil), s.opts.Peers...)
-	s.mu.RUnlock()
-
-	pl, _ := ln.(*peerListener)
-	if pl == nil {
-		return nil
-	}
-
-	out := peerCounters(pl, peers)
-	for i := range out {
-		// The snapshot is in allowlist order too, so the rates line up by
-		// position.
-		if i < len(snapshot) {
-			out[i].InputRateBytes = snapshot[i].InputRateBytes
-			out[i].OutputRateBytes = snapshot[i].OutputRateBytes
-		}
-	}
-	return out
+	return peerStatSnapshot(&s.mu, &s.ln, &s.opts.Peers, &s.peerStats)
 }
 
 // UpdatePeerStats snapshots the live per-peer counters, deriving each rate
 // from the previous snapshot; the stats task calls it on every tick, the way
 // it refreshes the tunnel's own stats.
 func (s *p2pTunnel) UpdatePeerStats() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	updatePeerStatSnapshot(&s.mu, &s.ln, &s.peerStats, &s.peerStatsAt, &s.opts.Peers)
+}
 
-	pl, _ := s.ln.(*peerListener)
+// peerStatSnapshot builds the report from a route: the live counters paired
+// with the allowlist, plus the rates the last UpdatePeerStats left. It takes the
+// lock and the field pointers rather than reading the fields itself — the route
+// and the allowlist are both replaced under the write lock, so they have to be
+// read here, not at the call site. Both tunnels that serve a p2p route — the
+// p2p tunnel and the tun hub — read through here, so they cannot report a hub
+// and a tunnel differently.
+func peerStatSnapshot(mu *sync.RWMutex, ln *net.Listener, peers *[]string, snapshot *[]PeerStat) []PeerStat {
+	mu.RLock()
+	route, allow, snap := *ln, append([]string(nil), *peers...), append([]PeerStat(nil), *snapshot...)
+	mu.RUnlock()
+
+	pl, _ := route.(*peerListener)
 	if pl == nil {
-		s.peerStats, s.peerStatsAt = nil, time.Time{}
+		return nil
+	}
+
+	out := peerCounters(pl, allow)
+	for i := range out {
+		// The snapshot is in allowlist order too, so the rates line up by
+		// position.
+		if i < len(snap) {
+			out[i].InputRateBytes = snap[i].InputRateBytes
+			out[i].OutputRateBytes = snap[i].OutputRateBytes
+		}
+	}
+	return out
+}
+
+// updatePeerStatSnapshot takes the next per-peer snapshot and stores it, with
+// each rate derived from the previous one. The lock and the field pointers are
+// its arguments so the p2p tunnel and the tun hub run one implementation over
+// their own route — a hub's rates and a p2p tunnel's are the same numbers by
+// construction, not by copy.
+func updatePeerStatSnapshot(mu *sync.RWMutex, ln *net.Listener, dst *[]PeerStat, dstAt *time.Time, peers *[]string) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	pl, _ := (*ln).(*peerListener)
+	if pl == nil {
+		*dst, *dstAt = nil, time.Time{}
 		return
 	}
 
 	now := time.Now()
-	d := now.Sub(s.peerStatsAt)
-	prev := make(map[string]PeerStat, len(s.peerStats))
-	for _, p := range s.peerStats {
+	d := now.Sub(*dstAt)
+	prev := make(map[string]PeerStat, len(*dst))
+	for _, p := range *dst {
 		prev[p.Key] = p
 	}
 
-	snapshot := peerCounters(pl, s.opts.Peers)
+	snapshot := peerCounters(pl, *peers)
 	if d > 0 {
 		for i, p := range snapshot {
 			before := prev[p.Key]
@@ -501,7 +520,7 @@ func (s *p2pTunnel) UpdatePeerStats() {
 			snapshot[i].OutputRateBytes = rate(p.OutputBytes, before.OutputBytes, d)
 		}
 	}
-	s.peerStats, s.peerStatsAt = snapshot, now
+	*dst, *dstAt = snapshot, now
 }
 
 // peerCounters pairs every peer in the allowlist snapshot with its live

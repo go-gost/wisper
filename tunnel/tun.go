@@ -29,6 +29,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// A tun hub accounts for its spokes' traffic exactly as a p2p tunnel does: the
+// API fills a hub's allowlist rows from the same two interfaces.
+var (
+	_ PeerStatsReporter = (*tunTunnel)(nil)
+	_ PeerStatsUpdater  = (*tunTunnel)(nil)
+)
+
 // tunTunnel is the hub half of a virtual network: it holds a tun device and
 // serves it to its spokes over p2p. There is no socket here — a spoke's
 // datagrams arrive as a stream on the process-wide p2p host, keyed by the
@@ -51,6 +58,13 @@ type tunTunnel struct {
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
+
+	// peerStats is the last per-peer snapshot the stats task took, with rates;
+	// peerStatsAt times the window those rates average over. Same fields, and
+	// the same helpers, as a p2p tunnel's: a hub's spokes arrive on the same
+	// peer route, so they are counted the same way.
+	peerStats   []PeerStat
+	peerStatsAt time.Time
 
 	cclose chan struct{}
 
@@ -305,6 +319,21 @@ func (s *tunTunnel) SetStatsBaseline(baseline cfg.ServiceStats) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.statsBaseline = baseline
+}
+
+// PeerStats reports each allowlisted spoke's traffic, in allowlist order —
+// the same report a p2p tunnel gives, over the same peer route, so a hub's
+// allowlist rows carry traffic like every other tunnel's. Nil while the hub is
+// not running (there is no route to count on).
+func (s *tunTunnel) PeerStats() []PeerStat {
+	return peerStatSnapshot(&s.mu, &s.ln, &s.opts.Peers, &s.peerStats)
+}
+
+// UpdatePeerStats snapshots the spokes' counters, deriving each rate from the
+// previous snapshot. The stats task calls it through PeerStatsUpdater, the
+// way it calls SetStats.
+func (s *tunTunnel) UpdatePeerStats() {
+	updatePeerStatSnapshot(&s.mu, &s.ln, &s.peerStats, &s.peerStatsAt, &s.opts.Peers)
 }
 
 func (s *tunTunnel) Close() error {

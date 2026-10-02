@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	cfg "github.com/go-gost/wisper/config"
 )
@@ -149,6 +150,94 @@ func TestTunTunnelRunRecordsFailure(t *testing.T) {
 	}
 	if tun.IsClosed() {
 		t.Error("a failed Run closed the tunnel, so it cannot be restarted")
+	}
+}
+
+// TestTunTunnelPeerStats: a hub's allowlist rows are filled by the API from the
+// same two interfaces a p2p tunnel answers, so a hub must report its spokes'
+// traffic the same way — allowlist order, an idle spoke as zeros, and rates
+// over the stats task's window. The route is registered through the manager the
+// way Run registers it; no tun device is created (that needs CAP_NET_ADMIN).
+func TestTunTunnelPeerStats(t *testing.T) {
+	m := &p2pHostManager{routes: make(map[string]*peerListener)}
+	ln, err := m.register([]string{"k1", "k2"})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	pl := ln.(*peerListener)
+	tun := &tunTunnel{opts: Options{Peers: []string{"k1", "k2"}}, ln: pl, cclose: make(chan struct{})}
+
+	if got := (&tunTunnel{opts: Options{Peers: []string{"k1"}}}).PeerStats(); got != nil {
+		t.Fatalf("PeerStats with no route = %v, want nil", got)
+	}
+
+	in1, far1 := peerPipe("k1")
+	defer far1.Close()
+	in2, far2 := peerPipe("k2")
+	defer far2.Close()
+	m.dispatch(in1)
+	m.dispatch(in2)
+
+	c1, err := pl.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	c2, err := pl.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	defer c2.Close()
+
+	// In from k1, out to k1.
+	msg := []byte("hello-from-k1")
+	reply := []byte("hi")
+	mustTransfer(t, far1, c1, msg)
+	mustTransfer(t, c1, far1, reply)
+	_ = c1.Close()
+
+	got := tun.PeerStats()
+	if len(got) != 2 || got[0].Key != "k1" || got[1].Key != "k2" {
+		t.Fatalf("PeerStats = %+v, want k1 then k2 (allowlist order)", got)
+	}
+	if got[0].InputBytes != uint64(len(msg)) || got[0].OutputBytes != uint64(len(reply)) {
+		t.Errorf("k1 bytes = %d in / %d out, want %d / %d", got[0].InputBytes, got[0].OutputBytes, len(msg), len(reply))
+	}
+	if got[0].TotalConns != 1 || got[0].CurrentConns != 0 {
+		t.Errorf("k1 conns = %d total / %d current, want 1 / 0 (the stream is closed)", got[0].TotalConns, got[0].CurrentConns)
+	}
+	if got[1] != (PeerStat{Key: "k2", CurrentConns: 1, TotalConns: 1}) {
+		t.Errorf("k2 stats = %+v, want its open stream counted and no bytes", got[1])
+	}
+
+	// Rates cover the tick window: k2's traffic moves through it, k1's does not.
+	tun.UpdatePeerStats() // baseline
+	time.Sleep(5 * time.Millisecond)
+	k2msg := []byte("k2 traffic")
+	mustTransfer(t, far2, c2, k2msg)
+	mustTransfer(t, c2, far2, []byte("k2 reply"))
+	tun.UpdatePeerStats()
+
+	got = tun.PeerStats()
+	if got[1].InputRateBytes == 0 || got[1].OutputRateBytes == 0 {
+		t.Errorf("k2 rates = %d in / %d out, want the bytes moved this window", got[1].InputRateBytes, got[1].OutputRateBytes)
+	}
+	if got[0].InputRateBytes != 0 || got[0].OutputRateBytes != 0 {
+		t.Errorf("k1 rates = %d in / %d out, want none (it moved nothing this window)", got[0].InputRateBytes, got[0].OutputRateBytes)
+	}
+
+	// Closing the hub's route zeroes the live conns (the p2p tunnel's own
+	// contract), and releasing the route — what Close does — gives the report up
+	// entirely: there is no route left to count on.
+	_ = c2.Close()
+	if err := pl.Close(); err != nil {
+		t.Fatalf("Close route: %v", err)
+	}
+	if got := tun.PeerStats(); len(got) != 2 || got[0].CurrentConns != 0 || got[1].CurrentConns != 0 {
+		t.Errorf("current conns after the route closed = %d/%d, want 0/0", got[0].CurrentConns, got[1].CurrentConns)
+	}
+	tun.ln = nil
+	if got := tun.PeerStats(); got != nil {
+		t.Errorf("PeerStats with the route released = %+v, want nil", got)
 	}
 }
 
