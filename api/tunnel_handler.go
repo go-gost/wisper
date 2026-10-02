@@ -27,8 +27,8 @@ type tunnelResponse struct {
 	Error      string            `json:"error,omitempty"`
 	Options    tunnelOptionsResp `json:"options"`
 	Stats      statsResponse     `json:"stats"`
-	// PeerStats is every allowlisted peer's traffic, allowlist order (p2p
-	// tunnels only).
+	// PeerStats is every allowlisted peer's traffic, allowlist order: a p2p
+	// tunnel's peers or a tun hub's spokes.
 	PeerStats []peerStatsJSON `json:"peer_stats,omitempty"`
 	// PeerTransport is where a p2p entrypoint's peer traffic goes right now:
 	// "direct" or "derp". Empty when it is not connected, or not a p2p object.
@@ -207,11 +207,13 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		},
 	}
 	// The p2p host's current state per peer, when this object has p2p peers —
-	// for a p2p tunnel's allowlist and for a p2p entrypoint's single peer. One
-	// snapshot read serves both the path word and the per-peer diagnostics.
+	// for a p2p tunnel's allowlist, a tun hub's spokes (the same peers on the
+	// same host: a hub reaches its spokes over p2p, so its allowlist is a p2p
+	// allowlist), and a p2p entrypoint's single peer. One snapshot read serves
+	// both the path word and the per-peer diagnostics.
 	var transports map[string]string
 	var diagnostics map[string]p2p.PeerDiagnostic
-	if opts.Peer != "" || t.Type() == tunnel.P2PTunnel {
+	if hasP2PPeers(opts) {
 		st := tunnel.P2PHostStatus()
 		transports = st.PeerTransports
 		diagnostics = st.PeerDiagnostics
@@ -247,6 +249,21 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	}
 	resp.Events = toEventResponses(event.List(t.ID()))
 	return resp
+}
+
+// hasP2PPeers reports whether this object has peers whose state the
+// process-wide p2p host knows about, and so whether its response should carry
+// the host's per-peer words — the path (direct or relay), the punch state, the
+// last error.
+//
+// It is asked of the peers rather than of a tunnel type, because the peers are
+// the question and not the type: a tun hub reaches its spokes over p2p, so its
+// allowlist is a p2p allowlist and it was excluded from the host snapshot only
+// because its type was not p2p. An empty allowlist is not a p2p tunnel — a p2p
+// tunnel may run and route nothing — so a peer-less object of any type stays
+// out, and the whole-host read is skipped for it.
+func hasP2PPeers(opts tunnel.Options) bool {
+	return opts.Peer != "" || len(opts.Peers) > 0
 }
 
 func errStr(err error) string {
@@ -670,6 +687,11 @@ type tunnelPeersRequest struct {
 // restarts it. The tunnel is rebuilt rather than patched: the process-wide host
 // routes each peer key to exactly one tunnel, so the old one must give its
 // routes up before the replacement claims them.
+//
+// A tun hub is refused here on purpose, not for lack of support: its keys are
+// edited in the hub's own form (one per line, each pasted off a spoke), which
+// is where its device and its routes live too. A hub has no peers page, so
+// nothing in the UI calls this for one.
 func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	old := tunnel.Get(id)
@@ -678,7 +700,7 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if old.Type() != tunnel.P2PTunnel {
-		writeError(w, http.StatusBadRequest, "only p2p tunnels have an allowlist")
+		writeError(w, http.StatusBadRequest, "only a p2p tunnel manages its allowlist on its own; a tun hub's spokes are edited in its form")
 		return
 	}
 

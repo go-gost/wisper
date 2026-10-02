@@ -1422,3 +1422,114 @@ func TestMutationLogCarriesActionID(t *testing.T) {
 		t.Fatalf("GET log = %q, want no mutation line", got)
 	}
 }
+
+// TestHasP2PPeers: which objects take the process-wide p2p host's snapshot.
+//
+// This is the whole of the hub-is-blind defect. The condition used to name a
+// tunnel type, so a tun hub was left out even though it reaches its spokes over
+// that same host and PeerStats already returns them — its rows carried the
+// traffic counters and empty strings for everything the host knows: no path
+// word, no punch state, no last error. A hub is where a spoke's FIRST
+// connection is hardest (the spoke is behind NAT, the hub holds the key), so
+// it is the least useful place to be blind.
+//
+// The question is asked of the peers rather than the type, so the cases pin
+// that: a peer-less object of any type must stay out (the snapshot is a
+// whole-host read and there is nothing to show for it), while every object that
+// names a p2p peer must be in. A p2p entrypoint's single peer counts as much
+// as a tunnel's allowlist, and a tun hub's spokes as much as a p2p tunnel's.
+//
+// The words the snapshot supplies are p2p's, for a peer with a live data path,
+// which needs a relay and a real peer: tunnel/p2p_e2e_test (tag p2ppoc) proves
+// those values end to end. What this pins is that the handler reads the
+// snapshot at all for a hub, which is what it stopped doing.
+func TestHasP2PPeers(t *testing.T) {
+	key := strings.Repeat("A", 43) // base64 of 32 bytes: a well-formed peer key
+
+	cases := []struct {
+		name string
+		opts tunnel.Options
+		want bool
+	}{
+		{"p2p tunnel with an allowlist", tunnel.Options{Peers: []string{key}}, true},
+		// The case the condition got wrong: a hub's spokes are p2p peers, so
+		// its allowlist must buy the host snapshot like a tunnel's does.
+		{"tun hub with spokes", tunnel.Options{Peers: []string{key}}, true},
+		{"p2p entrypoint's single peer", tunnel.Options{Peer: key}, true},
+		{"p2p tunnel with an empty allowlist", tunnel.Options{}, false},
+		{"tun hub with no spokes", tunnel.Options{}, false},
+		{"ordinary tunnel", tunnel.Options{Endpoint: "127.0.0.1:9"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasP2PPeers(tc.opts); got != tc.want {
+				t.Errorf("hasP2PPeers(peer=%q, peers=%d) = %v, want %v",
+					tc.opts.Peer, len(tc.opts.Peers), got, tc.want)
+			}
+		})
+	}
+}
+
+// TestTunHubRowsFollowItsAllowlist: a hub's per-peer report is its own
+// allowlist, one row per spoke in allowlist order, exactly as a p2p tunnel's
+// is. The rows are filled from the hub's PeerStats, and the host's per-peer
+// words are merged onto them when hasP2PPeers says to — so a hub's rows and a
+// p2p tunnel's are built by the same code from the same two interfaces.
+//
+// A hub cannot run here: creating the device needs root, and an unrun hub has
+// no route, so PeerStats is nil and there are no rows to read. What is pinned
+// is the part that does not need a device: a hub's response answers with the
+// allowlist intact, which is what its rows are built from, and a peer-less
+// object reports nothing.
+func TestTunHubRowsFollowItsAllowlist(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	key := strings.Repeat("A", 43)
+
+	hub := tunnel.NewTunTunnel(
+		tunnel.NameOption("Hub"),
+		tunnel.NetOption("10.10.0.1/24"),
+		tunnel.PeersOption(key),
+	)
+	hub.Close() // no device is created (that needs root) and no route is claimed
+	tunnel.Add(hub)
+	defer tunnel.Delete(hub.ID())
+
+	resp, body := getJSON(t, srv.URL+"/api/tunnels/"+hub.ID())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get hub = %d: %v", resp.StatusCode, body)
+	}
+	peers, _ := body["options"].(map[string]any)["peers"].([]any)
+	if len(peers) != 1 {
+		t.Fatalf("hub allowlist = %v, want the spoke it was built with", body["options"])
+	}
+	if first, _ := peers[0].(map[string]any); first["key"] != key {
+		t.Errorf("allowlist[0] = %v, want the spoke's key", first)
+	}
+
+	// A peer-less object stays out of the snapshot and reports nothing, so a
+	// plain tunnel's response is unchanged by any of this.
+	plain := preRegisterTunnel(t, tunnel.TCPTunnel, "Plain", "127.0.0.1:9")
+	if rows := peerStatsRows(t, srv, plain.ID()); len(rows) != 0 {
+		t.Errorf("a tunnel with no peers has %d peer_stats rows, want none", len(rows))
+	}
+}
+
+// peerStatsRows reads one object's per-peer report off the API, as the UI does.
+func peerStatsRows(t *testing.T, srv *httptest.Server, id string) []map[string]any {
+	t.Helper()
+	resp, body := getJSON(t, srv.URL+"/api/tunnels/"+id)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get %s = %d: %v", id, resp.StatusCode, body)
+	}
+	raw, _ := body["peer_stats"].([]any)
+	out := make([]map[string]any, 0, len(raw))
+	for _, r := range raw {
+		if m, ok := r.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
