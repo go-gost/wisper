@@ -282,21 +282,64 @@ form). Runtime untouched: `reconcile` rejecting the clash is correct.
 ### Still open — three more, found by the next review
 
 Reviewing the two above turned up three more places where the runtime and the UI disagree. All three
-are real; none is fixed yet:
+are real; all three are now fixed (see below).
 
-1. **The hub's per-spoke traffic is fetched but never rendered.** `peer_stats` is consumed in exactly
-   two places (`tunnel-peers-page.ts` and the p2p peers card count), a hub has no route to that page
-   (`tunnel-detail-page.ts` gates the card on `tunnelType === 'p2p'`), and the hub's view mode
-   renders its allowlist as one comma-joined string. So the previous commit made the API correct and
-   the web app still shows none of it — this is the "API first, page later" decision from the design
-   conversation, and the second half was not done.
-2. **A hub's spokes get no transport or diagnostics.** `api/tunnel_handler.go` fetches host state
-   only when `opts.Peer != "" || t.Type() == tunnel.P2PTunnel`, excluding the hub, so a hub's spokes
-   have no path word, punch state, or last error. A hub is where a spoke's *first* connection is
-   hardest — the spoke is behind NAT and the hub is the one holding the public key.
-3. **The "end-to-end encrypted" badge skips tun hubs.** `home-page.ts:149` grants it to p2p tunnels
-   and to p2p/tun entrypoints, but not to a tun tunnel — while p2p encryption is mandatory, so a
-   spoke and its hub are labelled inconsistently for the same wire.
+### Three more gaps closed — wisper `7dc6c93` (api), `2abbc8e` (badge), `b3010af` (web)
+
+**A hub's per-spoke traffic is rendered.** The row is now **one component**
+(`web-src/src/components/peer-stats-row.ts`) drawn by both the hub's detail page and the p2p peers
+page, so a hub's spoke and a tunnel's peer cannot drift. The hub does *not* get a route into the
+peers page: that page is built around editing a p2p tunnel's list (save all, add a key, toggle one
+off), and none of that applies to a hub, whose keys are typed one-per-line into its own form next
+to the device and routes they belong to. Reusing the component also removed ~240 lines of duplicated
+presentation and ~120 lines of dead CSS.
+
+Two things this surfaced that were not in the brief: the row's name comes from the **allowlist**,
+not from the report (an unrun hub has no counters, so its spokes rendered as "No alias" — found by
+the e2e), and a `slot` does not work for the row actions (slotted nodes live outside the shadow
+root, so an existing e2e selector stopped reaching them).
+
+**A hub's spokes carry diagnostics.** The API condition became `hasP2PPeers(opts)` =
+`opts.Peer != "" || len(opts.Peers) > 0`. The question was never the *type*, it is the *peers*. A
+p2p entrypoint is untouched and a non-p2p tunnel with no allowlist stays out.
+
+**The encryption badge.** `tun` joins the tunnel side of `_secure()`, and the ternary collapsed
+because both branches were the same predicate. A sweep found five places making the type-vs-side
+distinction; two changed, three already correct (recording, the entrypoint-side gates, the
+p2p-only gates on the peers page). One more bug fell out: `PUT /api/tunnels/{id}/peers` answered a
+hub with "only p2p tunnels have an allowlist", untrue since the hub landed.
+
+### One assertion this environment cannot make
+
+The requested API test — a hub's row carrying a non-empty `transport`/`state`/`last_error` — **is
+not achievable here, and the implementer proved it rather than assuming it.** p2p fills status only
+for a peer with a live data path, which needs a real relay and a live peer; and a tun hub cannot
+`Run()` at all without root (`operation not permitted` verified). An unrun hub has no route, so
+`PeerStats()` returns nil and there are no rows to assert on.
+
+What exists instead: `TestHasP2PPeers` is a table over real `Options` and **fails against the old
+condition** (verified by reverting), and `tunnel/p2p_e2e_test.go` (tag `p2ppoc`) covers the values
+end to end for a p2p tunnel against a real relay. **A `p2ppoc` e2e for a tun hub is the missing
+piece**, and it belongs on the privileged container this work is headed toward.
+
+### Still open after the third review pass
+
+Three more, found by that pass. None is a data or correctness bug — all are places where a hub is
+presented less informatively than a p2p tunnel:
+
+1. **A hub's row has no expander unless the spoke has a live session.** Correct (the host reports no
+   diagnostic for a peer that never dialled) but it means a hub's *first* connection shows only "No
+   traffic yet" with nothing to expand.
+2. **`tunnel-detail-page.ts:1040` — a p2p tunnel's allowlist summary still renders as one
+   comma-joined line of aliases**, while a hub's summary is now a count. Same list, two
+   presentations, and the p2p side still hides per-peer state behind the eye toggle. The fix is to
+   delete `_peerLabels()`.
+3. **A hub has no `PeerSetter`,** so `SetPeers` exists only on `p2pTunnel`; a hub's allowlist edit is
+   a full PUT and restart. Fine today, but the two objects with p2p peers differ in a way the API
+   does not advertise.
+
+Not swept, flagged rather than changed: `handleDeleteTunnel` removes a legacy per-tunnel key file
+only for `P2PTunnel`. No code path writes one for a tun hub, so it is believed dead.
 
 ---
 
