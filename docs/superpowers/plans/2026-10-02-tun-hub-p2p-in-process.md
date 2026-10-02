@@ -193,6 +193,71 @@ something other than what it was named for.** None of them turned the suite red 
 None of these are visible from "the tests pass". They are only visible from breaking something and
 watching a test stay green.
 
+### Tasks 5 and 6 — wisper wiring, API, UI
+
+**Task 5 — the hub stops binding a socket.** wisper commit `fead221` (`tunnel/tun.go`,
+`tunnel/tun_test.go`).
+
+`Run` now: create the device via the tun listener → `p2pHost.acquire` →
+`p2pHost.register(allowlist)` → `NewP2PHandler(deviceConn, auther, …)` → serve over the route.
+`init` rejects an endpoint outright and rejects an empty allowlist, so a hub carried over from the
+socket form says why it stopped working rather than silently changing meaning.
+
+Three things the brief did not anticipate, all found by the implementer:
+
+- **`deviceLn.Close()` must not be called at the end of `Run`** — it closes `l.active`, which *is*
+  the accepted conn, so it tears down the device fd and ends the hub. The old code closed on the
+  way out as correct cleanup; here that is a kill. The listener is retained and closed in `Close`.
+- **`p2pHost.register` only claims routes — it does not listen.** Without `acquire`, a hub that is
+  the only p2p tunnel on the host has nothing accepting its streams.
+- **`handler.ServiceOption` is required.** `peerTable` passes its service name to the auther on
+  every authentication, and x's own comment says dropping it silently changes what an external
+  plugin auther thinks is asking.
+
+The device conn vs listener question came out clean: `Accept()` reads a one-slot queue that
+`listenLoop` fills *before* parking, so the device is available the moment `Init` returns. No `x/`
+change needed.
+
+**The wiring itself is untested** — every test is config-level, because creating a real device
+needs `CAP_NET_ADMIN`. Task 7's e2e is the only thing that will prove the device conn really
+carries its config through to `ownNets`, and that the self-route guard is live.
+
+**Task 6 — the API and UI stopped describing the old hub.** wisper commit `9c3f0eb`.
+
+Scope was widened mid-flight: the plan had Task 6 as UI-only, but the API still *required* an
+endpoint the runtime now *forbids*, so a tun hub created through the UI either 400s or fails at
+`Run`. The feature the whole change exists for could not be created. `validateTunTunnel` now runs:
+endpoint set → 400 (naming the address it rejected) → empty allowlist → 400 → the unchanged
+`net`/`routes`/`dns` checks. All seven `TestCreateTunTunnelValidation` cases were rewritten to the
+new rule; each carries a valid spoke key so it reaches its own rule rather than tripping an earlier
+one.
+
+The UI change that was not in the brief and was needed for the feature to work at all: **there was
+no way to enter an allowlist.** With the bind-address field gone, a hub could only be created by
+hand-editing the config. An "Allowed spokes" editor was added — one key per line, with the same
+masked/reveal/copy treatment the p2p allowlist row has.
+
+Deliberately kept: `keepalive`/`ttl` on the tun **entrypoint** form (the same spoke binary talks to
+either kind of hub), the fields on `TunnelCreateRequest`/`TunnelOptions` (the config still carries
+them), and the p2p-only allowlist card (a hub has no `PeerSetter`, so routing it there would 400).
+
+### Still open after review
+
+Two inconsistencies a review of Task 6 surfaced, both between what the runtime does and what a user
+sees:
+
+1. **A hub shows no per-peer traffic.** `toTunnelResponse` fills `PeerStats` only for a
+   `PeerStatsReporter`, and `tunTunnel` is not one — so the hub's allowlist row shows aliases but no
+   figures while the identical row on a p2p tunnel does. The data already exists: the hub's streams
+   come from the same `peerListener`, which keeps per-peer counters. Wiring the two interfaces is
+   the fix. This was decided during design ("API first, page later") and never implemented.
+2. **A spoke key can only be held once**, hub or p2p tunnel — both draw from the process-wide
+   host, and `reconcile` rejects the clash. Nothing in the UI says so, so a user migrating from the
+   socket form moves keys to the hub and gets `peer … is already used by another p2p tunnel` with
+   no explanation.
+
+Neither is fixed yet.
+
 ---
 
 ## File structure
