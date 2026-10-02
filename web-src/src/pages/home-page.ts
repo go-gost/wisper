@@ -144,11 +144,15 @@ export class HomePage extends LitElement {
     return item.kind === 'entrypoint' ? transportView(item.data.peer_transport) : null;
   }
 
-  /** _secure is the static "end-to-end encrypted" badge: a p2p tunnel, or a
-   *  p2p/tun entrypoint, is encrypted by construction — no live status needed. */
+  /** _secure is the static "end-to-end encrypted" badge. It is a statement
+   *  about the wire, not about which side of it this object sits: a spoke's
+   *  traffic travels the same p2p link as its hub's, and p2p encryption is
+   *  mandatory — a session that does not settle encrypted is refused, never
+   *  built as plaintext. So a tun hub is as encrypted as a p2p tunnel, and a
+   *  tun entrypoint as a p2p one. */
   private _secure(item: Item): boolean {
     return item.kind === 'tunnel'
-      ? item.data.type === 'p2p'
+      ? item.data.type === 'p2p' || item.data.type === 'tun'
       : item.data.type === 'p2p' || item.data.type === 'tun';
   }
 

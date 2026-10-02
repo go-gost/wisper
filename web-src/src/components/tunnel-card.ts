@@ -49,7 +49,9 @@ export class TunnelCard extends LitElement {
   @property() error = '';
 
   /** Whether this object is end-to-end encrypted — a static, type-based fact
-   *  (a p2p tunnel, or a p2p/tun entrypoint). Draws a lock badge. */
+   *  (a p2p or tun tunnel, or a p2p/tun entrypoint: p2p encryption is
+   *  mandatory, so it is a fact about the wire and not about which side of it
+   *  this object sits). Draws a lock badge. */
   @property({ type: Boolean }) secure = false;
 
   static styles = css`

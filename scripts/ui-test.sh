@@ -97,7 +97,10 @@ fi
 mkdir -p "$CFG_HOME/.config/wisper"
 cat >"$CFG_HOME/.config/wisper/wisper.yaml" <<'YAML'
 # Fixture for web-e2e/tests: one p2p tunnel with two allowlisted peers (the
-# second switched off), and one stopped entrypoint so both lists have a card.
+# second switched off), a tun hub with one spoke, and one stopped entrypoint so
+# both lists have a card. The hub is closed: creating a tun device needs root,
+# and this script runs unprivileged — what the UI tests need is that its rows
+# render, which is a question about the page, not about the device.
 # The relay address is unroutable on purpose — the host retries in the
 # background and the tunnel still runs, which is all the UI needs.
 settings:
@@ -129,6 +132,17 @@ tunnels:
       - time: 2026-01-15T11:05:00Z
         level: warn
         message: "peer laptop: direct session dropped (2)"
+    created_at: 2026-01-15T10:30:00Z
+  - id: e2e-tun-hub
+    name: Hub
+    type: tun
+    net: 10.10.0.1/24
+    routes: 192.168.50.0/24
+    peers:
+      - dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA
+    peer_aliases:
+      dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA: laptop
+    closed: true
     created_at: 2026-01-15T10:30:00Z
 entrypoints:
   - id: e2e-entrypoint
