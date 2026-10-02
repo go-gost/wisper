@@ -3,6 +3,7 @@ package tunnel
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
 
 	cfg "github.com/go-gost/wisper/config"
@@ -74,15 +75,74 @@ func TestTunTunnelMetadata(t *testing.T) {
 	}
 }
 
-// TestTunTunnelRunRequiresEndpoint: a hub with no bind address fails to start
+// TestTunTunnelHasNoBindAddress: a tun hub reaches its spokes over p2p, so it
+// has no address to bind — the peer allowlist is the whole of its configuration
+// and it is what the route is built from.
+func TestTunTunnelHasNoBindAddress(t *testing.T) {
+	tun := NewTunTunnel(
+		NetOption("10.10.0.1/24"),
+		PeersOption("peer-a", "peer-b"),
+	).(*tunTunnel)
+
+	if err := tun.init(); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	if len(tun.config.Peers) != 2 {
+		t.Fatalf("allowlist = %v, want both peers", tun.config.Peers)
+	}
+	// The list is copied, so a later edit of the options cannot reach into a
+	// config the routes were already built from.
+	tun.opts.Peers[0] = "peer-z"
+	if tun.config.Peers[0] != "peer-a" {
+		t.Error("the config's allowlist aliases the options'")
+	}
+}
+
+// TestTunTunnelRejectsBindAddress: a hub carried over from the socket form is
+// refused with a reason instead of silently changing meaning — the paired p2p
+// tunnel that repeated the address would be dialing a socket nobody binds.
+func TestTunTunnelRejectsBindAddress(t *testing.T) {
+	tun := NewTunTunnel(
+		EndpointOption("127.0.0.1:8421"),
+		NetOption("10.10.0.1/24"),
+		PeersOption("peer-a"),
+	).(*tunTunnel)
+
+	err := tun.init()
+	if err == nil {
+		t.Fatal("a hub accepted a bind address")
+	}
+	if !strings.Contains(err.Error(), "127.0.0.1:8421") {
+		t.Errorf("the error does not name the address it rejected: %v", err)
+	}
+	if tun.config != nil {
+		t.Errorf("a rejected hub still built a config: %+v", tun.config)
+	}
+}
+
+// TestTunTunnelRequiresPeers: a hub with no allowlist has no route, so it would
+// run and discard every packet. Refused at construction rather than started.
+func TestTunTunnelRequiresPeers(t *testing.T) {
+	tun := NewTunTunnel(NetOption("10.10.0.1/24")).(*tunTunnel)
+
+	if err := tun.init(); err == nil {
+		t.Fatal("a hub accepted an empty allowlist")
+	}
+}
+
+// TestTunTunnelRunRecordsFailure: a hub whose config is refused fails to start
 // instead of half-starting a device, and the failure is recorded (not a panic,
 // not a closed tunnel — the API's start handler restarts a failed tunnel).
-func TestTunTunnelRunRequiresEndpoint(t *testing.T) {
+// Run is what reaches init, so this is also the test that init is on the start
+// path at all: without an endpoint there is nothing else it would refuse.
+func TestTunTunnelRunRecordsFailure(t *testing.T) {
 	cfg.Set(&cfg.Config{})
 
-	tun := NewTunTunnel(NameOption("hub"))
+	// An endpoint is the shape the old socket hub required, so this is the
+	// case a config carried over from that form actually hits.
+	tun := NewTunTunnel(NameOption("hub"), EndpointOption("127.0.0.1:8421"))
 	if err := tun.Run(); err == nil {
-		t.Fatal("Run without a bind address succeeded")
+		t.Fatal("Run with a bind address succeeded")
 	}
 	if tun.Err() == nil {
 		t.Error("the failure was not recorded")

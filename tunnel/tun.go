@@ -1,19 +1,25 @@
 package tunnel
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/go-gost/core/auth"
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/listener"
 	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
+	xauth "github.com/go-gost/x/auth"
 	// Both x packages are named "tun": the aliases keep them apart.
 	tunhandler "github.com/go-gost/x/handler/tun"
 	tunlistener "github.com/go-gost/x/listener/tun"
@@ -24,19 +30,24 @@ import (
 )
 
 // tunTunnel is the hub half of a virtual network: it holds a tun device and
-// serves it as a tun *server*, binding a UDP socket on its Endpoint. Every
-// spoke's datagrams reach that socket through a separate p2p tunnel whose
-// endpoint is the same address (the p2p host is the pipe; this device is the
-// network). The server demultiplexes the spokes by the address each one
-// registered with its keepalive, so the spokes themselves are stock tun
-// clients and this side needs no per-peer configuration.
+// serves it to its spokes over p2p. There is no socket here — a spoke's
+// datagrams arrive as a stream on the process-wide p2p host, keyed by the
+// peer key in its allowlist, and the hub writes them straight to the device.
+// The allowlist is therefore the whole of this hub's configuration: it is
+// both what admits a spoke and what names it.
 //
 // The device is created by this process, so the hub needs root (or
 // CAP_NET_ADMIN) — the trade the maintainer accepted for a UI-driven setup.
 // See docs/tun-integration.md.
 type tunTunnel struct {
-	opts          Options
-	forward       service.Service
+	opts    Options
+	config  *tunHubConfig
+	forward service.Service
+	// ln is the p2p route, released on Close; device is the tun listener, kept
+	// only so it can be closed there — its accepted conn is the device the hub
+	// runs on, so it is not closed on the way out of Run.
+	ln            net.Listener
+	device        listener.Listener
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
@@ -45,6 +56,13 @@ type tunTunnel struct {
 
 	err error
 	mu  sync.RWMutex
+}
+
+// tunHubConfig is what a hub needs beyond its options: the allowlist that
+// admits peers. A tun hub used to be a config.ServiceConfig with an Addr —
+// the socket form is gone, so there is no address left to configure.
+type tunHubConfig struct {
+	Peers []string
 }
 
 // NewTunTunnel creates a tun hub: the node that holds the device.
@@ -75,8 +93,9 @@ func (s *tunTunnel) ID() string   { return s.opts.ID }
 func (s *tunTunnel) Type() string { return TunTunnel }
 func (s *tunTunnel) Name() string { return s.opts.Name }
 
-// Endpoint is the UDP address the tun server binds; the paired p2p tunnel must
-// use the same address as its own endpoint.
+// Endpoint is empty: a p2p hub binds nothing. It is kept on the interface so
+// the config round trip still carries whatever was set — an endpoint that
+// survived from the socket form is what init refuses.
 func (s *tunTunnel) Endpoint() string { return s.opts.Endpoint }
 
 // Entrypoint is the device's address. A tun hub has no public URL, so the
@@ -100,15 +119,38 @@ func (s *tunTunnel) listenerMetadata() map[string]any {
 	}
 }
 
-// handlerMetadata is the tun server's keepalive configuration. "keepalive"
-// enables route expiry (a route lives 3×ttl past its last keepalive), which is
-// what retires a spoke that left; ttl is in seconds because that is the unit
-// x's metadata accessor reads for an int.
+// handlerMetadata is the keepalive configuration carried over from the socket
+// form. A p2p hub does not read it — x's p2p handler takes no metadata at all,
+// because a peer announces its departure by closing its stream instead of by
+// going silent — but the keepalive and ttl options are still in the config
+// file until the UI drops them, and this keeps what it says in one place.
 func (s *tunTunnel) handlerMetadata() map[string]any {
 	return map[string]any{
 		"keepalive": s.opts.Keepalive,
 		"ttl":       s.opts.TTL,
 	}
+}
+
+// init describes the hub: the device it creates, and the p2p route its spokes'
+// datagrams arrive on. It binds no address — a spoke's datagrams reach the
+// device over the p2p host directly, so there is no socket and no endpoint for
+// a paired p2p tunnel to repeat.
+func (s *tunTunnel) init() error {
+	// An endpoint left over from the socket form is refused rather than
+	// ignored: silently dropping it would run a hub in a different shape than
+	// its config says, and the paired p2p tunnel that repeated the address would
+	// be pointing at a socket nobody binds.
+	if strings.TrimSpace(s.opts.Endpoint) != "" {
+		return fmt.Errorf("tun hub no longer binds an address (endpoint %q): clear the endpoint — the peer allowlist is the whole configuration", s.opts.Endpoint)
+	}
+	// An empty allowlist runs and discards every packet: the routes are the
+	// admission, so with none there is nothing to admit.
+	if len(s.opts.Peers) == 0 {
+		return errors.New("tun hub requires at least one allowlisted peer")
+	}
+
+	s.config = &tunHubConfig{Peers: append([]string(nil), s.opts.Peers...)}
+	return nil
 }
 
 func (s *tunTunnel) Run() (err error) {
@@ -122,11 +164,8 @@ func (s *tunTunnel) Run() (err error) {
 		}
 	}()
 
-	// A hub with no bind address cannot serve anything: the tun server binds
-	// this address, and the paired p2p tunnel must use the same one (the API
-	// rejects an empty or portless endpoint before reaching here).
-	if s.opts.Endpoint == "" {
-		return errors.New("tun tunnel requires a bind address (endpoint)")
+	if err = s.init(); err != nil {
+		return
 	}
 
 	log := logger.Default().WithFields(map[string]any{
@@ -144,10 +183,11 @@ func (s *tunTunnel) Run() (err error) {
 		pStats.Add(stats.KindTotalErrs, int64(prev.TotalErrs))
 	}
 
-	listenerLogger := log.WithFields(map[string]any{"kind": "listener", "listener": "tun"})
-	ln := tunlistener.NewListener(
-		listener.AddrOption(s.opts.Endpoint),
-		listener.LoggerOption(listenerLogger),
+	// The device is the only privileged part, and it is unchanged: the listener
+	// creates it and hands back one conn carrying the parsed device config on
+	// its context, which is where the hub reads its own addresses.
+	deviceLn := tunlistener.NewListener(
+		listener.LoggerOption(log.WithFields(map[string]any{"kind": "listener", "listener": "tun"})),
 		listener.StatsOption(pStats),
 	)
 	// Init creates the device (and blocks until it exists), so a failure here
@@ -155,25 +195,72 @@ func (s *tunTunnel) Run() (err error) {
 	// closed on the way out: its own loop retries a device creation that cannot
 	// succeed (a missing privilege, say) — one line per second, forever, for an
 	// object that is about to be discarded.
-	if err = ln.Init(mdx.NewMetadata(s.listenerMetadata())); err != nil {
-		ln.Close()
+	if err = deviceLn.Init(mdx.NewMetadata(s.listenerMetadata())); err != nil {
+		deviceLn.Close()
+		return
+	}
+	// The device conn is the handler's, not the service's: the service accepts
+	// the spokes' streams. Take it from the device listener's queue here, so a
+	// failed start below never leaves a privileged device behind.
+	deviceConn, err := deviceLn.Accept()
+	if err != nil {
+		deviceLn.Close()
 		return
 	}
 
-	// No router and no forwarder hop: without either, x's tun handler runs in
-	// server mode and binds the listener's address.
+	// The spokes: one datagram stream each, straight off the p2p host. A failed
+	// route registration closes the device again — the device has no other
+	// consumer and nothing to serve.
+	//
+	// The manager owns the host (identity, DERP connection, accept loop); this
+	// hub holds one reference and its routes on it, so the routes are only
+	// reached while something is listening. A peer has its own p2p tunnel on
+	// the host, so this is usually already running — but a hub can be the only
+	// p2p tunnel on the host, and then this is what starts it.
+	if _, err = p2pHost.acquire(context.Background()); err != nil {
+		deviceLn.Close()
+		return
+	}
+	ln, err := p2pHost.register(s.config.Peers)
+	if err != nil {
+		p2pHost.release()
+		deviceLn.Close()
+		return
+	}
+	// register hands the route back as a net.Listener; it is always a
+	// *peerListener, the gost listener the service needs.
+	peerLn := ln.(*peerListener)
+	// The route is a plain listener, not an x listener, so it does not wrap
+	// accepted conns itself: hand it the stats the service reports.
+	peerLn.setStats(pStats)
+
+	var auther auth.Authenticator
+	if s.opts.Username != "" {
+		auther = xauth.NewAuthenticator(xauth.AuthsOption(map[string]string{s.opts.Username: s.opts.Password}))
+	}
+
+	// A p2p hub has no TTL and no keepalive setting: a peer announces its
+	// departure by closing its stream, so nothing here is parsed from metadata.
 	handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
-	h := tunhandler.NewHandler(
+	h := tunhandler.NewP2PHandler(deviceConn, auther,
 		handler.LoggerOption(handlerLogger),
+		handler.ServiceOption(s.opts.Name),
 	)
-	if err = h.Init(mdx.NewMetadata(s.handlerMetadata())); err != nil {
+	if err = h.Init(mdx.NewMetadata(nil)); err != nil {
+		p2pHost.unregister(peerLn)
+		p2pHost.release()
+		deviceLn.Close()
 		return
 	}
 
-	s.forward = xservice.NewService(s.opts.Name, ln, h,
+	s.forward = xservice.NewService(s.opts.Name, peerLn, h,
 		xservice.LoggerOption(log),
 		xservice.StatsOption(pStats),
 	)
+
+	s.mu.Lock()
+	s.ln, s.device = peerLn, deviceLn
+	s.mu.Unlock()
 
 	go func() {
 		serveErr := s.forward.Serve()
@@ -229,10 +316,27 @@ func (s *tunTunnel) Close() error {
 		}
 	}()
 
-	if s.forward != nil {
-		return s.forward.Close()
+	s.mu.Lock()
+	forward, ln, device := s.forward, s.ln, s.device
+	s.forward, s.ln, s.device = nil, nil, nil
+	s.mu.Unlock()
+
+	var err error
+	if forward != nil {
+		err = forward.Close()
 	}
-	return nil
+	// ln is set exactly when Run claimed the routes, so a hub that never got
+	// that far releases nothing here.
+	if ln != nil {
+		p2pHost.unregister(ln)
+		p2pHost.release()
+	}
+	// The service closes the handler, and the handler closes the device conn —
+	// which is also the listener's, so the listener has nothing left to release.
+	if device != nil {
+		_ = device.Close()
+	}
+	return err
 }
 
 func (s *tunTunnel) IsClosed() bool {
