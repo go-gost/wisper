@@ -5,11 +5,11 @@ import { icon } from '../utils/icons';
 import { getTunnels, subscribe, updatePeers } from '../store/tunnel-store';
 import { GoBackend } from '../api/backend';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber, maskKey } from '../utils/format';
-import { transportStyle } from '../utils/transport';
+import { maskKey } from '../utils/format';
 import { saveErrorText } from '../utils/save-error';
 import type { Peer, PendingPeer, Tunnel } from '../api/types';
 import '../components/app-scaffold';
+import '../components/peer-stats-row';
 
 /** One allowlist row. */
 interface PeerRow {
@@ -65,8 +65,6 @@ export class TunnelPeersPage extends LitElement {
   @state() private _rowError = '';
   @state() private _confirmDelete: number | null = null;
   @state() private _showKeys = false;
-  /** Key of the row whose diagnostics are expanded, if any — one at a time. */
-  @state() private _expandedKey: string | null = null;
   @state() private _snackbar = '';
   private _backend = new GoBackend();
   /** Keys that knocked and are on no allowlist. Process-wide, so it is fetched
@@ -230,119 +228,6 @@ export class TunnelPeersPage extends LitElement {
     return (this._tunnel?.peer_stats ?? []).find(s => s.key === key);
   }
 
-  private _renderStats(key: string) {
-    const stat = this._statFor(key);
-    if (!stat) return html`<span class="muted">${t('peersNoTraffic')}</span>`;
-    return html`
-      <span>${formatNumber(stat.current_conns)} ${t('p2pColConns')}</span>
-      <span>↓ ${formatBytes(stat.output_bytes)} <span class="rate">${formatRate(stat.output_rate_bytes)}</span></span>
-      <span>↑ ${formatBytes(stat.input_bytes)} <span class="rate">${formatRate(stat.input_rate_bytes)}</span></span>
-    `;
-  }
-
-  /** _renderTransport marks where this peer's traffic goes right now — the
-   *  only place the difference between peers shows. The badge stays one word
-   *  per state; the reason (a STUN server that does not answer, a punch that
-   *  failed, ...) is in the tooltip. Nothing when the peer has no session. */
-  private _renderTransport(key: string) {
-    const st = transportStyle(this._statFor(key)?.transport);
-    if (!st) return nothing;
-    return html`<span class="peer-badge ${st.tone}" title=${st.hint}>
-      ${icon(st.icon)}<span>${st.label}</span>
-    </span>`;
-  }
-
-  /** A row can expand when it has a live session: only then does the host
-   *  report a per-peer diagnostic to show. */
-  private _canExpand(key: string): boolean {
-    return !!this._statFor(key)?.transport;
-  }
-
-  private _toggleExpand(key: string) {
-    this._expandedKey = this._expandedKey === key ? null : key;
-  }
-
-  /** _ageMs renders a millisecond age compactly; an em dash when unset (0). */
-  private _ageMs(ms?: number): string {
-    if (!ms || ms <= 0) return '—';
-    const s = Math.floor(ms / 1000);
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s / 60);
-    if (m < 60) return `${m}m ${s % 60}s`;
-    const h = Math.floor(m / 60);
-    return `${h}h ${m % 60}m`;
-  }
-
-  /** _renderDiag is the row's expand: the raw per-peer state the host reports,
-   *  verbatim (p2p's own values), so the badge's one word is explained — which
-   *  endpoint was dialled, why the last round failed, how long the session and
-   *  the silence have been. */
-  private _renderDiag(key: string) {
-    const s = this._statFor(key);
-    if (!s) return nothing;
-    const caps = s.caps && s.caps.length > 0 ? s.caps.join(', ') : '';
-    return html`
-      <div class="peer-diag">
-        <div class="diag-row">
-          <span class="diag-label">${t('peersDiagPath')}</span>
-          <span class="diag-value">${s.transport ?? '—'}</span>
-        </div>
-        ${s.reason
-          ? html`<div class="diag-row">
-              <span class="diag-label">${t('peersDiagReason')}</span>
-              <span class="diag-value">${s.reason}</span>
-            </div>`
-          : nothing}
-        <div class="diag-row">
-          <span class="diag-label">${t('peersDiagState')}</span>
-          <span class="diag-value">${s.state ?? '—'}</span>
-        </div>
-        ${s.failed
-          ? html`<div class="diag-row">
-              <span class="diag-label">${t('peersDiagFailed')}</span>
-              <span class="diag-value">${t('peersDiagYes')}</span>
-            </div>`
-          : nothing}
-        ${s.last_error
-          ? html`<div class="diag-row">
-              <span class="diag-label">${t('peersDiagLastError')}</span>
-              <span class="diag-value">${s.last_error}</span>
-            </div>`
-          : nothing}
-        <div class="diag-row">
-          <span class="diag-label">${t('peersDiagEndpoint')}</span>
-          <span class="diag-value">${s.peer_addr || '—'}</span>
-        </div>
-        <div class="diag-row">
-          <span class="diag-label">${t('peersDiagCandidates')}</span>
-          <span class="diag-value">${s.candidates ?? 0}</span>
-        </div>
-        ${caps
-          ? html`<div class="diag-row">
-              <span class="diag-label">${t('peersDiagCaps')}</span>
-              <span class="diag-value">${caps}</span>
-            </div>`
-          : nothing}
-        <div class="diag-row">
-          <span class="diag-label">${t('peersDiagSession')}</span>
-          <span class="diag-value">${this._ageMs(s.session_age_ms)}</span>
-        </div>
-        <div class="diag-row">
-          <span class="diag-label">${t('peersDiagSilence')}</span>
-          <span class="diag-value">${this._ageMs(s.last_recv_age_ms)}</span>
-        </div>
-        ${s.trace && s.trace.length > 0
-          ? html`<div class="diag-trace">
-              <span class="diag-label">${t('peersDiagTrace')}</span>
-              <div class="trace-lines">
-                ${s.trace.map(line => html`<div class="trace-line">${line}</div>`)}
-              </div>
-            </div>`
-          : nothing}
-      </div>
-    `;
-  }
-
   private _renderEditor() {
     return html`
       <div class="peer-row editing">
@@ -430,18 +315,12 @@ export class TunnelPeersPage extends LitElement {
                 ${this._rows.map((row, i) => {
                   if (this._editing === i) return this._renderEditor();
                   return html`
-                    <div class="peer-row ${row.disabled ? 'off' : ''}">
-                      <div class="row-line">
-                        <span class="peer-alias">${row.alias || t('peersNoAlias')}</span>
-                        ${row.disabled
-                          ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
-                          : this._renderTransport(row.key)}
-                        ${this._canExpand(row.key)
-                          ? html`<button class="icon-btn" title="${t('peersDiagDetails')}"
-                              @click=${() => this._toggleExpand(row.key)}>
-                              ${icon(this._expandedKey === row.key ? 'chevron-up' : 'chevron-down')}
-                            </button>`
-                          : nothing}
+                    <peer-stats-row
+                      .peer=${row}
+                      .stat=${this._statFor(row.key) ?? null}
+                      ?disabled=${row.disabled}
+                      ?showKeys=${this._showKeys}
+                      .rowActions=${html`
                         <span class="row-actions">
                           <button class="icon-btn" title="${row.disabled ? t('peersEnable') : t('peersDisable')}"
                             ?disabled=${this._saving}
@@ -459,11 +338,7 @@ export class TunnelPeersPage extends LitElement {
                             ${icon('trash')}
                           </button>
                         </span>
-                      </div>
-                      <div class="peer-key">${this._showKeys ? row.key : maskKey(row.key)}</div>
-                      <div class="peer-stats">${this._renderStats(row.key)}</div>
-                      ${this._expandedKey === row.key ? this._renderDiag(row.key) : nothing}
-                    </div>
+                      `}></peer-stats-row>
                   `;
                 })}
                 ${this._editing === 'new' ? this._renderEditor() : nothing}
@@ -568,6 +443,8 @@ export class TunnelPeersPage extends LitElement {
       font-size: var(--font-sm);
     }
 
+    /* The editor and the pending rows; the allowlist rows themselves are
+       <peer-stats-row>, which owns that presentation. */
     .peer-row {
       padding: 10px 12px;
       border-bottom: 1px solid var(--border-subtle);
@@ -576,43 +453,6 @@ export class TunnelPeersPage extends LitElement {
       display: flex;
       align-items: center;
       gap: 8px;
-    }
-    .peer-alias {
-      flex: 1;
-      font-size: var(--font-sm);
-      font-weight: 500;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .peer-badge {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 1px 8px;
-      border-radius: var(--radius-pill);
-      background: var(--border-subtle);
-      color: var(--text-muted);
-      font-size: var(--font-sm);
-    }
-    .peer-badge svg {
-      width: 12px;
-      height: 12px;
-    }
-    .peer-badge.direct {
-      color: var(--green-text);
-      background: var(--green-bg);
-    }
-    .peer-badge.warn {
-      color: var(--amber);
-    }
-    /* A switched-off peer keeps its place and its key, but nothing about it is
-       live: the row reads dimmed. */
-    .peer-row.off .peer-alias,
-    .peer-row.off .peer-key,
-    .peer-row.off .peer-stats {
-      opacity: 0.5;
     }
     .row-actions {
       display: flex;
@@ -635,66 +475,6 @@ export class TunnelPeersPage extends LitElement {
       color: var(--text-secondary);
       font-size: var(--font-xs);
       white-space: nowrap;
-    }
-    .peer-stats {
-      display: flex;
-      gap: 16px;
-      align-items: flex-start;
-      padding-top: 6px;
-      font-size: var(--font-xs);
-      color: var(--text-muted);
-    }
-    .peer-stats .muted {
-      font-style: italic;
-    }
-    /* The rate sits on its own line under the byte count: on a narrow screen a
-       single line of "↓ 400.2 KB 0 B/s" has no room and wraps awkwardly. */
-    .peer-stats .rate {
-      display: block;
-      color: var(--text-muted);
-      opacity: 0.8;
-    }
-    /* The row's expand: the raw per-peer state, one label/value line each. */
-    .peer-diag {
-      margin-top: 8px;
-      padding: 8px 10px;
-      border-radius: var(--radius-sm);
-      background: var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      font-size: var(--font-xs);
-    }
-    .diag-row {
-      display: flex;
-      gap: 8px;
-    }
-    .diag-label {
-      flex: none;
-      width: 84px;
-      color: var(--text-muted);
-    }
-    .diag-value {
-      color: var(--text-secondary);
-      overflow-wrap: anywhere;
-    }
-    /* The peer's recent punch history: one monospace line per step, oldest
-       first (newest last). */
-    .diag-trace {
-      display: flex;
-      gap: 8px;
-      margin-top: 2px;
-    }
-    .trace-lines {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-      min-width: 0;
-      font-family: var(--font-mono, monospace);
-      color: var(--text-secondary);
-    }
-    .trace-line {
-      overflow-wrap: anywhere;
     }
 
     .form-input {

@@ -172,6 +172,10 @@ const en: Record<string, string> = {
   peerKeyInUseHint:
     'That key is already on another tunnel or hub — a spoke key can be on a hub or on a p2p tunnel, not both. Remove it from the other one first.',
   tunHubPeersEmpty: 'No spokes allowed — nothing reaches this device.',
+  tunHubSpokes: 'Spokes',
+  tunHubSpokesCount: '{n} allowed',
+  tunHubSpokesHint:
+    'The allowlist is edited in the form above. Each row here is a live p2p peer: its traffic, the path it takes, and — behind the arrow — the punch state and last error. A key that knocked without being listed would be refused, so paste it into the form to admit it.',
   tunPrivilegeHint:
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating this entrypoint fails with "operation not permitted" otherwise.',
   tunSpokeHint:

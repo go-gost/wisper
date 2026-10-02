@@ -169,6 +169,10 @@ const zh: Record<string, string> = {
   peerKeyInUseHint:
     '该公钥已经在另一条隧道或 hub 上了——一个 spoke 公钥只能属于 hub 或 p2p 隧道其中之一。请先把它从另一处移除。',
   tunHubPeersEmpty: '未允许任何 spoke——没有流量能到达该设备。',
+  tunHubSpokes: 'spoke 列表',
+  tunHubSpokesCount: '已允许 {n} 个',
+  tunHubSpokesHint:
+    '允许列表在上方表单里编辑。这里的每一行都是一个在线的 p2p 对端：它的流量、走的路径，以及箭头后面的打洞状态和最近一次错误。未被列入却来敲门的公钥会被拒绝，把它粘进表单即可准入。',
   tunPrivilegeHint:
     'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建会报 “operation not permitted”。',
   tunSpokeHint:
