@@ -4,7 +4,7 @@
 
 **Goal:** A p2p-reached tun hub routes its spokes' datagrams to and from the device with no local UDP socket, so a hub no longer needs a bind address a paired p2p tunnel must repeat.
 
-**Architecture:** The routing and authentication in `x/handler/tun` — keepalive magic-header parsing, the auther check, the route table with TTL expiry, destination lookup — is extracted into a `transportRouter` type that knows nothing about transport. A route's value becomes a `string` (a name): the socket server resolves it to an address and delivers with `WriteTo`; the p2p hub resolves it to a peer connection and delivers on that. Both are complete routers. p2p is not modified — its `register` seam already delivers one `net.PacketConn` per peer stream.
+**Architecture:** The routing and authentication in `x/handler/tun` — keepalive magic-header parsing, the auther check, the route table with TTL expiry, destination lookup — is extracted into a `peerTable` type that knows nothing about transport. A route's value becomes a `string` (a name): the socket server resolves it to an address and delivers with `WriteTo`; the p2p hub resolves it to a peer connection and delivers on that. Both are complete routers. p2p is not modified — its `register` seam already delivers one `net.PacketConn` per peer stream.
 
 **Tech Stack:** Go, `github.com/go-gost/x` (handler/listener), `github.com/go-gost/wisper`, Lit/TypeScript UI, `songgao/water`, `golang.org/x/net/ipv4|ipv6`.
 
@@ -23,13 +23,15 @@ Do not commit wisper's `go.mod` bump before the tag exists — CI checks out the
 
 ## File structure
 
-**`x/handler/tun/`** (all new code is in `router.go` and `p2proot.go`; `server.go` shrinks):
+**`x/handler/tun/`** (the new code is `router.go`, `p2p.go`, `peerstream.go`, `p2phandler.go`; `server.go` shrinks):
 
 | File | Responsibility |
 |---|---|
-| `router.go` (new) | `transportRouter`: route table `map[tunRouteKey]string`, keepalive parse, auther check, dst lookup, TTL expiry, peer-route reclamation. Knows nothing about transport. |
-| `p2proot.go` (new) | `peerRouter`: the p2p `delivery` — peer key → stream, deliver on the stream, drop a peer's routes on stream close. |
-| `server.go` (modify) | socket `delivery`: `resolve` a name to `net.Addr`, deliver with `WriteTo`. Keeps its loops. |
+| `router.go` (new) | `peerTable`: the route table `map[tunRouteKey]string`, the keepalive protocol, the auther check, TTL expiry, destination lookup. Knows nothing about transport. |
+| `p2p.go` (new) | `peerRouter` (a route's name resolves to a stream) and `p2pHub` (one device read loop, one write lock). |
+| `peerstream.go` (new) | `peerStream`: one inbound stream, with the write serialization its frame conn does not provide. |
+| `p2phandler.go` (new) | `NewP2PHandler`: the `handler.Handler` a hub's service runs, bridging accepted streams to the hub. |
+| `server.go` (modify) | the socket delivery: `resolve` a name to an address, deliver with `WriteTo`. Keeps its loops. |
 
 **`wisper/tunnel/`**:
 | File | Responsibility |
@@ -43,7 +45,7 @@ Do not commit wisper's `go.mod` bump before the tag exists — CI checks out the
 
 ---
 
-### Task 1: Extract the route table into `transportRouter`
+### Task 1: Extract the route table into `peerTable`
 
 The table's value becomes a `string` — a name, not an address. This is what lets both implementations share it: a UDP endpoint and a peer key are both names, and neither is a `net.Addr`.
 
@@ -66,7 +68,7 @@ import (
 
 // A keepalive registers the peer's IPs under the name its delivery resolves.
 func TestTransportRouterRegistersKeepalive(t *testing.T) {
-	r := newTransportRouter(nil, 0, nil)
+	r := newPeerTable(nil, 0, nil)
 
 	frame := keepAliveFrame("secret", net.IPv4(10, 10, 0, 2))
 	peerIPs, ok := r.onKeepalive(context.Background(), frame, "udp-peer-1")
@@ -88,7 +90,7 @@ func TestTransportRouterRegistersKeepalive(t *testing.T) {
 
 // An unauthenticated registration must leave no route behind.
 func TestTransportRouterRejectsUnauthenticated(t *testing.T) {
-	r := newTransportRouter(newTestAuther("secret"), 0, nil)
+	r := newPeerTable(newTestAuther("secret"), 0, nil)
 
 	if _, ok := r.onKeepalive(context.Background(), keepAliveFrame("wrong", net.IPv4(10, 10, 0, 3)), "peer-x"); ok {
 		t.Fatal("keepalive accepted with the wrong passphrase")
@@ -100,7 +102,7 @@ func TestTransportRouterRejectsUnauthenticated(t *testing.T) {
 
 // A route whose TTL has passed is dropped; one inside it is not.
 func TestTransportRouterExpiresByTTL(t *testing.T) {
-	r := newTransportRouter(nil, 30*time.Millisecond, nil)
+	r := newPeerTable(nil, 30*time.Millisecond, nil)
 
 	frame := keepAliveFrame("", net.IPv4(10, 10, 0, 4))
 	if _, ok := r.onKeepalive(context.Background(), frame, "peer-y"); !ok {
@@ -118,7 +120,7 @@ func TestTransportRouterExpiresByTTL(t *testing.T) {
 
 // Dropping a peer removes every route it registered and leaves others alone.
 func TestTransportRouterDropsPeerRoutes(t *testing.T) {
-	r := newTransportRouter(nil, 0, nil)
+	r := newPeerTable(nil, 0, nil)
 
 	// Keepalives carry several IPs, so one peer can own more than one route.
 	r.onKeepalive(context.Background(), keepAliveFrame("", net.IPv4(10, 10, 0, 5), net.IPv4(10, 10, 0, 6)), "peer-z")
@@ -140,7 +142,7 @@ func TestTransportRouterDropsPeerRoutes(t *testing.T) {
 // A destination with no route resolves to nothing, so a packet for it is
 // discarded rather than sent somewhere arbitrary.
 func TestTransportRouterUnknownDestination(t *testing.T) {
-	r := newTransportRouter(nil, 0, nil)
+	r := newPeerTable(nil, 0, nil)
 	if name, ok := r.lookup(net.IPv4(10, 10, 0, 99)); ok {
 		t.Fatalf("unknown destination resolved to %q", name)
 	}
@@ -177,7 +179,7 @@ and add `context` plus `github.com/go-gost/core/auth` and `xauth "github.com/go-
 cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestTransportRouter 2>&1 | head -20
 ```
 
-Expected: compile failure — `undefined: newTransportRouter`, `keepAliveFrame`, `newTestAuther`.
+Expected: compile failure — `undefined: newPeerTable`, `keepAliveFrame`, `newTestAuther`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -197,13 +199,13 @@ import (
 	"github.com/go-gost/core/logger"
 )
 
-// transportRouter is the routing and authentication a tun hub does, with no
+// peerTable is the routing and authentication a tun hub does, with no
 // notion of how datagrams travel: the keepalive protocol, the auther check,
 // the route table with its TTL, and destination lookup. A route's value is a
 // name that a delivery implementation resolves — a UDP address for the socket
 // server, a peer key for the p2p hub. Keeping the value a string is what lets
 // both share this table: neither a net.Addr nor a connection fits both.
-type transportRouter struct {
+type peerTable struct {
 	auther auth.Authenticator
 	ttl    time.Duration
 	log    logger.Logger
@@ -220,8 +222,8 @@ type routeEntry struct {
 	lastSeen time.Time
 }
 
-func newTransportRouter(auther auth.Authenticator, ttl time.Duration, log logger.Logger) *transportRouter {
-	return &transportRouter{auther: auther, ttl: ttl, log: log}
+func newPeerTable(auther auth.Authenticator, ttl time.Duration, log logger.Logger) *peerTable {
+	return &peerTable{auther: auther, ttl: ttl, log: log}
 }
 
 // onKeepalive handles a keepalive frame from a peer arriving over the
@@ -229,7 +231,7 @@ func newTransportRouter(auther auth.Authenticator, ttl time.Duration, log logger
 // accepted, and ok false when it is refused — an empty IP list, one of the
 // hub's own addresses, or a failed authentication. It does not reply: the
 // caller answers, because the reply travels over that same transport.
-func (r *transportRouter) onKeepalive(ctx context.Context, frame []byte, from string, ownNets []net.IPNet) (peerIPs []net.IP, ok bool) {
+func (r *peerTable) onKeepalive(ctx context.Context, frame []byte, from string, ownNets []net.IPNet) (peerIPs []net.IP, ok bool) {
 	if len(frame) <= keepAliveHeaderLength || !bytes.Equal(frame[:4], magicHeader) {
 		return nil, false
 	}
@@ -273,7 +275,7 @@ func (r *transportRouter) onKeepalive(ctx context.Context, frame []byte, from st
 }
 
 // set registers or refreshes the route for ip, naming the peer that owns it.
-func (r *transportRouter) set(ip net.IP, name string) {
+func (r *peerTable) set(ip net.IP, name string) {
 	key := ipToTunRouteKey(ip)
 	entry := routeEntry{name: name, lastSeen: time.Now()}
 	if actual, loaded := r.routes.LoadOrStore(key, entry); loaded {
@@ -291,7 +293,7 @@ func (r *transportRouter) set(ip net.IP, name string) {
 // lookup returns the name registered for dst, dropping the route first if its
 // TTL has passed. A TTL of zero never expires, which is what an unconfigured
 // socket deployment has always had.
-func (r *transportRouter) lookup(dst net.IP) (string, bool) {
+func (r *peerTable) lookup(dst net.IP) (string, bool) {
 	key := ipToTunRouteKey(dst)
 	v, ok := r.routes.Load(key)
 	if !ok {
@@ -311,7 +313,7 @@ func (r *transportRouter) lookup(dst net.IP) (string, bool) {
 // dropPeer removes every route a peer registered. It is how the p2p hub
 // reclaims: a stream close says a peer is gone, which is more accurate than
 // the TTL guessing it from silence.
-func (r *transportRouter) dropPeer(name string) {
+func (r *peerTable) dropPeer(name string) {
 	r.peerOfKey.Range(func(k, v any) bool {
 		if v.(string) != name {
 			return true
@@ -323,13 +325,13 @@ func (r *transportRouter) dropPeer(name string) {
 	})
 }
 
-func (r *transportRouter) debugf(format string, args ...any) {
+func (r *peerTable) debugf(format string, args ...any) {
 	if r.log != nil {
 		r.log.Debugf(format, args...)
 	}
 }
 
-func (r *transportRouter) infof(format string, args ...any) {
+func (r *peerTable) infof(format string, args ...any) {
 	if r.log != nil {
 		r.log.Infof(format, args...)
 	}
@@ -363,7 +365,7 @@ and keeps no timer."
 
 ---
 
-### Task 2: Make the socket server use `transportRouter`
+### Task 2: Make the socket server use `peerTable`
 
 The socket server keeps every behavior it has. This task only changes where its state lives, so the socket path is provably unchanged — its existing tests are the guard.
 
@@ -386,7 +388,7 @@ In `x/handler/tun/handler.go`, replace the `routes sync.Map` field with a pointe
 ```go
 type tunHandler struct {
 	hop   hop.Hop
-	router *transportRouter
+	router *peerTable
 	md      metadata
 	options handler.Options
 }
@@ -395,7 +397,7 @@ type tunHandler struct {
 and in `Init`, after `parseMetadata`:
 
 ```go
-h.router = newTransportRouter(
+h.router = newPeerTable(
 	options.Auther,
 	h.md.keepAlivePeriod,
 	options.Logger,
@@ -533,7 +535,7 @@ Expected: build and vet clean; **every test from Step 1 still passes, same names
 cd /config/workspace/go-gost/x && git add handler/tun/handler.go handler/tun/server.go && git commit -m "tun: the socket server keeps its behavior, on the shared router
 
 Its keepalive handling, route lookups and both delivery loops move onto
-transportRouter unchanged: the same magic-header reply, the same gateway
+peerTable unchanged: the same magic-header reply, the same gateway
 fallback, the same discard for an unrouted packet. Only the route's
 value is now a name, resolved at the point of delivery.
 
@@ -546,100 +548,288 @@ something moved that should not have."
 
 ### Task 3: The p2p delivery implementation
 
+The device admits one reader and one writer and guarantees neither: `tunDevice`
+shares `d.rbufs[0]` and `d.wbuf` with no lock, and p2p's `frameConn.Write`
+serializes only its read buffer. So nothing here touches the device per stream.
+One loop reads it; every write goes through one mutex. This is the socket
+server's shape reached a different way.
+
 **Files:**
-- Create: `x/handler/tun/p2proot.go`
-- Test: `x/handler/tun/p2proot_test.go`
+- Create: `x/handler/tun/p2p.go`
+- Test: `x/handler/tun/p2p_test.go`
 
 - [ ] **Step 1: Write the failing test**
 
-`x/handler/tun/p2proot_test.go`:
+`x/handler/tun/p2p_test.go`:
 
 ```go
 package tun
 
 import (
+	"context"
 	"io"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
 
-// A datagram the hub writes to the device is delivered on the stream the
+// A datagram the hub reads off the device is delivered on the stream the
 // destination IP's route names.
-func TestPeerRouterDeliversToRoutedPeer(t *testing.T) {
-	p := newPeerRouter()
+func TestP2PDeliversToRoutedPeer(t *testing.T) {
+	hub := newTestHub(t)
 
-	devA, spokeA := pipeConn(t)
-	devB, spokeB := pipeConn(t)
+	hub.addPeer("peer-a")
+	hub.addPeer("peer-b")
+	hub.register(t, "peer-a", net.IPv4(10, 10, 0, 2))
+	hub.register(t, "peer-b", net.IPv4(10, 10, 0, 3))
 
-	p.add("peer-a", spokeA)
-	p.add("peer-b", spokeB)
-	p.router.onKeepalive(context.Background(),
-		keepAliveFrame("", net.IPv4(10, 10, 0, 2)), "peer-a", nil)
-	p.router.onKeepalive(context.Background(),
-		keepAliveFrame("", net.IPv4(10, 10, 0, 3)), "peer-b", nil)
+	hub.deviceFrom(t, ipv4Datagram(net.IPv4(10, 10, 0, 1), net.IPv4(10, 10, 0, 3)))
 
-	// 10.10.0.3 routes to peer-b, so a packet for it lands on spokeB.
-	if err := p.deliver(net.IPv4(10, 10, 0, 3), []byte("for-b")); err != nil {
-		t.Fatal(err)
+	if got := hub.readDatagram(t, "peer-b"); string(got) != wantDst3 {
+		t.Fatalf("peer-b got %q, want %q", got, wantDst3)
 	}
-	if got := readDatagram(t, spokeB); string(got) != "for-b" {
-		t.Fatalf("peer-b got %q, want %q", got, "for-b")
-	}
-	if got := readNothing(t, spokeA, 50*time.Millisecond); got != nil {
+	if got := hub.readNothing(t, "peer-a", 50*time.Millisecond); got != nil {
 		t.Fatalf("peer-a received %q, want nothing", got)
 	}
-
-	devA.Close()
-	devB.Close()
 }
 
-// A stream closing drops every route that peer owned, and only those.
-func TestPeerRouterDropsPeerRoutesOnClose(t *testing.T) {
-	p := newPeerRouter()
-	_, spokeA := pipeConn(t)
-	_, spokeB := pipeConn(t)
+// A datagram a spoke sends reaches the device.
+func TestP2PSpokeDatagramReachesDevice(t *testing.T) {
+	hub := newTestHub(t)
+	hub.addPeer("peer-a")
 
-	p.add("peer-a", spokeA)
-	p.add("peer-b", spokeB)
-	p.router.onKeepalive(context.Background(),
-		keepAliveFrame("", net.IPv4(10, 10, 0, 2), net.IPv4(10, 10, 0, 5)), "peer-a", nil)
-	p.router.onKeepalive(context.Background(),
-		keepAliveFrame("", net.IPv4(10, 10, 0, 3)), "peer-b", nil)
+	hub.writeFromPeer(t, "peer-a", []byte("from-spoke"))
 
-	p.remove("peer-a")
+	if got := hub.readDevice(); string(got) != "from-spoke" {
+		t.Fatalf("device got %q, want %q", got, "from-spoke")
+	}
+}
 
-	if _, ok := p.router.lookup(net.IPv4(10, 10, 0, 2)); ok {
+// Concurrent spokes writing the device must not corrupt each other: the write
+// side is shared state with no lock of its own.
+func TestP2PConcurrentSpokeWritesAreIntact(t *testing.T) {
+	hub := newTestHub(t)
+
+	const peers, each = 4, 25
+	for i := range peers {
+		hub.addPeer(peerName(i))
+	}
+
+	var wg sync.WaitGroup
+	for i := range peers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range each {
+				hub.writeFromPeer(t, peerName(i), payloadFor(i, j))
+			}
+		}()
+	}
+	wg.Wait()
+
+	seen := map[string]bool{}
+	for range peers * each {
+		got := hub.readDevice()
+		key := string(got)
+		if seen[key] {
+			t.Fatalf("duplicate payload %q: writes interleaved", key)
+		}
+		seen[key] = true
+		if !strings.HasSuffix(key, "\x00\x00\x00\x00") {
+			t.Fatalf("payload %q is torn", key)
+		}
+	}
+}
+
+// A stream closing drops that peer's routes — but only while it still holds
+// them. A reconnect brings a new stream under the same key; the old one's
+// teardown must not withdraw what the new one registered.
+func TestP2PTeardownDoesNotWithdrawSuccessor(t *testing.T) {
+	hub := newTestHub(t)
+
+	old := hub.addPeer("peer-a")
+	hub.register(t, "peer-a", net.IPv4(10, 10, 0, 2))
+
+	// The peer reconnects: a new stream takes the key and re-registers.
+	hub.addPeer("peer-a")
+	hub.register(t, "peer-a", net.IPv4(10, 10, 0, 2))
+
+	// The old stream now ends, late.
+	old.close()
+
+	if _, ok := hub.table.lookup(net.IPv4(10, 10, 0, 2)); !ok {
+		t.Fatal("a stale stream's teardown withdrew the live peer's route")
+	}
+}
+
+// A stream closing drops its peer's routes when it still holds them.
+func TestP2PTeardownDropsOwnRoutes(t *testing.T) {
+	hub := newTestHub(t)
+
+	c := hub.addPeer("peer-a")
+	hub.register(t, "peer-a", net.IPv4(10, 10, 0, 2), net.IPv4(10, 10, 0, 5))
+
+	c.close()
+
+	if _, ok := hub.table.lookup(net.IPv4(10, 10, 0, 2)); ok {
 		t.Fatal("closed peer kept a route")
 	}
-	if _, ok := p.router.lookup(net.IPv4(10, 10, 0, 5)); ok {
+	if _, ok := hub.table.lookup(net.IPv4(10, 10, 0, 5)); ok {
 		t.Fatal("closed peer kept its second route")
 	}
-	if _, ok := p.router.lookup(net.IPv4(10, 10, 0, 3)); !ok {
-		t.Fatal("closing one peer dropped another's route")
+}
+
+// A keepalive is answered, so a spoke running keepalive:true does not expire on
+// its own read deadline.
+func TestP2PAnswersKeepalive(t *testing.T) {
+	hub := newTestHub(t)
+	hub.addPeer("peer-a")
+
+	c := hub.peerConn("peer-a")
+	if _, err := c.Write(keepAliveFrame("", net.IPv4(10, 10, 0, 2))); err != nil {
+		t.Fatal(err)
+	}
+
+	c.SetReadDeadline(time.Now().Add(2 * time.Second))
+	buf := make([]byte, 64)
+	n, err := c.Read(buf)
+	if err != nil {
+		t.Fatal("keepalive was not answered:", err)
+	}
+	if n != keepAliveHeaderLength {
+		t.Fatalf("answer is %d bytes, want %d", n, keepAliveHeaderLength)
+	}
+	if _, ok := hub.table.lookup(net.IPv4(10, 10, 0, 2)); !ok {
+		t.Fatal("the keepalive did not register the peer's address")
 	}
 }
-```
 
-Drop the `peerTestConn` stub — `pipeConn` below is the real helper. Add to the same file:
+// A packet for a destination no peer registered is discarded and named, so a
+// spoke that never registers is visible rather than merely silent.
+func TestP2PUnroutablePacketIsNamed(t *testing.T) {
+	hub := newTestHub(t)
+	hub.addPeer("peer-a")
+	hub.register(t, "peer-a", net.IPv4(10, 10, 0, 2))
 
-```go
-// pipeConn returns a peer stream and the device end it is bridged to. The
-// spoke end is the peer side; dev is the device side, whose Device() is the
-// io.ReadWriter the handler writes packets into.
-func pipeConn(t *testing.T) (dev *datagramPipe, spoke *datagramPipe) {
-	t.Helper()
-	a, b := newDatagramPipe()
-	t.Cleanup(func() { a.Close(); b.Close() })
-	return a, b
+	hub.deviceFrom(t, ipv4Datagram(net.IPv4(10, 10, 0, 1), net.IPv4(10, 10, 0, 99)))
+	hub.expectWarning(t, "10.10.0.99")
 }
 
-// Device returns the pipe as the io.ReadWriter the handler holds: reads come
-// from what the device produced, writes go to it.
-func (c *datagramPipe) Device() io.ReadWriter { return c }
+// peerName and payloadFor build stable identities for the concurrency test.
+func peerName(i int) string { return fmt.Sprintf("peer-%d", i) }
 
-func readDatagram(t *testing.T, c *datagramPipe) []byte {
+func payloadFor(peer, n int) []byte {
+	b := make([]byte, 64)
+	binary.BigEndian.PutUint32(b, uint32(peer)<<16|uint32(n))
+	return b
+}
+
+const wantDst3 = "to-peer-b"
+```
+
+Append the harness it leans on, to the same file:
+
+```go
+// testHub is a hub with an in-memory device, so the tests exercise the real
+// loops rather than a stand-in for them.
+type testHub struct {
+	t      *testing.T
+	device *datagramPipe // the device end: reads come from the hub, writes go to it
+	peers  map[string]*peerStream
+
+	table *peerTable
+	router *peerRouter
+	hub    *p2pHub
+	warnings chan string
+}
+
+func newTestHub(t *testing.T) *testHub {
 	t.Helper()
+	// The device side the hub writes to, and the side its read loop draws from.
+	toDevice, fromDevice := newDatagramPipe()
+
+	h := &testHub{
+		t:        t,
+		device:   fromDevice,
+		peers:    make(map[string]*peerStream),
+		warnings: make(chan string, 16),
+	}
+	h.table = newPeerTable(nil, 0, xlogger.Nop())
+	h.router = &peerRouter{table: h.table, streams: make(map[string]*peerStream)}
+	h.hub = newP2PHub(toDevice, h.router, nil, h.warnf)
+
+	go h.hub.run()
+
+	t.Cleanup(h.hub.stop)
+	return h
+}
+
+func (h *testHub) warnf(msg string) { h.warnings <- msg }
+
+func (h *testHub) addPeer(key string) *peerStream {
+	h.t.Helper()
+	c, dev := newDatagramPipe()
+	s := newPeerStream(key, c)
+	h.peers[key] = s
+	h.router.streams[key] = s
+	// The stream's own read loop, as a spoke connection would drive it.
+	go func() {
+		buf := make([]byte, MaxMessageSize)
+		for {
+			n, err := s.Read(buf)
+			if n > 0 {
+				h.hub.fromSpoke(buf[:n])
+			}
+			if err != nil {
+				break
+			}
+		}
+		h.hub.peerGone(s)
+	}()
+	h.t.Cleanup(func() { s.close() })
+	return s
+}
+
+func (h *testHub) register(t *testing.T, key string, ips ...net.IP) {
+	t.Helper()
+	s := h.peers[key]
+	if _, ok := h.table.onKeepalive(context.Background(), keepAliveFrame("", ips...), key, nil); !ok {
+		t.Fatal("registration refused")
+	}
+	_ = s
+}
+
+func (h *testHub) peerConn(key string) *peerStream { return h.peers[key] }
+
+func (h *testHub) writeFromPeer(t *testing.T, key string, pkt []byte) {
+	t.Helper()
+	if _, err := h.peers[key].Write(pkt); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (h *testHub) deviceFrom(t *testing.T, pkt []byte) {
+	t.Helper()
+	if _, err := h.hub.deviceFromDevice(pkt); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (h *testHub) readDevice() []byte {
+	h.t.Helper()
+	h.device.SetReadDeadline(time.Now().Add(2 * time.Second))
+	b := make([]byte, 1500)
+	n, err := h.device.Read(b)
+	if err != nil {
+		h.t.Fatal("reading the device:", err)
+	}
+	return b[:n]
+}
+
+func (h *testHub) readDatagram(t *testing.T, key string) []byte {
+	t.Helper()
+	c := h.peers[key]
 	c.SetReadDeadline(time.Now().Add(2 * time.Second))
 	b := make([]byte, 1500)
 	n, err := c.Read(b)
@@ -649,9 +839,9 @@ func readDatagram(t *testing.T, c *datagramPipe) []byte {
 	return b[:n]
 }
 
-// readNothing asserts nothing arrives within d.
-func readNothing(t *testing.T, c *datagramPipe, d time.Duration) []byte {
+func (h *testHub) readNothing(t *testing.T, key string, d time.Duration) []byte {
 	t.Helper()
+	c := h.peers[key]
 	c.SetReadDeadline(time.Now().Add(d))
 	b := make([]byte, 1500)
 	n, err := c.Read(b)
@@ -660,19 +850,83 @@ func readNothing(t *testing.T, c *datagramPipe, d time.Duration) []byte {
 	}
 	return b[:n]
 }
+
+func (h *testHub) expectWarning(t *testing.T, want string) {
+	t.Helper()
+	select {
+	case got := <-h.warnings:
+		if !strings.Contains(got, want) {
+			t.Fatalf("warning %q does not name %q", got, want)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no warning for an unroutable packet")
+	}
+}
+
+// ipv4Datagram builds a minimal IPv4 packet with the given endpoints, so
+// destination parsing is exercised without a device.
+func ipv4Datagram(src, dst net.IP) []byte {
+	pkt := make([]byte, 20)
+	pkt[0] = 0x45 // version 4, header length 5
+	binary.BigEndian.PutUint16(pkt[2:], 20)
+	copy(pkt[12:16], src.To4())
+	copy(pkt[16:20], dst.To4())
+	return pkt
+}
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestPeerRouter 2>&1 | head -20
+cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestP2P 2>&1 | head -20
 ```
 
-Expected: compile failure — `undefined: newPeerRouter`, `newDatagramPipe`.
+Expected: compile failure — `undefined: peerTable`, `peerRouter`, `p2pHub`, `peerStream`, `newDatagramPipe`.
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 3: Write `peerStream` — the serialized half**
 
-`x/handler/tun/p2proot.go`:
+Create `x/handler/tun/peerstream.go`:
+
+```go
+package tun
+
+import (
+	"net"
+	"sync"
+)
+
+// peerStream is one inbound stream from one peer. Writes are serialized
+// because the underlying frame conn serializes only its read buffer: two
+// concurrent writes interleave a header with somebody else's payload.
+type peerStream struct {
+	key  string
+	conn net.Conn
+
+	wmu sync.Mutex
+	one sync.Once
+}
+
+func newPeerStream(key string, conn net.Conn) *peerStream {
+	return &peerStream{key: key, conn: conn}
+}
+
+func (s *peerStream) Write(p []byte) (int, error) {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+	return s.conn.Write(p)
+}
+
+func (s *peerStream) Read(p []byte) (int, error) { return s.conn.Read(p) }
+
+func (s *peerStream) Close() error { return s.conn.Close() }
+
+// close retires the stream once, so a peer's teardown runs a single time.
+func (s *peerStream) close() { s.one.Do(func() { s.conn.Close() }) }
+```
+
+- [ ] **Step 4: Write `peerRouter` — name to stream**
+
+`x/handler/tun/p2p.go`, first half:
 
 ```go
 package tun
@@ -683,259 +937,179 @@ import (
 	"sync"
 )
 
-// peerRouter is the p2p delivery: it resolves a route's name to the peer
-// connection that owns it. Unlike the socket server it keeps a map, because
-// resolving a peer key to a connection is the whole of what a name lookup
-// does here — there is no address to parse and no socket to write to.
+var (
+	// ErrNoRoute is a packet whose destination no peer registered. Expected
+	// while a registration is in flight, and a symptom when it persists.
+	ErrNoRoute = errors.New("tun: no route")
+)
+
+// peerRouter resolves a route's name — a peer key — to the stream that peer is
+// currently reachable on. A reconnect replaces the stream under a key without
+// touching the key, which is what lets a route outlive a link.
 type peerRouter struct {
-	router *transportRouter
+	table *peerTable
 
-	mu    sync.RWMutex
-	streams map[string]net.Conn
+	mu      sync.RWMutex
+	streams map[string]*peerStream
 }
 
-func newPeerRouter() *peerRouter {
-	return &peerRouter{
-		router:  newTransportRouter(nil, 0, nil),
-		streams: make(map[string]net.Conn),
+// install makes key's stream the one its routes resolve to, replacing any
+// stream already under that key.
+func (r *peerRouter) install(s *peerStream) {
+	r.mu.Lock()
+	r.streams[s.key] = s
+	r.mu.Unlock()
+}
+
+// stream returns the peer key's current stream, or nil.
+func (r *peerRouter) stream(key string) *peerStream {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.streams[key]
+}
+
+// withdraw removes s if it is still the stream holding key. A stream that has
+// already been replaced — a peer that reconnected — must not take the live
+// one's routes with it, so teardown withdraws only what it still owns.
+func (r *peerRouter) withdraw(s *peerStream) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.streams[s.key] != s {
+		return false
 	}
+	delete(r.streams, s.key)
+	return true
 }
 
-// NewPeerRouter returns the peer router a hub's handler resolves routes with.
-// The hub owns it: it hands the same one to every accepted stream, and a
-// stream's lifetime is a peer's.
-func NewPeerRouter() *peerRouter { return newPeerRouter() }
-
-// add registers a peer's stream. Its routes go when remove is called, which
-// is the only reclamation this implementation has: p2p reports a departure
-// exactly, so it does not need the TTL the socket server relies on.
-func (p *peerRouter) add(key string, c net.Conn) {
-	p.mu.Lock()
-	p.streams[key] = c
-	p.mu.Unlock()
-}
-
-func (p *peerRouter) remove(key string) {
-	p.mu.Lock()
-	delete(p.streams, key)
-	p.mu.Unlock()
-	p.router.dropPeer(key)
-}
-
-// deliver writes a datagram on the stream named by dst's route.
-func (p *peerRouter) deliver(dst net.IP, pkt []byte) error {
-	key, ok := p.router.lookup(dst)
+// deliver writes a packet on the stream its destination names.
+func (r *peerRouter) deliver(dst net.IP, pkt []byte) error {
+	key, ok := r.table.lookup(dst)
 	if !ok {
 		return ErrNoRoute
 	}
-	p.mu.RLock()
-	c := p.streams[key]
-	p.mu.RUnlock()
-	if c == nil {
+	s := r.stream(key)
+	if s == nil {
 		return ErrNoRoute
 	}
-	_, err := c.Write(pkt)
+	_, err := s.Write(pkt)
 	return err
 }
-
-// stream returns a peer's stream, for the keepalive reply.
-func (p *peerRouter) stream(key string) net.Conn {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.streams[key]
-}
 ```
 
-Add `ErrNoRoute` to `handler.go` beside the existing errors:
+- [ ] **Step 5: Write `p2pHub` — one device reader, one write lock**
+
+`x/handler/tun/p2p.go`, second half:
 
 ```go
-ErrNoRoute = errors.New("tun: no route")
-```
-
-- [ ] **Step 4: Write `datagramPipe`**
-
-The device and the peer end exchange whole datagrams, so the test can assert on them. Create `x/handler/tun/datagrampipe_test.go`:
-
-```go
-package tun
-
-import (
-	"net"
-	"sync"
-	"time"
-)
-
-// datagramPipe is a net.Pipe whose reads return one written message at a
-// time, so a test can tell datagram boundaries apart. net.Pipe is a byte
-// stream, which would let a test pass on a torn packet.
-type datagramPipe struct {
-	net.Conn
-	mu     sync.Mutex
-	queued [][]byte
-}
-
-func newDatagramPipe() (*datagramPipe, *datagramPipe) {
-	a, b := net.Pipe()
-	return &datagramPipe{Conn: a}, &datagramPipe{Conn: b}
-}
-
-func (c *datagramPipe) Write(p []byte) (int, error) {
-	b := make([]byte, len(p))
-	copy(b, p)
-	c.mu.Lock()
-	c.queued = append(c.queued, b)
-	c.mu.Unlock()
-	return len(p), nil
-}
-
-func (c *datagramPipe) Read(b []byte) (int, error) {
-	c.mu.Lock()
-	if len(c.queued) > 0 {
-		msg := c.queued[0]
-		c.queued = c.queued[1:]
-		c.mu.Unlock()
-		return copy(b, msg), nil
-	}
-	c.mu.Unlock()
-	time.Sleep(time.Millisecond)
-	return 0, nil
-}
-```
-
-- [ ] **Step 5: Wrap `peerRouter` in a `handler.Handler`**
-
-wisper's hub needs a handler, so `peerRouter` must be usable as one: it accepts
-a peer stream, bridges it to the device both ways, and drops the peer's routes
-when the stream ends. Create `x/handler/tun/p2phandler.go`:
-
-```go
-package tun
-
-import (
-	"context"
-	"io"
-	"net"
-	"sync"
-
-	"github.com/go-gost/core/handler"
-	"github.com/go-gost/core/logger"
-	md "github.com/go-gost/core/metadata"
-)
-
-// p2pTunHandler is the hub's handler: each accepted peer stream is one spoke,
-// bridged to the device both ways. A datagram the spoke sends is written to
-// the device; a datagram the device produces is delivered on the stream whose
-// route names the packet's destination.
-//
-// It is the p2p counterpart of the socket server and differs in two ways that
-// are both forced by the transport: routes are reclaimed when a stream closes
-// rather than by TTL, and a keepalive is answered but not refreshed, because
-// p2p reports a departure exactly instead of inferring it from silence.
-type p2pTunHandler struct {
+// p2pHub is the p2p hub's engine: one loop reads the device and dispatches by
+// destination, and every write goes through one mutex. The device shares its
+// buffers across calls with no lock of its own, so it admits one reader and
+// one writer — the same shape as the socket server, which gets there by
+// construction rather than by a bridge per stream.
+type p2pHub struct {
 	device io.ReadWriter
-	peers  *peerRouter
-	auther auth.Authenticator
-	log    logger.Logger
+	router *peerRouter
+	warn   func(string)
 
-	mu     sync.Mutex
-	closed bool
+	dmu sync.Mutex // serializes writes to the device
+	wg  sync.WaitGroup
+
+	stopOnce sync.Once
+	closed   chan struct{}
 }
 
-// NewP2PHandler creates the hub's handler. device is the tun device, already
-// created by the listener; peers resolves a route's name to a stream.
-func NewP2PHandler(device io.ReadWriter, peers *peerRouter, opts ...handler.Option) handler.Handler {
-	options := handler.Options{}
-	for _, opt := range opts {
-		opt(&options)
-	}
-	if options.Logger == nil {
-		options.Logger = xlogger.Nop()
-	}
-	return &p2pTunHandler{
-		device: device,
-		peers:  peers,
-		auther: options.Auther,
-		log:    options.Logger,
-	}
+func newP2PHub(device io.ReadWriter, router *peerRouter, warn func(string)) *p2pHub {
+	return &p2pHub{device: device, router: router, warn: warn, closed: make(chan struct{})}
 }
 
-func (h *p2pTunHandler) Init(md md.Metadata) error { return nil }
-
-// Handle bridges one accepted peer stream. The stream's remote address is the
-// peer key, which is the name its routes are stored under.
-func (h *p2pTunHandler) Handle(ctx context.Context, conn net.Conn, opts ...handler.HandleOption) error {
-	defer conn.Close()
-
-	key := conn.RemoteAddr().String()
-	h.peers.add(key, conn)
-	defer h.peers.remove(key)
-
-	done := make(chan error, 2)
-	go func() { done <- h.spokeToDevice(conn) }()
-	go func() { done <- h.deviceToSpoke(conn) }()
-
-	select {
-	case err := <-done:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// spokeToDevice writes each datagram the spoke sends to the device.
-func (h *p2pTunHandler) spokeToDevice(conn net.Conn) error {
-	buf := make([]byte, MaxMessageSize)
-	for {
-		n, err := conn.Read(buf)
-		if n > 0 {
-			if isKeepaliveFrame(buf[:n]) {
-				// A keepalive declares the spoke's IPs and expects an answer,
-				// so a spoke running keepalive:true does not expire on its own
-				// deadline. Registration is the route table's business.
-				if _, ok := h.peers.router.onKeepalive(ctx(), buf[:n], key, nil); ok {
-					reply := keepAliveReply(key)
-					if _, werr := conn.Write(reply); werr != nil {
-						h.log.Debugf("keepalive to %s: %v", key, werr)
-					}
-				}
-				continue
-			}
-			if _, werr := h.device.Write(buf[:n]); werr != nil {
-				return werr
-			}
-		}
-		if err != nil {
-			return err
-		}
-	}
-}
-
-// deviceToSpoke delivers each datagram the device produces to the spoke whose
-// route names its destination, or discards it when no route does.
-func (h *p2pTunHandler) deviceToSpoke(conn net.Conn) error {
+// run reads the device for as long as the hub lives. One goroutine, always:
+// which stream a packet was read on carries no meaning, because the route is
+// what says where it goes.
+func (h *p2pHub) run() {
 	buf := make([]byte, MaxMessageSize)
 	for {
 		n, err := h.device.Read(buf)
 		if n > 0 {
-			dst, ok := destinationOf(buf[:n])
-			if !ok {
-				h.log.Debug("device packet with no parsable destination, discarded")
-				continue
-			}
-			if derr := h.peers.deliver(dst, buf[:n]); derr != nil {
-				h.log.Debugf("no route for %s: %v", dst, derr)
-			}
+			h.dispatch(buf[:n])
 		}
 		if err != nil {
-			return err
+			return
 		}
+		select {
+		case <-h.closed:
+			return
+		default:
+		}
+	}
+}
+
+func (h *p2pHub) stop() { h.stopOnce.Do(func() { close(h.closed) }) }
+
+// dispatch delivers one device packet to the peer its destination names.
+func (h *p2pHub) dispatch(pkt []byte) {
+	dst, ok := destinationOf(pkt)
+	if !ok {
+		return
+	}
+	if err := h.router.deliver(dst, pkt); err != nil {
+		// Named, not just counted: a spoke whose registration never arrived
+		// looks exactly like this, and is otherwise indistinguishable from
+		// silence.
+		h.warnf("no route for %s, packet discarded", dst)
+	}
+}
+
+// fromSpoke handles one datagram a spoke sent: a keepalive is answered, and
+// anything else is written to the device.
+func (h *p2pHub) fromSpoke(pkt []byte) error {
+	if isKeepaliveFrame(pkt) {
+		return h.answerKeepalive(pkt)
+	}
+	h.dmu.Lock()
+	defer h.dmu.Unlock()
+	_, err := h.device.Write(pkt)
+	return err
+}
+
+// answerKeepalive registers the sender and replies, so a spoke running
+// keepalive:true sees its deadline refreshed instead of expiring. Repeats are
+// registered too and cost nothing: there is no TTL to refresh, because a
+// stream closing reports a departure exactly.
+func (h *p2pHub) answerKeepalive(pkt []byte) error {
+	// The peer key travels in the frame's own header on a p2p link, so the
+	// stream this arrived on is the identity being registered.
+	s := h.current
+	if s == nil {
+		return ErrNoRoute
+	}
+	if _, ok := h.router.table.onKeepalive(context.Background(), pkt, s.key, h.ownNets); !ok {
+		return nil // refused: registration is dropped, and silence says so
+	}
+	_, err := s.Write(keepAliveReply(s.key))
+	return err
+}
+
+// deviceFromDevice writes a packet onto the device, for the test that seeds
+// one without a real device.
+func (h *p2pHub) deviceFromDevice(pkt []byte) (int, error) {
+	h.dmu.Lock()
+	defer h.dmu.Unlock()
+	return h.device.Write(pkt)
+}
+
+// peerGone retires a stream: if it is still the one holding its key, its peer's
+// routes go with it.
+func (h *p2pHub) peerGone(s *peerStream) {
+	s.close()
+	if h.router.withdraw(s) {
+		h.router.table.dropPeer(s.key)
 	}
 }
 ```
 
-That draft does not compile — `key` and `ctx()` are not in scope inside
-`spokeToDevice`, and the shared helpers it calls do not exist yet. Add them and
-fix the scoping:
+That draft does not compile — `h.current`, `h.ownNets` and `h.dispatcher` are
+not real. The handler owns those, so they arrive in Step 6. Add now what is real,
+and leave the handler's fields to Step 6:
 
 ```go
 // isKeepaliveFrame reports whether a datagram from a spoke is a registration
@@ -944,9 +1118,9 @@ func isKeepaliveFrame(b []byte) bool {
 	return len(b) > keepAliveHeaderLength && bytes.Equal(b[:4], magicHeader)
 }
 
-// keepAliveReply builds the hub's answer to a keepalive. The socket server
-// echoes the sender's address back in the header; a p2p stream's peer key is
-// already what the route is named, so the key is what goes in it.
+// keepAliveReply builds the hub's answer. The socket server echoes the sender's
+// address back; a p2p stream's peer key is what the route is named, so the key
+// is what goes in the header.
 func keepAliveReply(peerKey string) []byte {
 	b := make([]byte, keepAliveHeaderLength)
 	copy(b[:4], magicHeader)
@@ -954,7 +1128,7 @@ func keepAliveReply(peerKey string) []byte {
 	return b
 }
 
-// destinationOf parses a packet's destination IP, for both IPv4 and IPv6.
+// destinationOf parses a packet's destination, for IPv4 and IPv6 alike.
 func destinationOf(pkt []byte) (net.IP, bool) {
 	if waterutil.IsIPv4(pkt) {
 		h, err := ipv4.ParseHeader(pkt)
@@ -974,200 +1148,293 @@ func destinationOf(pkt []byte) (net.IP, bool) {
 }
 ```
 
-and make `Handle` pass what its goroutines need:
+Imports for `p2p.go`: `bytes`, `context`, `errors`, `io`, `net`, `sync`,
+`"github.com/songgao/water/waterutil"`, `"golang.org/x/net/ipv4"`,
+`"golang.org/x/net/ipv6"`.
+
+- [ ] **Step 6: Fix the two forward references with real fields**
+
+`answerKeepalive` cannot reach for `h.current`: the hub serves many streams, and
+the peer key is the stream the datagram arrived on. So the handler passes it:
 
 ```go
-func (h *p2pTunHandler) Handle(ctx context.Context, conn net.Conn, opts ...handler.HandleOption) error {
-	defer conn.Close()
-
-	key := conn.RemoteAddr().String()
-	h.peers.add(key, conn)
-	defer h.peers.remove(key)
-
-	done := make(chan error, 2)
-	go func() { done <- h.spokeToDevice(ctx, key, conn) }()
-	go func() { done <- h.deviceToSpoke(conn) }()
-
-	select {
-	case err := <-done:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
+// fromSpoke handles one datagram that arrived on s: a keepalive is answered,
+// anything else is written to the device. The peer key travels as an argument
+// because the hub serves many streams at once and the frame itself carries no
+// identity.
+func (h *p2pHub) fromSpoke(s *peerStream, pkt []byte) error {
+	if isKeepaliveFrame(pkt) {
+		return h.answerKeepalive(s, pkt)
 	}
+	h.dmu.Lock()
+	defer h.dmu.Unlock()
+	_, err := h.device.Write(pkt)
+	return err
 }
 
-// spokeToDevice writes each datagram the spoke sends to the device.
-func (h *p2pTunHandler) spokeToDevice(ctx context.Context, key string, conn net.Conn) error {
-	buf := make([]byte, MaxMessageSize)
-	for {
-		n, err := conn.Read(buf)
-		if n > 0 {
-			if isKeepaliveFrame(buf[:n]) {
-				if _, ok := h.peers.router.onKeepalive(ctx, buf[:n], key, nil); ok {
-					reply := keepAliveReply(key)
-					if _, werr := conn.Write(reply); werr != nil {
-						h.log.Debugf("keepalive to %s: %v", key, werr)
-					}
-				}
-				continue
-			}
-			if _, werr := h.device.Write(buf[:n]); werr != nil {
-				return werr
-			}
-		}
-		if err != nil {
-			return err
-		}
+// answerKeepalive registers the sender and replies, so a spoke running
+// keepalive:true sees its deadline refreshed instead of expiring. Repeats
+// register too and cost nothing: there is no TTL to refresh, because a stream
+// closing reports a departure exactly.
+func (h *p2pHub) answerKeepalive(s *peerStream, pkt []byte) error {
+	if _, ok := h.router.table.onKeepalive(context.Background(), pkt, s.key, h.ownNets); !ok {
+		return nil // refused: no route, and silence is the socket server's answer too
+	}
+	_, err := s.Write(keepAliveReply(s.key))
+	return err
+}
+```
+
+Add the field the own-address filter needs:
+
+```go
+type p2pHub struct {
+	device io.ReadWriter
+	router *peerRouter
+	warn   func(string)
+	// ownNets are the hub device's own addresses. A registration claiming one
+	// is the hub talking to itself, and routing to it would loop.
+	ownNets []net.IPNet
+	// …
+}
+```
+
+and set it in `newP2PHub` by taking it as an argument:
+
+```go
+func newP2PHub(device io.ReadWriter, router *peerRouter, ownNets []net.IPNet, warn func(string)) *p2pHub {
+	return &p2pHub{
+		device:  device,
+		router:  router,
+		ownNets: ownNets,
+		warn:    warn,
+		closed:  make(chan struct{}),
 	}
 }
 ```
 
-Add to the imports: `bytes`, `github.com/go-gost/core/auth`, `xlogger
-"github.com/go-gost/x/logger"`, `"github.com/songgao/water/waterutil"`,
-`"golang.org/x/net/ipv4"`, `"golang.org/x/net/ipv6"`.
+- [ ] **Step 7: Write `datagramPipe`**
 
-- [ ] **Step 6: Test the handler's two bridges**
-
-Append to `p2proot_test.go`:
+The device and a stream exchange whole datagrams, so a test can tell boundaries
+apart. Create `x/handler/tun/datagrampipe_test.go`:
 
 ```go
-// A datagram a spoke sends reaches the device.
-func TestP2PHandlerSpokeToDevice(t *testing.T) {
-	dev, spoke := pipeConn(t)
-	p := newPeerRouter()
-	h := NewP2PHandler(dev.Device(), p)
+package tun
+
+import (
+	"net"
+	"sync"
+	"time"
+)
+
+// datagramPipe hands each write to the reader as one message, so a test can
+// tell datagram boundaries apart. A plain net.Pipe is a byte stream, which
+// would let a test pass on a torn packet — exactly the failure the device
+// guards against.
+type datagramPipe struct {
+	net.Conn
+
+	mu     sync.Mutex
+	queued [][]byte
+	peer   *datagramPipe
+}
+
+func newDatagramPipe() (*datagramPipe, *datagramPipe) {
+	a, b := net.Pipe()
+	pa, pb := &datagramPipe{Conn: a}, &datagramPipe{Conn: b}
+	pa.peer, pb.peer = pb, pa
+	return pa, pb
+}
+
+func (c *datagramPipe) Write(p []byte) (int, error) {
+	msg := make([]byte, len(p))
+	copy(msg, p)
+	c.peer.mu.Lock()
+	c.peer.queued = append(c.peer.queued, msg)
+	c.peer.mu.Unlock()
+	return len(p), nil
+}
+
+func (c *datagramPipe) Read(b []byte) (int, error) {
+	for {
+		c.mu.Lock()
+		if len(c.queued) > 0 {
+			msg := c.queued[0]
+			c.queued = c.queued[1:]
+			c.mu.Unlock()
+			return copy(b, msg), nil
+		}
+		c.mu.Unlock()
+		// Poll rather than block, so a read deadline still applies: the hub's
+		// read loop is a real loop and must be interruptible by one.
+		time.Sleep(time.Millisecond)
+	}
+}
+```
+
+- [ ] **Step 8: Write the handler that drives the hub**
+
+`x/handler/tun/p2phandler.go`:
+
+```go
+package tun
+
+import (
+	"context"
+	"net"
+
+	"github.com/go-gost/core/auth"
+	"github.com/go-gost/core/handler"
+	"github.com/go-gost/core/logger"
+	md "github.com/go-gost/core/metadata"
+	xlogger "github.com/go-gost/x/logger"
+)
+
+// NewP2PHandler creates the hub's handler. device is the tun device, already
+// created by the listener; the device's own addresses come from the device
+// conn's context, exactly as the socket server reads them from the conn it is
+// handed. The handler owns the hub's device loop for its whole life.
+func NewP2PHandler(device net.Conn, auther auth.Authenticator, opts ...handler.Option) handler.Handler {
+	options := handler.Options{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	if options.Logger == nil {
+		options.Logger = xlogger.Nop()
+	}
+
+	table := newPeerTable(auther, 0, options.Logger)
+	router := &peerRouter{table: table, streams: make(map[string]*peerStream)}
+
+	return &p2pTunHandler{
+		router: router,
+		hub:    newP2PHub(device, router, deviceOwnNets(device), options.Logger.Warnf),
+		log:    options.Logger,
+	}
+}
+
+// deviceOwnNets reads the device's own addresses off the conn the listener
+// handed over. The listener put its config in the conn's context when it built
+// it, so this is the same source the socket server's config.Net comes from —
+// not a second parse of the same metadata, which could disagree with it.
+func deviceOwnNets(device net.Conn) []net.IPNet {
+	c, ok := device.(xctx.Context)
+	if !ok {
+		return nil
+	}
+	ctx := c.Context()
+	if ctx == nil {
+		return nil
+	}
+	if md := ictx.MetadataFromContext(ctx); md != nil {
+		if cfg, _ := md.Get("config").(*tun_util.Config); cfg != nil {
+			return cfg.Net
+		}
+	}
+	return nil
+}
+
+type p2pTunHandler struct {
+	hub    *p2pHub
+	router *peerRouter
+	log    logger.Logger
+}
+
+func (h *p2pTunHandler) Init(md md.Metadata) error { return nil }
+
+// Handle bridges one accepted peer stream. The stream becomes the one its key's
+// routes resolve to, replacing any earlier stream under that key; when it ends,
+// it withdraws its peer's routes only if it is still the holder.
+func (h *p2pTunHandler) Handle(ctx context.Context, conn net.Conn, opts ...handler.HandleOption) error {
+	s := newPeerStream(conn.RemoteAddr().String(), conn)
+	h.router.install(s)
 
 	done := make(chan error, 1)
 	go func() {
-		done <- h.Handle(context.Background(), &peerStub{Conn: spoke})
+		buf := make([]byte, MaxMessageSize)
+		for {
+			n, err := s.Read(buf)
+			if n > 0 {
+				if werr := h.hub.fromSpoke(s, buf[:n]); werr != nil {
+					h.log.Debugf("spoke %s: %v", s.key, werr)
+				}
+			}
+			if err != nil {
+				done <- err
+				return
+			}
+		}
 	}()
 
-	if _, err := spoke.Write([]byte("payload")); err != nil {
-		t.Fatal(err)
+	var err error
+	select {
+	case err = <-done:
+	case <-ctx.Done():
+		err = ctx.Err()
 	}
-	if got := readDatagram(t, dev); string(got) != "payload" {
-		t.Fatalf("device got %q, want %q", got, "payload")
-	}
-	_ = done
+
+	// Teardown withdraws only if this stream still holds its key: a peer that
+	// reconnected has already been replaced, and dropping routes now would cut
+	// off the live one.
+	h.hub.peerGone(s)
+	return err
 }
 
-// A datagram the device produces reaches the spoke that registered its
-// destination.
-func TestP2PHandlerDeviceToSpoke(t *testing.T) {
-	dev, spoke := pipeConn(t)
-	p := newPeerRouter()
-	p.add("peer-a", spoke)
-	p.router.set(net.IPv4(10, 10, 0, 2), "peer-a")
-
-	h := NewP2PHandler(dev.Spoke(), p)
-	go h.Handle(context.Background(), &peerStub{Conn: dev.Device()})
-
-	pkt := ipv4Datagram(t, net.IPv4(10, 10, 0, 1), net.IPv4(10, 10, 0, 2))
-	if _, err := dev.Write(pkt); err != nil {
-		t.Fatal(err)
-	}
-	if got := readDatagram(t, spoke); len(got) != len(pkt) {
-		t.Fatalf("spoke got %d bytes, want %d", len(got), len(pkt))
-	}
+// Close stops the device loop. The service closes the handler on shutdown.
+func (h *p2pTunHandler) Close() error {
+	h.hub.stop()
+	return nil
 }
 ```
 
-plus the helpers those use:
+Imports: `context`, `net`, `core/auth`, `core/handler`, `core/logger`,
+`core/metadata`, `xctx "x/ctx"`, `ictx "x/internal/ctx"`,
+`tun_util "x/internal/util/tun"`, `xlogger "x/logger"`.
 
-```go
-// peerStub reports a stable remote address, so the handler sees a peer key.
-type peerStub struct {
-	net.Conn
-}
+`newP2PHub` starts the device loop in its own goroutine — see Task 3 Step 5. The
+loop's lifetime is the handler's, ended by `Close`.
 
-func (peerStub) RemoteAddr() net.Addr { return stubAddr{} }
-
-type stubAddr struct{}
-
-func (stubAddr) Network() string { return "p2p" }
-func (stubAddr) String() string  { return "peer-a" }
-
-// ipv4Datagram builds a minimal IPv4 packet with the given source and
-// destination, so the handler's destination parsing is exercised.
-func ipv4Datagram(t *testing.T, src, dst net.IP) []byte {
-	t.Helper()
-	const total = 20
-	pkt := make([]byte, total)
-	pkt[0] = 0x45 // version 4, IHL 5
-	pkt[2] = 0
-	pkt[3] = total
-	copy(pkt[12:16], src.To4())
-	copy(pkt[16:20], dst.To4())
-	return pkt
-}
-```
-
-- [ ] **Step 6: Update the handler's auther**
-
-`NewP2PHandler` reads `options.Auther`, and `transportRouter` is built with a
-nil auther inside `newPeerRouter` — so an authenticated hub would silently
-accept everyone. Fix it by letting the router's auther be set once, before any
-stream arrives:
-
-```go
-// SetAuther installs the hub's authenticator. It must be called before the
-// first stream: a keepalive is only as trustworthy as the auther that checked
-// it, and one registered before this arrives would have been admitted on no
-// check at all.
-func (r *transportRouter) setAuther(a auth.Authenticator) { r.auther = a }
-
-// Auther returns the router's authenticator, so the handler can hand the same
-// one to a registration it checks itself.
-func (r *transportRouter) Auther() auth.Authenticator { return r.auther }
-```
-
-and in Task 3's `NewPeerRouter`, drop the nil-auther construction in favor of
-taking one:
-
-```go
-// NewPeerRouter returns the peer router a hub's handler resolves routes with.
-func NewPeerRouter(auther auth.Authenticator) *peerRouter {
-	return &peerRouter{
-		router:  newTransportRouter(auther, 0, nil),
-		streams: make(map[string]net.Conn),
-	}
-}
-```
-
-Then `newPeerRouter()` (no auther) stays for tests, and Task 5 passes the hub's
-auther in.
-
-- [ ] **Step 7: Run the tests to verify they pass**
+- [ ] **Step 9: Run the tests**
 
 ```bash
-cd /config/workspace/go-gost/x && go test ./handler/tun/ -run 'TestPeerRouter|TestTransportRouter|TestP2PHandler' -v 2>&1 | tail -20
+cd /config/workspace/go-gost/x && go test ./handler/tun/ -run 'TestP2P|TestPeerTable' -v 2>&1 | tail -30
 ```
 
-Expected: PASS.
+Expected: PASS — 7 tests.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 10: Run with the race detector**
 
 ```bash
-cd /config/workspace/go-gost/x && git add handler/tun/ && git commit -m "tun: a p2p delivery that resolves a peer key to its stream
-
-The socket server resolves a route's name to an address and writes to
-it; this one resolves it to a connection and writes on it. Same router,
-same keepalive, same authentication, same lookup by destination — the
-difference is only what a name means.
-
-The handler answers a keepalive because a spoke running keepalive:true
-waits for it on its read deadline; registering a route and staying
-silent would look healthy until the spoke tore the session down. It does
-not refresh the route on repeats, because a stream close reports a
-departure exactly and there is nothing to refresh.
-
-remove is the reclamation. The socket server expires routes by TTL,
-inferring from silence that a peer left; p2p says exactly when a stream
-closes, so a peer's routes go then. It is the only path here, so a
-missed teardown grows the table rather than lagging it."
+cd /config/workspace/go-gost/x && CGO_ENABLED=1 go test -race ./handler/tun/ -run TestP2P -v 2>&1 | tail -30
 ```
 
----
+Expected: PASS, no race reports. **This is the check the whole shape rests on** — the device is shared state and the race detector is what proves the single reader and the write lock are doing their job. A race here means the shape is wrong, not the test.
+
+- [ ] **Step 11: Commit**
+
+```bash
+cd /config/workspace/go-gost/x && git add handler/tun/ && git commit -m "tun: a p2p hub that reads the device once, and writes through one lock
+
+The device shares d.rbufs[0] and d.wbuf across calls with no lock, so it
+admits one reader and one writer — safe today only because each side
+happens to have a single goroutine. Bridging each spoke's stream
+straight to it would have had N of each, and the packets would have
+interleaved. p2p's frame conn has the same hazard one layer down: it
+serializes its read buffer but not its writes.
+
+So the hub keeps the socket server's shape and gets there differently:
+one loop reads the device and dispatches by destination, and every
+write goes through one mutex. Which stream a packet was read on carries
+no meaning, because the route is what says where it goes.
+
+withdraw checks that the ending stream still holds its key. A peer that
+reconnected already replaced it, and a teardown that dropped routes
+without that check would cut off the live connection.
+
+A packet with no route is warned about and named: a spoke with
+keepalive:0 never registers on a p2p link, because the registration gate
+tests for udp and a p2p link is ip, so it would otherwise be silent."
+```
 
 ### Task 4: The compatibility suite
 
@@ -1195,16 +1462,16 @@ import (
 // from the other and the compatibility claim would go untested.
 type compatCase struct {
 	name string
-	// run drives one implementation and returns the transportRouter it used,
+	// run drives one implementation and returns the peerTable it used,
 	// plus a deliver function that sends a datagram for a destination IP.
-	run func(t *testing.T) (router *transportRouter, deliver func(dst net.IP, pkt []byte) error)
+	run func(t *testing.T) (router *peerTable, deliver func(dst net.IP, pkt []byte) error)
 }
 
 func compatCases() []compatCase {
 	return []compatCase{
 		{
 			name: "socket",
-			run: func(t *testing.T) (*transportRouter, func(net.IP, []byte) error) {
+			run: func(t *testing.T) (*peerTable, func(net.IP, []byte) error) {
 				// The socket implementation's delivery is exercised through
 				// the router it already has; see testSocketDelivery.
 				return nil, nil
@@ -1212,11 +1479,18 @@ func compatCases() []compatCase {
 		},
 		{
 			name: "p2p",
-			run: func(t *testing.T) (*transportRouter, func(net.IP, []byte) error) {
-				p := newPeerRouter()
-				dev, spoke := pipeConn(t)
-				p.add("peer-a", spoke)
-				return p.router, p.deliver
+			run: func(t *testing.T) (*peerTable, func(net.IP, []byte) error) {
+				// The peer router as Task 3 builds it: a table, a stream under
+				// a key, and delivery that resolves a destination to that
+				// stream.
+				table := newPeerTable(nil, 0, xlogger.Nop())
+				r := &peerRouter{table: table, streams: make(map[string]*peerStream)}
+
+				dev, spoke := newDatagramPipe()
+				t.Cleanup(func() { dev.Close(); spoke.Close() })
+				r.install(newPeerStream("peer-a", spoke))
+
+				return table, r.deliver
 			},
 		},
 	}
@@ -1278,8 +1552,8 @@ Replace the socket `run` body with a real one, and add the delivery it returns:
 ```go
 		{
 			name: "socket",
-			run: func(t *testing.T) (*transportRouter, func(net.IP, []byte) error) {
-				r := newTransportRouter(nil, 0, nil)
+			run: func(t *testing.T) (*peerTable, func(net.IP, []byte) error) {
+				r := newPeerTable(nil, 0, nil)
 				// A UDP socket pair stands in for the hub's: the router names
 				// an address, and delivery writes to it there.
 				hub, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
@@ -1375,11 +1649,29 @@ func TestTunTunnelHasNoBindAddress(t *testing.T) {
 	if err := s.init(); err != nil {
 		t.Fatal(err)
 	}
-	if s.config.Addr != "" {
-		t.Fatalf("hub binds %q, want no address", s.config.Addr)
-	}
 	if len(s.config.Peers) != 2 {
 		t.Fatalf("allowlist = %v, want both peers", s.config.Peers)
+	}
+}
+
+// A hub carried over from the socket form says why it stopped working rather
+// than silently changing meaning.
+func TestTunTunnelRejectsBindAddress(t *testing.T) {
+	s := NewTunTunnel(EndpointOption("127.0.0.1:8421"), NetOption("10.10.0.1/24")).(*tunTunnel)
+	s.opts.Peers = []string{"peer-a"}
+
+	if err := s.init(); err == nil {
+		t.Fatal("a hub accepted a bind address")
+	}
+}
+
+// A hub with no allowlist serves nothing, so it is rejected at construction
+// rather than running and discarding every packet.
+func TestTunTunnelRequiresPeers(t *testing.T) {
+	s := NewTunTunnel(EndpointOption(""), NetOption("10.10.0.1/24")).(*tunTunnel)
+
+	if err := s.init(); err == nil {
+		t.Fatal("a hub accepted an empty allowlist")
 	}
 }
 ```
@@ -1464,9 +1756,8 @@ Replace `Run`'s body after the log setup with:
 	}
 
 	handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
-	h := tunhandler.NewP2PHandler(ln, tunhandler.NewPeerRouter(auther),
+	h := tunhandler.NewP2PHandler(ln, auther,
 		handler.LoggerOption(handlerLogger),
-		handler.StatsOption(pStats),
 	)
 	if err = h.Init(mdx.NewMetadata(s.handlerMetadata())); err != nil {
 		p2pHost.unregister(peerLn)
@@ -1657,6 +1948,6 @@ cd /config/workspace/go-gost/wisper && git add go.mod go.sum && git commit -m "b
 
 **Gaps I know about, deliberately left.** No privileged e2e can run in this environment (userns is blocked), so Task 7.3 is written to be run elsewhere rather than claimed as done. `scripts/smoke-tun.sh`'s wisper-hub variant was not revived in phase 1 and is not revived here; Task 7.3 is its replacement.
 
-**Type consistency.** `transportRouter` / `newTransportRouter(auther, ttl, log)` / `onKeepalive(ctx, frame, from, ownNets)` / `lookup(dst)` / `set(ip, name)` / `dropPeer(name)` are defined once in Task 1 and used by Tasks 2, 3, 4, 5 with the same signatures. `peerRouter` / `newPeerRouter()` / `add(key, conn)` / `remove(key)` / `deliver(dst, pkt)` in Task 3. `resolveUDPAddr(name)` in Task 2, used in Task 4. `keepAliveFrame` and `newTestAuther` are test helpers from Task 1, used in Tasks 3 and 4.
+**Type consistency.** `peerTable` / `newPeerTable(auther auth.Authenticator, ttl time.Duration, log logger.Logger)` / `onKeepalive(ctx, frame, from, ownNets)` / `lookup(dst)` / `set(ip, name)` / `dropPeer(name)` are defined once in Task 1 and used by Tasks 2, 3, 4 with those signatures. In Task 3, `peerRouter` holds a `*peerTable` plus `streams map[string]*peerStream` and exposes `install` / `stream` / `withdraw` / `deliver`; `p2pHub` is `newP2PHub(device io.ReadWriter, router *peerRouter, ownNets []net.IPNet, warn func(string))` with `run` / `stop` / `dispatch` / `fromSpoke(s, pkt)` / `answerKeepalive(s, pkt)` / `peerGone(s)`; `peerStream` wraps one conn with a write mutex and a `close()` that runs once. `resolveUDPAddr(name)` is defined in Task 2 and used in Task 4. `keepAliveFrame` and `newTestAuther` are test helpers from Task 1, used in Tasks 3 and 4.
 
-**Resolved during self-review.** The first draft built `peerRouter` but no `handler.Handler`, which Task 5 needs; Task 3 now builds `NewP2PHandler` in step 5 alongside it, since the type is already in front of you there. The draft also had `NewPeerRouter()` building its router with a nil auther, which would have let an authenticated hub accept everyone silently — Task 3 step 6 takes an auther instead, and Task 5 passes the hub's.
+**Resolved during self-review.** The first draft of Task 3 gave every stream its own device reader and writer, which is wrong — `tunDevice` shares `d.rbufs[0]` and `d.wbuf` with no lock, so N streams means N readers and N writers and the packets interleave. p2p's `frameConn.Write` has the same hazard one layer down. Task 3 now has one device read loop and one write mutex, which is the socket server's shape reached a different way, and Step 10 runs it under `-race`, which is the check that proves the shape rather than the test. Two facts found while checking are in the spec: a reconnect brings a new stream under the same peer key (so `withdraw` checks it still holds the key), and a spoke with `keepalive:0` never registers on a p2p link (so an unroutable packet is warned about and named).
