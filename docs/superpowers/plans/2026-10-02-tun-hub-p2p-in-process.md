@@ -93,9 +93,105 @@ round 13 under `-race`, before the fix).
 - **`golangci-lint` cannot run here** (v1.64.8 vs go1.27 export-data mismatch). `x`'s verification
   path is build + vet.
 
-### In progress
+### Carried into Task 5
 
-**Task 3 — the p2p delivery implementation.** Dispatched.
+- **`x`'s p2p hub is now runnable**: `NewP2PHandler` (`x/handler/tun/p2phandler.go`) is the
+  constructor wisper wires. Signature:
+  `NewP2PHandler(device net.Conn, auther auth.Authenticator, opts ...handler.Option) handler.Handler`.
+  TTL is 0 by construction — the p2p hub has none and reclaims on stream close.
+- **`ownNets` must be wired by whoever builds the handler's device conn**, or the self-loop guard
+  silently does nothing. `p2phandler.go` reads it off the conn's context the way `server.go` does;
+  the listener is what puts the parsed `config` there.
+- **wisper's hub keeps `p2pHostManager.register`**, so the allowlist stays the admission and no
+  bind address is needed. That is what removes the endpoint a paired p2p tunnel had to repeat.
+
+### Tasks 3 and 4 — the p2p engine, the compatibility suite, and the seam between them
+
+**Task 3 — the p2p delivery implementation.** `x` commit `e95b830` (`p2p.go` only).
+
+The shape the earlier draft got wrong, now corrected: **one loop reads the device and every write
+goes through one mutex.** `tunDevice` (`listener/tun/tun.go`) shares `d.rbufs[0]` and `d.wbuf`
+across calls with no lock, so it admits one reader and one writer and guarantees neither — safe
+today only because the socket server happens to have one goroutine per side. A per-stream bridge
+would have had N of each, and the packets would have interleaved. p2p's `frameConn.Write`
+serializes only its read buffer, so each peer's stream also gets its own write lock: two different
+shared states, so two locks rather than one lock doing two jobs.
+
+`dispatch` deliberately does **not** collapse the destination the way the socket p2p hub does. The
+collapse is right there (one logical peer, no better answer) and wrong here, where a name resolves
+to one specific stream and a spoke is reachable at the address it registered.
+
+Two things the implementer added that the brief did not ask for, both correct:
+
+- a length guard in `destinationOf`, because `waterutil.IsIPv4` indexes `packet[0]`
+  unconditionally and a zero-length read would panic
+- `isKeepaliveFrame` accepts a bare 20-byte header where `onKeepalive` refuses one as a
+  registration. It must: the echo carries the magic header, and letting it fall through would
+  inject a 20-byte non-packet into the device
+
+**The concurrency test was vacuous at first, and the implementer found that itself.** It built the
+harness as a datagram-shaped pipe, which delivers each `Write` through a channel and is therefore
+atomic per message — removing the write lock left the test green. The real conn frames each write
+as `[2-byte length][payload]` and parses it back, so it rewrote the harness as a byte stream that
+parses the way `frameConn.Read` does. Removing the lock then fails in round 0
+(`stream ends mid-frame: 1650 bytes left for a 8224-byte payload`), with and without `-race` — a
+spliced length prefix corrupts every subsequent frame's offset, which a message-shaped pipe cannot
+reproduce at all. The reason is recorded in the file so the pipe does not come back.
+
+**Task 4 — one assertion set, driven against both hubs.** `x` commits `6e84d37` (suite) and
+`8787aff` (lifting the p2p half).
+
+This is where the design's central claim is tested: **a spoke cannot tell which hub it reached.**
+Six shared assertions — registers, refuses a wrong passphrase, refuses its own address, delivers by
+destination, discards an unrouted destination, answers the keepalive — each run against both.
+
+The socket half drives `server.go`'s own `transportServer` over a real UDP link rather than
+reimplementing the loop, on the principle that a compat suite asserting against a copy only proves
+the copy agrees with itself.
+
+**The suite was delivered half-finished and said so.** The p2p half skipped all seven cases for
+want of an end-to-end seam — `p2p.go` was a complete engine that nothing could run. `available()`
+was made to panic rather than return a stub, so the skip could not be lifted by accident. The
+handler (`NewP2PHandler`) was then pulled forward from the later task to provide it. Final counts:
+socket 14 subtests, p2p 16, both real, zero implementation-specific skips; 92 pass package-wide
+under `-race`.
+
+**The lifted half exposed a hole in the suite Task 4 left behind.** Two mutations passed all six
+shared assertions: `peerGone` dropping routes unconditionally, and `install` not replacing on
+reconnect. No shared case registers, replaces, and then closes a stream under the same key — which
+is exactly what a reconnect is. A `peerGone` that cuts off a reconnected peer passed the whole
+suite. Added a p2p-only case (the socket hub cannot express a reconnect) asserting the route
+survives *and* that a packet off the device reaches the new stream, not the stale one.
+
+Mutation results at the end — each turned the p2p half red with the socket half green, which is
+the evidence that the suite distinguishes the two implementations rather than passing wholesale:
+
+| mutation | caught by |
+|---|---|
+| `fromSpoke` skips the keepalive answer | 4 shared p2p cases + the teardown case |
+| `peerGone` drops routes unconditionally | the new reconnect case |
+| `install` does not replace on reconnect | the new reconnect case |
+| `ownNets` not wired | `refuses the hub's own address` |
+
+`resolveUDPAddr`'s round-trip is **not** in the shared set: a p2p peer's name is a peer key, not an
+address, so the assertion has no counterpart. Forcing it onto both would mean asserting it against a
+name that is deliberately not an address.
+
+### A note on what mutation testing kept finding
+
+Every defect these four tasks surfaced was the same kind: **a test that passed while proving
+something other than what it was named for.** None of them turned the suite red on its own.
+
+- `auth.WithService` dropped — an external plugin auther would receive `""`
+- the TTL test not pinning `3×` (`3×→1×` passed)
+- the self-loop test vacuous — the auther refused the frame before the guard ran
+- the multi-address path untested — and it is the *common* path, since `client.go` sends every
+  address in `config.Net`
+- the reconnect path untested — six shared assertions all green with a `peerGone` that cuts off a
+  reconnected peer
+
+None of these are visible from "the tests pass". They are only visible from breaking something and
+watching a test stay green.
 
 ---
 
@@ -105,11 +201,14 @@ round 13 under `-race`, before the fix).
 
 | File | Responsibility |
 |---|---|
-| `router.go` (new) | `peerTable`: the route table `map[tunRouteKey]string`, the keepalive protocol, the auther check, TTL expiry, destination lookup. Knows nothing about transport. |
-| `p2p.go` (new) | `peerRouter` (a route's name resolves to a stream) and `p2pHub` (one device read loop, one write lock). |
-| `peerstream.go` (new) | `peerStream`: one inbound stream, with the write serialization its frame conn does not provide. |
-| `p2phandler.go` (new) | `NewP2PHandler`: the `handler.Handler` a hub's service runs, bridging accepted streams to the hub. |
-| `server.go` (modify) | the socket delivery: `resolve` a name to an address, deliver with `WriteTo`. Keeps its loops. |
+| `router.go` (new) | `peerTable`: the keepalive protocol, the auther check, TTL expiry, destination lookup. Knows nothing about transport. A route's value is a `string` — a name. |
+| `p2p.go` (new) | `peerStream` (one stream, writes serialized), `peerRouter` (a name resolves to a stream), `p2pHub` (one device read loop, one write lock). |
+| `p2phandler.go` (new) | `NewP2PHandler`: the `handler.Handler` a hub's service runs, bridging accepted streams into the hub and owning its device loop. |
+| `server.go` (modify) | the socket delivery: `resolveUDPAddr` turns a name into an address, delivered with `WriteTo`. Keeps its loops. |
+
+Note: the plan originally split this across `peerstream.go` and put `p2phandler.go` in a later
+task. In practice `peerStream` went in with the rest of the p2p engine, and the handler turned out
+to be the seam the compatibility suite needs — it was pulled forward, see the execution log.
 
 **`wisper/tunnel/`**:
 | File | Responsibility |
@@ -636,7 +735,7 @@ server's shape reached a different way.
 - Create: `x/handler/tun/p2p.go`
 - Test: `x/handler/tun/p2p_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `x/handler/tun/p2p_test.go`:
 
@@ -953,7 +1052,7 @@ func ipv4Datagram(src, dst net.IP) []byte {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestP2P 2>&1 | head -20
@@ -961,7 +1060,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestP2P 2>&1 | hea
 
 Expected: compile failure — `undefined: peerTable`, `peerRouter`, `p2pHub`, `peerStream`, `newDatagramPipe`.
 
-- [ ] **Step 3: Write `peerStream` — the serialized half**
+- [x] **Step 3: Write `peerStream` — the serialized half**
 
 Create `x/handler/tun/peerstream.go`:
 
@@ -1002,7 +1101,7 @@ func (s *peerStream) Close() error { return s.conn.Close() }
 func (s *peerStream) close() { s.one.Do(func() { s.conn.Close() }) }
 ```
 
-- [ ] **Step 4: Write `peerRouter` — name to stream**
+- [x] **Step 4: Write `peerRouter` — name to stream**
 
 `x/handler/tun/p2p.go`, first half:
 
@@ -1074,7 +1173,7 @@ func (r *peerRouter) deliver(dst net.IP, pkt []byte) error {
 }
 ```
 
-- [ ] **Step 5: Write `p2pHub` — one device reader, one write lock**
+- [x] **Step 5: Write `p2pHub` — one device reader, one write lock**
 
 `x/handler/tun/p2p.go`, second half:
 
@@ -1230,7 +1329,7 @@ Imports for `p2p.go`: `bytes`, `context`, `errors`, `io`, `net`, `sync`,
 `"github.com/songgao/water/waterutil"`, `"golang.org/x/net/ipv4"`,
 `"golang.org/x/net/ipv6"`.
 
-- [ ] **Step 6: Fix the two forward references with real fields**
+- [x] **Step 6: Fix the two forward references with real fields**
 
 `answerKeepalive` cannot reach for `h.current`: the hub serves many streams, and
 the peer key is the stream the datagram arrived on. So the handler passes it:
@@ -1291,7 +1390,7 @@ func newP2PHub(device io.ReadWriter, router *peerRouter, ownNets []net.IPNet, wa
 }
 ```
 
-- [ ] **Step 7: Write `datagramPipe`**
+- [x] **Step 7: Write `datagramPipe`**
 
 The device and a stream exchange whole datagrams, so a test can tell boundaries
 apart. Create `x/handler/tun/datagrampipe_test.go`:
@@ -1350,7 +1449,7 @@ func (c *datagramPipe) Read(b []byte) (int, error) {
 }
 ```
 
-- [ ] **Step 8: Write the handler that drives the hub**
+- [x] **Step 8: Write the handler that drives the hub**
 
 `x/handler/tun/p2phandler.go`:
 
@@ -1472,7 +1571,7 @@ Imports: `context`, `net`, `core/auth`, `core/handler`, `core/logger`,
 `newP2PHub` starts the device loop in its own goroutine — see Task 3 Step 5. The
 loop's lifetime is the handler's, ended by `Close`.
 
-- [ ] **Step 9: Run the tests**
+- [x] **Step 9: Run the tests**
 
 ```bash
 cd /config/workspace/go-gost/x && go test ./handler/tun/ -run 'TestP2P|TestPeerTable' -v 2>&1 | tail -30
@@ -1480,7 +1579,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -run 'TestP2P|TestPeerT
 
 Expected: PASS — 7 tests.
 
-- [ ] **Step 10: Run with the race detector**
+- [x] **Step 10: Run with the race detector**
 
 ```bash
 cd /config/workspace/go-gost/x && CGO_ENABLED=1 go test -race ./handler/tun/ -run TestP2P -v 2>&1 | tail -30
@@ -1488,7 +1587,7 @@ cd /config/workspace/go-gost/x && CGO_ENABLED=1 go test -race ./handler/tun/ -ru
 
 Expected: PASS, no race reports. **This is the check the whole shape rests on** — the device is shared state and the race detector is what proves the single reader and the write lock are doing their job. A race here means the shape is wrong, not the test.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 cd /config/workspace/go-gost/x && git add handler/tun/ && git commit -m "tun: a p2p hub that reads the device once, and writes through one lock
@@ -1521,7 +1620,7 @@ The spec's central claim is that a spoke cannot tell which hub it reached. That 
 **Files:**
 - Create: `x/handler/tun/compat_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `x/handler/tun/compat_test.go`:
 
@@ -1615,7 +1714,7 @@ func TestCompatUnauthenticatedRegistersNothing(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify the p2p half passes and the socket half is honestly skipped**
+- [x] **Step 2: Run the tests to verify the p2p half passes and the socket half is honestly skipped**
 
 ```bash
 cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestCompat -v 2>&1 | tail -15
@@ -1623,7 +1722,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -run TestCompat -v 2>&1
 
 Expected: `p2p` subtests PASS, `socket` subtests report `SKIP: delivery under construction`. A skip is visible, which is the point — it says the claim is not yet fully tested rather than passing silently.
 
-- [ ] **Step 3: Fill in the socket case**
+- [x] **Step 3: Fill in the socket case**
 
 Replace the socket `run` body with a real one, and add the delivery it returns:
 
@@ -1657,7 +1756,7 @@ Replace the socket `run` body with a real one, and add the delivery it returns:
 
 Now both subtests run. Re-run and expect all PASS — **no skips**.
 
-- [ ] **Step 4: Add the peer-to-peer routing case**
+- [x] **Step 4: Add the peer-to-peer routing case**
 
 Append to `compat_test.go`:
 
@@ -1682,7 +1781,7 @@ func TestCompatRoutesByDestinationIP(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: Run the whole package**
+- [x] **Step 5: Run the whole package**
 
 ```bash
 cd /config/workspace/go-gost/x && go build ./... && go vet ./...
@@ -1691,7 +1790,7 @@ cd /config/workspace/go-gost/x && go test ./handler/tun/ -v 2>&1 | tail -30
 
 Expected: all PASS, **zero SKIP**.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /config/workspace/go-gost/x && git add handler/tun/compat_test.go && git commit -m "tun: one compatibility suite, driven against both hubs
