@@ -8,7 +8,7 @@ import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import { GoBackend } from '../api/backend';
-import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent } from '../api/types';
+import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent, Peer } from '../api/types';
 import '../components/app-scaffold';
 
 type PageMode = 'view' | 'edit' | 'create';
@@ -53,14 +53,17 @@ export class TunnelDetailPage extends LitElement {
   @state() private _recordMode = 'off';
   @state() private _showPeers = false;
 
-  // tun hub fields: the device this node holds (see tunHubHint)
+  // tun hub fields: the device this node holds (see tunHubHint). A hub binds
+  // no address and has no keepalive/ttl: the p2p stream's closing is what
+  // reports a departure.
   @state() private _net = '';
   @state() private _mtu = 0;
   @state() private _deviceName = '';
   @state() private _routes = '';
   @state() private _dns = '';
-  @state() private _keepalive = true;
-  @state() private _ttl = 15;
+  /** A tun hub's allowlist as typed: one spoke's public key per line. The hub
+   *  has no other admission, so the list is required to create one. */
+  @state() private _hubPeers = '';
   /** How many keys are knocking on the process-wide host; shown on the peers
    *  entry. The list is not per-tunnel — a p2p stream carries no destination —
    *  so this is a count, not a per-tunnel allowlist field. */
@@ -169,8 +172,7 @@ export class TunnelDetailPage extends LitElement {
     this._deviceName = '';
     this._routes = '';
     this._dns = '';
-    this._keepalive = true;
-    this._ttl = 15;
+    this._hubPeers = '';
   }
 
   private _populateForm(t: Tunnel) {
@@ -190,8 +192,7 @@ export class TunnelDetailPage extends LitElement {
     this._deviceName = t.options.device_name ?? '';
     this._routes = t.options.routes ?? '';
     this._dns = t.options.dns ?? '';
-    this._keepalive = t.options.keepalive ?? true;
-    this._ttl = t.options.ttl || 15;
+    this._hubPeers = (t.options.peers ?? []).map(p => p.key).join('\n');
   }
 
   /** _peerLabels renders the allowlist for display: each peer's alias by
@@ -200,6 +201,12 @@ export class TunnelDetailPage extends LitElement {
     return (this._tunnel?.options.peers ?? [])
       .map(p => (this._showPeers ? p.key : p.alias || maskKey(p.key)))
       .join(', ');
+  }
+
+  /** _peerKeys is the allowlist verbatim, for the copy button: a hub's peers
+   *  are pasted somewhere, so what goes out is the keys and nothing else. */
+  private _peerKeys(): string {
+    return (this._tunnel?.options.peers ?? []).map(p => p.key).join('\n');
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -248,6 +255,17 @@ export class TunnelDetailPage extends LitElement {
     }, 2500);
   }
 
+  /** _parseHubPeers reads the allowlist textarea: one key per line, blank lines
+   *  ignored. An alias already given to a key is carried over, so editing a hub
+   *  for its device does not rename every spoke. */
+  private _parseHubPeers(): Peer[] {
+    const aliases = new Map((this._tunnel?.options.peers ?? []).map(p => [p.key, p.alias]));
+    return this._hubPeers.split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map(key => ({ key, alias: aliases.get(key) ?? '' }));
+  }
+
   // ── Actions ──────────────────────────────────────────────────────────
 
   private async _handleSave() {
@@ -276,13 +294,14 @@ export class TunnelDetailPage extends LitElement {
         record_mode: this._recordMode,
       };
       if (this.tunnelType === 'tun') {
+        // A hub binds nothing: an endpoint would be refused outright.
+        body.endpoint = '';
         body.net = this._net.trim() || undefined;
         body.mtu = this._mtu || undefined;
         body.device_name = this._deviceName.trim() || undefined;
         body.routes = this._routes.trim() || undefined;
         body.dns = this._dns.trim() || undefined;
-        body.keepalive = this._keepalive;
-        body.ttl = this._ttl;
+        body.peers = this._parseHubPeers();
       }
       if (this.tunnelType === 'p2p' && this.mode === 'edit') {
         // The allowlist is managed on its own page; an edit here must carry it
@@ -988,10 +1007,14 @@ export class TunnelDetailPage extends LitElement {
                   <span class="info-label">Created</span>
                   <span class="info-value text">${formatTimestamp(t2.created_at)}</span>
                 </div>
+                <!-- A tun hub binds nothing, so it has no target row. -->
+                ${this.tunnelType === 'tun'
+                  ? nothing
+                  : html`
                 <div class="info-row">
-                  <span class="info-label">${this.tunnelType === 'tun' ? t('fieldBindAddress') : 'Target'}</span>
+                  <span class="info-label">Target</span>
                   <span class="info-value">${t2.endpoint}</span>
-                </div>
+                </div>`}
                 ${this.tunnelType === 'tun'
                   ? html`
                     <div class="info-row">
@@ -1010,15 +1033,28 @@ export class TunnelDetailPage extends LitElement {
                     ${t2.options.dns
                       ? html`<div class="info-row"><span class="info-label">${t('fieldDNS')}</span><span class="info-value text">${t2.options.dns}</span></div>`
                       : ''}
+                    <div class="info-row">
+                      <span class="info-label">${t('tunHubPeers')}</span>
+                      ${t2.options.peers?.length
+                        ? html`
+                          <span class="info-value">${this._showPeers ? this._peerKeys() : this._peerLabels()}</span>
+                          <button class="copy-btn-mini" @click=${() => this._handleCopy(this._peerKeys())}>
+                            ${icon('copy')}
+                          </button>
+                          <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
+                            @click=${() => { this._showPeers = !this._showPeers; }}>
+                            ${icon(this._showPeers ? 'eye-off' : 'eye')}
+                          </button>
+                        `
+                        : html`<span class="info-value empty">${t('tunHubPeersEmpty')}</span>`}
+                    </div>
                     <div class="p2p-hint">${t('tunHubHint')}</div>
                   `
                   : nothing}
                 <!-- p2p: the inbound allowlist, shown by alias (the keys behind
                      the eye toggle); the host's own identity lives in Settings.
                      Other types: the public entrypoint URL, which is not secret. -->
-                ${this.tunnelType === 'tun'
-                  ? nothing
-                  : this.tunnelType === 'p2p'
+                ${this.tunnelType === 'p2p'
                   ? html`
                     <div class="info-row">
                       <span class="info-label">${t('p2pPeers')}</span>
@@ -1246,23 +1282,26 @@ export class TunnelDetailPage extends LitElement {
                     @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
                 </div>
 
-                <!-- Target / Directory -->
+                <!-- Target / Directory. A tun hub has neither: it binds no
+                     address, and its whole configuration is the device plus
+                     the allowlist below. -->
+                ${this.tunnelType === 'tun'
+                  ? nothing
+                  : html`
                 <div class="form-group">
                   <label class="form-label">
-                    ${this.tunnelType === 'file' ? t('fieldDirectory')
-                      : this.tunnelType === 'tun' ? t('fieldBindAddress')
-                      : t('fieldEndpoint')}
+                    ${this.tunnelType === 'file' ? t('fieldDirectory') : t('fieldEndpoint')}
                   </label>
                   <div class="dir-input-row">
                     <input class="form-input dir-input" .value=${this._endpoint}
-                      placeholder=${this.tunnelType === 'http' ? 'host:port' : this.tunnelType === 'file' ? '/path/to/dir' : this.tunnelType === 'tun' ? '127.0.0.1:8421' : 'host:port'}
+                      placeholder=${this.tunnelType === 'file' ? '/path/to/dir' : 'host:port'}
                       @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
                     ${this.tunnelType === 'file' && this._isNativeDirPicker
                       ? html`<button type="button" class="browse-btn"
                           @click=${this._browseDir}>📁 ${t('browseDirectory')}</button>`
                       : ''}
                   </div>
-                </div>
+                </div>`}
 
                 <!-- tun device: this node is the hub, the device is the network -->
                 ${this.tunnelType === 'tun'
@@ -1295,21 +1334,15 @@ export class TunnelDetailPage extends LitElement {
                       <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
                         @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
                     </div>
-                    <div class="switch-row">
-                      <span class="switch-label">${t('switchKeepalive')}</span>
-                      <div class="switch ${this._keepalive ? 'on' : ''}"
-                        @click=${() => { this._keepalive = !this._keepalive; }}>
-                        <div class="switch-knob"></div>
-                      </div>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">${t('fieldTTL')}</label>
-                      <input class="form-input" type="number" .value=${this._ttl ? String(this._ttl) : ''} placeholder="15"
-                        @input=${(e: Event) => { this._ttl = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
-                    </div>
-                    <div class="p2p-hint">${t('tunKeepaliveHint')}</div>
                     <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
                     <div class="p2p-hint">${t('tunHubHint')}</div>
+                    <div class="form-group">
+                      <label class="form-label">${t('tunHubPeers')}</label>
+                      <textarea class="form-input" rows="4" .value=${this._hubPeers}
+                        placeholder=${t('tunHubPeersPlaceholder')}
+                        @input=${(e: Event) => { this._hubPeers = (e.target as HTMLTextAreaElement).value; }}></textarea>
+                      <div class="p2p-hint">${t('tunHubPeersHint')}</div>
+                    </div>
                   `
                   : ''}
 

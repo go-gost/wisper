@@ -157,9 +157,14 @@ const zh: Record<string, string> = {
   protocolUdp: 'UDP',
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
   tunKeepaliveHint:
-    '把本机地址注册到 hub 的 tun server 并维持路由；hub 侧用于让已离开 spoke 的路由过期。仅点对点 tun↔tun 链路适合关闭。',
+    '把本机地址注册到 hub 的 tun server 并维持路由；在走 socket 的 hub 侧还用于让已离开 spoke 的路由过期。仅点对点 tun↔tun 链路适合关闭。',
   tunHubHint:
-    '设备就是网络本身：各 spoke 用标准 tun 客户端接入。再建一条 p2p 隧道，endpoint 填同一地址、允许列表填各 spoke 公钥。',
+    '设备就是网络本身：各 spoke 用标准 tun 客户端经 p2p 接入。未列入允许列表的 spoke 在拨号前就会被拒绝。',
+  tunHubPeers: '允许的 spoke',
+  tunHubPeersPlaceholder: '每行一个公钥',
+  tunHubPeersHint:
+    '每个 spoke 的 base64 公钥，一行一个——允许列表是 hub 唯一的准入条件，所以至少要有一个。',
+  tunHubPeersEmpty: '未允许任何 spoke——没有流量能到达该设备。',
   tunPrivilegeHint:
     'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建会报 “operation not permitted”。',
   tunSpokeHint:

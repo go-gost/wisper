@@ -362,41 +362,50 @@ func TestGetTunTunnelOptions(t *testing.T) {
 }
 
 // TestCreateTunTunnelValidation: the fields a tun hub cannot work without are
-// refused before any object is built, because x's tun listener skips what it
-// cannot parse (a typo would otherwise start a device with no address, or bind
-// a port the paired p2p tunnel can never reach).
+// refused before any object is built. A p2p hub binds nothing, so an endpoint
+// is a configuration error rather than a missing requirement; the allowlist is
+// the admission, so an empty one admits nobody; and x's tun listener skips what
+// it cannot parse, so a typo in the device fields would otherwise start a
+// device with no address.
 func TestCreateTunTunnelValidation(t *testing.T) {
+	// A well-formed peer key: base64 (raw url) of 32 bytes.
+	spoke := strings.Repeat("A", 43)
+
 	tests := []struct {
 		name string
 		body map[string]any
 	}{
 		{
+			name: "endpoint set",
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "endpoint": "127.0.0.1:8421",
+				"peers": []map[string]any{{"key": spoke}}},
+		},
+		{
+			name: "no peers",
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24"},
+		},
+		{
+			name: "empty peer list",
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24",
+				"peers": []map[string]any{}},
+		},
+		{
 			name: "no net",
-			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421"},
+			body: map[string]any{"type": "tun", "name": "hub", "peers": []map[string]any{{"key": spoke}}},
 		},
 		{
 			name: "bad net",
-			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421", "net": "10.10.0.1"},
-		},
-		{
-			name: "endpoint without a port",
-			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1", "net": "10.10.0.1/24"},
-		},
-		{
-			name: "endpoint port 0",
-			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:0", "net": "10.10.0.1/24"},
-		},
-		{
-			name: "endpoint host is not an IP",
-			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "localhost:8421", "net": "10.10.0.1/24"},
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1", "peers": []map[string]any{{"key": spoke}}},
 		},
 		{
 			name: "bad route",
-			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421", "net": "10.10.0.1/24", "routes": "not-a-cidr"},
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "routes": "not-a-cidr",
+				"peers": []map[string]any{{"key": spoke}}},
 		},
 		{
 			name: "bad dns",
-			body: map[string]any{"type": "tun", "name": "hub", "endpoint": "127.0.0.1:8421", "net": "10.10.0.1/24", "dns": "dns.example"},
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "dns": "dns.example",
+				"peers": []map[string]any{{"key": spoke}}},
 		},
 	}
 

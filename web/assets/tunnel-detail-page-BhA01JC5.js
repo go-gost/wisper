@@ -1,5 +1,8 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CKPkgpa3.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
-import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q as z,u as R,b as i,A as c,o as C,i as E,t as H}from"./index-CKPkgpa3.js";import{m as F,c as u,d as L,a as m,b as g,n as y,r as l}from"./format-DmRk6Ph1.js";import{i as d}from"./app-scaffold-CcMbL9Hu.js";import{c as I}from"./clipboard-C3x8_sid.js";var M=Object.defineProperty,N=Object.getOwnPropertyDescriptor,o=(t,s,r,p)=>{for(var a=p>1?void 0:p?N(s,r):s,v=t.length-1,f;v>=0;v--)(f=t[v])&&(a=(p?f(s,r,a):f(a))||a);return p&&a&&M(s,r,a),a};const h=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function _(t){return h.find(s=>s.value===t)??h[2]}let n=class extends w{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._showPeers=!1,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._keepalive=!0,this._ttl=15,this._pendingCount=0,this._backend=new x,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=s=>{this._endpoint=s,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push($(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){this.tunnelType==="p2p"&&this._loadPendingCount();const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const r=k().find(p=>p.id===t);r&&(this._tunnel=r,s?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._keepalive=!0,this._ttl=15}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??"",this._routes=t.options.routes??"",this._dns=t.options.dns??"",this._keepalive=t.options.keepalive??!0,this._ttl=t.options.ttl||15}_peerLabels(){return(this._tunnel?.options.peers??[]).map(t=>this._showPeers?t.key:t.alias||F(t.key)).join(", ")}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const s=(t??[])[0];if(!s)return e("eventsEntryDesc");const r=s.count||1;return r>1?`${s.message} ×${r}`:s.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const s={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(s.net=this._net.trim()||void 0,s.mtu=this._mtu||void 0,s.device_name=this._deviceName.trim()||void 0,s.routes=this._routes.trim()||void 0,s.dns=this._dns.trim()||void 0,s.keepalive=this._keepalive,s.ttl=this._ttl),this.tunnelType==="p2p"&&this.mode==="edit"&&(s.peers=this._tunnel?.options.peers??[]),this._showAuth&&(s.username=this._username.trim()||void 0,s.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-CKPkgpa3.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.create(s)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-CKPkgpa3.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.update(this.tunnelId,s)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(s){const r=s instanceof Error?s.message:"";this._showSnackbar(`${e("saveFailed")}${r?": "+r:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await D(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await P(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.tunnelId,this._resetKind),this._tunnel&&R(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,s){const r=s.indexOf(t);return s[(r+1)%s.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}render(){const t=this._tunnel,s=t?t.stats:null,r=this._typeLabel(),p=t?.peer_stats??[];return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-FB5SAbmt.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
+import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as P,k as S,m as D,q as z,u as R,b as i,A as c,o as C,i as H,t as E}from"./index-FB5SAbmt.js";import{m as F,c as u,d as L,a as m,b as g,n as y,r as l}from"./format-BRTjREcY.js";import{i as d}from"./app-scaffold-B8VT1sAn.js";import{c as M}from"./clipboard-C3x8_sid.js";var I=Object.defineProperty,N=Object.getOwnPropertyDescriptor,r=(t,s,o,p)=>{for(var a=p>1?void 0:p?N(s,o):s,v=t.length-1,f;v>=0;v--)(f=t[v])&&(a=(p?f(s,o,a):f(a))||a);return p&&a&&I(s,o,a),a};const h=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function _(t){return h.find(s=>s.value===t)??h[2]}let n=class extends w{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._showPeers=!1,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._hubPeers="",this._pendingCount=0,this._backend=new x,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=s=>{this._endpoint=s,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push($(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){this.tunnelType==="p2p"&&this._loadPendingCount();const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const o=k().find(p=>p.id===t);o&&(this._tunnel=o,s?(this.mode="edit",this._populateForm(o)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(o)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._hubPeers=""}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??"",this._routes=t.options.routes??"",this._dns=t.options.dns??"",this._hubPeers=(t.options.peers??[]).map(s=>s.key).join(`
+`)}_peerLabels(){return(this._tunnel?.options.peers??[]).map(t=>this._showPeers?t.key:t.alias||F(t.key)).join(", ")}_peerKeys(){return(this._tunnel?.options.peers??[]).map(t=>t.key).join(`
+`)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const s=(t??[])[0];if(!s)return e("eventsEntryDesc");const o=s.count||1;return o>1?`${s.message} ×${o}`:s.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}_parseHubPeers(){const t=new Map((this._tunnel?.options.peers??[]).map(s=>[s.key,s.alias]));return this._hubPeers.split(`
+`).map(s=>s.trim()).filter(s=>s.length>0).map(s=>({key:s,alias:t.get(s)??""}))}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const s={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(s.endpoint="",s.net=this._net.trim()||void 0,s.mtu=this._mtu||void 0,s.device_name=this._deviceName.trim()||void 0,s.routes=this._routes.trim()||void 0,s.dns=this._dns.trim()||void 0,s.peers=this._parseHubPeers()),this.tunnelType==="p2p"&&this.mode==="edit"&&(s.peers=this._tunnel?.options.peers??[]),this._showAuth&&(s.username=this._username.trim()||void 0,s.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-FB5SAbmt.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.create(s)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-FB5SAbmt.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.update(this.tunnelId,s)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(s){const o=s instanceof Error?s.message:"";this._showSnackbar(`${e("saveFailed")}${o?": "+o:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await P(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await S(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await D(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await M(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.tunnelId,this._resetKind),this._tunnel&&R(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,s){const o=s.indexOf(t);return s[(o+1)%s.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}render(){const t=this._tunnel,s=t?t.stats:null,o=this._typeLabel(),p=t?.peer_stats??[];return i`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -7,7 +10,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
             ${d("chevron-left")}
           </button>
           <span class="page-title">
-            ${this.mode==="create"?`${e("tunnelNewTitle")} — ${r}`:r+" Tunnel"}
+            ${this.mode==="create"?`${e("tunnelNewTitle")} — ${o}`:o+" Tunnel"}
           </span>
 
           ${this.mode==="view"&&t?i`
@@ -38,16 +41,18 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
               <div class="card">
                 <div class="info-row">
                   <span class="info-label">Type</span>
-                  <span class="info-value text">${r} Tunnel</span>
+                  <span class="info-value text">${o} Tunnel</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Created</span>
                   <span class="info-value text">${L(t.created_at)}</span>
                 </div>
+                <!-- A tun hub binds nothing, so it has no target row. -->
+                ${this.tunnelType==="tun"?c:i`
                 <div class="info-row">
-                  <span class="info-label">${this.tunnelType==="tun"?e("fieldBindAddress"):"Target"}</span>
+                  <span class="info-label">Target</span>
                   <span class="info-value">${t.endpoint}</span>
-                </div>
+                </div>`}
                 ${this.tunnelType==="tun"?i`
                     <div class="info-row">
                       <span class="info-label">${e("fieldNet")}</span>
@@ -57,12 +62,25 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                     ${t.options.device_name?i`<div class="info-row"><span class="info-label">${e("fieldDeviceName")}</span><span class="info-value text">${t.options.device_name}</span></div>`:""}
                     ${t.options.routes?i`<div class="info-row"><span class="info-label">${e("fieldRoutes")}</span><span class="info-value text">${t.options.routes}</span></div>`:""}
                     ${t.options.dns?i`<div class="info-row"><span class="info-label">${e("fieldDNS")}</span><span class="info-value text">${t.options.dns}</span></div>`:""}
+                    <div class="info-row">
+                      <span class="info-label">${e("tunHubPeers")}</span>
+                      ${t.options.peers?.length?i`
+                          <span class="info-value">${this._showPeers?this._peerKeys():this._peerLabels()}</span>
+                          <button class="copy-btn-mini" @click=${()=>this._handleCopy(this._peerKeys())}>
+                            ${d("copy")}
+                          </button>
+                          <button class="copy-btn-mini" title="${this._showPeers?e("hideKey"):e("revealKey")}"
+                            @click=${()=>{this._showPeers=!this._showPeers}}>
+                            ${d(this._showPeers?"eye-off":"eye")}
+                          </button>
+                        `:i`<span class="info-value empty">${e("tunHubPeersEmpty")}</span>`}
+                    </div>
                     <div class="p2p-hint">${e("tunHubHint")}</div>
                   `:c}
                 <!-- p2p: the inbound allowlist, shown by alias (the keys behind
                      the eye toggle); the host's own identity lives in Settings.
                      Other types: the public entrypoint URL, which is not secret. -->
-                ${this.tunnelType==="tun"?c:this.tunnelType==="p2p"?i`
+                ${this.tunnelType==="p2p"?i`
                     <div class="info-row">
                       <span class="info-label">${e("p2pPeers")}</span>
                       ${t.entrypoint?i`
@@ -244,7 +262,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                 <!-- Type (readonly) -->
                 <div class="form-group">
                   <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${r+" Tunnel"}>
+                  <input class="form-input" readonly .value=${o+" Tunnel"}>
                 </div>
 
                 <!-- Name -->
@@ -254,19 +272,22 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                     @input=${a=>{this._name=a.target.value}}>
                 </div>
 
-                <!-- Target / Directory -->
+                <!-- Target / Directory. A tun hub has neither: it binds no
+                     address, and its whole configuration is the device plus
+                     the allowlist below. -->
+                ${this.tunnelType==="tun"?c:i`
                 <div class="form-group">
                   <label class="form-label">
-                    ${this.tunnelType==="file"?e("fieldDirectory"):this.tunnelType==="tun"?e("fieldBindAddress"):e("fieldEndpoint")}
+                    ${this.tunnelType==="file"?e("fieldDirectory"):e("fieldEndpoint")}
                   </label>
                   <div class="dir-input-row">
                     <input class="form-input dir-input" .value=${this._endpoint}
-                      placeholder=${this.tunnelType==="http"?"host:port":this.tunnelType==="file"?"/path/to/dir":this.tunnelType==="tun"?"127.0.0.1:8421":"host:port"}
+                      placeholder=${this.tunnelType==="file"?"/path/to/dir":"host:port"}
                       @input=${a=>{this._endpoint=a.target.value}}>
                     ${this.tunnelType==="file"&&this._isNativeDirPicker?i`<button type="button" class="browse-btn"
                           @click=${this._browseDir}>📁 ${e("browseDirectory")}</button>`:""}
                   </div>
-                </div>
+                </div>`}
 
                 <!-- tun device: this node is the hub, the device is the network -->
                 ${this.tunnelType==="tun"?i`
@@ -298,21 +319,15 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                       <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
                         @input=${a=>{this._dns=a.target.value}}>
                     </div>
-                    <div class="switch-row">
-                      <span class="switch-label">${e("switchKeepalive")}</span>
-                      <div class="switch ${this._keepalive?"on":""}"
-                        @click=${()=>{this._keepalive=!this._keepalive}}>
-                        <div class="switch-knob"></div>
-                      </div>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">${e("fieldTTL")}</label>
-                      <input class="form-input" type="number" .value=${this._ttl?String(this._ttl):""} placeholder="15"
-                        @input=${a=>{this._ttl=parseInt(a.target.value,10)||0}}>
-                    </div>
-                    <div class="p2p-hint">${e("tunKeepaliveHint")}</div>
                     <div class="p2p-hint warn">${e("tunPrivilegeHint")}</div>
                     <div class="p2p-hint">${e("tunHubHint")}</div>
+                    <div class="form-group">
+                      <label class="form-label">${e("tunHubPeers")}</label>
+                      <textarea class="form-input" rows="4" .value=${this._hubPeers}
+                        placeholder=${e("tunHubPeersPlaceholder")}
+                        @input=${a=>{this._hubPeers=a.target.value}}></textarea>
+                      <div class="p2p-hint">${e("tunHubPeersHint")}</div>
+                    </div>
                   `:""}
 
                 <!-- URL Prefix (HTTP + file) -->
@@ -452,7 +467,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
             </div>
           `:""}
       </app-scaffold>
-    `}};n.styles=E`
+    `}};n.styles=H`
     /* ── AppBar ── */
     .back-btn {
       background: none;
@@ -990,4 +1005,4 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([y()],n.prototype,"tunnelType",2);o([y()],n.prototype,"tunnelId",2);o([l()],n.prototype,"mode",2);o([l()],n.prototype,"_tunnel",2);o([l()],n.prototype,"_saving",2);o([l()],n.prototype,"_snackbar",2);o([l()],n.prototype,"_showDeleteDialog",2);o([l()],n.prototype,"_showResetDialog",2);o([l()],n.prototype,"_name",2);o([l()],n.prototype,"_endpoint",2);o([l()],n.prototype,"_hostname",2);o([l()],n.prototype,"_prefix",2);o([l()],n.prototype,"_username",2);o([l()],n.prototype,"_password",2);o([l()],n.prototype,"_enableTLS",2);o([l()],n.prototype,"_rewriteHost",2);o([l()],n.prototype,"_fileUpload",2);o([l()],n.prototype,"_showAuth",2);o([l()],n.prototype,"_showPassword",2);o([l()],n.prototype,"_recordMode",2);o([l()],n.prototype,"_showPeers",2);o([l()],n.prototype,"_net",2);o([l()],n.prototype,"_mtu",2);o([l()],n.prototype,"_deviceName",2);o([l()],n.prototype,"_routes",2);o([l()],n.prototype,"_dns",2);o([l()],n.prototype,"_keepalive",2);o([l()],n.prototype,"_ttl",2);o([l()],n.prototype,"_pendingCount",2);n=o([H("tunnel-detail-page")],n);export{n as TunnelDetailPage};
+  `;r([y()],n.prototype,"tunnelType",2);r([y()],n.prototype,"tunnelId",2);r([l()],n.prototype,"mode",2);r([l()],n.prototype,"_tunnel",2);r([l()],n.prototype,"_saving",2);r([l()],n.prototype,"_snackbar",2);r([l()],n.prototype,"_showDeleteDialog",2);r([l()],n.prototype,"_showResetDialog",2);r([l()],n.prototype,"_name",2);r([l()],n.prototype,"_endpoint",2);r([l()],n.prototype,"_hostname",2);r([l()],n.prototype,"_prefix",2);r([l()],n.prototype,"_username",2);r([l()],n.prototype,"_password",2);r([l()],n.prototype,"_enableTLS",2);r([l()],n.prototype,"_rewriteHost",2);r([l()],n.prototype,"_fileUpload",2);r([l()],n.prototype,"_showAuth",2);r([l()],n.prototype,"_showPassword",2);r([l()],n.prototype,"_recordMode",2);r([l()],n.prototype,"_showPeers",2);r([l()],n.prototype,"_net",2);r([l()],n.prototype,"_mtu",2);r([l()],n.prototype,"_deviceName",2);r([l()],n.prototype,"_routes",2);r([l()],n.prototype,"_dns",2);r([l()],n.prototype,"_hubPeers",2);r([l()],n.prototype,"_pendingCount",2);n=r([E("tunnel-detail-page")],n);export{n as TunnelDetailPage};

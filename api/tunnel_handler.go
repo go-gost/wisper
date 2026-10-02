@@ -1,12 +1,11 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/go-gost/p2p"
@@ -92,8 +91,8 @@ type tunnelOptionsResp struct {
 	Peer string `json:"peer,omitempty"`
 	// Protocol is a p2p entrypoint's inner protocol: "tcp" or "udp".
 	Protocol string `json:"protocol,omitempty"`
-	// Peers is a p2p tunnel's inbound allowlist. Empty is valid: the tunnel
-	// runs and routes nothing.
+	// Peers is a p2p tunnel's or a tun hub's inbound allowlist. Empty is valid
+	// for a p2p tunnel — it runs and routes nothing — but a tun hub rejects it.
 	Peers []peerJSON `json:"peers,omitempty"`
 	// A tun entrypoint's device: its address, MTU, name, routed subnets and
 	// DNS servers.
@@ -341,33 +340,29 @@ func validateTunnelRequest(tunnelType string, req *tunnelCreateRequest) error {
 	return nil
 }
 
-// validateTunTunnel checks what a tun hub cannot do without: a device address,
-// and the UDP address the tun server binds (the paired p2p tunnel must use the
-// same endpoint, so an ephemeral port would leave the two unreachable). The
-// device fields are checked by validateTunEntryPoint's helpers — the same
-// rules apply to both ends of the device.
+// validateTunTunnel checks what a tun hub cannot work without: a device
+// address, and at least one allowlisted peer — the routes are the admission,
+// so with none there is nothing to admit. It also refuses an endpoint, which
+// the p2p hub no longer binds: the same rule tunnel/tun.go's init applies, and
+// for the same reason (a hub carried over from the socket form says why it
+// stopped working instead of silently changing meaning).
+//
+// The device fields are checked by validateTunNet and friends — the same rules
+// apply to both ends of the device.
 func validateTunTunnel(r *tunnelCreateRequest) error {
+	if ep := strings.TrimSpace(r.Endpoint); ep != "" {
+		return fmt.Errorf("a tun hub binds no address: clear the endpoint (%s) — the peer allowlist is the whole configuration", ep)
+	}
+	if len(r.Peers) == 0 {
+		return errors.New("a tun hub needs at least one allowlisted peer: the routes are the admission, so with none there is nothing to admit")
+	}
 	if err := validateTunNet(r.Net); err != nil {
 		return err
 	}
 	if err := validateTunRoutes(r.Routes); err != nil {
 		return err
 	}
-	if err := validateTunDNS(r.DNS); err != nil {
-		return err
-	}
-
-	host, port, err := net.SplitHostPort(r.Endpoint)
-	if err != nil {
-		return fmt.Errorf("endpoint must be host:port for a tun tunnel: %v", err)
-	}
-	if net.ParseIP(host) == nil {
-		return fmt.Errorf("endpoint host must be an IP address (got %q)", host)
-	}
-	if p, err := strconv.Atoi(port); err != nil || p <= 0 || p > 65535 {
-		return fmt.Errorf("endpoint port must be 1-65535 (got %q)", port)
-	}
-	return nil
+	return validateTunDNS(r.DNS)
 }
 
 // prefixRe matches a DNS label: lowercase letters, digits and hyphens,
@@ -493,9 +488,9 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 
 	// A p2p tunnel cannot be replaced while it lives: the process-wide host
 	// routes each peer key to exactly one tunnel, so the old one must give its
-	// routes up first (everything else binds its own socket and swaps after the
-	// replacement runs). A tun tunnel is the same shape: the replacement binds
-	// the same UDP address, so the old one must release it first.
+	// routes up first (everything else swaps its own socket after the
+	// replacement runs). A tun hub is the same shape: its allowlist is the same
+	// process-wide host's, so the old one must release its routes first.
 	if old.Type() == tunnel.P2PTunnel || old.Type() == tunnel.TunTunnel {
 		old.Close()
 	}
