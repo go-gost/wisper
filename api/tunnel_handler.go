@@ -3,8 +3,10 @@ package api
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/go-gost/p2p"
@@ -267,6 +269,8 @@ type tunnelCreateRequest struct {
 	EnableTLS   bool   `json:"enableTLS,omitempty"`
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
 	FileUpload  bool   `json:"file_upload,omitempty"`
+	Keepalive   bool   `json:"keepalive,omitempty"`
+	TTL         int    `json:"ttl,omitempty"`
 	RecordMode  string `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
@@ -311,12 +315,59 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.EnableTLSOption(r.EnableTLS),
 		tunnel.RewriteHostOption(r.RewriteHost),
 		tunnel.FileUploadOption(r.FileUpload),
+		tunnel.KeepaliveOption(r.Keepalive),
+		tunnel.TTLOption(r.TTL),
 		tunnel.RecordModeOption(r.RecordMode),
 		tunnel.PeerOption(r.Peer),
 		tunnel.PeersOption(peers...),
 		tunnel.PeerAliasesOption(aliases),
 		tunnel.PeerDisabledOption(tunnel.NormalizePeerDisabled(peers, disabled)),
+		tunnel.NetOption(r.Net),
+		tunnel.MTUOption(r.MTU),
+		tunnel.DeviceNameOption(r.DeviceName),
+		tunnel.RoutesOption(r.Routes),
+		tunnel.DNSOption(r.DNS),
 	}
+}
+
+// validateTunnelRequest rejects a request the runtime cannot honor, before any
+// object is constructed. Only the types with structural requirements appear
+// here; everything else is validated by its constructor.
+func validateTunnelRequest(tunnelType string, req *tunnelCreateRequest) error {
+	switch tunnelType {
+	case tunnel.TunTunnel:
+		return validateTunTunnel(req)
+	}
+	return nil
+}
+
+// validateTunTunnel checks what a tun hub cannot do without: a device address,
+// and the UDP address the tun server binds (the paired p2p tunnel must use the
+// same endpoint, so an ephemeral port would leave the two unreachable). The
+// device fields are checked by validateTunEntryPoint's helpers — the same
+// rules apply to both ends of the device.
+func validateTunTunnel(r *tunnelCreateRequest) error {
+	if err := validateTunNet(r.Net); err != nil {
+		return err
+	}
+	if err := validateTunRoutes(r.Routes); err != nil {
+		return err
+	}
+	if err := validateTunDNS(r.DNS); err != nil {
+		return err
+	}
+
+	host, port, err := net.SplitHostPort(r.Endpoint)
+	if err != nil {
+		return fmt.Errorf("endpoint must be host:port for a tun tunnel: %v", err)
+	}
+	if net.ParseIP(host) == nil {
+		return fmt.Errorf("endpoint host must be an IP address (got %q)", host)
+	}
+	if p, err := strconv.Atoi(port); err != nil || p <= 0 || p > 65535 {
+		return fmt.Errorf("endpoint port must be 1-65535 (got %q)", port)
+	}
+	return nil
 }
 
 // prefixRe matches a DNS label: lowercase letters, digits and hyphens,
@@ -370,6 +421,11 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		req.Prefix = p
+	}
+
+	if err := validateTunnelRequest(req.Type, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	t := tunnel.NewByType(req.Type, req.toOptions()...)
@@ -430,11 +486,17 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		tunnelType = old.Type()
 	}
 
+	if err := validateTunnelRequest(tunnelType, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// A p2p tunnel cannot be replaced while it lives: the process-wide host
 	// routes each peer key to exactly one tunnel, so the old one must give its
 	// routes up first (everything else binds its own socket and swaps after the
-	// replacement runs).
-	if old.Type() == tunnel.P2PTunnel {
+	// replacement runs). A tun tunnel is the same shape: the replacement binds
+	// the same UDP address, so the old one must release it first.
+	if old.Type() == tunnel.P2PTunnel || old.Type() == tunnel.TunTunnel {
 		old.Close()
 	}
 

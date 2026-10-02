@@ -52,6 +52,15 @@ export class TunnelDetailPage extends LitElement {
   @state() private _showPassword = false;
   @state() private _recordMode = 'off';
   @state() private _showPeers = false;
+
+  // tun hub fields: the device this node holds (see tunHubHint)
+  @state() private _net = '';
+  @state() private _mtu = 0;
+  @state() private _deviceName = '';
+  @state() private _routes = '';
+  @state() private _dns = '';
+  @state() private _keepalive = true;
+  @state() private _ttl = 15;
   /** How many keys are knocking on the process-wide host; shown on the peers
    *  entry. The list is not per-tunnel — a p2p stream carries no destination —
    *  so this is a count, not a per-tunnel allowlist field. */
@@ -155,6 +164,13 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = false;
     this._showAuth = false;
     this._recordMode = 'off';
+    this._net = '';
+    this._mtu = 0;
+    this._deviceName = '';
+    this._routes = '';
+    this._dns = '';
+    this._keepalive = true;
+    this._ttl = 15;
   }
 
   private _populateForm(t: Tunnel) {
@@ -169,6 +185,13 @@ export class TunnelDetailPage extends LitElement {
     this._fileUpload = t.options.file_upload ?? false;
     this._showAuth = !!(t.options.username || t.options.basic_auth);
     this._recordMode = t.options.record_mode || 'off';
+    this._net = t.options.net ?? '';
+    this._mtu = t.options.mtu ?? 0;
+    this._deviceName = t.options.device_name ?? '';
+    this._routes = t.options.routes ?? '';
+    this._dns = t.options.dns ?? '';
+    this._keepalive = t.options.keepalive ?? true;
+    this._ttl = t.options.ttl || 15;
   }
 
   /** _peerLabels renders the allowlist for display: each peer's alias by
@@ -252,6 +275,15 @@ export class TunnelDetailPage extends LitElement {
         file_upload: this._fileUpload,
         record_mode: this._recordMode,
       };
+      if (this.tunnelType === 'tun') {
+        body.net = this._net.trim() || undefined;
+        body.mtu = this._mtu || undefined;
+        body.device_name = this._deviceName.trim() || undefined;
+        body.routes = this._routes.trim() || undefined;
+        body.dns = this._dns.trim() || undefined;
+        body.keepalive = this._keepalive;
+        body.ttl = this._ttl;
+      }
       if (this.tunnelType === 'p2p' && this.mode === 'edit') {
         // The allowlist is managed on its own page; an edit here must carry it
         // along — the API replaces the whole config, so omitting it clears the
@@ -957,13 +989,36 @@ export class TunnelDetailPage extends LitElement {
                   <span class="info-value text">${formatTimestamp(t2.created_at)}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">Target</span>
+                  <span class="info-label">${this.tunnelType === 'tun' ? t('fieldBindAddress') : 'Target'}</span>
                   <span class="info-value">${t2.endpoint}</span>
                 </div>
+                ${this.tunnelType === 'tun'
+                  ? html`
+                    <div class="info-row">
+                      <span class="info-label">${t('fieldNet')}</span>
+                      <span class="info-value">${t2.entrypoint}</span>
+                    </div>
+                    ${t2.options.mtu
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldMTU')}</span><span class="info-value text">${t2.options.mtu}</span></div>`
+                      : ''}
+                    ${t2.options.device_name
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldDeviceName')}</span><span class="info-value text">${t2.options.device_name}</span></div>`
+                      : ''}
+                    ${t2.options.routes
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldRoutes')}</span><span class="info-value text">${t2.options.routes}</span></div>`
+                      : ''}
+                    ${t2.options.dns
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldDNS')}</span><span class="info-value text">${t2.options.dns}</span></div>`
+                      : ''}
+                    <div class="p2p-hint">${t('tunHubHint')}</div>
+                  `
+                  : nothing}
                 <!-- p2p: the inbound allowlist, shown by alias (the keys behind
                      the eye toggle); the host's own identity lives in Settings.
                      Other types: the public entrypoint URL, which is not secret. -->
-                ${this.tunnelType === 'p2p'
+                ${this.tunnelType === 'tun'
+                  ? nothing
+                  : this.tunnelType === 'p2p'
                   ? html`
                     <div class="info-row">
                       <span class="info-label">${t('p2pPeers')}</span>
@@ -1035,9 +1090,9 @@ export class TunnelDetailPage extends LitElement {
                     </div>
                   `
                   : ''}
-                <!-- Recording is ineffective for p2p: the tunnel is an embedded
-                     host, not a gost listener+handler, so no recorder is wired. -->
-                ${this.tunnelType === 'p2p'
+                <!-- Recording is ineffective for p2p and tun: neither is a gost
+                     listener+handler pair the recorder can attach to. -->
+                ${this.tunnelType === 'p2p' || this.tunnelType === 'tun'
                   ? ''
                   : html`
                 <div class="info-row">
@@ -1194,11 +1249,13 @@ export class TunnelDetailPage extends LitElement {
                 <!-- Target / Directory -->
                 <div class="form-group">
                   <label class="form-label">
-                    ${this.tunnelType === 'file' ? t('fieldDirectory') : t('fieldEndpoint')}
+                    ${this.tunnelType === 'file' ? t('fieldDirectory')
+                      : this.tunnelType === 'tun' ? t('fieldBindAddress')
+                      : t('fieldEndpoint')}
                   </label>
                   <div class="dir-input-row">
                     <input class="form-input dir-input" .value=${this._endpoint}
-                      placeholder=${this.tunnelType === 'http' ? 'host:port' : this.tunnelType === 'file' ? '/path/to/dir' : 'host:port'}
+                      placeholder=${this.tunnelType === 'http' ? 'host:port' : this.tunnelType === 'file' ? '/path/to/dir' : this.tunnelType === 'tun' ? '127.0.0.1:8421' : 'host:port'}
                       @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
                     ${this.tunnelType === 'file' && this._isNativeDirPicker
                       ? html`<button type="button" class="browse-btn"
@@ -1206,6 +1263,55 @@ export class TunnelDetailPage extends LitElement {
                       : ''}
                   </div>
                 </div>
+
+                <!-- tun device: this node is the hub, the device is the network -->
+                ${this.tunnelType === 'tun'
+                  ? html`
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldNet')}</label>
+                      <input class="form-input" .value=${this._net} placeholder="10.10.0.1/24"
+                        @input=${(e: Event) => { this._net = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldNetHint')}</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldMTU')}</label>
+                      <input class="form-input" type="number" .value=${this._mtu ? String(this._mtu) : ''} placeholder="1420"
+                        @input=${(e: Event) => { this._mtu = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldDeviceName')}</label>
+                      <input class="form-input" .value=${this._deviceName} placeholder="wisper0"
+                        @input=${(e: Event) => { this._deviceName = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldDeviceNameHint')}</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldRoutes')}</label>
+                      <input class="form-input" .value=${this._routes} placeholder="192.168.50.0/24"
+                        @input=${(e: Event) => { this._routes = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldRoutesHint')}</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldDNS')}</label>
+                      <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
+                        @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
+                    </div>
+                    <div class="switch-row">
+                      <span class="switch-label">${t('switchKeepalive')}</span>
+                      <div class="switch ${this._keepalive ? 'on' : ''}"
+                        @click=${() => { this._keepalive = !this._keepalive; }}>
+                        <div class="switch-knob"></div>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldTTL')}</label>
+                      <input class="form-input" type="number" .value=${this._ttl ? String(this._ttl) : ''} placeholder="15"
+                        @input=${(e: Event) => { this._ttl = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
+                    </div>
+                    <div class="p2p-hint">${t('tunKeepaliveHint')}</div>
+                    <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
+                    <div class="p2p-hint">${t('tunHubHint')}</div>
+                  `
+                  : ''}
 
                 <!-- URL Prefix (HTTP + file) -->
                 ${this.tunnelType === 'http' || this.tunnelType === 'file'
@@ -1245,8 +1351,8 @@ export class TunnelDetailPage extends LitElement {
                   `
                   : ''}
 
-                <!-- Recording mode: p2p has no recorder to attach it to. -->
-                ${this.tunnelType === 'p2p'
+                <!-- Recording mode: p2p and tun have no recorder to attach it to. -->
+                ${this.tunnelType === 'p2p' || this.tunnelType === 'tun'
                   ? ''
                   : html`
                 <div class="switch-row" @click=${() => this._setRecordMode(

@@ -98,6 +98,7 @@ const en: Record<string, string> = {
   typeUdpEntryDesc: 'Expose a tunnel endpoint as a local UDP port',
   typeP2pEntryDesc: 'Forward local traffic to a peer by public key (p2p entrypoint).',
   typeTun: 'TUN',
+  typeTunDesc: 'Host a tun device and route between the peers that reach it',
   typeTunEntryDesc: 'Join the virtual network of a peer (tun device)',
 
   // Notifications
@@ -160,6 +161,8 @@ const en: Record<string, string> = {
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
   tunKeepaliveHint:
     'Registers this spoke with the hub\'s tun server and keeps the route alive; on the hub it expires the routes of spokes that left. Off suits only a direct tun-to-tun link.',
+  tunHubHint:
+    'The device is the network: the spokes are stock tun clients. Pair it with a p2p tunnel whose endpoint is this same address and whose peers are the spoke keys.',
   tunPrivilegeHint:
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating this entrypoint fails with "operation not permitted" otherwise.',
   tunSpokeHint:

@@ -1,5 +1,10 @@
 # wisper 集成 tun 组网 评估
 
+> **状态（2026-10-02，再次修订）**：hub 已**重新作为 wisper 类型落地**（`tunnel/tun.go`，实现取回
+> `8411554`，并在 `Run` 里补上 `CleanStop` 分类）。理由与下面 2026-09-24 那段相反：为普通用户，
+> UI 驱动的部署比手写 gost YAML 更容易，代价是 **hub 上的 wisper 需要特权**（root / CAP_NET_ADMIN，
+> 因为设备由它自己创建）。下面 2026-09-24 的记录保留为历史；两条路都可用，见本文末尾的对比。
+
 > **状态（2026-09-24，实施后修订）**：只落地了 **spoke**（wisper 的 `tun` 入口点）。**hub 没有做成 wisper 类型**：
 > 设备由 gost 进程持有（tun server，见 `play/p2p-tun-hub/gost.yml`），wisper 只跑一条**现有的 p2p 隧道**
 > 把各 spoke 桥到它的 UDP 口（`endpoint` 填 tun server 的地址），**白名单仍是准入**——未列出的 key 在拨号前就被关流。
