@@ -258,6 +258,46 @@ sees:
 
 Neither is fixed yet.
 
+### Gaps closed after review
+
+**Per-peer traffic for a hub** — wisper commit `86eaef3`. `tunTunnel` implements
+`PeerStatsReporter` and `PeerStatsUpdater`. The two methods were **not** copied: the only difference
+between a p2p tunnel and a hub is which listener they read, so `peerStatSnapshot` and
+`updatePeerStatSnapshot` were extracted and both tunnels call them — a hub and a p2p tunnel cannot
+now drift into reporting a peer differently, which is the whole point of the gap.
+
+The implementer caught a race in its own first cut: it passed `s.ln` and `s.opts.Peers` as call
+arguments, which evaluates them *before* the helper takes the lock, while `Close`/`SetPeers` mutate
+both under the write lock. The helpers now take pointers and do the reading themselves.
+
+The test asserts rates (one peer non-zero, one zero across a window), not just counters — but it
+calls `UpdatePeerStats()` by hand, so it verifies the mechanism, not the wiring. Nothing in Go
+asserts that a registered `tunTunnel` is actually ticked; the e2e is what would catch that.
+
+**The exclusive-key explanation** — wisper commit `6c57300`. A hint in the hub's allowlist editor,
+and `web-src/src/utils/save-error.ts` translating `is already used by another p2p tunnel` into an
+explanation, wired into both places the clash can arrive (the p2p allowlist card and the hub's own
+form). Runtime untouched: `reconcile` rejecting the clash is correct.
+
+### Still open — three more, found by the next review
+
+Reviewing the two above turned up three more places where the runtime and the UI disagree. All three
+are real; none is fixed yet:
+
+1. **The hub's per-spoke traffic is fetched but never rendered.** `peer_stats` is consumed in exactly
+   two places (`tunnel-peers-page.ts` and the p2p peers card count), a hub has no route to that page
+   (`tunnel-detail-page.ts` gates the card on `tunnelType === 'p2p'`), and the hub's view mode
+   renders its allowlist as one comma-joined string. So the previous commit made the API correct and
+   the web app still shows none of it — this is the "API first, page later" decision from the design
+   conversation, and the second half was not done.
+2. **A hub's spokes get no transport or diagnostics.** `api/tunnel_handler.go` fetches host state
+   only when `opts.Peer != "" || t.Type() == tunnel.P2PTunnel`, excluding the hub, so a hub's spokes
+   have no path word, punch state, or last error. A hub is where a spoke's *first* connection is
+   hardest — the spoke is behind NAT and the hub is the one holding the public key.
+3. **The "end-to-end encrypted" badge skips tun hubs.** `home-page.ts:149` grants it to p2p tunnels
+   and to p2p/tun entrypoints, but not to a tun tunnel — while p2p encryption is mandatory, so a
+   spoke and its hub are labelled inconsistently for the same wire.
+
 ---
 
 ## File structure
