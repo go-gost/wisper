@@ -7,6 +7,7 @@ import { GoBackend } from '../api/backend';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, maskKey } from '../utils/format';
 import { transportStyle } from '../utils/transport';
+import { saveErrorText } from '../utils/save-error';
 import type { Peer, PendingPeer, Tunnel } from '../api/types';
 import '../components/app-scaffold';
 
@@ -204,8 +205,7 @@ export class TunnelPeersPage extends LitElement {
       this._showSnackbar(t('saved'));
       return true;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '';
-      const text = `${t('saveFailed')}${msg ? ': ' + msg : ''}`;
+      const text = saveErrorText(e);
       if (this._editing !== null) this._rowError = text;
       else this._showSnackbar(text);
       return false;

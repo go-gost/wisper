@@ -7,6 +7,7 @@ import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
+import { saveErrorText } from '../utils/save-error';
 import { GoBackend } from '../api/backend';
 import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent, Peer } from '../api/types';
 import '../components/app-scaffold';
@@ -325,8 +326,7 @@ export class TunnelDetailPage extends LitElement {
         await refresh();
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '';
-      this._showSnackbar(`${t('saveFailed')}${msg ? ': ' + msg : ''}`);
+      this._showSnackbar(saveErrorText(e));
     }
     this._saving = false;
   }
@@ -1342,6 +1342,7 @@ export class TunnelDetailPage extends LitElement {
                         placeholder=${t('tunHubPeersPlaceholder')}
                         @input=${(e: Event) => { this._hubPeers = (e.target as HTMLTextAreaElement).value; }}></textarea>
                       <div class="p2p-hint">${t('tunHubPeersHint')}</div>
+                      <div class="p2p-hint warn">${t('tunHubPeersExclusiveHint')}</div>
                     </div>
                   `
                   : ''}
