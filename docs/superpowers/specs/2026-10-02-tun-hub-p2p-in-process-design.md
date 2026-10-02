@@ -133,7 +133,8 @@ connection.
 | delivering a packet | `conn.WriteTo(pkt, addr)` | write the datagram on the stream |
 
 Both implementations are complete routers, and both are equally served by a
-route table that stores a name.
+route table that stores a name. The name resolves to a UDP address for the socket
+server and to a peer key for the p2p hub.
 
 This is also why the handler is not written in wisper: reimplementing the
 keepalive protocol and the auther check there would put the same wire format in
@@ -189,6 +190,59 @@ endpoint checks do not apply to it.
 The socket server keeps its own route table of UDP addresses and its own
 delivery. It is the right answer for a hub reached over ordinary UDP and is not
 weakened by this change.
+
+## The device admits one reader and one writer, and guarantees neither
+
+`tunDevice` (`x/listener/tun/tun.go`) shares `d.rbufs[0]` and `d.wbuf` across
+every call, with no lock: a concurrent write copies through the one buffer, and a
+concurrent read overwrites the first reader's target while its `dev.Read` is in
+flight. The type gives no guarantee. It is safe today only because each side has
+exactly one goroutine.
+
+So the hub cannot let a stream read or write the device directly. It has one
+device-read loop that owns the device's read side and dispatches what it reads,
+and every write goes through one serialization point. This is the socket
+server's shape — one reader, one writer — reached by a different route, not the
+per-stream bridge a first draft of this spec described.
+
+p2p's frame conn has the same hazard one layer down: `frameConn.Write`
+(`p2p/internal/host/frame.go:64`) serializes only its read buffer, so two writes
+to one peer's stream interleave header and payload. Writes to a given peer are
+serialized too.
+
+## Reconnecting is the same peer
+
+A p2p datagram link is per dial, and a peer's edge re-presents on its own
+schedule (a ≥2s floor) for as long as the link lives. A reconnect therefore
+yields a new stream under the same **peer key**.
+
+That is why a route's value is a name: the key is the identity, and it survives
+the reconnection. The new stream replaces the old as the route's destination.
+
+It is also a race worth naming. The old stream's teardown drops the peer's
+routes; if the new stream has already registered, teardown must not drop them.
+Teardown therefore withdraws a route only when the stream doing the withdrawing
+is still the one holding it.
+
+## A spoke that never registers is connected but silent
+
+The spoke sends its registration on any `udp` link regardless of `keepalive`
+(`client.go:47`), but on a p2p link the network is `ip`, not `udp`
+(`handler.go:88`), so a spoke configured with `keepalive: 0` never registers at
+all. Its packets have no route and are discarded — connected, but silent.
+
+The hub logs a discarded packet at warn rather than debug, naming the peer, so
+this is visible as a symptom rather than as an absence. Rejecting the stream
+instead would be wrong: registration and data are ordered but not atomically so.
+
+## Per-peer statistics already exist
+
+A hub's allowlist routes through the same `peerListener` the p2p tunnel uses, so
+per-peer byte and connection counters are already accumulated and exposed by the
+API. The hub does not get the p2p tunnel's peers page: that page is built around
+a transport badge and per-peer diagnostics that a hub has no use for, since its
+transport is always p2p. The API fields are the deliverable; the page is a
+separate design.
 
 ## Testing
 
