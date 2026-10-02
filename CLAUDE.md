@@ -31,6 +31,25 @@ make web-force
 ./wisper -addr :9000                    # custom port
 ./wisper -version                       # print version and exit
 
+# ── Web development mode ────────────────────────────────────────────────
+# The web UI is compile-time embedded (//go:embed web/*), so on a device a
+# one-line change costs vite build → go build → gradle → sign → install
+# (~11 min). WISPER_WEB_DIR points the running process at a directory of
+# built assets instead, and the WebView picks them up on reload — the app
+# needs no change, because it already loads http://127.0.0.1:8900.
+#
+#   (cd web-src && npx vite build)              # ~0.5s
+#   adb push web/ /sdcard/wisper-web/
+#   adb shell am force-stop run.gost.wisper && \
+#     adb shell am start -n run.gost.wisper/.MainActivity
+#
+# The env var must be visible to the app process (adb shell setprop
+# debug.wisper.WEB_DIR + a matching read, or a debug-signed build with it
+# exported); a missing directory is refused rather than falling back to the
+# embedded copy, because a stale bundle that still serves reads as "my change
+# did nothing". On the desktop the flag is enough:
+#   ./wisper -web-dir ./web
+
 # Run Go tests
 go test ./... -v
 go test ./api/ -v -run TestListTunnels  # single test suite

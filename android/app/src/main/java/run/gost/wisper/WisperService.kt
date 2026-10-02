@@ -17,9 +17,11 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 /**
  * Hosts the Go backend in the foreground, and decides whether the app needs a
@@ -230,6 +232,20 @@ class WisperService : Service() {
         Log.i(TAG, "onCreate")
 
         createNotificationChannel()
+
+        // Development web mode: with WISPER_WEB_DIR set (adb shell setprop, or
+        // `am start` with it exported), the Go backend serves the Lit UI from
+        // that directory instead of the APK's embedded copy — so a web change
+        // is `vite build` + `adb push` + reload, with no APK rebuild. Unset in
+        // every release build, where the embedded copy is the only source. Read
+        // through System.getenv so it works for a release-signed debug APK too.
+        System.getenv("WISPER_WEB_DIR")?.let { dir ->
+            if (File(dir).isDirectory) {
+                Log.i(TAG, "web dev mode: serving $dir")
+            } else {
+                Log.w(TAG, "web dev mode: WISPER_WEB_DIR=$dir is not a directory, ignoring")
+            }
+        }
 
         // Start Go backend. The listen() call happens synchronously inside
         // wisperStartGo, so by the time it returns the port is open.

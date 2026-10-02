@@ -21,7 +21,13 @@ func main() {
 	logOutput := flag.String("log.output", os.Getenv("WISPER_LOG_OUTPUT"), "log output: stderr, stdout, none, or a file path (default: config file)")
 	logLevel := flag.String("log.level", os.Getenv("WISPER_LOG_LEVEL"), "log level: debug, info, warn, error (default: config file)")
 	showVersion := flag.Bool("version", false, "Print version and exit")
+	// WISPER_WEB_DIR is the flag default, same precedence as the log flags:
+	// flag > env. A bare webDir is the env value, so only an explicit flag wins.
+	webDir := flag.String("web-dir", os.Getenv("WISPER_WEB_DIR"), "directory of built web assets to serve instead of the embedded ones (development; serves from disk, no rebuild)")
 	flag.Parse()
+	if *webDir != "" {
+		webDirFlag = *webDir
+	}
 
 	if *showVersion {
 		fmt.Printf("wisper %s\n", version.Version)
