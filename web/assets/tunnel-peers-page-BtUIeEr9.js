@@ -1,5 +1,5 @@
-import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}from"./index-DkU-W0ko.js";import{n as b,r as c,m as k,c as K,a as f,b as _}from"./format-CjWYPpxa.js";import{i as d}from"./app-scaffold-MuE5Fi1V.js";import{c as T}from"./clipboard-C3x8_sid.js";import{s as C}from"./save-error-DRZ1x0Ti.js";import{a as A}from"./transport-BT9I7WwK.js";var S=Object.defineProperty,R=Object.getOwnPropertyDescriptor,v=(e,t,a,r)=>{for(var n=r>1?void 0:r?R(t,a):t,g=e.length-1,u;g>=0;g--)(u=e[g])&&(n=(r?u(t,a,n):u(n))||n);return r&&n&&S(t,a,n),n};let h=class extends m{constructor(){super(...arguments),this.peer=null,this.stat=null,this.disabled=!1,this.showKeys=!1,this._expanded=!1}_renderTransport(){const e=A(this.stat?.transport);return e?i`<span class="peer-badge ${e.tone}" title=${e.hint}>
-      ${d(e.icon)}<span>${e.label}</span>
+import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}from"./index-DV4FQr84.js";import{n as b,r as c,m as k,c as K,a as v,b as _}from"./format-BrKCpgRA.js";import{i as l}from"./app-scaffold-c4I8zEOm.js";import{c as T}from"./clipboard-C3x8_sid.js";import{s as C}from"./save-error-la2Id7bD.js";import{a as S}from"./transport-DSW_pZOg.js";var A=Object.defineProperty,R=Object.getOwnPropertyDescriptor,f=(e,t,a,r)=>{for(var n=r>1?void 0:r?R(t,a):t,g=e.length-1,u;g>=0;g--)(u=e[g])&&(n=(r?u(t,a,n):u(n))||n);return r&&n&&A(t,a,n),n};let h=class extends m{constructor(){super(...arguments),this.peer=null,this.stat=null,this.disabled=!1,this.showKeys=!1,this._expanded=!1}_renderTransport(){const e=S(this.stat?.transport);return e?i`<span class="peer-badge ${e.tone}" title=${e.hint}>
+      ${l(e.icon)}<span>${e.label}</span>
     </span>`:o}_renderDiag(){const e=this.stat;if(!e)return o;const t=e.caps&&e.caps.length>0?e.caps.join(", "):"",a=(r,n)=>i`
       <div class="diag-row">
         <span class="diag-label">${r}</span>
@@ -14,8 +14,8 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
         ${a(s("peersDiagEndpoint"),e.peer_addr||"—")}
         ${a(s("peersDiagCandidates"),String(e.candidates??0))}
         ${t?a(s("peersDiagCaps"),t):o}
-        ${a(s("peersDiagSession"),x(e.session_age_ms))}
-        ${a(s("peersDiagSilence"),x(e.last_recv_age_ms))}
+        ${a(s("peersDiagSession"),w(e.session_age_ms))}
+        ${a(s("peersDiagSilence"),w(e.last_recv_age_ms))}
         ${e.trace&&e.trace.length>0?i`<div class="diag-trace">
               <span class="diag-label">${s("peersDiagTrace")}</span>
               <div class="trace-lines">
@@ -25,20 +25,26 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
       </div>
     `}render(){const e=this.peer,t=this.stat,a=!!t?.transport;return i`
       <div class="peer-row ${this.disabled?"off":""}">
+        <!-- Left to right: what the row is, then what it is doing, then the
+             page's controls. The facts (alias, path word, the diagnostic
+             expander) come before the buttons — the same order the tun
+             entrypoint's row uses, and the order this row had before it was
+             extracted here. Swapping them puts the controls in the middle and
+             the badge at the far right, which reads as a different row. -->
         <div class="row-line">
           <span class="peer-alias">${t?.alias||e?.alias||s("peersNoAlias")}</span>
-          ${this.rowActions}
           ${this.disabled?i`<span class="peer-badge" title=${s("peersDisabledHint")}>${s("peersDisabled")}</span>`:this._renderTransport()}
           ${a?i`<button class="icon-btn" title="${s("peersDiagDetails")}"
                 @click=${()=>{this._expanded=!this._expanded}}>
-                ${d(this._expanded?"chevron-up":"chevron-down")}
+                ${l(this._expanded?"chevron-up":"chevron-down")}
               </button>`:o}
+          ${this.rowActions}
         </div>
         <div class="peer-key">${this.showKeys?e?.key:k(e?.key??"")}</div>
         ${t?i`<div class="peer-stats">
               <span>${K(t.current_conns)} ${s("p2pColConns")}</span>
-              <span>↓ ${f(t.output_bytes)} <span class="rate">${_(t.output_rate_bytes)}</span></span>
-              <span>↑ ${f(t.input_bytes)} <span class="rate">${_(t.input_rate_bytes)}</span></span>
+              <span>↓ ${v(t.output_bytes)} <span class="rate">${_(t.output_rate_bytes)}</span></span>
+              <span>↑ ${v(t.input_bytes)} <span class="rate">${_(t.input_rate_bytes)}</span></span>
             </div>`:i`<div class="peer-stats"><span class="muted">${s("peersNoTraffic")}</span></div>`}
         ${this._expanded&&a?this._renderDiag():o}
       </div>
@@ -180,18 +186,18 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
       width: 14px;
       height: 14px;
     }
-  `;v([b({attribute:!1})],h.prototype,"peer",2);v([b({attribute:!1})],h.prototype,"stat",2);v([b({type:Boolean})],h.prototype,"disabled",2);v([b({type:Boolean})],h.prototype,"showKeys",2);v([b()],h.prototype,"rowActions",2);v([c()],h.prototype,"_expanded",2);h=v([$("peer-stats-row")],h);function x(e){if(!e||e<=0)return"—";const t=Math.floor(e/1e3);if(t<60)return`${t}s`;const a=Math.floor(t/60);return a<60?`${a}m ${t%60}s`:`${Math.floor(a/60)}h ${a%60}m`}var O=Object.defineProperty,B=Object.getOwnPropertyDescriptor,p=(e,t,a,r)=>{for(var n=r>1?void 0:r?B(t,a):t,g=e.length-1,u;g>=0;g--)(u=e[g])&&(n=(r?u(t,a,n):u(n))||n);return r&&n&&O(t,a,n),n};function M(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function w(e){return(e?.options.peers??[]).map(t=>({key:t.key,alias:t.alias??"",disabled:t.disabled===!0}))}let l=class extends m{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:"",disabled:!1},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._backend=new D,this._pending=[],this._unsub=null,this._toggleRow=async e=>{const t=this._rows.map((a,r)=>r===e?{...a,disabled:!a.disabled}:a);await this._save(t)},this._addPending=async e=>{await this._save([...this._rows,{key:e,alias:"",disabled:!1}])&&(this._pending=this._pending.filter(t=>t.key!==e))},this._dismissPending=async e=>{try{await this._backend.dismissPendingPeer(e),this._pending=this._pending.filter(t=>t.key!==e)}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${s("saveFailed")}${a?": "+a:""}`)}},this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim(),disabled:this._draft.disabled===!0};if(!M(e.key)){this._rowError=s("peersKeyInvalid");return}if(this._rows.filter((r,n)=>n!==this._editing).some(r=>r.key===e.key)){this._rowError=s("peersKeyDuplicate");return}const a=this._editing==="new"?[...this._rows,e]:this._rows.map((r,n)=>n===this._editing?e:r);await this._save(a)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,a)=>a!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=P(()=>this._load())}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=E().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=w(e),this._loadPending()}async _loadPending(){try{this._pending=(await this._backend.listPendingPeers()).peers??[]}catch{}}_startEdit(e){this._editing=e,this._draft={...this._rows[e]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:"",disabled:!1},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}_ago(e){const t=Math.max(0,(Date.now()-Date.parse(e))/1e3);return t<60?s("peersPendingJustNow"):s("peersPendingMinutes",{n:Math.floor(t/60)})}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await z(this.tunnelId,e.map(a=>({key:a.key,alias:a.alias||void 0,disabled:a.disabled||void 0})));return this._tunnel=t,this._rows=w(t),this._showSnackbar(s("saved")),!0}catch(t){const a=C(t);return this._editing!==null?this._rowError=a:this._showSnackbar(a),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderEditor(){return i`
+  `;f([b({attribute:!1})],h.prototype,"peer",2);f([b({attribute:!1})],h.prototype,"stat",2);f([b({type:Boolean})],h.prototype,"disabled",2);f([b({type:Boolean})],h.prototype,"showKeys",2);f([b()],h.prototype,"rowActions",2);f([c()],h.prototype,"_expanded",2);h=f([$("peer-stats-row")],h);function w(e){if(!e||e<=0)return"—";const t=Math.floor(e/1e3);if(t<60)return`${t}s`;const a=Math.floor(t/60);return a<60?`${a}m ${t%60}s`:`${Math.floor(a/60)}h ${a%60}m`}var O=Object.defineProperty,B=Object.getOwnPropertyDescriptor,p=(e,t,a,r)=>{for(var n=r>1?void 0:r?B(t,a):t,g=e.length-1,u;g>=0;g--)(u=e[g])&&(n=(r?u(t,a,n):u(n))||n);return r&&n&&O(t,a,n),n};function M(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function x(e){return(e?.options.peers??[]).map(t=>({key:t.key,alias:t.alias??"",disabled:t.disabled===!0}))}let d=class extends m{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:"",disabled:!1},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._backend=new D,this._pending=[],this._unsub=null,this._toggleRow=async e=>{const t=this._rows.map((a,r)=>r===e?{...a,disabled:!a.disabled}:a);await this._save(t)},this._addPending=async e=>{await this._save([...this._rows,{key:e,alias:"",disabled:!1}])&&(this._pending=this._pending.filter(t=>t.key!==e))},this._dismissPending=async e=>{try{await this._backend.dismissPendingPeer(e),this._pending=this._pending.filter(t=>t.key!==e)}catch(t){const a=t instanceof Error?t.message:"";this._showSnackbar(`${s("saveFailed")}${a?": "+a:""}`)}},this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim(),disabled:this._draft.disabled===!0};if(!M(e.key)){this._rowError=s("peersKeyInvalid");return}if(this._rows.filter((r,n)=>n!==this._editing).some(r=>r.key===e.key)){this._rowError=s("peersKeyDuplicate");return}const a=this._editing==="new"?[...this._rows,e]:this._rows.map((r,n)=>n===this._editing?e:r);await this._save(a)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,a)=>a!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=P(()=>this._load())}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=E().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=x(e),this._loadPending()}async _loadPending(){try{this._pending=(await this._backend.listPendingPeers()).peers??[]}catch{}}_startEdit(e){this._editing=e,this._draft={...this._rows[e]},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:"",disabled:!1},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}_ago(e){const t=Math.max(0,(Date.now()-Date.parse(e))/1e3);return t<60?s("peersPendingJustNow"):s("peersPendingMinutes",{n:Math.floor(t/60)})}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await z(this.tunnelId,e.map(a=>({key:a.key,alias:a.alias||void 0,disabled:a.disabled||void 0})));return this._tunnel=t,this._rows=x(t),this._showSnackbar(s("saved")),!0}catch(t){const a=C(t);return this._editing!==null?this._rowError=a:this._showSnackbar(a),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderEditor(){return i`
       <div class="peer-row editing">
         <div class="row-line">
           <input class="form-input alias grow" .value=${this._draft.alias}
             placeholder=${s("peersAliasPlaceholder")}
             @input=${e=>{this._draft={...this._draft,alias:e.target.value}}}>
           <button class="icon-btn" title="${s("btnCancel")}" @click=${()=>this._cancelEdit()}>
-            ${d("close")}
+            ${l("close")}
           </button>
           <button class="icon-btn accent" title="${s("btnSave")}" ?disabled=${this._saving}
             @click=${this._saveRow}>
-            ${d("check")}
+            ${l("check")}
           </button>
         </div>
         <input class="form-input key ${this._rowError?"invalid":""}" .value=${this._draft.key}
@@ -203,12 +209,12 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`)}>
-            ${d("chevron-left")}
+            ${l("chevron-left")}
           </button>
           <span class="page-title">${s("peersTitle")}</span>
           <button class="pill-btn appbar-action" title="${this._showKeys?s("hideKey"):s("revealKey")}"
             @click=${()=>{this._showKeys=!this._showKeys}}>
-            ${d(this._showKeys?"eye-off":"eye")}
+            ${l(this._showKeys?"eye-off":"eye")}
           </button>
         </div>
 
@@ -230,11 +236,11 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
                             <button class="icon-btn accent" title="${s("peersPendingAdd")}"
                               ?disabled=${this._saving}
                               @click=${()=>this._addPending(t.key)}>
-                              ${d("plus")}
+                              ${l("plus")}
                             </button>
                             <button class="icon-btn" title="${s("peersPendingDismiss")}"
                               @click=${()=>this._dismissPending(t.key)}>
-                              ${d("close")}
+                              ${l("close")}
                             </button>
                           </span>
                         </div>
@@ -258,17 +264,17 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
                           <button class="icon-btn" title="${t.disabled?s("peersEnable"):s("peersDisable")}"
                             ?disabled=${this._saving}
                             @click=${()=>this._toggleRow(a)}>
-                            ${d(t.disabled?"play":"stop")}
+                            ${l(t.disabled?"play":"stop")}
                           </button>
                           <button class="icon-btn" title="${s("btnCopy")}" @click=${()=>T(t.key)}>
-                            ${d("copy")}
+                            ${l("copy")}
                           </button>
                           <button class="icon-btn" title="${s("btnEdit")}" @click=${()=>this._startEdit(a)}>
-                            ${d("edit")}
+                            ${l("edit")}
                           </button>
                           <button class="icon-btn danger" title="${s("btnDelete")}"
                             @click=${()=>{this._confirmDelete=a}}>
-                            ${d("trash")}
+                            ${l("trash")}
                           </button>
                         </span>
                       `}></peer-stats-row>
@@ -277,7 +283,7 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
 
                 ${this._editing===null?i`
                     <button class="add-row" @click=${()=>this._startAdd()}>
-                      ${d("plus")} ${s("peersAdd")}
+                      ${l("plus")} ${s("peersAdd")}
                     </button>`:o}
               </div>
 
@@ -307,7 +313,7 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
 
         ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:o}
       </app-scaffold>
-    `}};l.styles=y`
+    `}};d.styles=y`
     .back-btn {
       background: none;
       border: none;
@@ -557,4 +563,4 @@ import{i as y,a as m,A as o,b as i,c as s,t as $,G as D,s as P,g as E,B as z}fro
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       z-index: 100;
     }
-  `;p([b()],l.prototype,"tunnelType",2);p([b()],l.prototype,"tunnelId",2);p([c()],l.prototype,"_tunnel",2);p([c()],l.prototype,"_rows",2);p([c()],l.prototype,"_editing",2);p([c()],l.prototype,"_draft",2);p([c()],l.prototype,"_saving",2);p([c()],l.prototype,"_rowError",2);p([c()],l.prototype,"_confirmDelete",2);p([c()],l.prototype,"_showKeys",2);p([c()],l.prototype,"_snackbar",2);p([c()],l.prototype,"_pending",2);l=p([$("tunnel-peers-page")],l);export{l as TunnelPeersPage};
+  `;p([b()],d.prototype,"tunnelType",2);p([b()],d.prototype,"tunnelId",2);p([c()],d.prototype,"_tunnel",2);p([c()],d.prototype,"_rows",2);p([c()],d.prototype,"_editing",2);p([c()],d.prototype,"_draft",2);p([c()],d.prototype,"_saving",2);p([c()],d.prototype,"_rowError",2);p([c()],d.prototype,"_confirmDelete",2);p([c()],d.prototype,"_showKeys",2);p([c()],d.prototype,"_snackbar",2);p([c()],d.prototype,"_pending",2);d=p([$("tunnel-peers-page")],d);export{d as TunnelPeersPage};

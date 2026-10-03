@@ -65,6 +65,22 @@ test('the peers page marks the switched-off peer', async ({ page }) => {
   await page.screenshot({ path: 'test-results/tunnel-peers.png', fullPage: true });
 });
 
+test('a peer row reads its facts first and its controls last', async ({ page }) => {
+  // A row's own facts — the path word, the disabled badge, the diagnostic
+  // expander — come before the page's buttons, the same way the tun
+  // entrypoint's row carries its transport word before its copy button.
+  // Extracting this row into one component silently swapped the two: the
+  // buttons moved into the middle and the badge went to the far right. Nothing
+  // compared them, so nothing noticed until a person did.
+  await page.goto(`${DETAIL}/peers`);
+
+  const row = page.locator('.peer-row').filter({ hasText: 'Disabled' });
+  const badge = (await row.getByText('Disabled', { exact: true }).boundingBox())!;
+  const firstButton = (await row.locator('.row-actions button').first().boundingBox())!;
+
+  expect(badge.x).toBeLessThan(firstButton.x);
+});
+
 test('a tun hub reaches its peers page the way a p2p tunnel does', async ({ page }) => {
   await page.goto(HUB);
   // The info card's row, not the peers card below it: the row is "Peers" and

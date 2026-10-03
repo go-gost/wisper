@@ -109,9 +109,14 @@ export class PeerStatsRow extends LitElement {
     const expandable = !!s?.transport;
     return html`
       <div class="peer-row ${this.disabled ? 'off' : ''}">
+        <!-- Left to right: what the row is, then what it is doing, then the
+             page's controls. The facts (alias, path word, the diagnostic
+             expander) come before the buttons — the same order the tun
+             entrypoint's row uses, and the order this row had before it was
+             extracted here. Swapping them puts the controls in the middle and
+             the badge at the far right, which reads as a different row. -->
         <div class="row-line">
           <span class="peer-alias">${s?.alias || p?.alias || t('peersNoAlias')}</span>
-          ${this.rowActions}
           ${this.disabled
             ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
             : this._renderTransport()}
@@ -121,6 +126,7 @@ export class PeerStatsRow extends LitElement {
                 ${icon(this._expanded ? 'chevron-up' : 'chevron-down')}
               </button>`
             : nothing}
+          ${this.rowActions}
         </div>
         <div class="peer-key">${this.showKeys ? p?.key : maskKey(p?.key ?? '')}</div>
         ${s
