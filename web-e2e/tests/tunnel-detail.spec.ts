@@ -67,9 +67,10 @@ test('the peers page marks the switched-off peer', async ({ page }) => {
 
 test('a tun hub reaches its peers page the way a p2p tunnel does', async ({ page }) => {
   await page.goto(HUB);
-  // The info card's row, not the peers card below it: both are titled
-  // "Allowed peers", because they are the same list under the same name.
-  const hubPeers = page.locator('.info-label').filter({ hasText: 'Allowed peers' });
+  // The info card's row, not the peers card below it: the row is "Peers" and
+  // the card is "Allowed peers", the same way round on both types — the row
+  // names the thing, the card is the entry to managing it.
+  const hubPeers = page.locator('.info-label').filter({ hasText: 'Peers' });
   await expect(hubPeers).toBeVisible();
 
   // Same entry, same page, same component: a hub's peers are p2p peers on the
@@ -93,6 +94,35 @@ test('a tun hub reaches its peers page the way a p2p tunnel does', async ({ page
   await expect(rows.first()).toContainText('dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA');
 
   await page.screenshot({ path: 'test-results/tun-hub-peers.png', fullPage: true });
+});
+
+test("a hub's allowlist row reads exactly as a p2p tunnel's", async ({ page }) => {
+  // The two rows were written separately and drifted: the hub's label was the
+  // longer "Allowed peers", which does not fit the label column's fixed 80px,
+  // so it wrapped onto a second line and pushed the row's own buttons out of
+  // line with its text. Same words, same face, same shape — this is what keeps
+  // them that way, since nothing else compares the two pages.
+  const shapeOf = async (url: string) => {
+    await page.goto(url);
+    const row = page.locator('.info-row').filter({ hasText: 'Peers' });
+    return {
+      label: (await row.locator('.info-label').innerText()).trim(),
+      value: (await row.locator('.info-value').innerText()).trim(),
+      // .info-value is monospace by default; "text" is the proportional face a
+      // count wants.
+      proportional: await row.locator('.info-value').evaluate(el => el.classList.contains('text')),
+    };
+  };
+
+  const p2p = await shapeOf(DETAIL);
+  const hub = await shapeOf(HUB);
+
+  expect(hub.label).toBe(p2p.label);
+  expect(hub.proportional).toBe(p2p.proportional);
+  // Both a count — not one a count and the other a comma-joined list of
+  // aliases, which is what the p2p side used to render.
+  expect(hub.value).toMatch(/^\d+/);
+  expect(p2p.value).toMatch(/^\d+/);
 });
 
 /**
@@ -173,7 +203,7 @@ test('a hub with no peers says so where the fix is, in the empty-state voice', a
 
   // The allowlist row: the same muted .info-value.empty the p2p page uses,
   // naming the peers page as what makes it reachable.
-  const row = page.locator('.info-row').filter({ hasText: 'Allowed peers' });
+  const row = page.locator('.info-row').filter({ hasText: 'Peers' });
   await expect(row.locator('.info-value.empty')).toBeVisible();
   await expect(row.locator('.info-value.empty')).toContainText('peers page');
 

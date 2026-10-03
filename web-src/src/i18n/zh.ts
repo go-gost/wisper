@@ -160,14 +160,14 @@ const zh: Record<string, string> = {
     '把本机地址注册到 hub 的 tun server 并维持路由；在走 socket 的 hub 侧还用于让已离开对端的路由过期。仅点对点 tun↔tun 链路适合关闭。',
   tunHubHint:
     '设备就是网络本身：各对端用标准 tun 客户端经 p2p 接入。未列入允许列表的对端在拨号前就会被拒绝。',
-  tunHubPeers: '允许的对端',
+  peersLabel: '对端',
   tunHubPeersExclusiveHint:
     '一个公钥只能属于 hub 或 p2p 隧道其中之一：同一 host 会把每个公钥只路由给一条隧道。要把某个对端移到这里，请先把它从原来那条 p2p 隧道上移除。',
   peerKeyInUseHint:
     '该公钥已经在另一条隧道或 hub 上了——一个对端公钥只能属于 hub 或 p2p 隧道其中之一。请先把它从另一处移除。',
   tunHubPeersEmpty:
     '还没有对端——设备已就绪，但在 peers 页面添加之前没有流量能到达。',
-  tunHubPeersCount: '已允许 {n} 个',
+  peersCount: '已允许 {n} 个',
   tunPrivilegeHint:
     'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建设备会报 “operation not permitted”。',
   tunPeerHint:
@@ -257,7 +257,6 @@ const zh: Record<string, string> = {
   p2pTransportConnected: '已连接',
   p2pTransportDetail: '状态详情',
   e2eEncrypted: '端到端加密',
-  p2pPeers: '对端',
   p2pPeersEmpty: '未配置对端——没有入站流量能到达该隧道。',
   p2pColPeer: '对端',
   p2pColConns: '连接',

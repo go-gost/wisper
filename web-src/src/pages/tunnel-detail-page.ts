@@ -6,7 +6,7 @@ import { getTunnels, refresh, remove, start, stop, subscribe, resetStats } from 
 import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
+import { formatBytes, formatRate, formatNumber, formatTimestamp } from '../utils/format';
 import { saveErrorText } from '../utils/save-error';
 import { GoBackend } from '../api/backend';
 import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent } from '../api/types';
@@ -55,7 +55,6 @@ export class TunnelDetailPage extends LitElement {
   /** Reveals a peer key in place of its alias. A key is a credential, so it
    *  is masked until asked for — the same switch the peers page's eye drives,
    *  because it reveals the same keys. */
-  @state() private _showPeers = false;
 
   // tun hub fields: the device this node holds (see tunHubHint). A hub binds
   // no address and has no keepalive/ttl: the p2p stream's closing is what
@@ -187,14 +186,6 @@ export class TunnelDetailPage extends LitElement {
     this._net = t.options.net ?? '';
     this._mtu = t.options.mtu ?? 0;
     this._deviceName = t.options.device_name ?? '';
-  }
-
-  /** _peerLabels renders the allowlist for display: each peer's alias by
-   *  default — the key is a credential — and the key itself once revealed. */
-  private _peerLabels(): string {
-    return (this._tunnel?.options.peers ?? [])
-      .map(p => (this._showPeers ? p.key : p.alias || maskKey(p.key)))
-      .join(', ');
   }
 
   /** _peerKeys is the allowlist verbatim, for the copy button: the keys go out
@@ -975,16 +966,12 @@ export class TunnelDetailPage extends LitElement {
                       ? html`<div class="info-row"><span class="info-label">${t('fieldDeviceName')}</span><span class="info-value text">${t2.options.device_name}</span></div>`
                       : ''}
                     <div class="info-row">
-                      <span class="info-label">${t('tunHubPeers')}</span>
+                      <span class="info-label">${t('peersLabel')}</span>
                       ${t2.options.peers?.length
                         ? html`
-                          <span class="info-value text">${t('tunHubPeersCount').replace('{n}', String(t2.options.peers.length))}</span>
+                          <span class="info-value text">${t('peersCount').replace('{n}', String(t2.options.peers.length))}</span>
                           <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._handleCopy(this._peerKeys())}>
                             ${icon('copy')}
-                          </button>
-                          <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
-                            @click=${() => { this._showPeers = !this._showPeers; }}>
-                            ${icon(this._showPeers ? 'eye-off' : 'eye')}
                           </button>
                         `
                         : html`<span class="info-value empty">${t('tunHubPeersEmpty')}</span>`}
@@ -992,22 +979,20 @@ export class TunnelDetailPage extends LitElement {
                     <div class="p2p-hint">${t('tunHubHint')}</div>
                   `
                   : nothing}
-                <!-- p2p: the inbound allowlist, shown by alias (the keys behind
-                     the eye toggle); the host's own identity lives in Settings.
-                     Other types: the public entrypoint URL, which is not secret. -->
+                <!-- p2p: the inbound allowlist, as a count and nothing more. A
+                     hub's row is drawn identically from here, so the two must
+                     not drift: the identities live on the peers page, the key
+                     is a credential, and neither belongs in a summary row.
+                     Other types: the public entrypoint URL, not secret. -->
                 ${this.tunnelType === 'p2p'
                   ? html`
                     <div class="info-row">
-                      <span class="info-label">${t('p2pPeers')}</span>
-                      ${t2.entrypoint
+                      <span class="info-label">${t('peersLabel')}</span>
+                      ${t2.options.peers?.length
                         ? html`
-                          <span class="info-value">${this._showPeers ? t2.entrypoint : this._peerLabels()}</span>
-                          <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
+                          <span class="info-value text">${t('peersCount').replace('{n}', String(t2.options.peers.length))}</span>
+                          <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._handleCopy(this._peerKeys())}>
                             ${icon('copy')}
-                          </button>
-                          <button class="copy-btn-mini" title="${this._showPeers ? t('hideKey') : t('revealKey')}"
-                            @click=${() => { this._showPeers = !this._showPeers; }}>
-                            ${icon(this._showPeers ? 'eye-off' : 'eye')}
                           </button>
                         `
                         : html`<span class="info-value empty">${t('p2pPeersEmpty')}</span>`}

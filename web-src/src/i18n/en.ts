@@ -163,14 +163,14 @@ const en: Record<string, string> = {
     'Registers this peer with the hub\'s tun server and keeps the route alive; on a hub reached over a socket it also expires the routes of peers that left. Off suits only a direct tun-to-tun link.',
   tunHubHint:
     'This device is the network: peers join it as ordinary tun clients over p2p. A peer that is not on the allowlist is refused before any dial.',
-  tunHubPeers: 'Allowed peers',
+  peersLabel: 'Peers',
   tunHubPeersExclusiveHint:
     'A key can sit on a hub or on a p2p tunnel, not both: one host routes each key to exactly one tunnel. To move a peer here, remove it from the p2p tunnel that holds it first.',
   peerKeyInUseHint:
     'That key is already on another tunnel or hub — a peer key can be on a hub or on a p2p tunnel, not both. Remove it from the other one first.',
   tunHubPeersEmpty:
     'No peers yet — the device is up, but nothing can reach it until one is added on the peers page.',
-  tunHubPeersCount: '{n} allowed',
+  peersCount: '{n} allowed',
   tunPrivilegeHint:
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating it fails with "operation not permitted" otherwise.',
   tunPeerHint:
@@ -264,7 +264,6 @@ const en: Record<string, string> = {
   p2pTransportConnected: 'Connected',
   p2pTransportDetail: 'Status details',
   e2eEncrypted: 'End-to-end encrypted',
-  p2pPeers: 'Peers',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
   p2pColPeer: 'Peer',
   p2pColConns: 'Conns',
