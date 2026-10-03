@@ -1,1 +1,0 @@
-import{c as r}from"./index-DV4FQr84.js";function a(s){const e=s instanceof Error?s.message:"";return e.includes("is already used by another p2p tunnel")?`${r("saveFailed")}: ${r("peerKeyInUseHint")}`:`${r("saveFailed")}${e?": "+e:""}`}export{a as s};

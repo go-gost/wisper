@@ -160,7 +160,7 @@ const en: Record<string, string> = {
   keepaliveHint:
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
   tunKeepaliveHint:
-    'Registers this peer with the hub\'s tun server and keeps the route alive; on a hub reached over a socket it also expires the routes of peers that left. Off suits only a direct tun-to-tun link.',
+    'Registers this device\'s address with the hub, which is how the hub learns where to send traffic back. Leave it on: with it off the hub has no route to this device and the link is one-way.',
   tunHubHint:
     'This device is the network: peers join it as ordinary tun clients over p2p. A peer that is not on the allowlist is refused before any dial.',
   peersLabel: 'Peers',
