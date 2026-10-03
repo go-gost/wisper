@@ -12,14 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-gost/core/auth"
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/listener"
 	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
-	xauth "github.com/go-gost/x/auth"
 	// Both x packages are named "tun": the aliases keep them apart.
 	tunhandler "github.com/go-gost/x/handler/tun"
 	tunlistener "github.com/go-gost/x/listener/tun"
@@ -260,15 +258,15 @@ func (s *tunTunnel) Run() (err error) {
 	// accepted conns itself: hand it the stats the service reports.
 	peerLn.setStats(pStats)
 
-	var auther auth.Authenticator
-	if s.opts.Username != "" {
-		auther = xauth.NewAuthenticator(xauth.AuthsOption(map[string]string{s.opts.Username: s.opts.Password}))
-	}
-
 	// A p2p hub has no TTL and no keepalive setting: a peer announces its
 	// departure by closing its stream, so nothing here is parsed from metadata.
 	handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
-	h := tunhandler.NewP2PHandler(deviceConn, auther,
+	// Nil authorizer: this hub's identity is the p2p allowlist that routed a
+	// spoke's stream here, so the username/password pair this argument used to
+	// take had nothing to check — an auther is consulted with the spoke's
+	// *claimed* address as the user name, which nothing ever supplied. Per-spoke
+	// address authorization arrives with the tun-hub IP allocation work.
+	h := tunhandler.NewP2PHandler(deviceConn, nil,
 		handler.LoggerOption(handlerLogger),
 		handler.ServiceOption(s.opts.Name),
 	)
