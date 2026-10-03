@@ -97,7 +97,7 @@ fi
 mkdir -p "$CFG_HOME/.config/wisper"
 cat >"$CFG_HOME/.config/wisper/wisper.yaml" <<'YAML'
 # Fixture for web-e2e/tests: one p2p tunnel with two allowlisted peers (the
-# second switched off), a tun hub with one spoke, a second tun hub with none
+# second switched off), a tun hub with one peer, a second tun hub with none
 # (the state the API used to refuse to create), and one stopped entrypoint so
 # both lists have a card. The hubs are closed: creating a tun device needs root,
 # and this script runs unprivileged — what the UI tests need is that its rows
@@ -146,7 +146,7 @@ tunnels:
     closed: true
     created_at: 2026-01-15T10:30:00Z
   - id: e2e-tun-hub-empty
-    name: Waiting for a spoke
+    name: Waiting for a peer
     type: tun
     net: 10.20.0.1/24
     closed: true

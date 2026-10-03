@@ -371,7 +371,7 @@ func TestGetTunTunnelOptions(t *testing.T) {
 // it is managed on the peers page, which the create form never reaches.
 func TestCreateTunTunnelValidation(t *testing.T) {
 	// A well-formed peer key: base64 (raw url) of 32 bytes.
-	spoke := strings.Repeat("A", 43)
+	peer := strings.Repeat("A", 43)
 
 	tests := []struct {
 		name string
@@ -380,25 +380,25 @@ func TestCreateTunTunnelValidation(t *testing.T) {
 		{
 			name: "endpoint set",
 			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "endpoint": "127.0.0.1:8421",
-				"peers": []map[string]any{{"key": spoke}}},
+				"peers": []map[string]any{{"key": peer}}},
 		},
 		{
 			name: "no net",
-			body: map[string]any{"type": "tun", "name": "hub", "peers": []map[string]any{{"key": spoke}}},
+			body: map[string]any{"type": "tun", "name": "hub", "peers": []map[string]any{{"key": peer}}},
 		},
 		{
 			name: "bad net",
-			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1", "peers": []map[string]any{{"key": spoke}}},
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1", "peers": []map[string]any{{"key": peer}}},
 		},
 		{
 			name: "bad route",
 			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "routes": "not-a-cidr",
-				"peers": []map[string]any{{"key": spoke}}},
+				"peers": []map[string]any{{"key": peer}}},
 		},
 		{
 			name: "bad dns",
 			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "dns": "dns.example",
-				"peers": []map[string]any{{"key": spoke}}},
+				"peers": []map[string]any{{"key": peer}}},
 		},
 	}
 
@@ -418,19 +418,19 @@ func TestCreateTunTunnelValidation(t *testing.T) {
 	}
 }
 
-// TestCreateTunTunnelWithoutSpokes: a hub is created with just a device — the
+// TestCreateTunTunnelWithoutPeers: a hub is created with just a device — the
 // create form never asks for the allowlist, so demanding one makes the
 // documented flow unreachable. The request is therefore not a rejection: it
 // gets as far as starting the tunnel, and the state that was refusing to be
-// silent about is recorded instead (see noteNoSpokes). The response is a hub
+// silent about is recorded instead (see noteNoPeers). The response is a hub
 // with no peers, not a 400.
 //
 // Run still needs the privilege to create the device, so this asserts what
 // stops being a validation error — the create is no longer refused *for the
 // allowlist* — and not that the device came up. That is the smoke's job: it
-// creates a hub this way in a privileged container and then runs two spokes
+// creates a hub this way in a privileged container and then runs two peers
 // through it.
-func TestCreateTunTunnelWithoutSpokes(t *testing.T) {
+func TestCreateTunTunnelWithoutPeers(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	srv := setupTestServer(t)
 	defer srv.Close()
@@ -450,7 +450,7 @@ func TestCreateTunTunnelWithoutSpokes(t *testing.T) {
 	// 201 needs the device, which needs CAP_NET_ADMIN; 500 is the device
 	// refusing, not the allowlist. 400 would be the guard still in place.
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("create tun hub with no spokes = %d: %v, want 201 (or 500 from the device, not 400 from validation)",
+		t.Fatalf("create tun hub with no peers = %d: %v, want 201 (or 500 from the device, not 400 from validation)",
 			resp.StatusCode, body)
 	}
 	if resp.StatusCode == http.StatusInternalServerError {
@@ -464,7 +464,7 @@ func TestCreateTunTunnelWithoutSpokes(t *testing.T) {
 		t.Errorf("type = %v, want tun", body["type"])
 	}
 	if peers, ok := body["options"].(map[string]any)["peers"]; ok && peers != nil {
-		t.Errorf("peers = %v, want none on a hub created without spokes", peers)
+		t.Errorf("peers = %v, want none on a hub created without peers", peers)
 	}
 	id, _ := body["id"].(string)
 	defer tunnel.Delete(id)
@@ -478,20 +478,20 @@ func TestCreateTunTunnelWithoutSpokes(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("creating a hub with no spokes recorded no warning: %v", event.List(id))
+		t.Errorf("creating a hub with no peers recorded no warning: %v", event.List(id))
 	}
 }
 
-// TestNoteNoSpokes: the helper every empty-allowlist moment goes through —
+// TestNoteNoPeers: the helper every empty-allowlist moment goes through —
 // creation and every save that leaves the list empty, including the removal of
-// the last spoke on the peers page. It speaks for tun hubs only: a p2p tunnel
+// the last peer on the peers page. It speaks for tun hubs only: a p2p tunnel
 // is reached by its own peers over a separate route, so an empty list there is
 // a normal state that was never silent and needs no announcement.
-func TestNoteNoSpokes(t *testing.T) {
+func TestNoteNoPeers(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
 
-	spoke := strings.Repeat("A", 43)
+	peer := strings.Repeat("A", 43)
 
 	cases := []struct {
 		name       string
@@ -500,15 +500,15 @@ func TestNoteNoSpokes(t *testing.T) {
 		want       int
 	}{
 		{
-			name:       "a hub with no spokes is announced",
+			name:       "a hub with no peers is announced",
 			tunnelType: tunnel.TunTunnel,
 			opts:       []tunnel.Option{tunnel.NetOption("10.10.0.1/24")},
 			want:       1,
 		},
 		{
-			name:       "a hub with spokes is not",
+			name:       "a hub with peers is not",
 			tunnelType: tunnel.TunTunnel,
-			opts:       []tunnel.Option{tunnel.NetOption("10.10.0.1/24"), tunnel.PeersOption(spoke)},
+			opts:       []tunnel.Option{tunnel.NetOption("10.10.0.1/24"), tunnel.PeersOption(peer)},
 			want:       0,
 		},
 		{
@@ -538,11 +538,11 @@ func TestNoteNoSpokes(t *testing.T) {
 	}
 }
 
-// TestNoteNoSpokesCoalesces: the peers page is polled, and a repeated save
+// TestNoteNoPeersCoalesces: the peers page is polled, and a repeated save
 // with an empty list must not flood the history — event.Record folds a repeat
 // of the newest event into one row with a count, and that is what noteNoSpokes
 // relies on to stay quiet.
-func TestNoteNoSpokesCoalesces(t *testing.T) {
+func TestNoteNoPeersCoalesces(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
 
@@ -728,7 +728,7 @@ func TestCreateEntrypointUnknownType(t *testing.T) {
 // Stats endpoint tests
 // ---------------------------------------------------------------------------
 
-// TestCreateTunEntryPointValidation: a spoke needs a device address and the
+// TestCreateTunEntryPointValidation: a peer needs a device address and the
 // hub's key; everything else is refused before any object (or device) is built.
 func TestCreateTunEntryPointValidation(t *testing.T) {
 	const key = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
@@ -1560,10 +1560,10 @@ func TestMutationLogCarriesActionID(t *testing.T) {
 // TestHasP2PPeers: which objects take the process-wide p2p host's snapshot.
 //
 // This is the whole of the hub-is-blind defect. The condition used to name a
-// tunnel type, so a tun hub was left out even though it reaches its spokes over
+// tunnel type, so a tun hub was left out even though it reaches its peers over
 // that same host and PeerStats already returns them — its rows carried the
 // traffic counters and empty strings for everything the host knows: no path
-// word, no punch state, no last error. A hub is where a spoke's FIRST
+// word, no punch state, no last error. A hub is where a peer's FIRST
 // connection is hardest (the spoke is behind NAT, the hub holds the key), so
 // it is the least useful place to be blind.
 //
