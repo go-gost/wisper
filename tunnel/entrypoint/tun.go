@@ -105,10 +105,14 @@ func (s *tunEntryPoint) Favorite(b bool)         { s.favorite.Store(b) }
 func (s *tunEntryPoint) IsFavorite() bool        { return s.favorite.Load() }
 
 // init builds the service description: a tun listener over a tun handler in
-// client mode (the chain, with no forwarder, is what selects client mode). The
-// keepalive is what registers this spoke's address with the hub's tun server —
-// without it the hub has no route back, so it is the difference between a
-// working link and a silent one-way one.
+// client mode (the chain, with no forwarder, is what selects client mode).
+//
+// The handler carries no keepalive or ttl. Both would be inert here: this
+// entrypoint reaches its hub over p2p and nothing else (the peer key is
+// required and this side dials out), the handshake that registers this
+// device's address is sent either way, and a hub's route table has no TTL to
+// refresh — a p2p peer announces that it has left by closing its stream. The
+// options remain on the entrypoint because the udp one uses them.
 func (s *tunEntryPoint) init() error {
 	svc := &xconfig.ServiceConfig{
 		Name: s.opts.Name,
@@ -117,10 +121,6 @@ func (s *tunEntryPoint) init() error {
 		Handler: &xconfig.HandlerConfig{
 			Type:  "tun",
 			Chain: s.opts.Name,
-			Metadata: map[string]any{
-				"keepalive": s.opts.Keepalive,
-				"ttl":       s.opts.TTL,
-			},
 		},
 		Listener: &xconfig.ListenerConfig{
 			Type: "tun",

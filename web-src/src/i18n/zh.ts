@@ -54,8 +54,6 @@ const zh: Record<string, string> = {
   hidePassword: '隐藏密码',
   fieldDirectory: '目录',
   browseDirectory: '浏览',
-  fieldTTL: 'TTL',
-  fieldTTLHint: '例如 30s',
 
   // Switches
   switchBasicAuth: '基本认证',
@@ -156,8 +154,6 @@ const zh: Record<string, string> = {
   protocolTcp: 'TCP',
   protocolUdp: 'UDP',
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
-  tunKeepaliveHint:
-    '把本机设备地址注册到 hub——hub 靠它知道该把流量送回哪里。请保持开启：关闭后 hub 没有回到本机的路由，链路会变成单向。',
   tunHubHint:
     '设备就是网络本身：各对端用标准 tun 客户端经 p2p 接入。未列入允许列表的对端在拨号前就会被拒绝。',
   peersLabel: '对端',

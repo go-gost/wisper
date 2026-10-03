@@ -44,8 +44,6 @@ export class EntrypointDetailPage extends LitElement {
   /** A udp p2p entrypoint's listener keepalive: hold a client's session
    *  (and so its tunnel) between datagrams instead of per-datagram dials. */
   @state() private _keepalive = true;
-  /** A tun entrypoint's keepalive period in seconds (x reads ttl as an int). */
-  @state() private _ttl = 15;
 
   // tun peer fields: this node's own device (see tunPeerHint)
   @state() private _net = '';
@@ -114,7 +112,6 @@ export class EntrypointDetailPage extends LitElement {
     this._showTransportDetail = false;
     this._protocol = 'tcp';
     this._keepalive = true;
-    this._ttl = 15;
     this._net = '';
     this._mtu = 0;
     this._deviceName = '';
@@ -133,7 +130,6 @@ export class EntrypointDetailPage extends LitElement {
     }
     this._protocol = ep.options?.protocol === 'udp' ? 'udp' : 'tcp';
     this._keepalive = ep.options?.keepalive ?? true;
-    this._ttl = ep.options?.ttl || 15;
     this._net = ep.options?.net ?? '';
     this._mtu = ep.options?.mtu ?? 0;
     this._deviceName = ep.options?.device_name ?? '';
@@ -251,13 +247,13 @@ export class EntrypointDetailPage extends LitElement {
         id: this._tunnelId.trim() || undefined,
         peer: this._peer.trim() || undefined,
         protocol: this.entrypointType === 'p2p' ? this._protocol : undefined,
+        // Only a p2p entrypoint over udp has a session to hold between
+        // datagrams; a tun entrypoint's is always on the wire (see the form's
+        // note), so neither value is sent for it.
         keepalive:
-          this.entrypointType === 'tun'
+          this.entrypointType === 'p2p' && this._protocol === 'udp'
             ? this._keepalive
-            : this.entrypointType === 'p2p' && this._protocol === 'udp'
-              ? this._keepalive
-              : undefined,
-        ttl: this.entrypointType === 'tun' ? this._ttl : undefined,
+            : undefined,
         net: this.entrypointType === 'tun' ? this._net.trim() || undefined : undefined,
         mtu: this.entrypointType === 'tun' ? this._mtu || undefined : undefined,
         device_name: this.entrypointType === 'tun' ? this._deviceName.trim() || undefined : undefined,
@@ -822,10 +818,6 @@ export class EntrypointDetailPage extends LitElement {
                         : ''}
                     </div>
                     ${this._renderTransport(ep.peer_transport)}
-                    <div class="info-row">
-                      <span class="info-label">${t('switchKeepalive')}</span>
-                      <span class="info-value text">${ep.options?.keepalive ? t('statusRunning') : t('statusStopped')}${ep.options?.ttl ? ` · ${ep.options.ttl}s` : ''}</span>
-                    </div>
                     <div class="p2p-hint">${t('tunPeerHint')}</div>
                   `
                   : this.entrypointType === 'p2p'
@@ -928,7 +920,6 @@ export class EntrypointDetailPage extends LitElement {
                   ? html`
                     <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
                     <div class="p2p-hint">${t('tunPeerHint')}</div>
-                    <div class="p2p-hint">${t('tunKeepaliveHint')}</div>
                   `
                   : ''}
 
@@ -996,22 +987,11 @@ export class EntrypointDetailPage extends LitElement {
                       <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
                         @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
                     </div>
-                    ${this.entrypointType === 'tun'
-                      ? html`
-                        <div class="switch-row">
-                          <span class="switch-label">${t('switchKeepalive')}</span>
-                          <div class="switch ${this._keepalive ? 'on' : ''}"
-                            @click=${() => { this._keepalive = !this._keepalive; }}>
-                            <div class="switch-knob"></div>
-                          </div>
-                        </div>
-                        <div class="form-group">
-                          <label class="form-label">${t('fieldTTL')}</label>
-                          <input class="form-input" type="number" .value=${this._ttl ? String(this._ttl) : ''} placeholder="15"
-                            @input=${(e: Event) => { this._ttl = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
-                        </div>
-                      `
-                      : ''}
+                    <!-- No keepalive, no ttl: this entrypoint reaches its hub
+                         over p2p and nothing else, the handshake that registers
+                         its address is sent either way, and a hub's route table
+                         has no TTL to refresh. Both controls would set values
+                         nothing reads. See tunnel/entrypoint/tun.go. -->
                     ${this.entrypointType === 'p2p'
                       ? html`
                     <div class="switch-row" @click=${() => {

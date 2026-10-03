@@ -67,13 +67,15 @@ func TestTunEntryPointServiceConfig(t *testing.T) {
 			t.Errorf("listener metadata[%s] = %v (%T), want %v (%T)", key, got, got, want, want)
 		}
 	}
-	if got := svc.Handler.Metadata["keepalive"]; got != true {
-		t.Errorf("handler metadata[keepalive] = %v, want true", got)
-	}
-	// x reads ttl as an int in seconds; a time.Duration here would be ignored.
-	if v, ok := svc.Handler.Metadata["ttl"].(int); !ok || v != 15 {
-		t.Errorf("handler metadata[ttl] = %v (%T), want int 15",
-			svc.Handler.Metadata["ttl"], svc.Handler.Metadata["ttl"])
+	// No keepalive and no ttl: this entrypoint only ever reaches its hub over
+	// p2p, where the handshake that registers its address is sent either way
+	// and a hub's route table has no TTL to refresh. The options exist on the
+	// entrypoint because the udp one uses them; setting them here would be
+	// values nothing reads.
+	for _, key := range []string{"keepalive", "ttl"} {
+		if got, ok := svc.Handler.Metadata[key]; ok {
+			t.Errorf("handler metadata carries %s (%v): a tun entrypoint must not", key, got)
+		}
 	}
 
 	node := s.config.Chains[0].Hops[0].Nodes[0]
