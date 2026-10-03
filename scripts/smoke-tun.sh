@@ -19,14 +19,20 @@
 # process, with the device address moved from the old gost YAML onto the hub's
 # tun tunnel.
 #
-# The devices live in ONE network namespace, which is why each side uses a
-# /32 address plus an explicit host route to the peer: two devices claiming the
-# same /24 would leave the kernel to pick one of them at random.
+# Each instance runs in its OWN network namespace. A tun device takes a host
+# route for its own address, so with all three devices in one namespace the
+# kernel's local route table answers a ping to a peer's address itself: the
+# hub -> peer checks passed without a packet ever crossing the tunnel. Isolation
+# is what makes each ping leave the sender's device and reach the peer only over
+# p2p. A bridge in the parent namespace, one veth pair per instance, and the
+# relay on the bridge address connect them: the instances talk to the relay and
+# to each other through the bridge, never through a shared loopback or device.
 #
 # Usage:
 #   scripts/smoke-tun.sh [workdir]
-# Requires: root + CAP_NET_ADMIN + /dev/net/tun, openssl, ping, curl, and either
-# $DERPER_BIN or docker (to extract the relay from gogost/derper).
+# Requires: root + CAP_NET_ADMIN + CAP_SYS_ADMIN (network namespaces) +
+# /dev/net/tun, ip(8), openssl, ping, curl, and either $DERPER_BIN or docker (to
+# extract the relay from gogost/derper).
 # Exit code = number of failed checks; 0 with SKIP when unprivileged.
 
 set -uo pipefail
@@ -36,9 +42,21 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="$HOME/.local/go/bin:$PATH"
 
 DERP_PORT="${DERP_PORT:-8443}"
-HUB_API="${HUB_API:-127.0.0.1:8901}"
-SPOKE_API="${SPOKE_API:-127.0.0.1:8902}"
-SPOKE2_API="${SPOKE2_API:-127.0.0.1:8903}"
+# The bridge lives in this (parent) namespace and is the only wire the instances
+# share: the relay binds $BR_IP and each instance reaches it (and, through it,
+# p2p) over the bridge. The APIs bind on the instance's veth address so the
+# curls below still run from here.
+BR=wispbr0
+BR_IP=10.99.0.1
+HUB_VETH_IP=10.99.0.11
+SPOKE_VETH_IP=10.99.0.12
+SPOKE2_VETH_IP=10.99.0.13
+NS_HUB=wisp-hub
+NS_SPOKE=wisp-spoke
+NS_SPOKE2=wisp-spoke2
+HUB_API="${HUB_API:-$HUB_VETH_IP:8901}"
+SPOKE_API="${SPOKE_API:-$SPOKE_VETH_IP:8902}"
+SPOKE2_API="${SPOKE2_API:-$SPOKE2_VETH_IP:8903}"
 HUB_IP=10.10.0.1
 SPOKE_IP=10.10.0.2
 SPOKE2_IP=10.10.0.3
@@ -58,7 +76,7 @@ if [ ! -c /dev/net/tun ]; then
   echo "SKIP: /dev/net/tun is not available"
   exit 0
 fi
-for c in curl openssl ping; do
+for c in curl openssl ping ip; do
   command -v "$c" >/dev/null 2>&1 || { echo "SKIP: $c not found"; exit 0; }
 done
 
@@ -73,8 +91,58 @@ cleanup() {
     [ -n "$p" ] && kill "$p" 2>/dev/null
   done
   wait 2>/dev/null
+  # Deleting a namespace destroys its interfaces (the tun device and the veth
+  # end) and, with it, the peer end here; the bridge then has nothing on it.
+  for ns in "$NS_HUB" "$NS_SPOKE" "$NS_SPOKE2"; do
+    ip netns del "$ns" 2>/dev/null
+  done
+  ip link del "$BR" 2>/dev/null
 }
 trap cleanup EXIT
+
+# --- the network namespaces -------------------------------------------------
+# One bridge, one veth pair per instance, one namespace per instance. The relay
+# is the only process in this namespace that anything routes to; the instances
+# see the bridge as their default route, so the only way a datagram leaves an
+# instance is through its own device (p2p) — never another instance's.
+
+add_instance() { # <ns> <veth-name> <veth-ip>
+  ip netns add "$1"
+  ip link add "$2" type veth peer name "$2-ns"
+  ip link set "$2-ns" netns "$1"
+  # The end here is a bridge port and carries no address: the address lives only
+  # in the instance's namespace, or the parent's own stack would answer for it.
+  ip link set "$2" master "$BR"
+  ip link set "$2" up
+  ip netns exec "$1" ip link set lo up
+  ip netns exec "$1" ip addr add "$3/24" dev "$2-ns"
+  ip netns exec "$1" ip link set "$2-ns" up
+  ip netns exec "$1" ip route add default via "$BR_IP"
+}
+
+# A subshell so `set -e` aborts on the first failure and the caller gets its
+# status. It must be called as a plain command, not as an `if` condition: bash
+# ignores `set -e` for a function's whole body when it runs in a condition, and
+# a mid-way failure would then be masked by a later command's success.
+setup_netns() (
+  set -e
+  # A crashed earlier run may have left these behind; start clean.
+  for ns in "$NS_HUB" "$NS_SPOKE" "$NS_SPOKE2"; do ip netns del "$ns" 2>/dev/null || true; done
+  ip link del "$BR" 2>/dev/null || true
+  ip link add "$BR" type bridge
+  ip addr add "$BR_IP/24" dev "$BR"
+  ip link set "$BR" up
+  add_instance "$NS_HUB" vh-hub "$HUB_VETH_IP"
+  add_instance "$NS_SPOKE" vh-spoke "$SPOKE_VETH_IP"
+  add_instance "$NS_SPOKE2" vh-spoke2 "$SPOKE2_VETH_IP"
+)
+
+setup_netns
+if [ $? -ne 0 ]; then
+  echo "SKIP: cannot build the network namespaces (need root + CAP_NET_ADMIN/SYS_ADMIN, e.g. --privileged)"
+  exit 0
+fi
+say "a bridge ($BR_IP/24) and one namespace each for the hub and both peers"
 
 # --- binaries ---------------------------------------------------------------
 
@@ -105,24 +173,27 @@ fi
 
 DERP_DIR="$W/derper"
 mkdir -p "$DERP_DIR/certs"
+# The relay binds the bridge address and serves TLS from a self-signed
+# certificate for that IP; the p2p clients dial with secure:false, so the
+# certificate is never verified — only the address the instances dial matters.
 openssl req -x509 -newkey rsa:2048 -nodes \
-  -keyout "$DERP_DIR/certs/127.0.0.1.key" -out "$DERP_DIR/certs/127.0.0.1.crt" -days 3 \
-  -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1" >/dev/null 2>&1 \
+  -keyout "$DERP_DIR/certs/$BR_IP.key" -out "$DERP_DIR/certs/$BR_IP.crt" -days 3 \
+  -subj "/CN=$BR_IP" -addext "subjectAltName=IP:$BR_IP" >/dev/null 2>&1 \
   || { echo "cert generation failed" >&2; exit 1; }
-DERP_URL="wss://127.0.0.1:$DERP_PORT/derp"
+DERP_URL="wss://$BR_IP:$DERP_PORT/derp"
 
-say "starting derper on $DERP_PORT"
-"$DERPER_BIN" -c "$DERP_DIR/derper.json" -hostname 127.0.0.1 -certmode manual \
-  -certdir "$DERP_DIR/certs" -a "127.0.0.1:$DERP_PORT" -http-port -1 -stun=false \
+say "starting derper on $BR_IP:$DERP_PORT"
+"$DERPER_BIN" -c "$DERP_DIR/derper.json" -hostname "$BR_IP" -certmode manual \
+  -certdir "$DERP_DIR/certs" -a "$BR_IP:$DERP_PORT" -http-port -1 -stun=false \
   >"$DERP_DIR/derper.log" 2>&1 &
 pids+=($!)
 
 for _ in $(seq 1 50); do
-  curl -sk --max-time 1 "https://127.0.0.1:$DERP_PORT/" >/dev/null 2>&1 && break
+  curl -sk --max-time 1 "https://$BR_IP:$DERP_PORT/" >/dev/null 2>&1 && break
   sleep 0.2
 done
-if curl -sk --max-time 2 "https://127.0.0.1:$DERP_PORT/" >/dev/null 2>&1; then
-  ok "derper is up on $DERP_PORT"
+if curl -sk --max-time 2 "https://$BR_IP:$DERP_PORT/" >/dev/null 2>&1; then
+  ok "derper is up on $BR_IP:$DERP_PORT"
 else
   bad "derper did not start (see $DERP_DIR/derper.log)"
   exit $fail
@@ -130,8 +201,8 @@ fi
 
 # --- instances --------------------------------------------------------------
 
-start_wisper() { # <config-dir> <api-addr>
-  XDG_CONFIG_HOME="$1" "$WISPER_BIN" -addr "$2" >"$1/wisper.log" 2>&1 &
+start_wisper() { # <ns> <config-dir> <api-addr>
+  ip netns exec "$1" env XDG_CONFIG_HOME="$2" "$WISPER_BIN" -addr "$3" >"$2/wisper.log" 2>&1 &
   pids+=($!)
 }
 
@@ -148,9 +219,9 @@ pubkey() { # <api-addr>
 }
 
 say "starting the hub ($HUB_API) and the two peers ($SPOKE_API, $SPOKE2_API)"
-start_wisper "$HUB_CFG" "$HUB_API"
-start_wisper "$SPOKE_CFG" "$SPOKE_API"
-start_wisper "$SPOKE2_CFG" "$SPOKE2_API"
+start_wisper "$NS_HUB" "$HUB_CFG" "$HUB_API"
+start_wisper "$NS_SPOKE" "$SPOKE_CFG" "$SPOKE_API"
+start_wisper "$NS_SPOKE2" "$SPOKE2_CFG" "$SPOKE2_API"
 
 wait_api "$HUB_API" || { bad "hub API did not come up"; exit $fail; }
 wait_api "$SPOKE_API" || { bad "peer API did not come up"; exit $fail; }
@@ -226,6 +297,10 @@ case "$BARE" in *'"peers"'*) bad "the hub was created with peers it was not give
 case "$BARE" in *'no peers'*) ;; *) bad "a hub with no peers recorded no announcement of the state: $BARE" ;; esac
 ok "a hub with no peers comes up, routes nothing, and says so"
 
+# The device holds $SPOKE_IP/32, so the hub is not on-link: without the explicit
+# $HUB_IP/32 route a ping to the hub would follow the default route (out the
+# veth to the bridge) instead of entering this device. The route is what makes
+# the device the way out.
 say "peer: a device with keepalive:true that joins the network"
 code=$(post "$SPOKE_API" /api/entrypoints "{
   \"name\": \"spoke\", \"type\": \"tun\", \"peer\": \"$HUB_KEY\",
@@ -266,22 +341,23 @@ ok "the hub's peers save on their own, like a p2p tunnel's peers"
 # --- traffic ----------------------------------------------------------------
 
 # The first packet triggers the dial, the registration and the route lookup, so
-# allow a few seconds before judging.
-ping_until() { # <dst> <checks>
-  for _ in $(seq 1 "$2"); do
-    ping -c 1 -W 2 "$1" >/dev/null 2>&1 && return 0
+# allow a few seconds before judging. Each ping runs inside the sender's
+# namespace: a packet can leave it only through that instance's device.
+ping_until() { # <ns> <dst> <checks>
+  for _ in $(seq 1 "$3"); do
+    ip netns exec "$1" ping -c 1 -W 2 "$2" >/dev/null 2>&1 && return 0
     sleep 1
   done
   return 1
 }
 
-if ping_until "$SPOKE_IP" 20; then
+if ping_until "$NS_HUB" "$SPOKE_IP" 20; then
   ok "hub reaches the peer ($SPOKE_IP)"
 else
   bad "hub cannot reach the peer ($SPOKE_IP)"
 fi
 
-if ping_until "$HUB_IP" 20; then
+if ping_until "$NS_SPOKE" "$HUB_IP" 20; then
   ok "peer reaches the hub ($HUB_IP)"
 else
   bad "peer cannot reach the hub ($HUB_IP)"
@@ -311,13 +387,13 @@ fi
 # peer2's route must have been registered by its one-shot registration and
 # answered: keepalive:false means no keepalive to refresh it, so the hub either
 # answered (the route lives as long as the stream) or dropped the packet.
-if ping_until "$SPOKE2_IP" 20; then
+if ping_until "$NS_HUB" "$SPOKE2_IP" 20; then
   ok "hub reaches the keepalive:false peer ($SPOKE2_IP)"
 else
   bad "hub cannot reach the keepalive:false peer ($SPOKE2_IP)"
 fi
 
-if ping_until "$HUB_IP" 5; then
+if ping_until "$NS_SPOKE2" "$HUB_IP" 5; then
   ok "the keepalive:false peer still reaches the hub ($HUB_IP)"
 else
   bad "the keepalive:false peer cannot reach the hub ($HUB_IP)"
@@ -343,13 +419,13 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "http://$SPOKE2_API/api/
 # The hub learns of the departure from the closed stream, not from a timer, so
 # give the teardown a moment before asking whether its routes are gone.
 sleep 5
-if ping -c 1 -W 2 "$SPOKE2_IP" >/dev/null 2>&1; then
+if ip netns exec "$NS_HUB" ping -c 1 -W 2 "$SPOKE2_IP" >/dev/null 2>&1; then
   bad "the hub still reaches $SPOKE2_IP after peer2 left"
 else
   ok "the hub's route to peer2 is reclaimed after it left"
 fi
 
-if ping_until "$SPOKE_IP" 5 && ping_until "$HUB_IP" 5; then
+if ping_until "$NS_HUB" "$SPOKE_IP" 5 && ping_until "$NS_SPOKE" "$HUB_IP" 5; then
   ok "peer1's routes survived peer2 leaving"
 else
   bad "peer1's link broke when peer2 left"
