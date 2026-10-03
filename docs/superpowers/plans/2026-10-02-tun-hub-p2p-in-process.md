@@ -322,7 +322,47 @@ condition** (verified by reverting), and `tunnel/p2p_e2e_test.go` (tag `p2ppoc`)
 end to end for a p2p tunnel against a real relay. **A `p2ppoc` e2e for a tun hub is the missing
 piece**, and it belongs on the privileged container this work is headed toward.
 
-### Still open after the third review pass
+### Incident: a hub's routes took a gateway's LAN down
+
+Recorded because it is the one thing in this work that caused real damage, and
+because the design made it possible without warning.
+
+A hub was deployed on a machine that is its LAN's gateway, and created with
+`routes` naming that LAN. The machine went dark, and the whole network with it,
+until the container was removed.
+
+The mechanism is the interaction of two decisions, each reasonable alone:
+
+- the hub runs with `network_mode: host`, so its device is created in the **host's**
+  network namespace (this is what makes p2p hole punching work — see the deployment notes)
+- `x/listener/tun` applies the `routes` metadata with **`netlink.RouteReplace`**
+  (`tun_linux.go`), which *replaces* a route to the same destination rather than
+  adding one beside it
+
+So naming the LAN did not add a route into the tunnel, it replaced the host's own
+route to the LAN with one pointing at the tun device. On a gateway, that redirects
+every packet bound for the LAN into a tunnel that has nowhere to send it.
+
+`routes` and `dns` are client-side settings — they tell a device whose traffic is
+being *captured* what to capture and which resolver to push. A hub captures
+nothing, and its peers share the device's own subnet, so the address in `net` is
+the only route it needs (`net: 10.10.100.1/24` gives the kernel a route to the
+whole `/24`). Both are now refused by the API, dropped by the hub, and absent from
+its form.
+
+Two things this says beyond the fix:
+
+- **The `routes` field was carried over from the socket form without asking what
+  it means on a hub.** On the socket form the device is in a container netns, so a
+  wrong route is contained; on a host-networked hub the same value reaches the
+  host's routing table. Moving a field across that boundary is what changed its
+  blast radius, and nothing in the UI said so.
+- **`RouteReplace` is the sharp edge, not `RouteAdd`.** A hub that only ever added
+  routes would have been wrong in a much less interesting way.
+
+The smoke could not have caught it: it runs as one unprivileged-adjacent container
+with no LAN to take down, and it asserted the hub's routes reached the listener —
+the very thing that was dangerous. The test now asserts the opposite.
 
 Three more, found by that pass. None is a data or correctness bug — all are places where a hub is
 presented less informatively than a p2p tunnel:
