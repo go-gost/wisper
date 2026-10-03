@@ -208,6 +208,24 @@ code=$(post "$HUB_API" /api/tunnels "{
 [ "$code" = 201 ] || { bad "creating the hub's tun tunnel returned $code, want 201"; exit $fail; }
 ok "hub device is up at $HUB_IP/32, both spokes allowlisted"
 
+# A hub created with no spokes at all: the UI's create form does not ask for
+# the allowlist (it lives on the peers page), so this is the shape every hub
+# starts in. It must answer 201 and come up, not 400 — the routes are the
+# admission, and with none the hub is simply not reachable yet. This is the
+# only check that can prove the create: it needs the device, so only a
+# privileged run gets here.
+say "hub: created with no spokes at all"
+code=$(post "$HUB_API" /api/tunnels "{
+  \"name\": \"hub-bare\", \"type\": \"tun\", \"net\": \"10.30.0.1/32\"
+}")
+[ "$code" = 201 ] || { bad "creating a hub with no spokes returned $code, want 201"; }
+BARE_ID=$(curl -s "http://$HUB_API/api/tunnels" | tr '}' '\n' | grep '"name":"hub-bare"' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+[ -n "$BARE_ID" ] || { bad "a hub created with no spokes is not listed"; }
+BARE=$(curl -s "http://$HUB_API/api/tunnels/$BARE_ID")
+case "$BARE" in *'"peers"'*) bad "the hub was created with peers it was not given: $BARE" ;; esac
+case "$BARE" in *'no spokes'*) ;; *) bad "a hub with no spokes recorded no announcement of the state: $BARE" ;; esac
+ok "a hub with no spokes comes up, routes nothing, and says so"
+
 say "spoke: a device with keepalive:true that joins the network"
 code=$(post "$SPOKE_API" /api/entrypoints "{
   \"name\": \"spoke\", \"type\": \"tun\", \"peer\": \"$HUB_KEY\",
@@ -238,7 +256,7 @@ ok "spoke2 device is up"
 # device or the spoke that is already talking over it — that is the whole
 # reason a hub reconciles its routes instead of being rebuilt.
 say "the hub's spoke list, saved in place"
-HUB_ID=$(curl -s "http://$HUB_API/api/tunnels" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+HUB_ID=$(curl -s "http://$HUB_API/api/tunnels" | tr '}' '\n' | grep '"name":"hub"' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
 code=$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
   -d "{\"peers\": [{\"key\": \"$SPOKE_KEY\", \"alias\": \"spoke\"}, {\"key\": \"$SPOKE2_KEY\", \"alias\": \"spoke2\"}]}" \
   "http://$HUB_API/api/tunnels/$HUB_ID/peers")

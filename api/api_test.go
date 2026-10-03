@@ -14,10 +14,12 @@ import (
 	"testing"
 	"time"
 
+	clogger "github.com/go-gost/core/logger"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
 	"github.com/go-gost/wisper/tunnel/entrypoint"
+	xlogger "github.com/go-gost/x/logger"
 )
 
 // directOff pins the p2p hosts in these tests to the relay: they cover API
@@ -363,10 +365,10 @@ func TestGetTunTunnelOptions(t *testing.T) {
 
 // TestCreateTunTunnelValidation: the fields a tun hub cannot work without are
 // refused before any object is built. A p2p hub binds nothing, so an endpoint
-// is a configuration error rather than a missing requirement; the allowlist is
-// the admission, so an empty one admits nobody; and x's tun listener skips what
-// it cannot parse, so a typo in the device fields would otherwise start a
-// device with no address.
+// is a configuration error rather than a missing requirement; and x's tun
+// listener skips what it cannot parse, so a typo in the device fields would
+// otherwise start a device with no address. The allowlist is not among them:
+// it is managed on the peers page, which the create form never reaches.
 func TestCreateTunTunnelValidation(t *testing.T) {
 	// A well-formed peer key: base64 (raw url) of 32 bytes.
 	spoke := strings.Repeat("A", 43)
@@ -379,15 +381,6 @@ func TestCreateTunTunnelValidation(t *testing.T) {
 			name: "endpoint set",
 			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "endpoint": "127.0.0.1:8421",
 				"peers": []map[string]any{{"key": spoke}}},
-		},
-		{
-			name: "no peers",
-			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24"},
-		},
-		{
-			name: "empty peer list",
-			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24",
-				"peers": []map[string]any{}},
 		},
 		{
 			name: "no net",
@@ -422,6 +415,147 @@ func TestCreateTunTunnelValidation(t *testing.T) {
 				t.Errorf("%d tunnels registered after a rejected create, want 0", n)
 			}
 		})
+	}
+}
+
+// TestCreateTunTunnelWithoutSpokes: a hub is created with just a device — the
+// create form never asks for the allowlist, so demanding one makes the
+// documented flow unreachable. The request is therefore not a rejection: it
+// gets as far as starting the tunnel, and the state that was refusing to be
+// silent about is recorded instead (see noteNoSpokes). The response is a hub
+// with no peers, not a 400.
+//
+// Run still needs the privilege to create the device, so this asserts what
+// stops being a validation error — the create is no longer refused *for the
+// allowlist* — and not that the device came up. That is the smoke's job: it
+// creates a hub this way in a privileged container and then runs two spokes
+// through it.
+func TestCreateTunTunnelWithoutSpokes(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	// The gost default logger is nil here (wisper sets it at startup) and
+	// Run() dereferences it; a real one keeps the device path running. Only
+	// restore a logger that was there — Store(nil) panics on an atomic.Value.
+	if oldLog := clogger.Default(); oldLog != nil {
+		t.Cleanup(func() { clogger.SetDefault(oldLog) })
+	}
+	clogger.SetDefault(xlogger.NewLogger(xlogger.LevelOption(clogger.ErrorLevel)))
+
+	resp, body := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
+		"type": "tun", "name": "hub", "net": "10.10.0.1/24",
+	})
+
+	// 201 needs the device, which needs CAP_NET_ADMIN; 500 is the device
+	// refusing, not the allowlist. 400 would be the guard still in place.
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("create tun hub with no spokes = %d: %v, want 201 (or 500 from the device, not 400 from validation)",
+			resp.StatusCode, body)
+	}
+	if resp.StatusCode == http.StatusInternalServerError {
+		if msg, _ := body["error"].(string); !strings.Contains(msg, "failed to start tunnel") {
+			t.Fatalf("error = %v, want the device's failure, not an allowlist refusal", body)
+		}
+		t.Skip("no CAP_NET_ADMIN here: the device could not be created, so the hub never ran")
+	}
+
+	if got, _ := body["type"].(string); got != "tun" {
+		t.Errorf("type = %v, want tun", body["type"])
+	}
+	if peers, ok := body["options"].(map[string]any)["peers"]; ok && peers != nil {
+		t.Errorf("peers = %v, want none on a hub created without spokes", peers)
+	}
+	id, _ := body["id"].(string)
+	defer tunnel.Delete(id)
+
+	// The state the removed guard used to refuse is announced instead, so a
+	// hub created and never finished is not a hub that silently drops packets.
+	found := false
+	for _, ev := range event.List(id) {
+		if ev.Level == event.LevelWarn && strings.Contains(ev.Message, "no spokes") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("creating a hub with no spokes recorded no warning: %v", event.List(id))
+	}
+}
+
+// TestNoteNoSpokes: the helper every empty-allowlist moment goes through —
+// creation and every save that leaves the list empty, including the removal of
+// the last spoke on the peers page. It speaks for tun hubs only: a p2p tunnel
+// is reached by its own peers over a separate route, so an empty list there is
+// a normal state that was never silent and needs no announcement.
+func TestNoteNoSpokes(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	spoke := strings.Repeat("A", 43)
+
+	cases := []struct {
+		name       string
+		tunnelType string
+		opts       []tunnel.Option
+		want       int
+	}{
+		{
+			name:       "a hub with no spokes is announced",
+			tunnelType: tunnel.TunTunnel,
+			opts:       []tunnel.Option{tunnel.NetOption("10.10.0.1/24")},
+			want:       1,
+		},
+		{
+			name:       "a hub with spokes is not",
+			tunnelType: tunnel.TunTunnel,
+			opts:       []tunnel.Option{tunnel.NetOption("10.10.0.1/24"), tunnel.PeersOption(spoke)},
+			want:       0,
+		},
+		{
+			name:       "a p2p tunnel with no peers is not",
+			tunnelType: tunnel.P2PTunnel,
+			opts:       []tunnel.Option{tunnel.EndpointOption("127.0.0.1:9")},
+			want:       0,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			tun := tunnel.NewByType(tt.tunnelType, append([]tunnel.Option{
+				tunnel.NameOption(tt.name),
+				tunnel.CreatedAtOption(time.Date(2026, 1, 15, 10, 30, 0, 0, time.UTC)),
+			}, tt.opts...)...)
+			if tun == nil {
+				t.Fatalf("unknown tunnel type: %s", tt.tunnelType)
+			}
+			tun.Close() // no device, no service: these cases are about the event
+			tunnel.Add(tun)
+			noteNoSpokes(tun)
+			if got := len(event.List(tun.ID())); got != tt.want {
+				t.Errorf("recorded %d events, want %d: %v", got, tt.want, event.List(tun.ID()))
+			}
+		})
+	}
+}
+
+// TestNoteNoSpokesCoalesces: the peers page is polled, and a repeated save
+// with an empty list must not flood the history — event.Record folds a repeat
+// of the newest event into one row with a count, and that is what noteNoSpokes
+// relies on to stay quiet.
+func TestNoteNoSpokesCoalesces(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	tun := preRegisterTunnel(t, tunnel.TunTunnel, "hub", "")
+	for i := 0; i < 3; i++ {
+		noteNoSpokes(tun)
+	}
+	evs := event.List(tun.ID())
+	if len(evs) != 1 {
+		t.Fatalf("recorded %d events, want one folded row: %v", len(evs), evs)
+	}
+	if evs[0].Count < 3 {
+		t.Errorf("count = %d, want 3", evs[0].Count)
 	}
 }
 

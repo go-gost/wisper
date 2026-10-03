@@ -97,8 +97,9 @@ fi
 mkdir -p "$CFG_HOME/.config/wisper"
 cat >"$CFG_HOME/.config/wisper/wisper.yaml" <<'YAML'
 # Fixture for web-e2e/tests: one p2p tunnel with two allowlisted peers (the
-# second switched off), a tun hub with one spoke, and one stopped entrypoint so
-# both lists have a card. The hub is closed: creating a tun device needs root,
+# second switched off), a tun hub with one spoke, a second tun hub with none
+# (the state the API used to refuse to create), and one stopped entrypoint so
+# both lists have a card. The hubs are closed: creating a tun device needs root,
 # and this script runs unprivileged — what the UI tests need is that its rows
 # render, which is a question about the page, not about the device.
 # The relay address is unroutable on purpose — the host retries in the
@@ -142,6 +143,12 @@ tunnels:
       - dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA
     peer_aliases:
       dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA: laptop
+    closed: true
+    created_at: 2026-01-15T10:30:00Z
+  - id: e2e-tun-hub-empty
+    name: Waiting for a spoke
+    type: tun
+    net: 10.20.0.1/24
     closed: true
     created_at: 2026-01-15T10:30:00Z
 entrypoints:

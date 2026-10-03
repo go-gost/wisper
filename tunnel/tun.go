@@ -150,12 +150,12 @@ func (s *tunTunnel) init() error {
 	if strings.TrimSpace(s.opts.Endpoint) != "" {
 		return fmt.Errorf("tun hub no longer binds an address (endpoint %q): clear the endpoint — the peer allowlist is the whole configuration", s.opts.Endpoint)
 	}
-	// An empty allowlist runs and discards every packet: the routes are the
-	// admission, so with none there is nothing to admit.
-	if len(s.opts.Peers) == 0 {
-		return errors.New("tun hub requires at least one allowlisted peer")
-	}
-
+	// An empty allowlist is valid: the list is managed on the peers page, which
+	// the create form never reaches, so a hub starts with no spokes and its
+	// first one is added there. The hub then runs and discards every packet,
+	// which is expected rather than broken — the API records an event at
+	// creation and on every save that leaves the list empty, and the detail
+	// page says so in place. p2pTunnel has always taken an empty list this way.
 	return nil
 }
 

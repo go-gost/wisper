@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -358,20 +357,22 @@ func validateTunnelRequest(tunnelType string, req *tunnelCreateRequest) error {
 }
 
 // validateTunTunnel checks what a tun hub cannot work without: a device
-// address, and at least one allowlisted peer — the routes are the admission,
-// so with none there is nothing to admit. It also refuses an endpoint, which
-// the p2p hub no longer binds: the same rule tunnel/tun.go's init applies, and
-// for the same reason (a hub carried over from the socket form says why it
-// stopped working instead of silently changing meaning).
+// address, and no endpoint — the p2p hub binds nothing, so the same rule
+// tunnel/tun.go's init applies, and for the same reason (a hub carried over
+// from the socket form says why it stopped working instead of silently
+// changing meaning).
+//
+// The allowlist is not required: it is managed on its own peers page, which
+// the create form never reaches, so a hub starts with no spokes and its first
+// one is added there. What an empty list means — up, routing nothing — is
+// recorded as an event at creation and on every save that leaves it empty,
+// rather than refused here.
 //
 // The device fields are checked by validateTunNet and friends — the same rules
 // apply to both ends of the device.
 func validateTunTunnel(r *tunnelCreateRequest) error {
 	if ep := strings.TrimSpace(r.Endpoint); ep != "" {
 		return fmt.Errorf("a tun hub binds no address: clear the endpoint (%s) — the peer allowlist is the whole configuration", ep)
-	}
-	if len(r.Peers) == 0 {
-		return errors.New("a tun hub needs at least one allowlisted peer: the routes are the admission, so with none there is nothing to admit")
 	}
 	if err := validateTunNet(r.Net); err != nil {
 		return err
@@ -455,11 +456,30 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 
 	tunnel.Add(t)
 	event.Record(t.ID(), event.LevelInfo, "created")
+	noteNoSpokes(t)
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
 
 	writeJSON(w, http.StatusCreated, toTunnelResponse(t))
+}
+
+// noteNoSpokes records that a tun hub is up with nothing to route, for the two
+// moments it becomes true: a hub created before its first spoke arrives, and a
+// hub whose last spoke was just removed on the peers page. Both read as broken
+// otherwise — a hub is running, its device is there, and a request to it is
+// simply never answered — and the peers page is where the fix is, so the event
+// says so.
+//
+// A hub is the only type this applies to: a p2p tunnel is reached by its own
+// peers over a separate route, so an empty list there has always been a normal
+// state with nothing to announce. warn, not error — the hub is running, and the
+// user is expected to be here (that is why it is empty).
+func noteNoSpokes(t tunnel.Tunnel) {
+	if t.Type() != tunnel.TunTunnel || len(t.Options().Peers) > 0 {
+		return
+	}
+	event.Record(t.ID(), event.LevelWarn, "no spokes yet — this hub is up but routes nothing, so requests to it go unanswered until a spoke is added on the peers page")
 }
 
 func handleGetTunnel(w http.ResponseWriter, r *http.Request) {
@@ -539,6 +559,7 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 
 	tunnel.Add(t)
 	event.Record(t.ID(), event.LevelInfo, "updated")
+	noteNoSpokes(t)
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
@@ -747,6 +768,10 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
+
+	// Removing the last spoke is the moment an existing, working hub stops
+	// answering, so the state is recorded where the user just was.
+	noteNoSpokes(old)
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(old))
 }

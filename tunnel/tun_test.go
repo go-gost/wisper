@@ -116,13 +116,16 @@ func TestTunTunnelRejectsBindAddress(t *testing.T) {
 	}
 }
 
-// TestTunTunnelRequiresPeers: a hub with no allowlist has no route, so it would
-// run and discard every packet. Refused at construction rather than started.
-func TestTunTunnelRequiresPeers(t *testing.T) {
+// TestTunTunnelAcceptsNoPeers: a hub is created with just a device and its
+// spokes arrive on the peers page, so an empty allowlist is the state it is
+// built in — not a misconfiguration to refuse. The hub then runs and discards
+// every packet, which the API announces (noteNoSpokes) and the detail page
+// shows; p2pTunnel has always taken an empty list this way.
+func TestTunTunnelAcceptsNoPeers(t *testing.T) {
 	tun := NewTunTunnel(NetOption("10.10.0.1/24")).(*tunTunnel)
 
-	if err := tun.init(); err == nil {
-		t.Fatal("a hub accepted an empty allowlist")
+	if err := tun.init(); err != nil {
+		t.Fatalf("init refused a hub with no spokes: %v", err)
 	}
 }
 
