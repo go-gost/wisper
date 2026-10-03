@@ -87,3 +87,42 @@ test('a tun hub reaches its peers page the way a p2p tunnel does', async ({ page
 
   await page.screenshot({ path: 'test-results/tun-hub-spokes.png', fullPage: true });
 });
+
+/**
+ * A tun hub's create form.
+ *
+ * Same assertions as the tun entrypoint's, and for the same reason: the leading
+ * hints are what a reader has to know before choosing anything — the device
+ * needs administrator rights (the one thing that makes the save fail) and what
+ * the hub is. They belong above the fields they explain.
+ */
+test('the tun hub form explains itself before its fields', async ({ page }) => {
+  await page.goto('/tunnel/tun/new');
+
+  const lead = page.locator('.p2p-hint').first();
+  await expect(lead).toBeVisible();
+  await expect(lead).toContainText('administrator rights');
+
+  const intro = page.locator('.p2p-hint').filter({ hasText: 'the network' });
+  await expect(intro).toBeVisible();
+
+  const deviceAddress = page.locator('input[placeholder="10.10.0.1/24"]');
+  await expect(deviceAddress).toBeVisible();
+
+  const fieldBox = (await deviceAddress.boundingBox())!;
+  expect((await lead.boundingBox())!.y).toBeLessThan(fieldBox.y);
+  expect((await intro.boundingBox())!.y).toBeLessThan(fieldBox.y);
+
+  // The allowlist is not asked for here: it lives on the peers page, exactly as
+  // a p2p tunnel's does.
+  await expect(page.locator('textarea')).toHaveCount(0);
+
+  await page.screenshot({ path: 'test-results/tun-hub-new.png', fullPage: true });
+});
+
+test('a tun hub card carries the encryption badge', async ({ page }) => {
+  await page.goto('/');
+  const card = page.locator('tunnel-card').filter({ hasText: 'Hub' });
+  // The same wire a p2p tunnel's badge asserts, so the same lock.
+  await expect(card.locator('.secure')).toHaveAttribute('title', 'End-to-end encrypted');
+});

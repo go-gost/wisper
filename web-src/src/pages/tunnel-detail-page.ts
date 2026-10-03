@@ -1253,6 +1253,17 @@ export class TunnelDetailPage extends LitElement {
                   </div>
                 </div>`}
 
+                <!-- What a tun hub is and what it needs, before the fields
+                     it implies: the device is the one thing here that can make
+                     the save fail. The same leading block the tun entrypoint's
+                     form carries. -->
+                ${this.tunnelType === 'tun'
+                  ? html`
+                    <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
+                    <div class="p2p-hint">${t('tunHubHint')}</div>
+                  `
+                  : ''}
+
                 <!-- tun device: this node is the hub, the device is the network -->
                 ${this.tunnelType === 'tun'
                   ? html`
@@ -1284,8 +1295,6 @@ export class TunnelDetailPage extends LitElement {
                       <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
                         @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
                     </div>
-                    <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
-                    <div class="p2p-hint">${t('tunHubHint')}</div>
                   `
                   : ''}
 

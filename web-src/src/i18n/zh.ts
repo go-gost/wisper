@@ -168,7 +168,7 @@ const zh: Record<string, string> = {
   tunHubPeersEmpty: '未允许任何 spoke——没有流量能到达该设备。',
   tunHubSpokesCount: '已允许 {n} 个',
   tunPrivilegeHint:
-    'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建会报 “operation not permitted”。',
+    'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建设备会报 “operation not permitted”。',
   tunSpokeHint:
     '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
   peersTitle: '允许的对端',

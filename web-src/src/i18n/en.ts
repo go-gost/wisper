@@ -171,7 +171,7 @@ const en: Record<string, string> = {
   tunHubPeersEmpty: 'No spokes allowed — nothing reaches this device.',
   tunHubSpokesCount: '{n} allowed',
   tunPrivilegeHint:
-    'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating this entrypoint fails with "operation not permitted" otherwise.',
+    'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating it fails with "operation not permitted" otherwise.',
   tunSpokeHint:
     'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
   peersTitle: 'Allowed peers',
