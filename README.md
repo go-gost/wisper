@@ -19,7 +19,7 @@ Expose local services to the public internet without opening firewall ports. Wis
 - **5 tunnel types** — File server, HTTP reverse proxy, TCP relay, UDP relay, P2P
 - **4 entrypoint types** — TCP, UDP, P2P and TUN endpoints
 - **P2P mode** — reach a service by public key over a DERP relay, preferring a direct hole-punched path and falling back to the relay, with a per-tunnel inbound allowlist
-- **TUN entrypoint** — join a peer's virtual network through a tun device (spoke)
+- **TUN entrypoint** — join a peer's virtual network through a tun device (a tun peer)
 - **Real-time stats** — bytes in/out per second, connection counts, per-tunnel rates
 - **Event history** — start/stop/update and peer-transport events, per object and host-wide, surviving restarts
 - **Traffic inspection** — HTTP / WebSocket records from an external inspector service
@@ -71,7 +71,7 @@ Print version:
 | **TCP** | Listen locally and forward into a GOST tunnel |
 | **UDP** | Same as TCP entrypoint, with keepalive + TTL support |
 | **P2P** | Forward local traffic to a peer by its public key, over an inner `tcp` (default) or `udp` protocol |
-| **TUN** | Join a peer's virtual network through a tun device (spoke; needs admin rights) |
+| **TUN** | Join a peer's virtual network through a tun device (a tun peer; needs admin rights) |
 
 P2P tunnels and entrypoints require a [DERP relay](#p2p) configured in Settings.
 A p2p tunnel routes only the peers on its allowlist (the key is the credential);
@@ -102,7 +102,7 @@ to a file.
 
 ### P2P
 
-Private p2p tunnels, entrypoints and tun spokes share one deployment-level p2p
+Private p2p tunnels, entrypoints and tun peers share one deployment-level p2p
 host. Set its relay in Settings → P2P, or in the config file:
 
 ```yaml

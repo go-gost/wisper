@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# wisper tun smoke: a wisper tun hub and two wisper tun spokes, pinged across
+# wisper tun smoke: a wisper tun hub and two wisper tun peers, pinged across
 # the devices.
 #
-# Why: the unit tests stop at the metadata the spoke describes — the device
+# Why: the unit tests stop at the metadata the peer describes — the device
 # itself needs /dev/net/tun and CAP_NET_ADMIN, so nothing in `go test` can prove
 # the data path. This script starts a real relay, the hub (a wisper `tun` tunnel:
-# it creates the device and routes its allowlisted spokes' datagrams over p2p)
-# and the spokes (wisper tun entrypoints), then pings across the devices in both
+# it creates the device and routes its allowlisted peers' datagrams over p2p)
+# and the peers (wisper tun entrypoints), then pings across the devices in both
 # directions.
 #
 # The hub was once NOT a wisper type: gost held the device and a paired `p2p`
-# tunnel bridged the spokes to gost's UDP port, so a hub was a hand-written YAML
+# tunnel bridged the peers to gost's UDP port, so a hub was a hand-written YAML
 # file plus a bind address that tunnel had to repeat. It is a wisper type now
-# (`tunnel/tun.go`): the hub creates its own device and its spokes' datagrams
+# (`tunnel/tun.go`): the hub creates its own device and its peers' datagrams
 # arrive on the process-wide p2p host, so there is no gost, no UDP socket, no
 # endpoint and no paired tunnel — the peer allowlist is the whole configuration.
-# This script therefore starts the hub the way it starts a spoke: a wisper
+# This script therefore starts the hub the way it starts a peer: a wisper
 # process, with the device address moved from the old gost YAML onto the hub's
 # tun tunnel.
 #
@@ -147,14 +147,14 @@ pubkey() { # <api-addr>
   curl -s "http://$1/api/p2p" | sed -n 's/.*"public_key":"\([^"]*\)".*/\1/p'
 }
 
-say "starting the hub ($HUB_API) and the two spokes ($SPOKE_API, $SPOKE2_API)"
+say "starting the hub ($HUB_API) and the two peers ($SPOKE_API, $SPOKE2_API)"
 start_wisper "$HUB_CFG" "$HUB_API"
 start_wisper "$SPOKE_CFG" "$SPOKE_API"
 start_wisper "$SPOKE2_CFG" "$SPOKE2_API"
 
 wait_api "$HUB_API" || { bad "hub API did not come up"; exit $fail; }
-wait_api "$SPOKE_API" || { bad "spoke API did not come up"; exit $fail; }
-wait_api "$SPOKE2_API" || { bad "spoke2 API did not come up"; exit $fail; }
+wait_api "$SPOKE_API" || { bad "peer API did not come up"; exit $fail; }
+wait_api "$SPOKE2_API" || { bad "peer2 API did not come up"; exit $fail; }
 ok "all three instances are up"
 
 # The relay must be configured before the first p2p tunnel starts: the shared
@@ -175,7 +175,7 @@ if [ -n "$HUB_KEY" ] && [ -n "$SPOKE_KEY" ] && [ -n "$SPOKE2_KEY" ] \
   && [ "$SPOKE_KEY" != "$SPOKE2_KEY" ]; then
   ok "all identities exist and differ"
 else
-  bad "identities are missing or identical (hub=$HUB_KEY spoke=$SPOKE_KEY spoke2=$SPOKE2_KEY)"
+  bad "identities are missing or identical (hub=$HUB_KEY peer=$SPOKE_KEY peer2=$SPOKE2_KEY)"
   exit $fail
 fi
 
@@ -206,62 +206,62 @@ code=$(post "$HUB_API" /api/tunnels "{
   ]
 }")
 [ "$code" = 201 ] || { bad "creating the hub's tun tunnel returned $code, want 201"; exit $fail; }
-ok "hub device is up at $HUB_IP/32, both spokes allowlisted"
+ok "hub device is up at $HUB_IP/32, both peers allowlisted"
 
-# A hub created with no spokes at all: the UI's create form does not ask for
+# A hub created with no peers at all: the UI's create form does not ask for
 # the allowlist (it lives on the peers page), so this is the shape every hub
 # starts in. It must answer 201 and come up, not 400 — the routes are the
 # admission, and with none the hub is simply not reachable yet. This is the
 # only check that can prove the create: it needs the device, so only a
 # privileged run gets here.
-say "hub: created with no spokes at all"
+say "hub: created with no peers at all"
 code=$(post "$HUB_API" /api/tunnels "{
   \"name\": \"hub-bare\", \"type\": \"tun\", \"net\": \"10.30.0.1/32\"
 }")
-[ "$code" = 201 ] || { bad "creating a hub with no spokes returned $code, want 201"; }
+[ "$code" = 201 ] || { bad "creating a hub with no peers returned $code, want 201"; }
 BARE_ID=$(curl -s "http://$HUB_API/api/tunnels" | tr '}' '\n' | grep '"name":"hub-bare"' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
-[ -n "$BARE_ID" ] || { bad "a hub created with no spokes is not listed"; }
+[ -n "$BARE_ID" ] || { bad "a hub created with no peers is not listed"; }
 BARE=$(curl -s "http://$HUB_API/api/tunnels/$BARE_ID")
 case "$BARE" in *'"peers"'*) bad "the hub was created with peers it was not given: $BARE" ;; esac
-case "$BARE" in *'no spokes'*) ;; *) bad "a hub with no spokes recorded no announcement of the state: $BARE" ;; esac
-ok "a hub with no spokes comes up, routes nothing, and says so"
+case "$BARE" in *'no spokes'*) ;; *) bad "a hub with no peers recorded no announcement of the state: $BARE" ;; esac
+ok "a hub with no peers comes up, routes nothing, and says so"
 
-say "spoke: a device with keepalive:true that joins the network"
+say "peer: a device with keepalive:true that joins the network"
 code=$(post "$SPOKE_API" /api/entrypoints "{
   \"name\": \"spoke\", \"type\": \"tun\", \"peer\": \"$HUB_KEY\",
   \"net\": \"$SPOKE_IP/32\", \"routes\": \"$HUB_IP/32\",
   \"keepalive\": true, \"ttl\": 15
 }")
-[ "$code" = 201 ] || { bad "creating the spoke's tun entrypoint returned $code"; exit $fail; }
-ok "spoke device is up"
+[ "$code" = 201 ] || { bad "creating the peer's tun entrypoint returned $code"; exit $fail; }
+ok "peer device is up"
 
-# A spoke with keepalive:false sends the one-shot registration and then no
+# A peer with keepalive:false sends the one-shot registration and then no
 # keepalive at all. The hub must hold that session on its own: the hub has no TTL
 # (a p2p peer announces its departure by closing its stream), so nothing expires
 # it. This is the case that catches a hub which registered the route but never
 # answered the registration.
-say "spoke2: the same device with keepalive:false"
+say "peer2: the same device with keepalive:false"
 code=$(post "$SPOKE2_API" /api/entrypoints "{
   \"name\": \"spoke2\", \"type\": \"tun\", \"peer\": \"$HUB_KEY\",
   \"net\": \"$SPOKE2_IP/32\", \"routes\": \"$HUB_IP/32\",
   \"keepalive\": false
 }")
-[ "$code" = 201 ] || { bad "creating the second spoke's tun entrypoint returned $code"; exit $fail; }
-ok "spoke2 device is up"
+[ "$code" = 201 ] || { bad "creating the second peer's tun entrypoint returned $code"; exit $fail; }
+ok "peer2 device is up"
 
 # --- the hub's allowlist, edited on its own ----------------------------------
 
-# A hub's spokes are managed on its peers page, the way a p2p tunnel's peers
+# A hub's peers are managed on its peers page, the way a p2p tunnel's peers
 # are: PUT /api/tunnels/{id}/peers, applied in place. It must not disturb the
-# device or the spoke that is already talking over it — that is the whole
+# device or the peer that is already talking over it — that is the whole
 # reason a hub reconciles its routes instead of being rebuilt.
-say "the hub's spoke list, saved in place"
+say "the hub's peer list, saved in place"
 HUB_ID=$(curl -s "http://$HUB_API/api/tunnels" | tr '}' '\n' | grep '"name":"hub"' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
 code=$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
   -d "{\"peers\": [{\"key\": \"$SPOKE_KEY\", \"alias\": \"spoke\"}, {\"key\": \"$SPOKE2_KEY\", \"alias\": \"spoke2\"}]}" \
   "http://$HUB_API/api/tunnels/$HUB_ID/peers")
-[ "$code" = 200 ] || { bad "saving the hub's spokes returned $code, want 200"; }
-ok "the hub's spokes save on their own, like a p2p tunnel's peers"
+[ "$code" = 200 ] || { bad "saving the hub's peers returned $code, want 200"; }
+ok "the hub's peers save on their own, like a p2p tunnel's peers"
 
 # --- traffic ----------------------------------------------------------------
 
@@ -276,15 +276,15 @@ ping_until() { # <dst> <checks>
 }
 
 if ping_until "$SPOKE_IP" 20; then
-  ok "hub reaches the spoke ($SPOKE_IP)"
+  ok "hub reaches the peer ($SPOKE_IP)"
 else
-  bad "hub cannot reach the spoke ($SPOKE_IP)"
+  bad "hub cannot reach the peer ($SPOKE_IP)"
 fi
 
 if ping_until "$HUB_IP" 20; then
-  ok "spoke reaches the hub ($HUB_IP)"
+  ok "peer reaches the hub ($HUB_IP)"
 else
-  bad "spoke cannot reach the hub ($HUB_IP)"
+  bad "peer cannot reach the hub ($HUB_IP)"
 fi
 
 # The datagrams crossed the hub's p2p route, so its counters must have moved — a
@@ -296,34 +296,34 @@ else
   bad "the hub's tun tunnel counted nothing: $(curl -s "http://$HUB_API/api/tunnels")"
 fi
 
-# The spoke's path to the hub is what the UI badges, so the response has to
+# The peer's path to the hub is what the UI badges, so the response has to
 # carry it — a tun entrypoint is a peer link like a p2p one. "disabled" is p2p's
 # wording for the direct path being switched off, which is what this run does.
 transport=$(curl -s "http://$SPOKE_API/api/entrypoints" | sed -n 's/.*"peer_transport":"\([^"]*\)".*/\1/p')
 if [ -n "$transport" ]; then
-  ok "the spoke reports its peer's path ($transport)"
+  ok "the peer reports its peer's path ($transport)"
 else
-  bad "the spoke's entrypoint carries no peer path: $(curl -s "http://$SPOKE_API/api/entrypoints")"
+  bad "the peer's entrypoint carries no peer path: $(curl -s "http://$SPOKE_API/api/entrypoints")"
 fi
 
-# --- the second spoke, and its leaving --------------------------------------
+# --- the second peer, and its leaving --------------------------------------
 
-# spoke2's route must have been registered by its one-shot registration and
+# peer2's route must have been registered by its one-shot registration and
 # answered: keepalive:false means no keepalive to refresh it, so the hub either
 # answered (the route lives as long as the stream) or dropped the packet.
 if ping_until "$SPOKE2_IP" 20; then
-  ok "hub reaches the keepalive:false spoke ($SPOKE2_IP)"
+  ok "hub reaches the keepalive:false peer ($SPOKE2_IP)"
 else
-  bad "hub cannot reach the keepalive:false spoke ($SPOKE2_IP)"
+  bad "hub cannot reach the keepalive:false peer ($SPOKE2_IP)"
 fi
 
 if ping_until "$HUB_IP" 5; then
-  ok "the keepalive:false spoke still reaches the hub ($HUB_IP)"
+  ok "the keepalive:false peer still reaches the hub ($HUB_IP)"
 else
-  bad "the keepalive:false spoke cannot reach the hub ($HUB_IP)"
+  bad "the keepalive:false peer cannot reach the hub ($HUB_IP)"
 fi
 
-# Its session must be held by the hub, not by a keepalive the spoke stopped
+# Its session must be held by the hub, not by a keepalive the peer stopped
 # sending: current_conns on the hub's allowlist row is the stream itself. The
 # rows are split on the object's closing brace first — one sed over the whole
 # array would match the *last* current_conns in it, another peer's.
@@ -331,28 +331,28 @@ spoke2_conns=$(curl -s "http://$HUB_API/api/tunnels" | tr '}' '\n' \
   | grep -F "\"key\":\"$SPOKE2_KEY\"" \
   | sed -n 's/.*"current_conns":\([0-9]*\).*/\1/p')
 if [ -n "$spoke2_conns" ] && [ "$spoke2_conns" -ge 1 ] 2>/dev/null; then
-  ok "the hub holds a session with the keepalive:false spoke ($spoke2_conns)"
+  ok "the hub holds a session with the keepalive:false peer ($spoke2_conns)"
 else
-  bad "the hub holds no session with the keepalive:false spoke (current_conns=${spoke2_conns:-missing})"
+  bad "the hub holds no session with the keepalive:false peer (current_conns=${spoke2_conns:-missing})"
 fi
 
 SPOKE2_ID=$(curl -s "http://$SPOKE2_API/api/entrypoints" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
 code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "http://$SPOKE2_API/api/entrypoints/$SPOKE2_ID")
-[ "$code" = 200 ] || { bad "deleting the second spoke's entrypoint returned $code"; }
+[ "$code" = 200 ] || { bad "deleting the second peer's entrypoint returned $code"; }
 
 # The hub learns of the departure from the closed stream, not from a timer, so
 # give the teardown a moment before asking whether its routes are gone.
 sleep 5
 if ping -c 1 -W 2 "$SPOKE2_IP" >/dev/null 2>&1; then
-  bad "the hub still reaches $SPOKE2_IP after spoke2 left"
+  bad "the hub still reaches $SPOKE2_IP after peer2 left"
 else
-  ok "the hub's route to spoke2 is reclaimed after it left"
+  ok "the hub's route to peer2 is reclaimed after it left"
 fi
 
 if ping_until "$SPOKE_IP" 5 && ping_until "$HUB_IP" 5; then
-  ok "spoke1's routes survived spoke2 leaving"
+  ok "peer1's routes survived peer2 leaving"
 else
-  bad "spoke1's link broke when spoke2 left"
+  bad "peer1's link broke when peer2 left"
 fi
 
 # --- a device that cannot be created ----------------------------------------
@@ -394,8 +394,8 @@ if [ "$fail" != 0 ]; then
   # wisper logs under its config dir, not on stdout (the redirect only catches
   # a start-up failure).
   say "hub wisper log"; tail -n 40 "$HUB_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$HUB_CFG/wisper.log"
-  say "spoke log"; tail -n 40 "$SPOKE_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$SPOKE_CFG/wisper.log"
-  say "spoke2 log"; tail -n 40 "$SPOKE2_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$SPOKE2_CFG/wisper.log"
+  say "peer log"; tail -n 40 "$SPOKE_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$SPOKE_CFG/wisper.log"
+  say "peer2 log"; tail -n 40 "$SPOKE2_CFG/wisper/logs/wisper.log" 2>/dev/null || tail -n 20 "$SPOKE2_CFG/wisper.log"
   say "derper log"; tail -n 20 "$DERP_DIR/derper.log"
 fi
 
