@@ -32,7 +32,6 @@ import (
 type fileTunnel struct {
 	endpoint      string
 	opts          Options
-	file          service.Service
 	forward       service.Service
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats

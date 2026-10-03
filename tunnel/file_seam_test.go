@@ -54,7 +54,9 @@ func serveFile(t *testing.T, dir, user, pass string) string {
 	}
 
 	svc := xservice.NewService("file", &tcpListener{ln}, h, xservice.StatsOption(xstats.NewStats(false)))
-	go svc.Serve()
+	// Serve returns when the service closes, which the cleanup below does; there
+	// is nothing to assert on it here.
+	go func() { _ = svc.Serve() }()
 	t.Cleanup(func() { svc.Close() })
 
 	return ln.Addr().String()
@@ -72,7 +74,9 @@ func get(t *testing.T, addr, req string) string {
 		t.Fatal(err)
 	}
 
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	buf := make([]byte, 4096)
 	n, _ := conn.Read(buf)
 	return string(buf[:n])
