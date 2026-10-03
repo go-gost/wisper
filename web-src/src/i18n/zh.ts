@@ -63,7 +63,7 @@ const zh: Record<string, string> = {
   fieldPrefix: 'URL 前缀',
   fieldPrefixHint: '自定义 URL 主机名，8-63 个字符：小写字母、数字、连字符。被占用时回退为随机主机名。',
   fieldNet: '设备地址',
-  fieldNetHint: '例如 hub 为 10.10.0.1/24，spoke 为 10.10.0.2/24',
+  fieldNetHint: '例如 hub 为 10.10.0.1/24，对端为 10.10.0.2/24',
   fieldMTU: 'MTU',
   fieldDeviceName: '设备名',
   fieldDeviceNameHint: '留空则由内核命名。',
@@ -98,7 +98,7 @@ const zh: Record<string, string> = {
   typeUdpEntryDesc: '将隧道端点暴露为本地 UDP 端口',
   typeP2pEntryDesc: '按公钥把本地流量转发到对端（p2p 入口点）。',
   typeTun: 'TUN',
-  typeTunDesc: '本机持有 tun 设备，为接入的各节点转发',
+  typeTunDesc: '本机持有 tun 设备，为经 p2p 接入的对端转发——无端口、无公网地址',
   typeTunEntryDesc: '加入对端搭建的虚拟网络（tun 设备）',
 
   // Notifications
@@ -157,19 +157,20 @@ const zh: Record<string, string> = {
   protocolUdp: 'UDP',
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
   tunKeepaliveHint:
-    '把本机地址注册到 hub 的 tun server 并维持路由；在走 socket 的 hub 侧还用于让已离开 spoke 的路由过期。仅点对点 tun↔tun 链路适合关闭。',
+    '把本机地址注册到 hub 的 tun server 并维持路由；在走 socket 的 hub 侧还用于让已离开对端的路由过期。仅点对点 tun↔tun 链路适合关闭。',
   tunHubHint:
-    '设备就是网络本身：各 spoke 用标准 tun 客户端经 p2p 接入。未列入允许列表的 spoke 在拨号前就会被拒绝。',
-  tunHubPeers: '允许的 spoke',
+    '设备就是网络本身：各对端用标准 tun 客户端经 p2p 接入。未列入允许列表的对端在拨号前就会被拒绝。',
+  tunHubPeers: '允许的对端',
   tunHubPeersExclusiveHint:
-    '一个公钥只能属于 hub 或 p2p 隧道其中之一：同一 host 会把每个公钥只路由给一条隧道。要把某个 spoke 移到这里，请先把它从原来那条 p2p 隧道上移除。',
+    '一个公钥只能属于 hub 或 p2p 隧道其中之一：同一 host 会把每个公钥只路由给一条隧道。要把某个对端移到这里，请先把它从原来那条 p2p 隧道上移除。',
   peerKeyInUseHint:
-    '该公钥已经在另一条隧道或 hub 上了——一个 spoke 公钥只能属于 hub 或 p2p 隧道其中之一。请先把它从另一处移除。',
-  tunHubPeersEmpty: '未允许任何 spoke——没有流量能到达该设备。',
-  tunHubSpokesCount: '已允许 {n} 个',
+    '该公钥已经在另一条隧道或 hub 上了——一个对端公钥只能属于 hub 或 p2p 隧道其中之一。请先把它从另一处移除。',
+  tunHubPeersEmpty:
+    '还没有对端——设备已就绪，但在 peers 页面添加之前没有流量能到达。',
+  tunHubPeersCount: '已允许 {n} 个',
   tunPrivilegeHint:
     'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建设备会报 “operation not permitted”。',
-  tunSpokeHint:
+  tunPeerHint:
     '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
   peersTitle: '允许的对端',
   peersEntryDesc: '{n} 个已允许 — 管理列表',
@@ -189,6 +190,7 @@ const zh: Record<string, string> = {
   peersDisabled: '已禁用',
   peersDisabledHint: '已禁用：公钥仍保留在列表里，但不接入新连接；已建立的连接自然结束。',
   peersNoneHint: '未配置对端：隧道在运行，但不可达。',
+  tunHubNoPeersHint: 'hub 已在运行；在这里添加一个对端即可被访问。',
   peersPendingTitle: '请求接入',
   peersPendingAdd: '加到这条隧道',
   peersPendingDismiss: '忽略',

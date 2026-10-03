@@ -47,7 +47,7 @@ export class EntrypointDetailPage extends LitElement {
   /** A tun entrypoint's keepalive period in seconds (x reads ttl as an int). */
   @state() private _ttl = 15;
 
-  // tun spoke fields: this node's own device (see tunSpokeHint)
+  // tun peer fields: this node's own device (see tunPeerHint)
   @state() private _net = '';
   @state() private _mtu = 0;
   @state() private _deviceName = '';
@@ -502,15 +502,19 @@ export class EntrypointDetailPage extends LitElement {
     }
     .copy-btn-mini:hover { background: var(--border-subtle); color: var(--text); }
 
-    .p2p-hint.warn {
-      color: var(--red);
-    }
-
     .p2p-hint {
       font-size: var(--font-xs);
       color: var(--text-muted);
       line-height: 1.5;
       padding: 0 14px 10px;
+    }
+
+    /* Same as the tun hub form's, which is the only other place a privilege
+       hint is shown: a warning that is not yet an error (the user may be root,
+       or in a container with CAP_NET_ADMIN), so red rather than anything
+       heavier. Identical rule on both pages on purpose. */
+    .p2p-hint.warn {
+      color: var(--red);
     }
 
     /* ── Option rows (protocol, keepalive) ── */
@@ -822,7 +826,7 @@ export class EntrypointDetailPage extends LitElement {
                       <span class="info-label">${t('switchKeepalive')}</span>
                       <span class="info-value text">${ep.options?.keepalive ? t('statusRunning') : t('statusStopped')}${ep.options?.ttl ? ` · ${ep.options.ttl}s` : ''}</span>
                     </div>
-                    <div class="p2p-hint">${t('tunSpokeHint')}</div>
+                    <div class="p2p-hint">${t('tunPeerHint')}</div>
                   `
                   : this.entrypointType === 'p2p'
                   ? html`
@@ -923,7 +927,7 @@ export class EntrypointDetailPage extends LitElement {
                 ${this.entrypointType === 'tun'
                   ? html`
                     <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
-                    <div class="p2p-hint">${t('tunSpokeHint')}</div>
+                    <div class="p2p-hint">${t('tunPeerHint')}</div>
                     <div class="p2p-hint">${t('tunKeepaliveHint')}</div>
                   `
                   : ''}

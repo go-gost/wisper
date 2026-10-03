@@ -6,24 +6,27 @@ a word here collides with one in `core/`, the collision is called out.
 ## Tun
 
 **hub** — the node that holds the tun device. Its device *is* the network: it
-routes between the spokes, and nothing else on the path makes routing decisions.
-One hub serves many spokes.
+routes between the peers, and nothing else on the path makes routing decisions.
+One hub serves many peers.
 
-**spoke** — a node with a tun device that reaches a hub's network. A spoke is an
-ordinary tun client; it needs no knowledge of how the hub is reached.
+**peer** — a node with a tun device that reaches a hub's network. A peer is an
+ordinary tun client; it needs no knowledge of how the hub is reached. There is
+no separate word for the tun side of a p2p link: on a hub's allowlist, and
+everywhere else in the app, that node is simply one **peer** — the same word
+`PeerStats`, `peerKey` and `p2pPeers` use.
 
 **device** — the tun interface a hub owns. Creating one requires privilege
 (root, or CAP_NET_ADMIN), which is why a hub-side wisper needs it and why
-Android's spoke instead borrows a device from its VpnService.
+Android's tun peer instead borrows a device from its VpnService.
 
-**device network** — the addressing a spoke's device is configured with: its own
-address, the subnets routed through it, its DNS. Reachability between spokes is
-settled by the hub device's configuration, not by anything on the path.
+**device network** — the addressing a tun peer's device is configured with: its
+own address, the subnets routed through it, its DNS. Reachability between peers
+is settled by the hub device's configuration, not by anything on the path.
 
 ## Registration
 
-**registration handshake** — a spoke's declaration of the addresses its device
-holds. The only thing that knows a spoke's tun-network address is the spoke, so
+**registration handshake** — a peer's declaration of the addresses its device
+holds. The only thing that knows a peer's tun-network address is the peer, so
 this is how the hub learns it. Distinct from keeping a route alive: see
 **keepalive**.
 

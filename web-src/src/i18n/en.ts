@@ -63,7 +63,7 @@ const en: Record<string, string> = {
   fieldPrefix: 'URL Prefix',
   fieldPrefixHint: 'Custom URL host, 8-63 chars: a-z, 0-9, hyphens. Falls back to a random host if taken.',
   fieldNet: 'Device Address',
-  fieldNetHint: 'e.g. 10.10.0.1/24 for the hub, 10.10.0.2/24 for a spoke',
+  fieldNetHint: 'e.g. 10.10.0.1/24 for the hub, 10.10.0.2/24 for a peer',
   fieldMTU: 'MTU',
   fieldDeviceName: 'Device Name',
   fieldDeviceNameHint: 'Leave empty to let the kernel name it.',
@@ -98,7 +98,7 @@ const en: Record<string, string> = {
   typeUdpEntryDesc: 'Expose a tunnel endpoint as a local UDP port',
   typeP2pEntryDesc: 'Forward local traffic to a peer by public key (p2p entrypoint).',
   typeTun: 'TUN',
-  typeTunDesc: 'Host a tun device and route between the peers that reach it',
+  typeTunDesc: 'Host a tun device and route between the peers that reach it over p2p — no port, no public URL',
   typeTunEntryDesc: 'Join the virtual network of a peer (tun device)',
 
   // Notifications
@@ -160,19 +160,20 @@ const en: Record<string, string> = {
   keepaliveHint:
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
   tunKeepaliveHint:
-    'Registers this spoke with the hub\'s tun server and keeps the route alive; on a hub reached over a socket it also expires the routes of spokes that left. Off suits only a direct tun-to-tun link.',
+    'Registers this peer with the hub\'s tun server and keeps the route alive; on a hub reached over a socket it also expires the routes of peers that left. Off suits only a direct tun-to-tun link.',
   tunHubHint:
-    'This device is the network: spokes join it as ordinary tun clients over p2p. A spoke that is not on the allowlist is refused before any dial.',
-  tunHubPeers: 'Allowed spokes',
+    'This device is the network: peers join it as ordinary tun clients over p2p. A peer that is not on the allowlist is refused before any dial.',
+  tunHubPeers: 'Allowed peers',
   tunHubPeersExclusiveHint:
-    'A key can sit on a hub or on a p2p tunnel, not both: one host routes each key to exactly one tunnel. To move a spoke here, remove it from the p2p tunnel that holds it first.',
+    'A key can sit on a hub or on a p2p tunnel, not both: one host routes each key to exactly one tunnel. To move a peer here, remove it from the p2p tunnel that holds it first.',
   peerKeyInUseHint:
-    'That key is already on another tunnel or hub — a spoke key can be on a hub or on a p2p tunnel, not both. Remove it from the other one first.',
-  tunHubPeersEmpty: 'No spokes allowed — nothing reaches this device.',
-  tunHubSpokesCount: '{n} allowed',
+    'That key is already on another tunnel or hub — a peer key can be on a hub or on a p2p tunnel, not both. Remove it from the other one first.',
+  tunHubPeersEmpty:
+    'No peers yet — the device is up, but nothing can reach it until one is added on the peers page.',
+  tunHubPeersCount: '{n} allowed',
   tunPrivilegeHint:
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating it fails with "operation not permitted" otherwise.',
-  tunSpokeHint:
+  tunPeerHint:
     'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
   peersTitle: 'Allowed peers',
   peersEntryDesc: '{n} allowed — manage the list',
@@ -195,6 +196,7 @@ const en: Record<string, string> = {
   peersDisabledHint:
     'Disabled: the key stays on the list but takes no new connections; established ones drain.',
   peersNoneHint: 'No peers configured: this tunnel is running but unreachable.',
+  tunHubNoPeersHint: 'The hub is up; add a peer here and it becomes reachable.',
   peersPendingTitle: 'Requesting peers',
   peersPendingAdd: 'Add to this tunnel',
   peersPendingDismiss: 'Dismiss',

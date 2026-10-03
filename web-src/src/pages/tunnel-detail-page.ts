@@ -120,7 +120,7 @@ export class TunnelDetailPage extends LitElement {
 
   private _load() {
     // A tun hub's allowlist answers a knock too, and it is the likeliest
-    // answer: the spoke is the one being set up, and a key nobody added is a
+    // answer: the peer is the one being set up, and a key nobody added is a
     // hub that will refuse it. So both p2p types ask for the count.
     if (this.tunnelType === 'p2p' || this.tunnelType === 'tun') void this._loadPendingCount();
 
@@ -204,7 +204,7 @@ export class TunnelDetailPage extends LitElement {
   }
 
   /** _peerKeys is the allowlist verbatim, for the copy button: the keys go out
-   *  and nothing else, since a hub's spokes are pasted off their peers. */
+   *  and nothing else, since a hub's peers are pasted off their peers. */
   private _peerKeys(): string {
     return (this._tunnel?.options.peers ?? []).map(p => p.key).join('\n');
   }
@@ -566,6 +566,14 @@ export class TunnelDetailPage extends LitElement {
       color: var(--red) !important;
     }
 
+    /* Same as the tun entrypoint form's, which is the only other place a
+       privilege hint is shown: a warning that is not yet an error (the user
+       may be root, or in a container with CAP_NET_ADMIN), so red rather than
+       anything heavier. Identical rule on both pages on purpose. */
+    .p2p-hint.warn {
+      color: var(--red);
+    }
+
     .p2p-hint {
       font-size: var(--font-xs);
       color: var(--text-muted);
@@ -897,7 +905,6 @@ export class TunnelDetailPage extends LitElement {
     const t2 = this._tunnel;
     const stats = t2 ? t2.stats : null;
     const typeLabel = this._typeLabel();
-    const peerStats = t2?.peer_stats ?? [];
 
     return html`
       <app-scaffold>
@@ -985,7 +992,7 @@ export class TunnelDetailPage extends LitElement {
                       <span class="info-label">${t('tunHubPeers')}</span>
                       ${t2.options.peers?.length
                         ? html`
-                          <span class="info-value text">${t('tunHubSpokesCount').replace('{n}', String(t2.options.peers.length))}</span>
+                          <span class="info-value text">${t('tunHubPeersCount').replace('{n}', String(t2.options.peers.length))}</span>
                           <button class="copy-btn-mini" title="${t('btnCopy')}" @click=${() => this._handleCopy(this._peerKeys())}>
                             ${icon('copy')}
                           </button>
@@ -1128,7 +1135,7 @@ export class TunnelDetailPage extends LitElement {
 
             <!-- Allowed peers: the allowlist lives on its own page (long lists,
                  per-peer live traffic), where saving it applies in place. A
-                 tun hub's spokes are the same keys on the same host and the
+                 tun hub's peers are the same keys on the same host and the
                  same rows, so it reaches its peers page the same way. -->
             ${this._isP2P
               ? html`
@@ -1140,9 +1147,11 @@ export class TunnelDetailPage extends LitElement {
                       <div style="flex:1;">
                         <div style="font-size:var(--font-sm);font-weight:600;">${t('peersTitle')}</div>
                         <div style="font-size:var(--font-sm);color:var(--text-muted);">
-                          ${peerStats.length
-                            ? t('peersEntryDesc').replace('{n}', String(peerStats.length))
-                            : t('peersNoneHint')}
+                          ${t2?.options.peers?.length
+                            ? t('peersEntryDesc').replace('{n}', String(t2.options.peers.length))
+                            : this.tunnelType === 'tun'
+                              ? t('tunHubNoPeersHint')
+                              : t('peersNoneHint')}
                         </div>
                       </div>
                       ${this._pendingCount > 0

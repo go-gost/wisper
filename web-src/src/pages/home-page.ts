@@ -145,7 +145,7 @@ export class HomePage extends LitElement {
   }
 
   /** _secure is the static "end-to-end encrypted" badge. It is a statement
-   *  about the wire, not about which side of it this object sits: a spoke's
+   *  about the wire, not about which side of it this object sits: a tun peer's
    *  traffic travels the same p2p link as its hub's, and p2p encryption is
    *  mandatory — a session that does not settle encrypted is refused, never
    *  built as plaintext. So a tun hub is as encrypted as a p2p tunnel, and a
