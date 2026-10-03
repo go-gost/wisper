@@ -223,7 +223,7 @@ BARE_ID=$(curl -s "http://$HUB_API/api/tunnels" | tr '}' '\n' | grep '"name":"hu
 [ -n "$BARE_ID" ] || { bad "a hub created with no peers is not listed"; }
 BARE=$(curl -s "http://$HUB_API/api/tunnels/$BARE_ID")
 case "$BARE" in *'"peers"'*) bad "the hub was created with peers it was not given: $BARE" ;; esac
-case "$BARE" in *'no spokes'*) ;; *) bad "a hub with no peers recorded no announcement of the state: $BARE" ;; esac
+case "$BARE" in *'no peers'*) ;; *) bad "a hub with no peers recorded no announcement of the state: $BARE" ;; esac
 ok "a hub with no peers comes up, routes nothing, and says so"
 
 say "peer: a device with keepalive:true that joins the network"

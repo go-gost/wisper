@@ -363,7 +363,7 @@ func validateTunnelRequest(tunnelType string, req *tunnelCreateRequest) error {
 // changing meaning).
 //
 // The allowlist is not required: it is managed on its own peers page, which
-// the create form never reaches, so a hub starts with no spokes and its first
+// the create form never reaches, so a hub starts with no peers and its first
 // one is added there. What an empty list means — up, routing nothing — is
 // recorded as an event at creation and on every save that leaves it empty,
 // rather than refused here.
@@ -465,8 +465,8 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 }
 
 // noteNoSpokes records that a tun hub is up with nothing to route, for the two
-// moments it becomes true: a hub created before its first spoke arrives, and a
-// hub whose last spoke was just removed on the peers page. Both read as broken
+// moments it becomes true: a hub created before its first peer arrives, and a
+// hub whose last peer was just removed on the peers page. Both read as broken
 // otherwise — a hub is running, its device is there, and a request to it is
 // simply never answered — and the peers page is where the fix is, so the event
 // says so.
@@ -479,7 +479,7 @@ func noteNoSpokes(t tunnel.Tunnel) {
 	if t.Type() != tunnel.TunTunnel || len(t.Options().Peers) > 0 {
 		return
 	}
-	event.Record(t.ID(), event.LevelWarn, "no spokes yet — this hub is up but routes nothing, so requests to it go unanswered until a spoke is added on the peers page")
+	event.Record(t.ID(), event.LevelWarn, "no peers yet — this hub is up but routes nothing, so requests to it go unanswered until a peer is added on the peers page")
 }
 
 func handleGetTunnel(w http.ResponseWriter, r *http.Request) {

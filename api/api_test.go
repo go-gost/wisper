@@ -473,7 +473,7 @@ func TestCreateTunTunnelWithoutSpokes(t *testing.T) {
 	// hub created and never finished is not a hub that silently drops packets.
 	found := false
 	for _, ev := range event.List(id) {
-		if ev.Level == event.LevelWarn && strings.Contains(ev.Message, "no spokes") {
+		if ev.Level == event.LevelWarn && strings.Contains(ev.Message, "no peers") {
 			found = true
 		}
 	}
