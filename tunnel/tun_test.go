@@ -46,14 +46,22 @@ func TestTunTunnelMetadata(t *testing.T) {
 
 	lm := s.listenerMetadata()
 	for key, want := range map[string]any{
-		"name":   "wisper-hub",
-		"mtu":    1400,
-		"net":    "10.10.0.1/24",
-		"routes": "192.168.50.0/24",
-		"dns":    "10.10.0.1",
+		"name": "wisper-hub",
+		"mtu":  1400,
+		"net":  "10.10.0.1/24",
 	} {
 		if got := lm[key]; got != want {
 			t.Errorf("listener metadata[%s] = %v (%T), want %v (%T)", key, got, got, want, want)
+		}
+	}
+	// Routes and DNS must never reach a hub's device, even when they are set on
+	// the options. Both are client-side, and a hub runs with host networking:
+	// routes would RouteReplace the host's own route to that subnet, and dns
+	// would register the hub's device as a resolver on the host. Naming a
+	// subnet the host already routes — its own LAN — takes the network down.
+	for _, key := range []string{"routes", "dns"} {
+		if got, ok := lm[key]; ok {
+			t.Errorf("listener metadata carries %s (%v): a tun hub must not", key, got)
 		}
 	}
 	if _, ok := lm["peer"]; ok {

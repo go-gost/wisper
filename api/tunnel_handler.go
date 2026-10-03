@@ -370,17 +370,30 @@ func validateTunnelRequest(tunnelType string, req *tunnelCreateRequest) error {
 //
 // The device fields are checked by validateTunNet and friends — the same rules
 // apply to both ends of the device.
+//
+// Routes and DNS are refused outright. They are client-side settings: they tell
+// a device whose traffic is being captured what to capture and which resolver
+// to use. A hub captures nothing. Worse, a hub runs with host networking, so
+// the device is built in the host's network namespace and both are applied
+// there — routes through netlink.RouteReplace (which replaces the host's own
+// route to that subnet rather than sitting beside it) and dns through
+// `resolvectl dns`. Naming a subnet the host already routes, its own LAN,
+// takes the network down. Refused rather than ignored, so a config carried
+// over from the socket form says why instead of quietly doing nothing.
 func validateTunTunnel(r *tunnelCreateRequest) error {
 	if ep := strings.TrimSpace(r.Endpoint); ep != "" {
 		return fmt.Errorf("a tun hub binds no address: clear the endpoint (%s) — the peer allowlist is the whole configuration", ep)
 	}
+	if rs := strings.TrimSpace(r.Routes); rs != "" {
+		return fmt.Errorf("a tun hub takes no routes (%s): routes are client-side, and on a hub they replace the host's own route to that subnet — its peers share the device's subnet and need none", rs)
+	}
+	if dns := strings.TrimSpace(r.DNS); dns != "" {
+		return fmt.Errorf("a tun hub takes no dns (%s): dns is client-side, and on a hub it would register the device as a resolver on the host", dns)
+	}
 	if err := validateTunNet(r.Net); err != nil {
 		return err
 	}
-	if err := validateTunRoutes(r.Routes); err != nil {
-		return err
-	}
-	return validateTunDNS(r.DNS)
+	return nil
 }
 
 // prefixRe matches a DNS label: lowercase letters, digits and hyphens,

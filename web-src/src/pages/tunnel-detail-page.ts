@@ -63,8 +63,6 @@ export class TunnelDetailPage extends LitElement {
   @state() private _net = '';
   @state() private _mtu = 0;
   @state() private _deviceName = '';
-  @state() private _routes = '';
-  @state() private _dns = '';
   /** How many keys are knocking on the process-wide host; shown on the peers
    *  entry. The list is not per-tunnel — a p2p stream carries no destination —
    *  so this is a count, not a per-tunnel allowlist field. */
@@ -172,8 +170,6 @@ export class TunnelDetailPage extends LitElement {
     this._net = '';
     this._mtu = 0;
     this._deviceName = '';
-    this._routes = '';
-    this._dns = '';
   }
 
   private _populateForm(t: Tunnel) {
@@ -191,8 +187,6 @@ export class TunnelDetailPage extends LitElement {
     this._net = t.options.net ?? '';
     this._mtu = t.options.mtu ?? 0;
     this._deviceName = t.options.device_name ?? '';
-    this._routes = t.options.routes ?? '';
-    this._dns = t.options.dns ?? '';
   }
 
   /** _peerLabels renders the allowlist for display: each peer's alias by
@@ -295,8 +289,6 @@ export class TunnelDetailPage extends LitElement {
         body.net = this._net.trim() || undefined;
         body.mtu = this._mtu || undefined;
         body.device_name = this._deviceName.trim() || undefined;
-        body.routes = this._routes.trim() || undefined;
-        body.dns = this._dns.trim() || undefined;
       }
       if (this._isP2P && this.mode === 'edit') {
         // The allowlist is managed on its own page; an edit here must carry it
@@ -982,12 +974,6 @@ export class TunnelDetailPage extends LitElement {
                     ${t2.options.device_name
                       ? html`<div class="info-row"><span class="info-label">${t('fieldDeviceName')}</span><span class="info-value text">${t2.options.device_name}</span></div>`
                       : ''}
-                    ${t2.options.routes
-                      ? html`<div class="info-row"><span class="info-label">${t('fieldRoutes')}</span><span class="info-value text">${t2.options.routes}</span></div>`
-                      : ''}
-                    ${t2.options.dns
-                      ? html`<div class="info-row"><span class="info-label">${t('fieldDNS')}</span><span class="info-value text">${t2.options.dns}</span></div>`
-                      : ''}
                     <div class="info-row">
                       <span class="info-label">${t('tunHubPeers')}</span>
                       ${t2.options.peers?.length
@@ -1293,17 +1279,11 @@ export class TunnelDetailPage extends LitElement {
                         @input=${(e: Event) => { this._deviceName = (e.target as HTMLInputElement).value; }}>
                       <div class="p2p-hint">${t('fieldDeviceNameHint')}</div>
                     </div>
-                    <div class="form-group">
-                      <label class="form-label">${t('fieldRoutes')}</label>
-                      <input class="form-input" .value=${this._routes} placeholder="192.168.50.0/24"
-                        @input=${(e: Event) => { this._routes = (e.target as HTMLInputElement).value; }}>
-                      <div class="p2p-hint">${t('fieldRoutesHint')}</div>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">${t('fieldDNS')}</label>
-                      <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
-                        @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
-                    </div>
+                    <!-- No routes, no dns: both are client-side, and a hub runs
+                         with host networking, so they would be applied to the
+                         host's own routing and resolver. The API refuses them
+                         too. Peers share the device's subnet, so "net" is the
+                         only route a hub needs. -->
                   `
                   : ''}
 

@@ -116,13 +116,28 @@ func (s *tunTunnel) IsFavorite() bool { return s.favorite.Load() }
 // listenerMetadata is the tun listener's device configuration. Keys follow
 // x/listener/tun: name, mtu, net, routes, dns. Empty values are ignored by the
 // listener, so an unset optional field is simply absent behavior.
+// listenerMetadata is the tun device's configuration.
+//
+// Routes and DNS are deliberately absent, and must stay absent. Both are
+// client-side: they tell a device whose traffic is being captured what to
+// capture and which resolver to use. A hub captures nothing, so it needs
+// neither — and on a hub running with host networking, both are actively
+// dangerous, because the device is created in the host's network namespace:
+//
+//   - routes go through netlink.RouteReplace, so naming a subnet the host
+//     already routes (its own LAN, say) does not add a route beside it, it
+//     replaces it. On a machine that is its network's gateway, that points the
+//     whole LAN at the tunnel and takes the network down.
+//   - dns is applied with `resolvectl dns <dev> ...`, which would register the
+//     hub's device as a resolver on the host.
+//
+// A hub's peers are reached over p2p streams and share the device's own
+// subnet, so the address in "net" is the only route it needs.
 func (s *tunTunnel) listenerMetadata() map[string]any {
 	return map[string]any{
-		"name":   s.opts.DeviceName,
-		"mtu":    s.opts.MTU,
-		"net":    s.opts.Net,
-		"routes": s.opts.Routes,
-		"dns":    s.opts.DNS,
+		"name": s.opts.DeviceName,
+		"mtu":  s.opts.MTU,
+		"net":  s.opts.Net,
 	}
 }
 

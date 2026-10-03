@@ -391,13 +391,16 @@ func TestCreateTunTunnelValidation(t *testing.T) {
 			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1", "peers": []map[string]any{{"key": peer}}},
 		},
 		{
-			name: "bad route",
-			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "routes": "not-a-cidr",
+			// A *valid* route is the case that matters: this is the value that
+			// reached the host's routing table and took the LAN down, so the
+			// guard must refuse it, not merely refuse malformed ones.
+			name: "route set",
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "routes": "192.168.50.0/24",
 				"peers": []map[string]any{{"key": peer}}},
 		},
 		{
-			name: "bad dns",
-			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "dns": "dns.example",
+			name: "dns set",
+			body: map[string]any{"type": "tun", "name": "hub", "net": "10.10.0.1/24", "dns": "10.10.0.1",
 				"peers": []map[string]any{{"key": peer}}},
 		},
 	}

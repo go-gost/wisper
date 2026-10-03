@@ -194,19 +194,19 @@ post() { # <api-addr> <path> <json>
 say "hub: a tun tunnel whose device it creates itself"
 code=$(post "$HUB_API" /api/tunnels "{
   \"name\": \"hub\", \"type\": \"tun\", \"endpoint\": \"127.0.0.1:8421\",
-  \"net\": \"$HUB_IP/32\", \"peers\": [{\"key\": \"$SPOKE_KEY\"}]
+  \"net\": \"$HUB_IP/24\", \"peers\": [{\"key\": \"$SPOKE_KEY\"}]
 }")
 [ "$code" = 400 ] || { bad "a tun hub with an endpoint returned $code, want 400"; }
 
 code=$(post "$HUB_API" /api/tunnels "{
-  \"name\": \"hub\", \"type\": \"tun\", \"net\": \"$HUB_IP/32\", \"mtu\": 1420,
-  \"routes\": \"$SPOKE_IP/32,$SPOKE2_IP/32\", \"peers\": [
+  \"name\": \"hub\", \"type\": \"tun\", \"net\": \"$HUB_IP/24\", \"mtu\": 1420,
+  \"peers\": [
     {\"key\": \"$SPOKE_KEY\", \"alias\": \"spoke\"},
     {\"key\": \"$SPOKE2_KEY\", \"alias\": \"spoke2\"}
   ]
 }")
 [ "$code" = 201 ] || { bad "creating the hub's tun tunnel returned $code, want 201"; exit $fail; }
-ok "hub device is up at $HUB_IP/32, both peers allowlisted"
+ok "hub device is up at $HUB_IP/24, both peers allowlisted"
 
 # A hub created with no peers at all: the UI's create form does not ask for
 # the allowlist (it lives on the peers page), so this is the shape every hub
