@@ -381,6 +381,81 @@ presented less informatively than a p2p tunnel:
 Not swept, flagged rather than changed: `handleDeleteTunnel` removes a legacy per-tunnel key file
 only for `P2PTunnel`. No code path writes one for a tun hub, so it is believed dead.
 
+### The keepalive switch did nothing, and it was the bug
+
+Found by asking a smaller question: the tun entrypoint's `keepalive` hint mentioned a *socket* hub
+and a *point-to-point tun↔tun* link, neither of which a user meets. Rewriting it needed the facts.
+
+**What the handshake is for.** A tun client sends `[magic][passphrase][N×16B addresses]` to the far
+side's tun server. The server routes by destination address, and this frame is the **only** source
+of the mapping from an address to the peer that holds it — a peer's device address is a private
+fact. Without it the server discards everything bound for that peer: traffic leaves, nothing comes
+back. That is the one-way link the entrypoint's own comment warns about.
+
+**The bug.** `keepalive()` has always sent the handshake unconditionally and returned early when no
+period was configured — the period only ever decided whether it *repeated*. But the call site gated
+the whole call:
+
+```go
+if network == "udp" || h.md.keepAlivePeriod > 0 {
+```
+
+On a p2p link `network` is `"ip"`, so with the switch off **nothing was sent at all**. And a p2p
+hub's route table has `ttl = 0` — a peer says it has left by closing its stream — so on p2p the
+repeat buys nothing and the one-shot is everything. The gate demanded the part that does nothing in
+order to get the part that is everything.
+
+**Fixed in x `v0.19.5`:** the handshake always runs; the period keeps its meaning where it has one
+(a server reached over UDP is connectionless, so silence is the only departure signal, and the
+repeat is what lets a route expire).
+
+**And the switch was never a choice for this entrypoint.** A wisper tun entrypoint reaches its hub
+over p2p and nothing else — the peer key is required and this side dials out. So with the fix, both
+`keepalive` and `ttl` set values nothing reads: removed from the form, the view row and the handler
+metadata. The test that asserted they reached x now asserts they never do.
+
+**Two verifications, because the first kind was wrong before.**
+
+| | registrations the hub logged | routes |
+|---|---|---|
+| old x, debug run | 1 (only the `keepalive:true` peer) | 1 |
+| x v0.19.5, debug run | **2** | **2** |
+
+and the smoke's tunnel assertions, run against a binary built from the *old* x, fail:
+
+```
+FAIL hub cannot reach the peer (10.10.0.2)
+FAIL hub cannot reach the keepalive:false peer (10.10.0.3)
+{"level":"warn","msg":"no route for 10.10.0.2, packet discarded"}
+```
+
+That last pair is the point. Those assertions had been passing against the old x too — for years of
+runs, in effect.
+
+### Why they had been passing: one network namespace for every instance
+
+The smoke started the hub, both peers and the derper in **one** netns. A tun device takes a host
+route for its own address, so a ping from the hub to `10.10.0.3` was routed by the kernel to **peer
+2's own device**, inside the machine. It never touched the p2p link, and the assertion passed
+whether or not the peer had registered.
+
+This is what hid the keepalive bug: the smoke was written to check that a `keepalive:false` peer
+still registers and is reachable, and the check could not fail.
+
+Each instance now has its own netns, joined by a bridge (the derper binds the bridge address and the
+instances dial that). One effect worth recording, because it was masked before: the peer's device is
+a `/32`, so the hub is not on-link and the peer genuinely needs `routes: "<hub>/32"` — in the shared
+netns the hub's own `/24` route had been covering for it.
+
+Still passing for a reason other than their names, left as they are:
+
+- `the hub's route to peer2 is reclaimed after it left` fails the ping after a delete, which it also
+  does when the route was never established — it is only meaningful because the preceding check
+  establishes the route first
+- `the hub's tun tunnel carried the traffic` greps `output_bytes` across the whole tunnel list rather
+  than the hub's own row
+- the derper serves a self-signed cert for its IP; the `openssl`-generated file is never used
+
 ---
 
 ## File structure
