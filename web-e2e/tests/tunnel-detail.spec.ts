@@ -16,9 +16,13 @@ import { expect, test } from '@playwright/test';
 const TUNNEL_ID = 'e2e-p2p-tunnel';
 const DETAIL = `/tunnel/p2p/${TUNNEL_ID}`;
 /** A tun hub, closed (a device needs root): its allowlist rows must render
- *  anyway, since a spoke's first connection is the case they exist for. */
+ *  anyway, since a peer's first connection is the case they exist for. */
 const HUB_ID = 'e2e-tun-hub';
 const HUB = `/tunnel/tun/${HUB_ID}`;
+/** A tun hub whose allowlist is empty: the state a hub is created in, since
+ *  the create form does not ask for peers. */
+const EMPTY_HUB_ID = 'e2e-tun-hub-empty';
+const EMPTY_HUB = `/tunnel/tun/${EMPTY_HUB_ID}`;
 
 /** A sub-pixel difference is layout rounding, not a layout bug. */
 const SAME_WIDTH = 0.5;
@@ -63,16 +67,19 @@ test('the peers page marks the switched-off peer', async ({ page }) => {
 
 test('a tun hub reaches its peers page the way a p2p tunnel does', async ({ page }) => {
   await page.goto(HUB);
-  await expect(page.getByText('Allowed spokes')).toBeVisible();
+  // The info card's row, not the peers card below it: both are titled
+  // "Allowed peers", because they are the same list under the same name.
+  const hubPeers = page.locator('.info-label').filter({ hasText: 'Allowed peers' });
+  await expect(hubPeers).toBeVisible();
 
-  // Same entry, same page, same component: a hub's spokes are p2p peers on the
+  // Same entry, same page, same component: a hub's peers are p2p peers on the
   // same host, so a user who knows where a tunnel's list lives finds it here.
-  await page.getByText('Allowed peers', { exact: true }).click();
+  await page.getByText('Allowed peers', { exact: true }).last().click();
   await expect(page).toHaveURL(new RegExp(`/tunnel/tun/${HUB_ID}/peers$`));
 
-  // One row per allowlisted spoke, by alias — the same component the peers page
+  // One row per allowlisted peer, by alias — the same component the peers page
   // draws, so a hub and a tunnel cannot report a peer differently. The alias
-  // comes off the allowlist, so a spoke that has never dialled is still named.
+  // comes off the allowlist, so a peer that has never dialled is still named.
   const rows = page.locator('peer-stats-row');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('laptop');
@@ -85,7 +92,7 @@ test('a tun hub reaches its peers page the way a p2p tunnel does', async ({ page
   await page.getByTitle('Reveal').first().click();
   await expect(rows.first()).toContainText('dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA');
 
-  await page.screenshot({ path: 'test-results/tun-hub-spokes.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/tun-hub-peers.png', fullPage: true });
 });
 
 /**
@@ -118,6 +125,80 @@ test('the tun hub form explains itself before its fields', async ({ page }) => {
   await expect(page.locator('textarea')).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/tun-hub-new.png', fullPage: true });
+});
+
+/**
+ * The privilege hint is styled, not merely marked: `warn` is a suffix nothing
+ * implements unless the page defines it, and this defect shipped exactly that —
+ * the class was on the element and no `.p2p-hint.warn` rule existed, so the
+ * warning rendered as ordinary grey hint text. Asserting the *colour* is what
+ * catches it; asserting the class or the string would both pass on the broken
+ * build.
+ *
+ * Checked on both pages because they are separate components with separate
+ * `static styles`: one having the rule says nothing about the other.
+ */
+const RED = 'rgb(239, 68, 68)'; // --red, the light theme's value.
+const MUTED = 'rgb(156, 163, 175)'; // --text-muted, the plain hint colour.
+
+for (const [name, path] of [
+  ['tun hub', '/tunnel/tun/new'],
+  ['tun entrypoint', '/entrypoint/tun/new'],
+] as const) {
+  test(`the ${name} privilege hint is actually red`, async ({ page }) => {
+    await page.goto(path);
+    const warn = page.locator('.p2p-hint.warn').first();
+    await expect(warn).toBeVisible();
+    await expect(warn).toHaveCSS('color', RED);
+
+    // And the rule is scoped to `warn`, so the ordinary hints beside it are
+    // still the muted grey rather than inheriting the warning colour.
+    await expect(page.locator('.p2p-hint:not(.warn)').first()).toHaveCSS('color', MUTED);
+
+    await page.screenshot({ path: `test-results/${name.replace(' ', '-')}-privilege-warn.png`, fullPage: true });
+  });
+}
+
+/**
+ * A hub with no peers: the state the API used to refuse to create.
+ *
+ * Why it must render and not look broken: the hub is running — its device is
+ * there — it simply has nothing to route to, and its first peer is added on
+ * the peers page. The page a user is looking at has to say that, and it has to
+ * say it in the muted empty-state voice the p2p side already uses, not in the
+ * error voice: there is nothing wrong here.
+ */
+test('a hub with no peers says so where the fix is, in the empty-state voice', async ({ page }) => {
+  await page.goto(EMPTY_HUB);
+
+  // The allowlist row: the same muted .info-value.empty the p2p page uses,
+  // naming the peers page as what makes it reachable.
+  const row = page.locator('.info-row').filter({ hasText: 'Allowed peers' });
+  await expect(row.locator('.info-value.empty')).toBeVisible();
+  await expect(row.locator('.info-value.empty')).toContainText('peers page');
+
+  // The peers card: an entry to the fix, with a hub-specific line. The p2p
+  // wording ("running but unreachable") would read as a fault and would call a
+  // hub a tunnel. The info row carries the same title, so the card is the one
+  // holding this line rather than the one holding the count.
+  const card = page.locator('.card').filter({ hasText: 'The hub is up' });
+  await expect(card).toBeVisible();
+  await expect(card).not.toContainText('unreachable');
+
+  // Clicking it reaches the peers page, where the peer is added.
+  await card.getByText('Allowed peers', { exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/tunnel/tun/${EMPTY_HUB_ID}/peers$`));
+  await expect(page.locator('.empty')).toContainText('No peers yet');
+
+  // A hub that DOES have peers must not show the empty state at all — and it
+  // must not show it merely because its peer has not carried traffic yet, so
+  // this hub is closed and idle. That is the case a traffic-derived condition
+  // gets wrong.
+  await page.goto(HUB);
+  await expect(page.getByText('The hub is up')).toHaveCount(0);
+  await expect(page.getByText('1 allowed', { exact: true })).toBeVisible();
+
+  await page.screenshot({ path: 'test-results/tun-hub-no-peers.png', fullPage: true });
 });
 
 test('a tun hub card carries the encryption badge', async ({ page }) => {
