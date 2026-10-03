@@ -264,6 +264,7 @@ const en: Record<string, string> = {
   p2pTransportConnected: 'Connected',
   p2pTransportDetail: 'Status details',
   e2eEncrypted: 'End-to-end encrypted',
+  p2pPeers: 'Peers',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',
   p2pColPeer: 'Peer',
   p2pColConns: 'Conns',

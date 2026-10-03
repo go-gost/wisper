@@ -257,6 +257,7 @@ const zh: Record<string, string> = {
   p2pTransportConnected: '已连接',
   p2pTransportDetail: '状态详情',
   e2eEncrypted: '端到端加密',
+  p2pPeers: '对端',
   p2pPeersEmpty: '未配置对端——没有入站流量能到达该隧道。',
   p2pColPeer: '对端',
   p2pColConns: '连接',
