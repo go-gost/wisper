@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -88,14 +89,11 @@ func TestTunTunnelHasNoBindAddress(t *testing.T) {
 	if err := tun.init(); err != nil {
 		t.Fatalf("init: %v", err)
 	}
-	if len(tun.config.Peers) != 2 {
-		t.Fatalf("allowlist = %v, want both peers", tun.config.Peers)
+	if len(tun.opts.Peers) != 2 {
+		t.Fatalf("allowlist = %v, want both peers", tun.opts.Peers)
 	}
-	// The list is copied, so a later edit of the options cannot reach into a
-	// config the routes were already built from.
-	tun.opts.Peers[0] = "peer-z"
-	if tun.config.Peers[0] != "peer-a" {
-		t.Error("the config's allowlist aliases the options'")
+	if tun.Endpoint() != "" {
+		t.Errorf("Endpoint = %q, want a hub to bind nothing", tun.Endpoint())
 	}
 }
 
@@ -116,9 +114,6 @@ func TestTunTunnelRejectsBindAddress(t *testing.T) {
 	if !strings.Contains(err.Error(), "127.0.0.1:8421") {
 		t.Errorf("the error does not name the address it rejected: %v", err)
 	}
-	if tun.config != nil {
-		t.Errorf("a rejected hub still built a config: %+v", tun.config)
-	}
 }
 
 // TestTunTunnelRequiresPeers: a hub with no allowlist has no route, so it would
@@ -128,6 +123,80 @@ func TestTunTunnelRequiresPeers(t *testing.T) {
 
 	if err := tun.init(); err == nil {
 		t.Fatal("a hub accepted an empty allowlist")
+	}
+}
+
+// TestTunTunnelSetPeersAppliesInPlace: a hub saves its spokes the way a p2p
+// tunnel saves its peers — the host's routes are reconciled on the tunnel that
+// holds them, so the device, the service and a live spoke's stream all survive
+// the change. The routes are the whole of it: a removed spoke is dropped from
+// the table, an added one claimed, and a disabled one keeps its place with its
+// route taken away. No device is created (that needs CAP_NET_ADMIN): what is
+// pinned is that nothing is rebuilt and nothing else is touched.
+func TestTunTunnelSetPeersAppliesInPlace(t *testing.T) {
+	ln, err := p2pHost.register([]string{"k1"})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	pl := ln.(*peerListener)
+	tun := &tunTunnel{
+		opts:   Options{Peers: []string{"k1"}, Net: "10.10.0.1/24"},
+		ln:     pl,
+		cclose: make(chan struct{}),
+	}
+	// The manager is process-wide, so the routes go back when the test ends.
+	defer p2pHost.unregister(pl)
+
+	if err := tun.SetPeers(context.Background(), []string{"k1", "k2"}, map[string]string{"k2": "spoke2"}, []string{"k1"}); err != nil {
+		t.Fatalf("SetPeers: %v", err)
+	}
+
+	// The disabled spoke keeps its place on the list and loses its route; the
+	// added one claims one. Same table a p2p tunnel reconciles against.
+	if _, ok := p2pHost.routes["k1"]; ok {
+		t.Error("the disabled spoke still holds a route")
+	}
+	if p2pHost.routes["k2"] != pl {
+		t.Errorf("the added spoke's route = %v, want this hub's", p2pHost.routes["k2"])
+	}
+	if got := pl.Addr().String(); got != "k2" {
+		t.Errorf("the hub's route serves %q, want only the enabled spoke", got)
+	}
+	// The options are swapped under the lock, so the rows the API builds and
+	// the routes the host holds cannot disagree.
+	if got := tun.Options().Peers; len(got) != 2 || got[0] != "k1" || got[1] != "k2" {
+		t.Errorf("Peers = %v, want k1 then k2", got)
+	}
+	if got := tun.Options().PeerAliases["k2"]; got != "spoke2" {
+		t.Errorf("the alias of the added spoke = %q, want it kept", got)
+	}
+	if got := tun.Options().PeerDisabled; len(got) != 1 || got[0] != "k1" {
+		t.Errorf("PeerDisabled = %v, want [k1]", got)
+	}
+	if got := tun.Options().Net; got != "10.10.0.1/24" {
+		t.Errorf("Net = %q, want the device untouched by an allowlist save", got)
+	}
+
+	// A key another tunnel holds is the host's one refusal, and it is
+	// all-or-nothing: a rejected save leaves the table exactly as it was.
+	other, err := p2pHost.register([]string{"k3"})
+	if err != nil {
+		t.Fatalf("register the other tunnel: %v", err)
+	}
+	defer other.Close()
+	if err := tun.SetPeers(context.Background(), []string{"k1", "k3"}, nil, nil); err == nil {
+		t.Fatal("a hub claimed a key another tunnel holds")
+	}
+	if p2pHost.routes["k3"] != other.(*peerListener) {
+		t.Error("the rejected save took the other tunnel's route")
+	}
+	if _, ok := p2pHost.routes["k2"]; !ok {
+		t.Error("the rejected save still dropped this hub's own route")
+	}
+
+	// No route means no hub to save: a stopped hub has no device and no table.
+	if err := (&tunTunnel{cclose: make(chan struct{})}).SetPeers(context.Background(), []string{"k1"}, nil, nil); err == nil {
+		t.Error("a hub with no route took a peer list")
 	}
 }
 

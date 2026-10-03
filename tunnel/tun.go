@@ -34,6 +34,7 @@ import (
 var (
 	_ PeerStatsReporter = (*tunTunnel)(nil)
 	_ PeerStatsUpdater  = (*tunTunnel)(nil)
+	_ PeerSetter        = (*tunTunnel)(nil)
 )
 
 // tunTunnel is the hub half of a virtual network: it holds a tun device and
@@ -48,7 +49,6 @@ var (
 // See docs/tun-integration.md.
 type tunTunnel struct {
 	opts    Options
-	config  *tunHubConfig
 	forward service.Service
 	// ln is the p2p route, released on Close; device is the tun listener, kept
 	// only so it can be closed there — its accepted conn is the device the hub
@@ -70,13 +70,6 @@ type tunTunnel struct {
 
 	err error
 	mu  sync.RWMutex
-}
-
-// tunHubConfig is what a hub needs beyond its options: the allowlist that
-// admits peers. A tun hub used to be a config.ServiceConfig with an Addr —
-// the socket form is gone, so there is no address left to configure.
-type tunHubConfig struct {
-	Peers []string
 }
 
 // NewTunTunnel creates a tun hub: the node that holds the device.
@@ -163,7 +156,6 @@ func (s *tunTunnel) init() error {
 		return errors.New("tun hub requires at least one allowlisted peer")
 	}
 
-	s.config = &tunHubConfig{Peers: append([]string(nil), s.opts.Peers...)}
 	return nil
 }
 
@@ -235,7 +227,12 @@ func (s *tunTunnel) Run() (err error) {
 		deviceLn.Close()
 		return
 	}
-	ln, err := p2pHost.register(s.config.Peers)
+	// A disabled spoke keeps its place in the allowlist but gets no route, the
+	// same as a p2p tunnel's disabled peer. The route is built from the
+	// options, which is also what SetPeers swaps, so there is one allowlist
+	// and a save cannot leave the two out of step.
+	enabled := enabledPeers(s.opts.Peers, s.opts.PeerDisabled)
+	ln, err := p2pHost.register(enabled)
 	if err != nil {
 		p2pHost.release()
 		deviceLn.Close()
@@ -334,6 +331,47 @@ func (s *tunTunnel) PeerStats() []PeerStat {
 // way it calls SetStats.
 func (s *tunTunnel) UpdatePeerStats() {
 	updatePeerStatSnapshot(&s.mu, &s.ln, &s.peerStats, &s.peerStatsAt, &s.opts.Peers)
+}
+
+// SetPeers applies a new spoke allowlist in place, exactly as a p2p tunnel
+// applies a new peer list: the process-wide host's routes are reconciled
+// (all-or-nothing) and the options are swapped, so the service, its peer route
+// and its tun device all keep running and a live spoke's stream is not cut.
+// What a p2p tunnel never had to give up, a hub does: the device conn belongs
+// to a handler the service owns, so tearing the hub down and running it again
+// would drop the device and re-create it — which needs the privilege the hub
+// was started with and would take the network down mid-save. Reconciling the
+// routes in place keeps both. ctx carries the action id of the save, named in
+// the warm-up's p2p seam log line.
+func (s *tunTunnel) SetPeers(ctx context.Context, peers []string, aliases map[string]string, disabled []string) error {
+	if s.IsClosed() {
+		return ErrTunnelClosed
+	}
+
+	s.mu.RLock()
+	pl, _ := s.ln.(*peerListener)
+	s.mu.RUnlock()
+	if pl == nil {
+		return errors.New("tun hub is not running")
+	}
+
+	normalized := NormalizePeerAliases(peers, aliases)
+	off := NormalizePeerDisabled(peers, disabled)
+	enabled := enabledPeers(peers, off)
+	if err := p2pHost.reconcile(pl, enabled); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.opts.Peers = peers
+	s.opts.PeerAliases = normalized
+	s.opts.PeerDisabled = off
+	s.mu.Unlock()
+
+	// A spoke added here must get the same head start a spoke configured at Run
+	// time does, or its row would stay blank until it happens to dial in.
+	p2pHost.warmPeers(ctx, enabled)
+	return nil
 }
 
 func (s *tunTunnel) Close() error {

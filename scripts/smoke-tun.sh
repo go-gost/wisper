@@ -231,6 +231,20 @@ code=$(post "$SPOKE2_API" /api/entrypoints "{
 [ "$code" = 201 ] || { bad "creating the second spoke's tun entrypoint returned $code"; exit $fail; }
 ok "spoke2 device is up"
 
+# --- the hub's allowlist, edited on its own ----------------------------------
+
+# A hub's spokes are managed on its peers page, the way a p2p tunnel's peers
+# are: PUT /api/tunnels/{id}/peers, applied in place. It must not disturb the
+# device or the spoke that is already talking over it — that is the whole
+# reason a hub reconciles its routes instead of being rebuilt.
+say "the hub's spoke list, saved in place"
+HUB_ID=$(curl -s "http://$HUB_API/api/tunnels" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+code=$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' \
+  -d "{\"peers\": [{\"key\": \"$SPOKE_KEY\", \"alias\": \"spoke\"}, {\"key\": \"$SPOKE2_KEY\", \"alias\": \"spoke2\"}]}" \
+  "http://$HUB_API/api/tunnels/$HUB_ID/peers")
+[ "$code" = 200 ] || { bad "saving the hub's spokes returned $code, want 200"; }
+ok "the hub's spokes save on their own, like a p2p tunnel's peers"
+
 # --- traffic ----------------------------------------------------------------
 
 # The first packet triggers the dial, the registration and the route lookup, so

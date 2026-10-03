@@ -352,6 +352,7 @@ export class TunnelPeersPage extends LitElement {
               </div>
 
               <div class="hint">${t('peersHint')}</div>
+              <div class="hint">${t('tunHubPeersExclusiveHint')}</div>
               <div class="hint">${t('peersRestartHint')}</div>
               ${this._rows.length === 0 ? html`<div class="hint">${t('peersNoneHint')}</div>` : nothing}
             </div>

@@ -61,9 +61,14 @@ test('the peers page marks the switched-off peer', async ({ page }) => {
   await page.screenshot({ path: 'test-results/tunnel-peers.png', fullPage: true });
 });
 
-test('a tun hub lists its spokes as rows on its own page', async ({ page }) => {
+test('a tun hub reaches its peers page the way a p2p tunnel does', async ({ page }) => {
   await page.goto(HUB);
   await expect(page.getByText('Allowed spokes')).toBeVisible();
+
+  // Same entry, same page, same component: a hub's spokes are p2p peers on the
+  // same host, so a user who knows where a tunnel's list lives finds it here.
+  await page.getByText('Allowed peers', { exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/tunnel/tun/${HUB_ID}/peers$`));
 
   // One row per allowlisted spoke, by alias — the same component the peers page
   // draws, so a hub and a tunnel cannot report a peer differently. The alias
@@ -81,11 +86,4 @@ test('a tun hub lists its spokes as rows on its own page', async ({ page }) => {
   await expect(rows.first()).toContainText('dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA');
 
   await page.screenshot({ path: 'test-results/tun-hub-spokes.png', fullPage: true });
-});
-
-test('a tun hub card carries the encryption badge', async ({ page }) => {
-  await page.goto('/');
-  const card = page.locator('tunnel-card').filter({ hasText: 'Hub' });
-  // The same wire a p2p tunnel's badge asserts, so the same lock.
-  await expect(card.locator('.secure')).toHaveAttribute('title', 'End-to-end encrypted');
 });

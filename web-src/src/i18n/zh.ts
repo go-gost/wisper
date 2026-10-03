@@ -161,18 +161,12 @@ const zh: Record<string, string> = {
   tunHubHint:
     '设备就是网络本身：各 spoke 用标准 tun 客户端经 p2p 接入。未列入允许列表的 spoke 在拨号前就会被拒绝。',
   tunHubPeers: '允许的 spoke',
-  tunHubPeersPlaceholder: '每行一个公钥',
-  tunHubPeersHint:
-    '每个 spoke 的 base64 公钥，一行一个——允许列表是 hub 唯一的准入条件，所以至少要有一个。',
   tunHubPeersExclusiveHint:
     '一个公钥只能属于 hub 或 p2p 隧道其中之一：同一 host 会把每个公钥只路由给一条隧道。要把某个 spoke 移到这里，请先把它从原来那条 p2p 隧道上移除。',
   peerKeyInUseHint:
     '该公钥已经在另一条隧道或 hub 上了——一个 spoke 公钥只能属于 hub 或 p2p 隧道其中之一。请先把它从另一处移除。',
   tunHubPeersEmpty: '未允许任何 spoke——没有流量能到达该设备。',
-  tunHubSpokes: 'spoke 列表',
   tunHubSpokesCount: '已允许 {n} 个',
-  tunHubSpokesHint:
-    '允许列表在上方表单里编辑。这里的每一行都是一个在线的 p2p 对端：它的流量、走的路径，以及箭头后面的打洞状态和最近一次错误。未被列入却来敲门的公钥会被拒绝，把它粘进表单即可准入。',
   tunPrivilegeHint:
     'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建会报 “operation not permitted”。',
   tunSpokeHint:

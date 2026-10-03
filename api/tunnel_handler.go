@@ -676,22 +676,20 @@ func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toTunnelResponse(t))
 }
 
-// tunnelPeersRequest is the JSON body for saving a p2p tunnel's allowlist on
-// its own — the peers page changes the list without touching the rest of the
-// tunnel's config.
+// tunnelPeersRequest is the JSON body for saving a p2p tunnel's or a tun hub's
+// allowlist on its own — the peers page changes the list without touching the
+// rest of the tunnel's config.
 type tunnelPeersRequest struct {
 	Peers []peerJSON `json:"peers"`
 }
 
-// handleUpdateTunnelPeers replaces a p2p tunnel's inbound allowlist and
-// restarts it. The tunnel is rebuilt rather than patched: the process-wide host
-// routes each peer key to exactly one tunnel, so the old one must give its
-// routes up before the replacement claims them.
+// handleUpdateTunnelPeers replaces a p2p tunnel's or a tun hub's inbound
+// allowlist. The list is taken in place, not by a rebuild: the process-wide
+// host routes each peer key to exactly one tunnel, so the tunnel holding the
+// old routes is the one that reconciles them — its service, its peer route and
+// (for a hub) its tun device all keep running.
 //
-// A tun hub is refused here on purpose, not for lack of support: its keys are
-// edited in the hub's own form (one per line, each pasted off a spoke), which
-// is where its device and its routes live too. A hub has no peers page, so
-// nothing in the UI calls this for one.
+// Only the two p2p types answer this; anything else has no allowlist to manage.
 func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	old := tunnel.Get(id)
@@ -699,8 +697,8 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "tunnel not found")
 		return
 	}
-	if old.Type() != tunnel.P2PTunnel {
-		writeError(w, http.StatusBadRequest, "only a p2p tunnel manages its allowlist on its own; a tun hub's spokes are edited in its form")
+	if old.Type() != tunnel.P2PTunnel && old.Type() != tunnel.TunTunnel {
+		writeError(w, http.StatusBadRequest, "only a p2p tunnel or a tun hub manages its allowlist on its own")
 		return
 	}
 

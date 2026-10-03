@@ -9,9 +9,8 @@ import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import { saveErrorText } from '../utils/save-error';
 import { GoBackend } from '../api/backend';
-import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent, Peer } from '../api/types';
+import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent } from '../api/types';
 import '../components/app-scaffold';
-import '../components/peer-stats-row';
 
 type PageMode = 'view' | 'edit' | 'create';
 
@@ -66,9 +65,6 @@ export class TunnelDetailPage extends LitElement {
   @state() private _deviceName = '';
   @state() private _routes = '';
   @state() private _dns = '';
-  /** A tun hub's allowlist as typed: one spoke's public key per line. The hub
-   *  has no other admission, so the list is required to create one. */
-  @state() private _hubPeers = '';
   /** How many keys are knocking on the process-wide host; shown on the peers
    *  entry. The list is not per-tunnel — a p2p stream carries no destination —
    *  so this is a count, not a per-tunnel allowlist field. */
@@ -178,7 +174,6 @@ export class TunnelDetailPage extends LitElement {
     this._deviceName = '';
     this._routes = '';
     this._dns = '';
-    this._hubPeers = '';
   }
 
   private _populateForm(t: Tunnel) {
@@ -198,7 +193,6 @@ export class TunnelDetailPage extends LitElement {
     this._deviceName = t.options.device_name ?? '';
     this._routes = t.options.routes ?? '';
     this._dns = t.options.dns ?? '';
-    this._hubPeers = (t.options.peers ?? []).map(p => p.key).join('\n');
   }
 
   /** _peerLabels renders the allowlist for display: each peer's alias by
@@ -209,10 +203,17 @@ export class TunnelDetailPage extends LitElement {
       .join(', ');
   }
 
-  /** _peerKeys is the allowlist verbatim, for the copy button: a hub's peers
-   *  are pasted somewhere, so what goes out is the keys and nothing else. */
+  /** _peerKeys is the allowlist verbatim, for the copy button: the keys go out
+   *  and nothing else, since a hub's spokes are pasted off their peers. */
   private _peerKeys(): string {
     return (this._tunnel?.options.peers ?? []).map(p => p.key).join('\n');
+  }
+
+  /** _isP2P is what both p2p types have in common on this page: an allowlist
+   *  that lives on its own peers page, so neither the create form nor an edit
+   *  here asks for it. */
+  private get _isP2P(): boolean {
+    return this.tunnelType === 'p2p' || this.tunnelType === 'tun';
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -261,17 +262,6 @@ export class TunnelDetailPage extends LitElement {
     }, 2500);
   }
 
-  /** _parseHubPeers reads the allowlist textarea: one key per line, blank lines
-   *  ignored. An alias already given to a key is carried over, so editing a hub
-   *  for its device does not rename every spoke. */
-  private _parseHubPeers(): Peer[] {
-    const aliases = new Map((this._tunnel?.options.peers ?? []).map(p => [p.key, p.alias]));
-    return this._hubPeers.split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-      .map(key => ({ key, alias: aliases.get(key) ?? '' }));
-  }
-
   // ── Actions ──────────────────────────────────────────────────────────
 
   private async _handleSave() {
@@ -307,9 +297,8 @@ export class TunnelDetailPage extends LitElement {
         body.device_name = this._deviceName.trim() || undefined;
         body.routes = this._routes.trim() || undefined;
         body.dns = this._dns.trim() || undefined;
-        body.peers = this._parseHubPeers();
       }
-      if (this.tunnelType === 'p2p' && this.mode === 'edit') {
+      if (this._isP2P && this.mode === 'edit') {
         // The allowlist is managed on its own page; an edit here must carry it
         // along — the API replaces the whole config, so omitting it clears the
         // list (and the p2p host's routes).
@@ -596,30 +585,6 @@ export class TunnelDetailPage extends LitElement {
     .copy-btn-mini:hover {
       background: var(--border-subtle);
       color: var(--text);
-    }
-
-    /* ── Spokes (a tun hub's allowlist rows) ── */
-    .spokes-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 600;
-      padding: 12px 12px 2px;
-      font-size: var(--font-sm);
-    }
-    .pending-badge {
-      font-size: var(--font-xs);
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      border-radius: var(--radius-pill);
-      padding: 2px 8px;
-      white-space: nowrap;
-    }
-    .hint {
-      padding: 10px 12px 12px;
-      font-size: var(--font-xs);
-      color: var(--text-muted);
-      line-height: 1.5;
     }
 
     /* ── Stats grid ── */
@@ -1161,39 +1126,11 @@ export class TunnelDetailPage extends LitElement {
                 : ''}
             </div>
 
-            <!-- Spokes: a hub's allowlist is the whole configuration, and each
-                 entry is a live p2p peer like any other — its traffic, its path
-                 and its diagnostics belong on the same rows a p2p tunnel's
-                 peers page draws, so they are the same component. There is no
-                 peers page for a hub: it edits the list in its own form (the
-                 keys are typed one per line, and each is pasted off a spoke),
-                 and what a hub's rows add is what a plain list cannot show. -->
-            ${this.tunnelType === 'tun' && t2.options.peers?.length
-              ? html`
-                <div class="section">
-                  <div class="card" style="padding:0;">
-                    <div class="spokes-head">
-                      <span>${t('tunHubSpokes')}</span>
-                      ${this._pendingCount > 0
-                        ? html`<span class="pending-badge">${t('peersPendingBadge').replace('{n}', String(this._pendingCount))}</span>`
-                        : nothing}
-                    </div>
-                    ${(t2.options.peers ?? []).map(p => html`
-                      <peer-stats-row
-                        .peer=${p}
-                        .stat=${peerStats.find(s => s.key === p.key) ?? null}
-                        ?disabled=${p.disabled === true}
-                        ?showKeys=${this._showPeers}></peer-stats-row>
-                    `)}
-                    <div class="hint">${t('tunHubSpokesHint')}</div>
-                  </div>
-                </div>
-              `
-              : nothing}
-
             <!-- Allowed peers: the allowlist lives on its own page (long lists,
-                 per-peer live traffic), and saving it restarts the tunnel. -->
-            ${this.tunnelType === 'p2p'
+                 per-peer live traffic), where saving it applies in place. A
+                 tun hub's spokes are the same keys on the same host and the
+                 same rows, so it reaches its peers page the same way. -->
+            ${this._isP2P
               ? html`
                 <div class="section">
                   <div class="card" style="padding:0;">
@@ -1349,14 +1286,6 @@ export class TunnelDetailPage extends LitElement {
                     </div>
                     <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
                     <div class="p2p-hint">${t('tunHubHint')}</div>
-                    <div class="form-group">
-                      <label class="form-label">${t('tunHubPeers')}</label>
-                      <textarea class="form-input" rows="4" .value=${this._hubPeers}
-                        placeholder=${t('tunHubPeersPlaceholder')}
-                        @input=${(e: Event) => { this._hubPeers = (e.target as HTMLTextAreaElement).value; }}></textarea>
-                      <div class="p2p-hint">${t('tunHubPeersHint')}</div>
-                      <div class="p2p-hint warn">${t('tunHubPeersExclusiveHint')}</div>
-                    </div>
                   `
                   : ''}
 

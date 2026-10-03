@@ -164,18 +164,12 @@ const en: Record<string, string> = {
   tunHubHint:
     'This device is the network: spokes join it as ordinary tun clients over p2p. A spoke that is not on the allowlist is refused before any dial.',
   tunHubPeers: 'Allowed spokes',
-  tunHubPeersPlaceholder: 'One public key per line',
-  tunHubPeersHint:
-    'Each spoke\'s base64 public key, one per line — the allowlist is the hub\'s only admission, so a hub needs at least one.',
   tunHubPeersExclusiveHint:
     'A key can sit on a hub or on a p2p tunnel, not both: one host routes each key to exactly one tunnel. To move a spoke here, remove it from the p2p tunnel that holds it first.',
   peerKeyInUseHint:
     'That key is already on another tunnel or hub — a spoke key can be on a hub or on a p2p tunnel, not both. Remove it from the other one first.',
   tunHubPeersEmpty: 'No spokes allowed — nothing reaches this device.',
-  tunHubSpokes: 'Spokes',
   tunHubSpokesCount: '{n} allowed',
-  tunHubSpokesHint:
-    'The allowlist is edited in the form above. Each row here is a live p2p peer: its traffic, the path it takes, and — behind the arrow — the punch state and last error. A key that knocked without being listed would be refused, so paste it into the form to admit it.',
   tunPrivilegeHint:
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating this entrypoint fails with "operation not permitted" otherwise.',
   tunSpokeHint:

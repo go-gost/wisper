@@ -1,8 +1,6 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-7erqeHsR.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
-import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q as z,u as R,b as i,A as c,o as H,i as C,t as E}from"./index-7erqeHsR.js";import{m as L,c as v,d as F,a as m,b as g,n as y,r as l}from"./format-DT_YmQ4-.js";import{i as d}from"./app-scaffold-CijyBcD_.js";import{c as I}from"./clipboard-C3x8_sid.js";import{s as M}from"./peer-stats-row-FCAC2-o3.js";import"./transport-DrpTtcx8.js";var N=Object.defineProperty,A=Object.getOwnPropertyDescriptor,o=(t,s,r,p)=>{for(var a=p>1?void 0:p?A(s,r):s,h=t.length-1,f;h>=0;h--)(f=t[h])&&(a=(p?f(s,r,a):f(a))||a);return p&&a&&N(s,r,a),a};const u=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function _(t){return u.find(s=>s.value===t)??u[2]}let n=class extends w{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._showPeers=!1,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._hubPeers="",this._pendingCount=0,this._backend=new x,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=s=>{this._endpoint=s,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push($(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){(this.tunnelType==="p2p"||this.tunnelType==="tun")&&this._loadPendingCount();const t=this.tunnelId,s=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const r=k().find(p=>p.id===t);r&&(this._tunnel=r,s?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._hubPeers=""}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??"",this._routes=t.options.routes??"",this._dns=t.options.dns??"",this._hubPeers=(t.options.peers??[]).map(s=>s.key).join(`
-`)}_peerLabels(){return(this._tunnel?.options.peers??[]).map(t=>this._showPeers?t.key:t.alias||L(t.key)).join(", ")}_peerKeys(){return(this._tunnel?.options.peers??[]).map(t=>t.key).join(`
-`)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const s=(t??[])[0];if(!s)return e("eventsEntryDesc");const r=s.count||1;return r>1?`${s.message} ×${r}`:s.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}_parseHubPeers(){const t=new Map((this._tunnel?.options.peers??[]).map(s=>[s.key,s.alias]));return this._hubPeers.split(`
-`).map(s=>s.trim()).filter(s=>s.length>0).map(s=>({key:s,alias:t.get(s)??""}))}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const s={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(s.endpoint="",s.net=this._net.trim()||void 0,s.mtu=this._mtu||void 0,s.device_name=this._deviceName.trim()||void 0,s.routes=this._routes.trim()||void 0,s.dns=this._dns.trim()||void 0,s.peers=this._parseHubPeers()),this.tunnelType==="p2p"&&this.mode==="edit"&&(s.peers=this._tunnel?.options.peers??[]),this._showAuth&&(s.username=this._username.trim()||void 0,s.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-7erqeHsR.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.create(s)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-7erqeHsR.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.update(this.tunnelId,s)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(s){this._showSnackbar(M(s))}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await P(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await D(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.tunnelId,this._resetKind),this._tunnel&&R(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,s){const r=s.indexOf(t);return s[(r+1)%s.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}render(){const t=this._tunnel,s=t?t.stats:null,r=this._typeLabel(),p=t?.peer_stats??[];return i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-m6XZ2FEM.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
+import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q as z,u as R,b as s,A as c,o as C,i as E,t as H}from"./index-m6XZ2FEM.js";import{m as L,c as u,d as F,a as m,b as g,n as y,r as l}from"./format-T399x7Wh.js";import{i as d}from"./app-scaffold-CyGUv19U.js";import{c as I}from"./clipboard-C3x8_sid.js";import{s as N}from"./save-error-8HfwdD4m.js";var M=Object.defineProperty,A=Object.getOwnPropertyDescriptor,o=(t,i,r,p)=>{for(var a=p>1?void 0:p?A(i,r):i,v=t.length-1,f;v>=0;v--)(f=t[v])&&(a=(p?f(i,r,a):f(a))||a);return p&&a&&M(i,r,a),a};const h=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function _(t){return h.find(i=>i.value===t)??h[2]}let n=class extends w{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._showPeers=!1,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._pendingCount=0,this._backend=new x,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=i=>{this._endpoint=i,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push($(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){(this.tunnelType==="p2p"||this.tunnelType==="tun")&&this._loadPendingCount();const t=this.tunnelId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const r=k().find(p=>p.id===t);r&&(this._tunnel=r,i?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns=""}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??"",this._routes=t.options.routes??"",this._dns=t.options.dns??""}_peerLabels(){return(this._tunnel?.options.peers??[]).map(t=>this._showPeers?t.key:t.alias||L(t.key)).join(", ")}_peerKeys(){return(this._tunnel?.options.peers??[]).map(t=>t.key).join(`
+`)}get _isP2P(){return this.tunnelType==="p2p"||this.tunnelType==="tun"}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const i=(t??[])[0];if(!i)return e("eventsEntryDesc");const r=i.count||1;return r>1?`${i.message} ×${r}`:i.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const i={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(i.endpoint="",i.net=this._net.trim()||void 0,i.mtu=this._mtu||void 0,i.device_name=this._deviceName.trim()||void 0,i.routes=this._routes.trim()||void 0,i.dns=this._dns.trim()||void 0),this._isP2P&&this.mode==="edit"&&(i.peers=this._tunnel?.options.peers??[]),this._showAuth&&(i.username=this._username.trim()||void 0,i.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-m6XZ2FEM.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.create(i)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-m6XZ2FEM.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.update(this.tunnelId,i)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(i){this._showSnackbar(N(i))}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await D(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await P(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await I(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.tunnelId,this._resetKind),this._tunnel&&R(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,i){const r=i.indexOf(t);return i[(r+1)%i.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}render(){const t=this._tunnel,i=t?t.stats:null,r=this._typeLabel(),p=t?.peer_stats??[];return s`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -13,13 +11,13 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
             ${this.mode==="create"?`${e("tunnelNewTitle")} — ${r}`:r+" Tunnel"}
           </span>
 
-          ${this.mode==="view"&&t?i`
-              ${t.status==="running"?i`<button class="pill-btn danger appbar-action" title="${e("btnStop")}" @click=${()=>this._handleStop()}>
+          ${this.mode==="view"&&t?s`
+              ${t.status==="running"?s`<button class="pill-btn danger appbar-action" title="${e("btnStop")}" @click=${()=>this._handleStop()}>
                   ${d("stop")}
-                </button>`:i`<button class="pill-btn primary appbar-action" title="${e("btnStart")}" @click=${()=>this._handleStart()}>
+                </button>`:s`<button class="pill-btn primary appbar-action" title="${e("btnStart")}" @click=${()=>this._handleStart()}>
                   ${d("play")}
                 </button>`}
-            `:i`
+            `:s`
               <button class="pill-btn primary appbar-action" title="${e("btnSave")}" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
                 ${d("check")}
               </button>
@@ -27,12 +25,12 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
         </div>
 
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
-        ${this.mode==="view"&&t?i`
+        ${this.mode==="view"&&t?s`
             <!-- Status banner -->
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
-              ${t.status==="running"?e("statusRunning")+" · "+v(t.stats.current_conns)+" "+e("activeConnections"):t.status==="error"?e("statusError"):e("statusStopped")}
-              ${t.error?i` — ${t.error}`:""}
+              ${t.status==="running"?e("statusRunning")+" · "+u(t.stats.current_conns)+" "+e("activeConnections"):t.status==="error"?e("statusError"):e("statusStopped")}
+              ${t.error?s` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
 
@@ -48,23 +46,23 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                   <span class="info-value text">${F(t.created_at)}</span>
                 </div>
                 <!-- A tun hub binds nothing, so it has no target row. -->
-                ${this.tunnelType==="tun"?c:i`
+                ${this.tunnelType==="tun"?c:s`
                 <div class="info-row">
                   <span class="info-label">Target</span>
                   <span class="info-value">${t.endpoint}</span>
                 </div>`}
-                ${this.tunnelType==="tun"?i`
+                ${this.tunnelType==="tun"?s`
                     <div class="info-row">
                       <span class="info-label">${e("fieldNet")}</span>
                       <span class="info-value">${t.entrypoint}</span>
                     </div>
-                    ${t.options.mtu?i`<div class="info-row"><span class="info-label">${e("fieldMTU")}</span><span class="info-value text">${t.options.mtu}</span></div>`:""}
-                    ${t.options.device_name?i`<div class="info-row"><span class="info-label">${e("fieldDeviceName")}</span><span class="info-value text">${t.options.device_name}</span></div>`:""}
-                    ${t.options.routes?i`<div class="info-row"><span class="info-label">${e("fieldRoutes")}</span><span class="info-value text">${t.options.routes}</span></div>`:""}
-                    ${t.options.dns?i`<div class="info-row"><span class="info-label">${e("fieldDNS")}</span><span class="info-value text">${t.options.dns}</span></div>`:""}
+                    ${t.options.mtu?s`<div class="info-row"><span class="info-label">${e("fieldMTU")}</span><span class="info-value text">${t.options.mtu}</span></div>`:""}
+                    ${t.options.device_name?s`<div class="info-row"><span class="info-label">${e("fieldDeviceName")}</span><span class="info-value text">${t.options.device_name}</span></div>`:""}
+                    ${t.options.routes?s`<div class="info-row"><span class="info-label">${e("fieldRoutes")}</span><span class="info-value text">${t.options.routes}</span></div>`:""}
+                    ${t.options.dns?s`<div class="info-row"><span class="info-label">${e("fieldDNS")}</span><span class="info-value text">${t.options.dns}</span></div>`:""}
                     <div class="info-row">
                       <span class="info-label">${e("tunHubPeers")}</span>
-                      ${t.options.peers?.length?i`
+                      ${t.options.peers?.length?s`
                           <span class="info-value text">${e("tunHubSpokesCount").replace("{n}",String(t.options.peers.length))}</span>
                           <button class="copy-btn-mini" title="${e("btnCopy")}" @click=${()=>this._handleCopy(this._peerKeys())}>
                             ${d("copy")}
@@ -73,17 +71,17 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                             @click=${()=>{this._showPeers=!this._showPeers}}>
                             ${d(this._showPeers?"eye-off":"eye")}
                           </button>
-                        `:i`<span class="info-value empty">${e("tunHubPeersEmpty")}</span>`}
+                        `:s`<span class="info-value empty">${e("tunHubPeersEmpty")}</span>`}
                     </div>
                     <div class="p2p-hint">${e("tunHubHint")}</div>
                   `:c}
                 <!-- p2p: the inbound allowlist, shown by alias (the keys behind
                      the eye toggle); the host's own identity lives in Settings.
                      Other types: the public entrypoint URL, which is not secret. -->
-                ${this.tunnelType==="p2p"?i`
+                ${this.tunnelType==="p2p"?s`
                     <div class="info-row">
                       <span class="info-label">${e("p2pPeers")}</span>
-                      ${t.entrypoint?i`
+                      ${t.entrypoint?s`
                           <span class="info-value">${this._showPeers?t.entrypoint:this._peerLabels()}</span>
                           <button class="copy-btn-mini" @click=${()=>this._handleCopy(t.entrypoint)}>
                             ${d("copy")}
@@ -92,9 +90,9 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                             @click=${()=>{this._showPeers=!this._showPeers}}>
                             ${d(this._showPeers?"eye-off":"eye")}
                           </button>
-                        `:i`<span class="info-value empty">${e("p2pPeersEmpty")}</span>`}
+                        `:s`<span class="info-value empty">${e("p2pPeersEmpty")}</span>`}
                     </div>
-                  `:t.entrypoint?i`
+                  `:t.entrypoint?s`
                       <div class="info-row">
                         <span class="info-label">Entrypoint</span>
                         <span class="info-value">${t.entrypoint}</span>
@@ -103,32 +101,32 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                         </button>
                       </div>
                     `:c}
-                ${this.tunnelType==="p2p"?i`<div class="p2p-hint">${e("p2pHint")}</div>`:c}
-                ${t.options.prefix?i`
+                ${this.tunnelType==="p2p"?s`<div class="p2p-hint">${e("p2pHint")}</div>`:c}
+                ${t.options.prefix?s`
                     <div class="info-row">
                       <span class="info-label">${e("fieldPrefix")}</span>
                       <span class="info-value text">${t.options.prefix}</span>
                     </div>
                   `:""}
-                ${t.options.hostname?i`
+                ${t.options.hostname?s`
                     <div class="info-row">
                       <span class="info-label">Hostname</span>
                       <span class="info-value text">${t.options.hostname}</span>
                     </div>
                   `:""}
-                ${this.tunnelType==="http"?i`
+                ${this.tunnelType==="http"?s`
                     <div class="info-row">
                       <span class="info-label">TLS</span>
                       <span class="info-value text">${t.options.enableTLS?"Enabled":"Disabled"}</span>
                     </div>
                   `:""}
-                ${t.options.username?i`
+                ${t.options.username?s`
                     <div class="info-row">
                       <span class="info-label">Auth</span>
                       <span class="info-value text">Basic · ${t.options.username}</span>
                     </div>
                   `:""}
-                ${this.tunnelType==="file"?i`
+                ${this.tunnelType==="file"?s`
                     <div class="info-row">
                       <span class="info-label">Upload</span>
                       <span class="info-value text">${t.options.file_upload?"Enabled":"Disabled"}</span>
@@ -136,10 +134,10 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                   `:""}
                 <!-- Recording is ineffective for p2p and tun: neither is a gost
                      listener+handler pair the recorder can attach to. -->
-                ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":i`
+                ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":s`
                 <div class="info-row">
                   <span class="info-label">Recording</span>
-                  <span class="info-value text">${e(u.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
+                  <span class="info-value text">${e(h.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
                 </div>
                 <div class="info-row" style="margin-top:-8px;">
                   <span class="info-label"></span>
@@ -157,60 +155,36 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
               </div>
 
               <!-- Stats grid -->
-              ${s?i`
+              ${i?s`
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(s.total_conns)}</div>
-                      <div class="stat-rate">${v(s.current_conns)} active · ${s.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-value">${u(i.total_conns)}</div>
+                      <div class="stat-rate">${u(i.current_conns)} active · ${i.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(s.total_errs)}</div>
+                      <div class="stat-value">${u(i.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${m(s.output_bytes)}</div>
-                      <div class="stat-rate">${g(s.output_rate_bytes)}</div>
+                      <div class="stat-value">${m(i.output_bytes)}</div>
+                      <div class="stat-rate">${g(i.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${m(s.input_bytes)}</div>
-                      <div class="stat-rate">${g(s.input_rate_bytes)}</div>
+                      <div class="stat-value">${m(i.input_bytes)}</div>
+                      <div class="stat-rate">${g(i.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
             </div>
 
-            <!-- Spokes: a hub's allowlist is the whole configuration, and each
-                 entry is a live p2p peer like any other — its traffic, its path
-                 and its diagnostics belong on the same rows a p2p tunnel's
-                 peers page draws, so they are the same component. There is no
-                 peers page for a hub: it edits the list in its own form (the
-                 keys are typed one per line, and each is pasted off a spoke),
-                 and what a hub's rows add is what a plain list cannot show. -->
-            ${this.tunnelType==="tun"&&t.options.peers?.length?i`
-                <div class="section">
-                  <div class="card" style="padding:0;">
-                    <div class="spokes-head">
-                      <span>${e("tunHubSpokes")}</span>
-                      ${this._pendingCount>0?i`<span class="pending-badge">${e("peersPendingBadge").replace("{n}",String(this._pendingCount))}</span>`:c}
-                    </div>
-                    ${(t.options.peers??[]).map(a=>i`
-                      <peer-stats-row
-                        .peer=${a}
-                        .stat=${p.find(h=>h.key===a.key)??null}
-                        ?disabled=${a.disabled===!0}
-                        ?showKeys=${this._showPeers}></peer-stats-row>
-                    `)}
-                    <div class="hint">${e("tunHubSpokesHint")}</div>
-                  </div>
-                </div>
-              `:c}
-
             <!-- Allowed peers: the allowlist lives on its own page (long lists,
-                 per-peer live traffic), and saving it restarts the tunnel. -->
-            ${this.tunnelType==="p2p"?i`
+                 per-peer live traffic), where saving it applies in place. A
+                 tun hub's spokes are the same keys on the same host and the
+                 same rows, so it reaches its peers page the same way. -->
+            ${this._isP2P?s`
                 <div class="section">
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
@@ -222,7 +196,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                           ${p.length?e("peersEntryDesc").replace("{n}",String(p.length)):e("peersNoneHint")}
                         </div>
                       </div>
-                      ${this._pendingCount>0?i`<span style="font-size:var(--font-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
+                      ${this._pendingCount>0?s`<span style="font-size:var(--font-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
                             ${e("peersPendingBadge").replace("{n}",String(this._pendingCount))}
                           </span>`:c}
                       <span style="color:var(--text-muted);">&rarr;</span>
@@ -233,7 +207,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
 
             <!-- History: drops, recoveries and lifecycle events, on their own
                  page — a list this long does not belong inline. -->
-            ${this.mode==="view"&&t?i`
+            ${this.mode==="view"&&t?s`
                 <div class="section">
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
@@ -253,7 +227,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
 
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
                  inspecting, and only when an inspector URL is configured. -->
-            ${this.mode==="view"&&t&&(this.tunnelType==="http"||this.tunnelType==="file")&&H().inspector_url?i`
+            ${this.mode==="view"&&t&&(this.tunnelType==="http"||this.tunnelType==="file")&&C().inspector_url?s`
                 <div class="section">
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
@@ -272,7 +246,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
               `:""}
 
             <!-- Edit button (view mode only) -->
-            ${this.mode==="view"&&t?i`
+            ${this.mode==="view"&&t?s`
                 <div class="section">
                   <button class="btn-edit-bottom" title="${e("btnEdit")}" @click=${()=>this._enterEdit()}>
                     ${d("edit")}
@@ -282,7 +256,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
           `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
-        ${this.mode!=="view"?i`
+        ${this.mode!=="view"?s`
             <div class="section">
               <div class="card" style="padding:16px;">
                 <!-- Type (readonly) -->
@@ -301,7 +275,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                 <!-- Target / Directory. A tun hub has neither: it binds no
                      address, and its whole configuration is the device plus
                      the allowlist below. -->
-                ${this.tunnelType==="tun"?c:i`
+                ${this.tunnelType==="tun"?c:s`
                 <div class="form-group">
                   <label class="form-label">
                     ${this.tunnelType==="file"?e("fieldDirectory"):e("fieldEndpoint")}
@@ -310,13 +284,13 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                     <input class="form-input dir-input" .value=${this._endpoint}
                       placeholder=${this.tunnelType==="file"?"/path/to/dir":"host:port"}
                       @input=${a=>{this._endpoint=a.target.value}}>
-                    ${this.tunnelType==="file"&&this._isNativeDirPicker?i`<button type="button" class="browse-btn"
+                    ${this.tunnelType==="file"&&this._isNativeDirPicker?s`<button type="button" class="browse-btn"
                           @click=${this._browseDir}>📁 ${e("browseDirectory")}</button>`:""}
                   </div>
                 </div>`}
 
                 <!-- tun device: this node is the hub, the device is the network -->
-                ${this.tunnelType==="tun"?i`
+                ${this.tunnelType==="tun"?s`
                     <div class="form-group">
                       <label class="form-label">${e("fieldNet")}</label>
                       <input class="form-input" .value=${this._net} placeholder="10.10.0.1/24"
@@ -347,18 +321,10 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                     </div>
                     <div class="p2p-hint warn">${e("tunPrivilegeHint")}</div>
                     <div class="p2p-hint">${e("tunHubHint")}</div>
-                    <div class="form-group">
-                      <label class="form-label">${e("tunHubPeers")}</label>
-                      <textarea class="form-input" rows="4" .value=${this._hubPeers}
-                        placeholder=${e("tunHubPeersPlaceholder")}
-                        @input=${a=>{this._hubPeers=a.target.value}}></textarea>
-                      <div class="p2p-hint">${e("tunHubPeersHint")}</div>
-                      <div class="p2p-hint warn">${e("tunHubPeersExclusiveHint")}</div>
-                    </div>
                   `:""}
 
                 <!-- URL Prefix (HTTP + file) -->
-                ${this.tunnelType==="http"||this.tunnelType==="file"?i`
+                ${this.tunnelType==="http"||this.tunnelType==="file"?s`
                     <div class="form-group">
                       <label class="form-label">${e("fieldPrefix")}</label>
                       <input class="form-input" .value=${this._prefix} placeholder="my-app-name"
@@ -370,7 +336,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                   `:""}
 
                 <!-- Hostname (HTTP only) -->
-                ${this.tunnelType==="http"?i`
+                ${this.tunnelType==="http"?s`
                     <div class="form-group">
                       <label class="form-label">${e("fieldHostname")}</label>
                       <input class="form-input" .value=${this._hostname} placeholder="example.com"
@@ -379,7 +345,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                   `:""}
 
                 <!-- TLS toggle (HTTP only) -->
-                ${this.tunnelType==="http"?i`
+                ${this.tunnelType==="http"?s`
                     <div class="switch-row">
                       <span class="switch-label">${e("switchEnableTLS")}</span>
                       <div class="switch ${this._enableTLS?"on":""}"
@@ -390,11 +356,11 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                   `:""}
 
                 <!-- Recording mode: p2p and tun have no recorder to attach it to. -->
-                ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":i`
-                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,u.map(a=>a.value)))}>
+                ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":s`
+                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,h.map(a=>a.value)))}>
                   <span class="switch-label">${e("settingsRecordMode")}</span>
                   <span style="font-size:var(--font-sm);color:var(--text-muted);display:flex;align-items:center;gap:4px;">
-                    ${e(u.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}
+                    ${e(h.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}
                     ${d("chevron-right")}
                   </span>
                 </div>
@@ -404,7 +370,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                 </div>`}
 
                 <!-- Auth section (HTTP/File) -->
-                ${this.tunnelType==="http"||this.tunnelType==="file"?i`
+                ${this.tunnelType==="http"||this.tunnelType==="file"?s`
                     <div class="switch-row" style="border-bottom:none;">
                       <span class="switch-label">${e("switchBasicAuth")}</span>
                       <div class="switch ${this._showAuth?"on":""}"
@@ -413,7 +379,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                       </div>
                     </div>
 
-                    ${this._showAuth?i`
+                    ${this._showAuth?s`
                         <div class="form-group" style="margin-top:12px;">
                           <label class="form-label">${e("fieldUsername")}</label>
                           <input class="form-input" .value=${this._username} placeholder="admin"
@@ -434,7 +400,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                         </div>
                       `:""}
 
-                    ${this.tunnelType==="file"?i`
+                    ${this.tunnelType==="file"?s`
                         <div class="switch-row">
                           <span class="switch-label">${e("switchFileUpload")}</span>
                           <div class="switch ${this._fileUpload?"on":""}"
@@ -446,7 +412,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
                   `:""}
 
                 <!-- Danger Zone (edit only) -->
-                ${this.mode==="edit"?i`
+                ${this.mode==="edit"?s`
                     <div class="danger-zone">
                       <div class="danger-zone-label">Danger Zone</div>
                       <button class="pill-btn danger" title="${e("btnDelete")}" @click=${()=>{this._showDeleteDialog=!0}}>
@@ -458,9 +424,9 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
             </div>
           `:""}
 
-        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?s`<div class="toast">${this._snackbar}</div>`:""}
 
-        ${this._showResetDialog?i`
+        ${this._showResetDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
               <div class="dialog-box" @click=${a=>a.stopPropagation()}>
                 <div class="dialog-title">${e("resetStatsConfirmTitle")}</div>
@@ -477,7 +443,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
             </div>
           `:""}
 
-        ${this._showDeleteDialog?i`
+        ${this._showDeleteDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
               <div class="dialog-box" @click=${a=>a.stopPropagation()}>
                 <div class="dialog-title">${e("deleteConfirmTitle")}</div>
@@ -494,7 +460,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
             </div>
           `:""}
       </app-scaffold>
-    `}};n.styles=C`
+    `}};n.styles=E`
     /* ── AppBar ── */
     .back-btn {
       background: none;
@@ -682,30 +648,6 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
     .copy-btn-mini:hover {
       background: var(--border-subtle);
       color: var(--text);
-    }
-
-    /* ── Spokes (a tun hub's allowlist rows) ── */
-    .spokes-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 600;
-      padding: 12px 12px 2px;
-      font-size: var(--font-sm);
-    }
-    .pending-badge {
-      font-size: var(--font-xs);
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      border-radius: var(--radius-pill);
-      padding: 2px 8px;
-      white-space: nowrap;
-    }
-    .hint {
-      padding: 10px 12px 12px;
-      font-size: var(--font-xs);
-      color: var(--text-muted);
-      line-height: 1.5;
     }
 
     /* ── Stats grid ── */
@@ -1010,4 +952,4 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as P,m as D,q a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([y()],n.prototype,"tunnelType",2);o([y()],n.prototype,"tunnelId",2);o([l()],n.prototype,"mode",2);o([l()],n.prototype,"_tunnel",2);o([l()],n.prototype,"_saving",2);o([l()],n.prototype,"_snackbar",2);o([l()],n.prototype,"_showDeleteDialog",2);o([l()],n.prototype,"_showResetDialog",2);o([l()],n.prototype,"_name",2);o([l()],n.prototype,"_endpoint",2);o([l()],n.prototype,"_hostname",2);o([l()],n.prototype,"_prefix",2);o([l()],n.prototype,"_username",2);o([l()],n.prototype,"_password",2);o([l()],n.prototype,"_enableTLS",2);o([l()],n.prototype,"_rewriteHost",2);o([l()],n.prototype,"_fileUpload",2);o([l()],n.prototype,"_showAuth",2);o([l()],n.prototype,"_showPassword",2);o([l()],n.prototype,"_recordMode",2);o([l()],n.prototype,"_showPeers",2);o([l()],n.prototype,"_net",2);o([l()],n.prototype,"_mtu",2);o([l()],n.prototype,"_deviceName",2);o([l()],n.prototype,"_routes",2);o([l()],n.prototype,"_dns",2);o([l()],n.prototype,"_hubPeers",2);o([l()],n.prototype,"_pendingCount",2);n=o([E("tunnel-detail-page")],n);export{n as TunnelDetailPage};
+  `;o([y()],n.prototype,"tunnelType",2);o([y()],n.prototype,"tunnelId",2);o([l()],n.prototype,"mode",2);o([l()],n.prototype,"_tunnel",2);o([l()],n.prototype,"_saving",2);o([l()],n.prototype,"_snackbar",2);o([l()],n.prototype,"_showDeleteDialog",2);o([l()],n.prototype,"_showResetDialog",2);o([l()],n.prototype,"_name",2);o([l()],n.prototype,"_endpoint",2);o([l()],n.prototype,"_hostname",2);o([l()],n.prototype,"_prefix",2);o([l()],n.prototype,"_username",2);o([l()],n.prototype,"_password",2);o([l()],n.prototype,"_enableTLS",2);o([l()],n.prototype,"_rewriteHost",2);o([l()],n.prototype,"_fileUpload",2);o([l()],n.prototype,"_showAuth",2);o([l()],n.prototype,"_showPassword",2);o([l()],n.prototype,"_recordMode",2);o([l()],n.prototype,"_showPeers",2);o([l()],n.prototype,"_net",2);o([l()],n.prototype,"_mtu",2);o([l()],n.prototype,"_deviceName",2);o([l()],n.prototype,"_routes",2);o([l()],n.prototype,"_dns",2);o([l()],n.prototype,"_pendingCount",2);n=o([H("tunnel-detail-page")],n);export{n as TunnelDetailPage};
