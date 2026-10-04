@@ -506,7 +506,14 @@ func TestAllocatePeerIPsAgreesWithHonorablePeerIPs(t *testing.T) {
 			rows:  map[string]string{"a": "", "b": "", "c": ""},
 		},
 		{
-			name:  "an empty row is the state that means may claim nothing",
+			// A blank row is filled here, so it cannot survive: what comes back is
+			// two allocated addresses. The empty row as a *surviving* state is a
+			// filter behaviour, not a door one, and tun_test.go pins it —
+			// "empty" in TestTunHubDropsRowsItCannotHonour. It is the one asymmetry
+			// between this door and that filter: the filter keeps what it cannot
+			// fill, the door refuses rather than leaving a spoke that may claim
+			// nothing, which is what the API has to do to be able to answer.
+			name:  "a blank row is filled, never left empty",
 			net:   "10.10.0.1/24,fd00::1/64",
 			peers: []string{"a", "b"},
 			rows:  map[string]string{"a": "", "b": "fd00::2"},

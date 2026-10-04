@@ -1759,7 +1759,10 @@ func peerRows(t *testing.T, body map[string]any) []map[string]any {
 }
 
 // rowIP is one allowlist row's address out of a response, or "" when the field is
-// absent — which is what asks the hub to allocate one.
+// absent. Absent is not "allocate me one": it is "unchanged", the ruling a save
+// with no ip in the request keeps the address the spoke already holds. It is also
+// what a row with no address comes back as, which is the same sentence said back —
+// so a response never reads as a request to clear.
 func rowIP(row map[string]any) string {
 	ip, _ := row["ip"].(string)
 	return ip
