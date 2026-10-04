@@ -75,9 +75,11 @@ func (a *spokeAuthorizer) set(assigned map[string]string) {
 }
 
 // Authorize reports whether the peer that sent a registration may hold every
-// address in it. It is called by the hub's peer-route loop, after the self-loop
-// guard and before the auther, so a claim that is not this peer's to make costs no
-// credential check.
+// address in it. The rule is set equality: the addresses a spoke claims must be the
+// addresses its own allowlist row assigns, as a set — any order, no subset, nothing
+// extra. It is called by the hub's peer-route loop, after the self-loop guard and
+// before the auther, so a claim that is not this peer's to make costs no credential
+// check.
 func (a *spokeAuthorizer) Authorize(ctx context.Context, peer string, ips []net.IP) bool {
 	// A cancelled context is not a policy decision and is not reported as one: a
 	// spoke whose stream died mid-registration would otherwise write a warning
@@ -120,24 +122,46 @@ func (a *spokeAuthorizer) Authorize(ctx context.Context, peer string, ips []net.
 		claim = append(claim, addr.Unmap())
 	}
 
-	// The claim must be the row's set, in the row's order: not a subset, because a
-	// subset check would let a spoke entitled to 10.10.0.2 also claim 10.10.0.3
-	// and take that route from the spoke that owns it.
+	// The claim must be the assigned set, and — the whole point — no subset of it.
 	//
-	// Index by index rather than as an unordered set, because both ends build the
-	// frame from the same allowlist row — the spoke writes its addresses in the
-	// order the row lists them, and the hub reads them back in that order. A spoke
-	// that reorders its own list is refused like any other mismatch, naming both
-	// sides, rather than silently taking a different route home.
+	// Order is not part of the rule. The claim arrives as a []net.IP parsed out of a
+	// frame that came over the network, and nothing in the protocol pins its order to
+	// the row's; a spoke entitled to exactly 10.10.0.2 and 10.10.0.3 that announces
+	// them the other way round is claiming exactly what it is entitled to. Comparing
+	// index by index would refuse it, as an intermittent spoke failure pointing
+	// nowhere near the cause. Nothing downstream needs the order: x's peerTable.set
+	// is keyed per address, so the routes registered are the same either way.
+	//
+	// The length check comes first, and it is what makes the sweep below set
+	// equality rather than a subset test. Every claimed address being assigned, with
+	// as many addresses claimed as assigned, leaves no room for an extra one: a spoke
+	// entitled to 10.10.0.2 cannot reach 10.10.0.3 that way, because claiming it
+	// would make the claim the longer of the two. Dropping the length check is
+	// exactly what would turn this into the subset bug the authorizer exists to
+	// prevent — it is the first half of the comparison, not a shortcut past it.
 	if len(want) != len(claim) {
 		return a.refuse(peer, ips, want, fmt.Sprintf("claimed %d addresses, assigned %d", len(claim), len(want)))
 	}
-	for i := range want {
-		if want[i] != claim[i] {
-			return a.refuse(peer, ips, want, fmt.Sprintf("claimed %s, assigned %s", claim[i], want[i]))
+	for _, claimed := range claim {
+		if !assigned(want, claimed) {
+			return a.refuse(peer, ips, want, fmt.Sprintf("claimed %s, which is not assigned to it", claimed))
 		}
 	}
 	return true
+}
+
+// assigned reports whether want holds addr.
+//
+// A containment sweep rather than a sorted copy of each side: a row names one or two
+// addresses, and the decision runs inside the hub's registration loop, so it
+// allocates nothing.
+func assigned(want []netip.Addr, addr netip.Addr) bool {
+	for _, w := range want {
+		if w == addr {
+			return true
+		}
+	}
+	return false
 }
 
 // refuse records one refusal, on the hub's logger and in the hub's event history,

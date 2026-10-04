@@ -64,7 +64,7 @@ func TestAuthorizeMatchesAnIPv4ClaimAgainstAnIPv4Assignment(t *testing.T) {
 // TestAuthorizeMatchesTwoAddressesAsASet: a row may name two addresses — one per
 // family, typically — and a spoke holding both is holding exactly what it was
 // given. Nothing here is about being lenient: the same row refuses every claim
-// that is not that set, which the other tests pin.
+// that is not that set, which the tests below pin.
 func TestAuthorizeMatchesTwoAddressesAsASet(t *testing.T) {
 	a := newSpokeAuthorizer("hub-two", map[string]string{"p1": "10.10.0.2,fd00::2"}, xlogger.Nop())
 	ctx := context.Background()
@@ -74,14 +74,70 @@ func TestAuthorizeMatchesTwoAddressesAsASet(t *testing.T) {
 		t.Errorf("a claim of exactly the row's two addresses was refused, want authorized (assigned %v)", claim)
 	}
 
-	// Order is part of the comparison, because both ends build the frame from the
-	// same allowlist row: the spoke writes the addresses in the row's order and
-	// the hub compares index by index. A spoke that reorders its own list and
-	// keeps the same set is refused, and says so in the same warning as any other
-	// mismatch — which is the point of reporting refusals at all.
+	// Order is not part of the rule. The claim is a []net.IP parsed out of a frame
+	// that arrived over the network, and nothing in the protocol pins its order to
+	// the row's — so the same set announced the other way round is the same claim,
+	// and refusing it would be an intermittent spoke failure with a warning that
+	// names no cause. This is the regression test for exactly that.
 	reversed := []net.IP{claim[1], claim[0]}
-	if a.Authorize(ctx, "p1", reversed) {
-		t.Errorf("a claim of the row's two addresses in the other order was authorized, want refused")
+	if !a.Authorize(ctx, "p1", reversed) {
+		t.Errorf("a claim of the row's two addresses in the other order was refused, want authorized: the set is the same (%v)", reversed)
+	}
+}
+
+// TestAuthorizeComparesTheSetNotTheSequence: set equality has two halves and both
+// need teeth, because the containment sweep alone is a subset check.
+//
+// The length check is what makes the sweep exact: with both sets the same size,
+// every claimed address assigned leaves no room for an extra one. Take the length
+// check away and a spoke entitled to 10.10.0.2 claims 10.10.0.3 as well, takes that
+// route from the spoke that owns it, and the sweep still passes — which is the
+// whole defect this authorizer exists to prevent. So all four combinations are here:
+// same set either order is authorized, and a set that differs in either direction —
+// one address too many, or one too few — is refused.
+func TestAuthorizeComparesTheSetNotTheSequence(t *testing.T) {
+	ctx := context.Background()
+	// v4 is the 16-byte form x puts on the wire; v4short the 4-byte form a caller
+	// holding a net.IPv4 has. Both spell one address, so a claim mixing them is
+	// still the row's set.
+	v4 := func(s string) net.IP { return net.ParseIP(s).To16() }
+	v4short := func(s string) net.IP { return net.ParseIP(s).To4() }
+	v6 := func(s string) net.IP { return net.ParseIP(s).To16() }
+
+	// One address: order cannot vary, so the case is the sweep against a length check.
+	one := newSpokeAuthorizer("hub-set-one", map[string]string{"p1": "10.10.0.2"}, xlogger.Nop())
+	if !one.Authorize(ctx, "p1", []net.IP{v4("10.10.0.2")}) {
+		t.Error("the row's own single address was refused, want authorized")
+	}
+	// Two claimed, one assigned: the containment sweep would pass the first and the
+	// length check is the only thing that refuses.
+	if one.Authorize(ctx, "p1", []net.IP{v4("10.10.0.2"), v4("10.10.0.3")}) {
+		t.Error("a spoke assigned one address claimed two, want refused")
+	}
+	// Zero claimed, one assigned: the other direction, which no sweep would catch.
+	if one.Authorize(ctx, "p1", nil) {
+		t.Error("a spoke assigned one address claimed none, want refused")
+	}
+
+	// Two addresses: the same set in either order is authorized.
+	two := newSpokeAuthorizer("hub-set-two", map[string]string{"p1": "10.10.0.2,fd00::2"}, xlogger.Nop())
+	for name, claim := range map[string][]net.IP{
+		"row order":    {v4("10.10.0.2"), v6("fd00::2")},
+		"reversed":     {v6("fd00::2"), v4("10.10.0.2")},
+		"rotated":      {v4("fd00::2"), v4("10.10.0.2")},
+		"mixed widths": {v4short("10.10.0.2"), v6("fd00::2")},
+	} {
+		if !two.Authorize(ctx, "p1", claim) {
+			t.Errorf("%s: a claim of the row's set was refused, want authorized", name)
+		}
+	}
+	// A different pair of the same size: both containment directions are exercised,
+	// because the first claimed address is assigned and the second is not.
+	if two.Authorize(ctx, "p1", []net.IP{v4("10.10.0.2"), v4("10.10.0.3")}) {
+		t.Error("a spoke assigned 10.10.0.2,fd00::2 claimed 10.10.0.2,10.10.0.3, want refused")
+	}
+	if two.Authorize(ctx, "p1", []net.IP{v4("fd00::2"), v4("10.10.0.3")}) {
+		t.Error("a spoke assigned 10.10.0.2,fd00::2 claimed fd00::2,10.10.0.3, want refused")
 	}
 }
 
