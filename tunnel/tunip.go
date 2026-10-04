@@ -380,8 +380,11 @@ func lastAddrIn(prefix netip.Prefix) netip.Addr {
 		return addr
 	}
 	// AsSlice returns a copy, so setting bits here cannot reach the Addr it
-	// came from. For a /0 the loop is empty and this returns the address itself,
-	// which is also the last one — the single-address case needs no special case.
+	// came from. For a /0 the loop runs over every byte, because 0/8 leaves the
+	// high bits of the first byte to the host, so a /0 is the longest walk there
+	// is rather than an empty one. The loop is empty only where there are no host
+	// bits at all — a /32 or a /128 — and there it returns the address itself,
+	// which is also the last one, so the single-address case needs no special case.
 	hostBits := prefix.Bits()
 	raw := addr.AsSlice()
 	for i := hostBits / 8; i < len(raw); i++ {
