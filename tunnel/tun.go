@@ -115,7 +115,28 @@ func (s *tunTunnel) Endpoint() string { return s.opts.Endpoint }
 // device address is what identifies it on screen.
 func (s *tunTunnel) Entrypoint() string { return s.opts.Net }
 
-func (s *tunTunnel) Options() Options { return s.opts }
+// Options is the hub's configuration, read under the lock for the same reason
+// p2pTunnel's is: a save rewrites the allowlist and the assignment in place, and
+// Options is how the API reads them. Without the lock a concurrent save tore the
+// copy, and a torn copy of a multi-word struct is not a slightly stale read — it
+// is one response carrying an allowlist and an assignment from different instants,
+// and a peers-PUT that read such a copy deciding what "unchanged" meant, then
+// saving the result as the new truth.
+//
+// That read is the one the API makes on the way into settlePeerIPs, where it
+// supplies the value a row with no address keeps, so the race was on this
+// feature's critical path and not merely somewhere in the background.
+//
+// It fixes the torn read only. The window between SetPeers and SetPeerIPs — a
+// hub that briefly has the new routes and the old assignment — is the documented
+// ordered save and is not a locking problem; it closes only when both have been
+// applied, and the order is what keeps a spoke from holding a route whose
+// address has been withdrawn.
+func (s *tunTunnel) Options() Options {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.opts
+}
 func (s *tunTunnel) Favorite(b bool)  { s.favorite.Store(b) }
 func (s *tunTunnel) IsFavorite() bool { return s.favorite.Load() }
 
