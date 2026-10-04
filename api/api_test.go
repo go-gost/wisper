@@ -991,7 +991,8 @@ func TestPeerAliasesFlow(t *testing.T) {
 		Peers: []peerJSON{{Key: "k1"}, {Key: "k2", Alias: "laptop"}},
 	}
 	var opts tunnel.Options
-	for _, opt := range req.toOptions() {
+	// nil is what a non-hub has to settle to: a p2p tunnel's rows carry no address.
+	for _, opt := range req.toOptions(nil) {
 		opt(&opts)
 	}
 
@@ -1024,14 +1025,20 @@ func TestPeerAliasesFlow(t *testing.T) {
 		t.Errorf("disabled flags = %v/%v, want only k2 off", legacy[0].Disabled, legacy[1].Disabled)
 	}
 	// A row with an address of its own carries it out with it, and one with none is
-	// left without the field rather than given an empty one: absent is what asks
-	// the hub to allocate, empty is the state that means "may claim nothing".
+	// left without the field rather than given an empty one: absent is what tells a
+	// save "unchanged", and a response that said otherwise would ask the operator's
+	// own client to clear every address the hub holds.
 	withIP := peersJSON([]string{"k1"}, nil, nil, map[string]string{"k1": "10.10.0.2"})
-	if len(withIP) != 1 || withIP[0].IP != "10.10.0.2" {
+	if len(withIP) != 1 || withIP[0].IP == nil || *withIP[0].IP != "10.10.0.2" {
 		t.Errorf("peersJSON with an assignment = %+v, want the row carrying 10.10.0.2", withIP)
 	}
-	if got := peersJSON([]string{"k1"}, nil, nil, map[string]string{"other": "10.10.0.2"})[0].IP; got != "" {
-		t.Errorf("a row with no assignment carries %q, want no address", got)
+	if got := peersJSON([]string{"k1"}, nil, nil, map[string]string{"other": "10.10.0.2"})[0].IP; got != nil {
+		t.Errorf("a row with no assignment carries %q, want the field absent", *got)
+	}
+	// A spoke the operator cleared holds "", and that is not the same thing as a
+	// spoke with nothing: it must not come back looking like a request to clear.
+	if got := peersJSON([]string{"k1"}, nil, nil, map[string]string{"k1": ""})[0].IP; got != nil {
+		t.Errorf("a row with an empty assignment carries %q, want the field absent", *got)
 	}
 	if peersJSON(nil, nil, nil, nil) != nil {
 		// An empty allowlist must stay absent from the JSON, not become [].
@@ -1685,6 +1692,20 @@ func peerStatsRows(t *testing.T, srv *httptest.Server, id string) []map[string]a
 // A tun hub's peers carry the address each spoke may claim
 // ---------------------------------------------------------------------------
 
+// defaultLogger installs a real one for the duration of the test. The gost default
+// logger is nil here (wisper sets it at startup) and tunTunnel.Run dereferences it,
+// so any test that reaches a hub's device needs this — it is a helper rather than
+// a line in each test because forgetting it is invisible: the panic lands in the
+// server's goroutine, and the test fails only if it happened to run first. Only
+// restore a logger that was there — Store(nil) panics on an atomic.Value.
+func defaultLogger(t *testing.T) {
+	t.Helper()
+	if oldLog := clogger.Default(); oldLog != nil {
+		t.Cleanup(func() { clogger.SetDefault(oldLog) })
+	}
+	clogger.SetDefault(xlogger.NewLogger(xlogger.LevelOption(clogger.ErrorLevel)))
+}
+
 // startTunHub creates a tun hub through the API and returns its id. The device is
 // what makes a hub a hub, so a case that needs one is skipped rather than asserted
 // against a hub that never ran: creating the device needs CAP_NET_ADMIN. Each
@@ -1692,13 +1713,7 @@ func peerStatsRows(t *testing.T, srv *httptest.Server, id string) []map[string]a
 // it holds and two devices on one subnet would collide.
 func startTunHub(t *testing.T, srv *httptest.Server, netSpec string) string {
 	t.Helper()
-	// The gost default logger is nil here (wisper sets it at startup) and Run
-	// dereferences it; a real one keeps the device path running. Only restore a
-	// logger that was there — Store(nil) panics on an atomic.Value.
-	if oldLog := clogger.Default(); oldLog != nil {
-		t.Cleanup(func() { clogger.SetDefault(oldLog) })
-	}
-	clogger.SetDefault(xlogger.NewLogger(xlogger.LevelOption(clogger.ErrorLevel)))
+	defaultLogger(t)
 
 	resp, body := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
 		"type": "tun", "name": "hub", "net": netSpec,
@@ -1818,11 +1833,10 @@ func TestUpdateTunnelPeersCarriesTheAddress(t *testing.T) {
 		t.Errorf("the assignment after the round trip = %v, want it unchanged", got)
 	}
 
-	// An address the operator typed is kept, padding and all but the padding, and a
-	// row left with no address is filled again from what is free: no address is the
-	// request for one. The second spoke gets .2 because the first has just moved off
-	// it — the allocator hands out the first address nothing else holds, not the
-	// one a row used to hold, and it never overwrites a row that names its own.
+	// An address the operator typed is kept, padding trimmed, and a row that says
+	// nothing about its address keeps what its spoke already had. This is the rule
+	// that makes an address belong to a spoke: the second spoke still holds .3
+	// although .2 is sitting free, because nothing about this save was about it.
 	resp, retyped := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
 		"peers": []map[string]any{{"key": key1, "alias": "laptop", "ip": " 10.10.0.9 "}, {"key": key2}},
 	})
@@ -1836,8 +1850,8 @@ func TestUpdateTunnelPeersCarriesTheAddress(t *testing.T) {
 	if got := rowIP(rows[0]); got != "10.10.0.9" {
 		t.Errorf("the typed address = %q, want 10.10.0.9, padding trimmed", got)
 	}
-	if got := rowIP(rows[1]); got != "10.10.0.2" {
-		t.Errorf("the other spoke's address = %q, want 10.10.0.2 — the first address free once the other spoke moved off it", got)
+	if got := rowIP(rows[1]); got != "10.10.0.3" {
+		t.Errorf("the unmentioned spoke's address = %q, want 10.10.0.3 kept: this save was not about it", got)
 	}
 
 	// A GET is built the same way, so the page that reads the assignment off the
@@ -2179,6 +2193,301 @@ func TestUpdateTunnelPeersSetsTheRoutesBeforeTheAssignment(t *testing.T) {
 	if got := tunnel.Get(id).Options().Peers; len(got) != 2 {
 		t.Errorf("the allowlist after a refused save = %v, want the two spokes it had", got)
 	}
+}
+
+// TestUpdateTunnelKeepsUnmentionedAddresses: the ruling, at the full-tunnel PUT —
+// a save that does not mention a spoke's address does not move it. This is the
+// shape that used to lock the network out: the detail page PUTs the tunnel with
+// its peers listed and no ip on them (a client that never learned the field), the
+// rows came back as "" — "may claim nothing" — every spoke was refused, and every
+// signal said healthy, because "" is what "not allocated yet" also looks like.
+//
+// The second half is the other half of the ruling: an address the operator types is
+// taken, and one they clear with an explicit empty string is replaced. So there is
+// exactly one way to move a spoke to a different address, and it is a request that
+// says so.
+func TestUpdateTunnelKeepsUnmentionedAddresses(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	offlineP2P()
+
+	key := strings.Repeat("C", 43)
+	id := startTunHub(t, srv, "10.40.0.1/24")
+
+	resp, saved := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key, "ip": "10.40.0.7"}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("save one spoke = %d: %v", resp.StatusCode, saved)
+	}
+	// .7 and not the .2 the allocator hands out first, so that "kept" and
+	// "reallocated" cannot look the same from here: every case below is about an
+	// address that allocation would not have chosen.
+	if got := tunnel.Get(id).Options().PeerIPs[key]; got != "10.40.0.7" {
+		t.Fatalf("the assignment after the peers save = %q, want 10.40.0.7", got)
+	}
+
+	// The body below names the spoke and says nothing about its address.
+	resp, kept := putJSON(t, srv.URL+"/api/tunnels/"+id, map[string]any{
+		"name": "hub", "type": "tun", "net": "10.40.0.1/24",
+		"peers": []map[string]any{{"key": key, "alias": "laptop"}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update the whole hub = %d: %v", resp.StatusCode, kept)
+	}
+	if got := tunnel.Get(id).Options().PeerIPs[key]; got != "10.40.0.7" {
+		t.Errorf("the assignment after a PUT that did not mention it = %q, want 10.40.0.7 kept", got)
+	}
+	if got := config.Get().Tunnels[0].PeerIPs[key]; got != "10.40.0.7" {
+		t.Errorf("the persisted assignment = %q, want 10.40.0.7, not an empty row", got)
+	}
+
+	// The same again with the alias changed, since that is the edit the detail page
+	// actually offers and the one that used to take the addresses with it.
+	resp, renamed := putJSON(t, srv.URL+"/api/tunnels/"+id, map[string]any{
+		"name": "renamed", "type": "tun", "net": "10.40.0.1/24",
+		"peers": []map[string]any{{"key": key, "alias": "desktop"}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("rename the hub = %d: %v", resp.StatusCode, renamed)
+	}
+	if got := tunnel.Get(id).Options().PeerIPs[key]; got != "10.40.0.7" {
+		t.Errorf("the assignment after a rename = %q, want 10.40.0.7 kept", got)
+	}
+
+	// Clearing an address on purpose is the one request that does replace it, and
+	// what replaces it is the first free address of the hub's subnet — .2, which is
+	// what a save that reallocated would also have produced.
+	resp, cleared := putJSON(t, srv.URL+"/api/tunnels/"+id, map[string]any{
+		"name": "renamed", "type": "tun", "net": "10.40.0.1/24",
+		"peers": []map[string]any{{"key": key, "alias": "desktop", "ip": ""}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear the spoke's address = %d: %v", resp.StatusCode, cleared)
+	}
+	if got := tunnel.Get(id).Options().PeerIPs[key]; got != "10.40.0.2" {
+		t.Errorf("the assignment after an explicit clear = %q, want a fresh 10.40.0.2", got)
+	}
+}
+
+// TestUpdateTunnelValidatesTheAssignmentItCarries: the full-tunnel PUT applies the
+// same policy as the peers door, and has to — it rebuilds the hub, so anything it
+// does not check is written straight through and only discovered afterwards, when
+// the new hub's own filter drops the row and SaveConfig persists the loss. The old
+// answers were a 200 and a hub authorizing nothing.
+//
+// The second case is the one that pins which net the rows are judged against. This
+// request proposes a different device network, so its rows have to be checked
+// against the network they would live on: the addresses are sound where the hub is
+// today and unusable where it is being moved, and a save that answers 200 has just
+// made a hub no spoke can reach.
+func TestUpdateTunnelValidatesTheAssignmentItCarries(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	offlineP2P()
+
+	key := strings.Repeat("C", 43)
+	id := startTunHub(t, srv, "10.50.0.1/24")
+
+	resp, saved := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("save one spoke = %d: %v", resp.StatusCode, saved)
+	}
+	hub := tunnel.Get(id)
+
+	for _, tc := range []struct {
+		name string
+		body map[string]any
+		want string
+	}{
+		{
+			name: "an address off the hub's subnet",
+			body: map[string]any{
+				"name": "hub", "type": "tun", "net": "10.50.0.1/24",
+				"peers": []map[string]any{{"key": key, "ip": "192.168.9.9"}},
+			},
+			want: "192.168.9.9",
+		},
+		{
+			name: "an address off the subnet the request is moving the hub to",
+			body: map[string]any{
+				"name": "hub", "type": "tun", "net": "10.60.0.1/24",
+				"peers": []map[string]any{{"key": key, "ip": "10.50.0.2"}},
+			},
+			want: "10.50.0.2",
+		},
+		{
+			name: "a prefix where an address belongs",
+			body: map[string]any{
+				"name": "hub", "type": "tun", "net": "10.50.0.1/24",
+				"peers": []map[string]any{{"key": key, "ip": "10.50.0.2/24"}},
+			},
+			want: "not a comma-separated list",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, body := putJSON(t, srv.URL+"/api/tunnels/"+id, tc.body)
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("PUT %s = %d: %v, want 400", tc.name, resp.StatusCode, body)
+			}
+			msg, _ := body["error"].(string)
+			if !strings.Contains(msg, tc.want) {
+				t.Errorf("the refusal %q does not name %q", msg, tc.want)
+			}
+			// The refusal is the whole answer: the hub that was running is still
+			// running, still holds the assignment, and the config still has it.
+			if got := tunnel.Get(id); got != hub {
+				t.Fatalf("a refused PUT rebuilt the hub: %v", got)
+			}
+			if got := hub.Options().PeerIPs[key]; got != "10.50.0.2" {
+				t.Errorf("the assignment after a refused PUT = %q, want 10.50.0.2 untouched", got)
+			}
+			if tunnel.IsServiceFailed(hub) {
+				t.Error("a refused PUT stopped the hub it was not about")
+			}
+			if got := config.Get().Tunnels[0].PeerIPs[key]; got != "10.50.0.2" {
+				t.Errorf("the persisted assignment = %q, want 10.50.0.2: a refused save must not persist a loss", got)
+			}
+		})
+	}
+}
+
+// TestCreateTunTunnelAllocatesItsSpokes: a create is the third door onto the same
+// field, so it gets the same policy — a hub created with spokes that name no
+// address is given one each, rather than coming up authorizing nothing.
+func TestCreateTunTunnelAllocatesItsSpokes(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	offlineP2P()
+	defaultLogger(t)
+
+	key1, key2 := strings.Repeat("C", 43), strings.Repeat("D", 43)
+	resp, created := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
+		"type": "tun", "name": "hub", "net": "10.70.0.1/24",
+		"peers": []map[string]any{{"key": key1}, {"key": key2}},
+	})
+	if resp.StatusCode == http.StatusInternalServerError {
+		t.Skipf("no CAP_NET_ADMIN here: the hub's device could not be created (%v)", created["error"])
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create a hub with two spokes = %d: %v, want 201", resp.StatusCode, created)
+	}
+	id, _ := created["id"].(string)
+	t.Cleanup(func() { tunnel.Delete(id) })
+
+	if got := tunnel.Get(id).Options().PeerIPs; got[key1] != "10.70.0.2" || got[key2] != "10.70.0.3" {
+		t.Errorf("the created hub's assignment = %v, want the two spokes allocated", got)
+	}
+	rows := peerRows(t, created)
+	if len(rows) != 2 || rowIP(rows[0]) != "10.70.0.2" || rowIP(rows[1]) != "10.70.0.3" {
+		t.Errorf("the created hub's rows = %v, want each spoke holding its address", rows)
+	}
+
+	// And the same refusal as the two saves: a row the hub could not honour is
+	// refused before the device is built, not dropped afterwards by the new hub.
+	resp, refused := postJSON(t, srv.URL+"/api/tunnels", map[string]any{
+		"type": "tun", "name": "hub", "net": "10.80.0.1/24",
+		"peers": []map[string]any{{"key": key1, "ip": "192.168.9.9"}},
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("create a hub with an unusable address = %d: %v, want 400", resp.StatusCode, refused)
+	}
+	if msg, _ := refused["error"].(string); !strings.Contains(msg, "192.168.9.9") {
+		t.Errorf("the refusal %q does not name the address", msg)
+	}
+}
+
+// TestUpdateTunnelPeersKeepsUnmentionedAddresses: the ruling at the peers door, and
+// the case a reviewer demonstrated: deleting one spoke moved another from .4 to .3.
+// A spoke's address belongs to that spoke, so a save that does not mention it
+// leaves it alone — including when the save is a deletion elsewhere in the list.
+func TestUpdateTunnelPeersKeepsUnmentionedAddresses(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	offlineP2P()
+
+	key1, key2, key3 := strings.Repeat("C", 43), strings.Repeat("D", 43), strings.Repeat("E", 43)
+	id := startTunHub(t, srv, "10.90.0.1/24")
+
+	resp, saved := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key1}, {"key": key2}, {"key": key3}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("save three spokes = %d: %v", resp.StatusCode, saved)
+	}
+	want := map[string]string{key1: "10.90.0.2", key2: "10.90.0.3", key3: "10.90.0.4"}
+	if got := tunnel.Get(id).Options().PeerIPs; !sameAssignment(got, want) {
+		t.Fatalf("the assignment after the first save = %v, want %v", got, want)
+	}
+
+	// A save that mentions no address at all, which is what a client that never
+	// learned the field sends. Everything stays where it is.
+	resp, none := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key1}, {"key": key2}, {"key": key3}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("save three spokes without addresses = %d: %v", resp.StatusCode, none)
+	}
+	if got := tunnel.Get(id).Options().PeerIPs; !sameAssignment(got, want) {
+		t.Errorf("a save that named no address moved the assignment: %v, want %v", got, want)
+	}
+
+	// The demonstrated one: dropping a spoke from the list. The other two keep
+	// theirs, and the address the deleted one freed is not handed to a neighbour.
+	resp, deleted := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key1}, {"key": key3}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("delete the middle spoke = %d: %v", resp.StatusCode, deleted)
+	}
+	if got := tunnel.Get(id).Options().PeerIPs; len(got) != 2 || got[key1] != "10.90.0.2" || got[key3] != "10.90.0.4" {
+		t.Errorf("the assignment after deleting a spoke = %v, want the other two where they were", got)
+	}
+
+	// Clearing an address on purpose is the one request that does move a spoke, and
+	// it is explicit: "ip": "" means the operator cleared it.
+	resp, cleared := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key1, "ip": ""}, {"key": key3}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear one spoke's address = %d: %v", resp.StatusCode, cleared)
+	}
+	// .2 is the first free address of the subnet, which is the one just freed.
+	if got := tunnel.Get(id).Options().PeerIPs; got[key1] != "10.90.0.2" || got[key3] != "10.90.0.4" {
+		t.Errorf("the assignment after an explicit clear = %v, want key1 back on 10.90.0.2", got)
+	}
+
+	// A spoke added to a list the client was shown keeps the neighbours it showed
+	// and is given an address of its own.
+	resp, added := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key1}, {"key": key2}, {"key": key3}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("add a spoke back = %d: %v", resp.StatusCode, added)
+	}
+	if got := tunnel.Get(id).Options().PeerIPs; got[key1] != "10.90.0.2" || got[key2] != "10.90.0.3" || got[key3] != "10.90.0.4" {
+		t.Errorf("the assignment after adding a spoke back = %v, want the three as they were", got)
+	}
+}
+
+// sameAssignment reports whether two assignments hold the same rows and the same
+// addresses, so a failure prints the two rather than an index.
+func sameAssignment(got, want map[string]string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for peer, ips := range want {
+		if got[peer] != ips {
+			return false
+		}
+	}
+	return true
 }
 
 // TestUpdateTunnelPreservesPeerIPs: the full-tunnel PUT rebuilds the hub from the

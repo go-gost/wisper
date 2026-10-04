@@ -252,7 +252,7 @@ func AllocatePeerIPs(peers []string, rows map[string]string, netSpec string) (ma
 	if len(prefixes) > 0 {
 		for _, peer := range peers {
 			var why []string
-			for _, addr := range spelledAddrs(parsed[peer]) {
+			for _, addr := range distinctAddrs(parsed[peer]) {
 				if err := validatePeerIP(addr.String(), prefixes, self); err != nil {
 					why = append(why, err.Error())
 				}
@@ -270,7 +270,7 @@ func AllocatePeerIPs(peers []string, rows map[string]string, netSpec string) (ma
 	// iteration order, and a winner would change on the next save.
 	for _, peer := range peers {
 		var why []string
-		for _, addr := range spelledAddrs(parsed[peer]) {
+		for _, addr := range distinctAddrs(parsed[peer]) {
 			owners := claims[addr.Unmap()]
 			if len(owners) < 2 {
 				continue
@@ -301,26 +301,6 @@ func AllocatePeerIPs(peers []string, rows map[string]string, netSpec string) (ma
 		return nil, err
 	}
 	return merged, nil
-}
-
-// spelledAddrs keeps each address of a row once, in the row's own order, spelled
-// the way the operator wrote it rather than canonicalized. The dedupe is by address
-// — one address written two ways is one address, and a message that says the same
-// thing about it twice reads as two problems where there is one — but the spelling
-// is kept, because it is the input validatePeerIP needs to be exercised by a row
-// carrying ::ffff:.
-func spelledAddrs(addrs []netip.Addr) []netip.Addr {
-	seen := make(map[netip.Addr]struct{}, len(addrs))
-	out := make([]netip.Addr, 0, len(addrs))
-	for _, addr := range addrs {
-		canonical := addr.Unmap()
-		if _, ok := seen[canonical]; ok {
-			continue
-		}
-		seen[canonical] = struct{}{}
-		out = append(out, addr)
-	}
-	return out
 }
 
 // nextFreeAddr is the first address of prefixes that nothing has taken, scanning

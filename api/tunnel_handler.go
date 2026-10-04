@@ -73,9 +73,18 @@ type peerJSON struct {
 	// streams are closed while established ones drain.
 	Disabled bool `json:"disabled,omitempty"`
 	// IP is the address this peer may claim on the hub's device network: a
-	// comma-separated list of host addresses, never a prefix. Empty means the
-	// hub allocates one. A p2p tunnel ignores it — it has no device network.
-	IP string `json:"ip,omitempty"`
+	// comma-separated list of host addresses, never a prefix. A p2p tunnel ignores
+	// it — it has no device network.
+	//
+	// A pointer, because absent and empty are different requests and must not
+	// arrive as one value: nil means the request said nothing about this spoke's
+	// address, so the spoke keeps the one it has, and a pointer to "" means the
+	// operator cleared it, so the hub allocates afresh. As a plain string the two
+	// were the same value, and "says nothing" then reallocated every row of every
+	// save that did not restate the addresses — addresses moving under a save that
+	// never mentioned them. The field is left out of the response for a spoke with
+	// no address, which is that same sentence said back: nothing to change.
+	IP *string `json:"ip,omitempty"`
 }
 
 type tunnelOptionsResp struct {
@@ -130,9 +139,9 @@ type statsResponse struct {
 // peerIPs is a tun hub's assignment — the map every response builds its rows
 // from, since it is the one place the answers are already kept. It is passed
 // rather than read from a tunnel so this stays a pure builder, and it is looked
-// up per key: a p2p tunnel's rows have no address to carry and a spoke with none
-// assigned yet comes back with the field absent, which is what makes an empty
-// value "allocate me one" rather than "hold nothing".
+// up per key: a p2p tunnel's rows have no address to carry, and a spoke with none
+// assigned yet comes back with the field absent, which is what makes an absent
+// value "keep what you have" rather than "hold nothing".
 func peersJSON(peers []string, aliases map[string]string, disabled []string, peerIPs map[string]string) []peerJSON {
 	normalized := tunnel.NormalizePeerAliases(peers, aliases)
 	off := make(map[string]bool, len(disabled))
@@ -144,7 +153,16 @@ func peersJSON(peers []string, aliases map[string]string, disabled []string, pee
 	for _, k := range peers {
 		if a, ok := normalized[k]; ok && !seen[k] {
 			seen[k] = true
-			out = append(out, peerJSON{Key: k, Alias: a, Disabled: off[k], IP: peerIPs[k]})
+			peer := peerJSON{Key: k, Alias: a, Disabled: off[k]}
+			// Only a row that holds an address carries the field, so a client that
+			// saves the list back is saying "unchanged" about a spoke with none —
+			// which is the same thing, since there is nothing to keep and nothing to
+			// change. A pointer to "" would mean the operator had asked for a new
+			// address, and no response should read that way.
+			if ips := peerIPs[k]; ips != "" {
+				peer.IP = &ips
+			}
+			out = append(out, peer)
 		}
 	}
 	return out
@@ -325,28 +343,69 @@ type tunnelCreateRequest struct {
 	DNS string `json:"dns,omitempty"`
 }
 
-func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
+// settlePeerIPs applies a tun hub's address policy to the rows of a request, and
+// is the one door onto it: create, the full-tunnel PUT and the peers-only PUT all
+// come through here, so a proposed configuration is answered the same way whichever
+// request proposed it.
+//
+// Three rules, in this order:
+//
+//   - absent means unchanged. A row whose ip is not in the request keeps what the
+//     spoke already holds, so a client that saves a form without restating the
+//     addresses — or adds one spoke to a list it was shown — moves nothing. This is
+//     the rule that makes an address attached to a spoke rather than to the list
+//     position it happens to occupy.
+//   - present and empty means cleared. It is the only way to ask for a new address,
+//     and the ask is honoured by the allocation below.
+//   - everything left blank is then filled from the hub's own subnet, in the order
+//     the rows were listed.
+//
+// current is the assignment in force — old.Options().PeerIPs on a save of a running
+// hub, nil on a create, where a spoke has nothing to keep and so is simply new.
+// netSpec is the net being *asked for*, not the one the running hub holds: a PUT
+// that moves a hub to a different subnet proposes exactly that, and its rows have to
+// be judged against the subnet they would live on. Asking the running hub's instead
+// would bless a configuration that cannot work.
+//
+// A non-hub gets nil and no error: a p2p tunnel has no device network, so its rows
+// carry no address and there is nothing to settle.
+func settlePeerIPs(tunnelType string, rows []peerJSON, current map[string]string, netSpec string) (map[string]string, error) {
+	if tunnelType != tunnel.TunTunnel {
+		return nil, nil
+	}
+	// The order is the order the rows were listed in, which is the allowlist order
+	// and so the order the peers page shows and the one allocation walks. Keys are
+	// trimmed here for the same reason the peers handler trims them: a padded key
+	// would otherwise get a row of its own that the allowlist does not list.
+	peers := make([]string, 0, len(rows))
+	resolved := make(map[string]string, len(rows))
+	for _, p := range rows {
+		key := strings.TrimSpace(p.Key)
+		peers = append(peers, key)
+		if p.IP != nil {
+			resolved[key] = strings.TrimSpace(*p.IP)
+			continue
+		}
+		// Absent: the address this spoke already has. A spoke new to the hub reads
+		// as the empty string, which is not "unchanged" but "nothing yet" — and so
+		// is allocated below like any other blank row.
+		resolved[key] = current[key]
+	}
+	return tunnel.AllocatePeerIPs(peers, resolved, netSpec)
+}
+
+func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string) []tunnel.Option {
 	peers := make([]string, 0, len(r.Peers))
 	aliases := make(map[string]string, len(r.Peers))
 	var disabled []string
-	// peerIPs is a tun hub's assignment, read off the same rows the allowlist is:
-	// one field on the wire, one map in the options. It is gathered for a hub only,
-	// because a p2p tunnel has no device to allocate from and a row carrying an
-	// address there is a client sending a field nothing reads.
-	var peerIPs map[string]string
-	if r.Type == tunnel.TunTunnel {
-		peerIPs = make(map[string]string, len(r.Peers))
-	}
 	for _, p := range r.Peers {
-		peers = append(peers, p.Key)
+		key := strings.TrimSpace(p.Key)
+		peers = append(peers, key)
 		if p.Alias != "" {
-			aliases[p.Key] = p.Alias
+			aliases[key] = p.Alias
 		}
 		if p.Disabled {
-			disabled = append(disabled, p.Key)
-		}
-		if peerIPs != nil {
-			peerIPs[p.Key] = strings.TrimSpace(p.IP)
+			disabled = append(disabled, key)
 		}
 	}
 	aliases = tunnel.NormalizePeerAliases(peers, aliases)
@@ -368,10 +427,13 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.PeersOption(peers...),
 		tunnel.PeerAliasesOption(aliases),
 		tunnel.PeerDisabledOption(tunnel.NormalizePeerDisabled(peers, disabled)),
-		// Not optional, and the reason is the full-tunnel PUT: it rebuilds the hub
-		// from this request, so an assignment missing here is a hub restarted with
-		// none, every spoke refused as unknown, and SaveConfig writing peer_ips back
-		// as null — a working network turned off by an unrelated edit.
+		// peerIPs is the settled assignment the caller passed in — it comes from
+		// settlePeerIPs rather than being re-read from the rows here, so that a hub
+		// rebuilt by the full-tunnel PUT cannot be handed rows nobody validated and
+		// nobody allocated. Not optional, and the reason is that PUT: it rebuilds the
+		// hub from this request, so an assignment missing here is a hub restarted
+		// with none, every spoke refused as unknown, and SaveConfig writing peer_ips
+		// back as null — a working network turned off by an unrelated edit.
 		tunnel.PeerIPsOption(tunnel.NormalizePeerIPs(peers, peerIPs)),
 		tunnel.NetOption(r.Net),
 		tunnel.MTUOption(r.MTU),
@@ -490,7 +552,17 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t := tunnel.NewByType(req.Type, req.toOptions()...)
+	// A create is the same door as the two saves, so it gets the same policy: a hub
+	// created with spokes that name no address is given one each, and a row that
+	// cannot be honoured is refused now rather than becoming a hub that authorizes
+	// nothing. Nothing is preserved (nil), because nothing exists to preserve.
+	peerIPs, err := settlePeerIPs(req.Type, req.Peers, nil, req.Net)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	t := tunnel.NewByType(req.Type, req.toOptions(peerIPs)...)
 	if t == nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown tunnel type: %s", req.Type))
 		return
@@ -577,6 +649,23 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The same policy as the peers door, and it has to be here: this PUT rebuilds
+	// the hub from the request, so without this the request's raw ip text is written
+	// straight through — a row off the requested subnet survives until the new hub's
+	// own filter drops it, which is data loss the reply does not mention (SaveConfig
+	// then persists the loss), and a PUT carrying no ip at all turns every row into
+	// "" — "may claim nothing" — locking every spoke out while the empty reply says
+	// nothing is assigned yet and the service says it is healthy.
+	//
+	// old.Options().PeerIPs is read before the Close below, because after it the
+	// options are the only place an assignment still lives and the reply would be
+	// built from a tunnel that no longer exists.
+	peerIPs, err := settlePeerIPs(tunnelType, req.Peers, old.Options().PeerIPs, req.Net)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// A p2p tunnel cannot be replaced while it lives: the process-wide host
 	// routes each peer key to exactly one tunnel, so the old one must give its
 	// routes up first (everything else swaps its own socket after the
@@ -586,11 +675,14 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		old.Close()
 	}
 
-	// Create replacement with same ID first (before deleting old).
+	// Create replacement with same ID first (before deleting old). The settled
+	// assignment goes in whole, not the rows: this is the request's answer to "what
+	// may each spoke claim", already validated and allocated, so the hub that comes
+	// up authorizes exactly what was agreed.
 	opts := append([]tunnel.Option{
 		tunnel.IDOption(id),
 		tunnel.CreatedAtOption(old.Options().CreatedAt),
-	}, req.toOptions()...)
+	}, req.toOptions(peerIPs)...)
 
 	t := tunnel.NewByType(tunnelType, opts...)
 	if t == nil {
@@ -790,12 +882,6 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	peers := make([]string, 0, len(req.Peers))
 	aliases := make(map[string]string, len(req.Peers))
 	var disabled []string
-	// ip is a tun hub's assignment, keyed like aliases and absent on a p2p tunnel:
-	// it has no device network, so a row's ip is a field nothing there reads.
-	var ip map[string]string
-	if old.Type() == tunnel.TunTunnel {
-		ip = make(map[string]string, len(req.Peers))
-	}
 	seen := make(map[string]bool, len(req.Peers))
 	for _, p := range req.Peers {
 		key := strings.TrimSpace(p.Key)
@@ -815,29 +901,28 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		if p.Disabled {
 			disabled = append(disabled, key)
 		}
-		if ip != nil {
-			ip[key] = strings.TrimSpace(p.IP)
-		}
 	}
 
-	// The assignment is settled before anything is applied, so a row that names an
-	// address outside the hub's subnets, the hub's own address, or an address
-	// another row names too is refused here with the spoke and the subnet named.
-	// SetPeerIPs cannot refuse it: the hub filters what it is given, and a row it
-	// drops is a spoke refused at registration with a message pointing nowhere near
-	// the cause — and an empty row that is never filled is a spoke that may hold
-	// nothing, which is not a state anyone asked for.
-	if ip != nil {
-		// The error is checked before the map is used, and that order is the whole
-		// point: assignPeerIPs hands back the rows it managed alongside its error,
-		// and taking the map first would answer a refused save with a partial
-		// assignment — the request said no and the response saved half of it.
-		merged, err := tunnel.AllocatePeerIPs(peers, ip, old.Options().Net)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		ip = merged
+	// The same policy the other two doors apply (settlePeerIPs), settled before
+	// anything is applied so a row naming an address outside the hub's subnets, the
+	// hub's own address, or an address another row names too is refused here with
+	// the spoke and the subnet named. SetPeerIPs cannot refuse it: the hub filters
+	// what it is given, and a row it drops is a spoke refused at registration with a
+	// message pointing nowhere near the cause.
+	//
+	// old.Options().PeerIPs is what "unchanged" means here: a row that says nothing
+	// about its address keeps the one its spoke already holds. And
+	// old.Options().Net is what the rows are judged against, because this request
+	// cannot change a hub's net, so the one in force is the one being asked about.
+	//
+	// The error is checked before the map is used, and that order is the whole point:
+	// assignPeerIPs hands back the rows it managed alongside its error, and taking
+	// the map first would answer a refused save with a partial assignment — the
+	// request said no and the response saved half of it.
+	ip, err := settlePeerIPs(old.Type(), req.Peers, old.Options().PeerIPs, old.Options().Net)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	// The list is taken in place: the routes are reconciled on the

@@ -357,14 +357,24 @@ func (s *tunTunnel) dropPeerIP(peer, reason string, log logger.Logger) {
 // order. A row naming the same address twice is one thing to say out loud, and an
 // event that repeated the same sentence twice would read as two problems where there
 // is one.
+//
+// Identity is the unmapped address, so one address written two ways — 10.10.0.2
+// and ::ffff:10.10.0.2 — is one address rather than two, which is what a row means
+// by naming it twice. The spelling kept is the one the row was written with rather
+// than a canonical one: the caller that validates rows hands it to validatePeerIP,
+// and feeding it the operator's own text is what leaves validatePeerIP's own unmap
+// to decide a row written in the ::ffff: form instead of having this function
+// quietly answer for it. Every other caller has already unmapped (see unmapAll),
+// for which Unmap is the identity, so the two spellings are the same value there.
 func distinctAddrs(addrs []netip.Addr) []netip.Addr {
 	seen := make(map[netip.Addr]struct{}, len(addrs))
 	out := make([]netip.Addr, 0, len(addrs))
 	for _, addr := range addrs {
-		if _, ok := seen[addr]; ok {
+		canonical := addr.Unmap()
+		if _, ok := seen[canonical]; ok {
 			continue
 		}
-		seen[addr] = struct{}{}
+		seen[canonical] = struct{}{}
 		out = append(out, addr)
 	}
 	return out

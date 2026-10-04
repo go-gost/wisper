@@ -4,6 +4,9 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+
+	"github.com/go-gost/wisper/event"
+	xlogger "github.com/go-gost/x/logger"
 )
 
 // TestParseHubNets: the hub's "net" field is a list of CIDRs, each naming the
@@ -452,6 +455,226 @@ func TestAssignPeerIPsIgnoresARowThatNamesNoAddress(t *testing.T) {
 	}
 	if got["b"] != "10.10.0.2" {
 		t.Errorf("b = %q, want 10.10.0.2", got["b"])
+	}
+}
+
+// TestAllocatePeerIPsAgreesWithHonorablePeerIPs pins the two implementations of one
+// policy to each other. AllocatePeerIPs is what the REST door answers a proposed
+// configuration with; honorablePeerIPs is what the hub does to the rows it is
+// actually given. They are two code paths and not one, and nothing but this test
+// keeps them in step — which is what makes the duplication safe to have at all.
+//
+// The direction asserted is the one that matters: anything the door accepted must
+// survive the hub untouched. If they drift the other way, the door refuses a save
+// the hub would have honoured, which is an operator blocked from a configuration
+// that works; if they drift this way, the door promises an assignment and the hub
+// silently drops a row, which is the failure the whole feature exists to prevent — a
+// spoke refused at registration with a message pointing nowhere near the cause.
+//
+// The cases are the ones the two disagree about first, when they do. The last one is
+// the rule that was unpinned by anything: only rows step 1 kept take part in the
+// duplicate sweep, so a row dropped for being off-subnet cannot cost a sound row its
+// address by naming it too.
+func TestAllocatePeerIPsAgreesWithHonorablePeerIPs(t *testing.T) {
+	const hubID = "hub-agrees"
+	event.Seed(hubID, nil) // isolate: the store is process-wide
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	cases := []struct {
+		name string
+		net  string
+		// peers is the allowlist in order, which is the order allocation walks.
+		peers []string
+		// rows is what each spoke's row says.
+		rows map[string]string
+		// wantRefused is the headline of the refusal, empty when the door accepts.
+		wantRefused string
+		// notRefused is text that must not appear in the refusal — used to pin a
+		// sound row out of a conflict it did not cause.
+		notRefused string
+	}{
+		{
+			name:  "a plain assignment is kept whole",
+			net:   "10.10.0.1/24",
+			peers: []string{"a", "b"},
+			rows:  map[string]string{"a": "10.10.0.2", "b": "10.10.0.3"},
+		},
+		{
+			name:  "blank rows are allocated and kept",
+			net:   "10.10.0.1/24",
+			peers: []string{"a", "b", "c"},
+			rows:  map[string]string{"a": "", "b": "", "c": ""},
+		},
+		{
+			name:  "an empty row is the state that means may claim nothing",
+			net:   "10.10.0.1/24,fd00::1/64",
+			peers: []string{"a", "b"},
+			rows:  map[string]string{"a": "", "b": "fd00::2"},
+		},
+		{
+			name:        "an address off every subnet is refused",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a"},
+			rows:        map[string]string{"a": "192.168.9.9"},
+			wantRefused: "192.168.9.9",
+		},
+		{
+			name:        "the hub's own address is refused",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a"},
+			rows:        map[string]string{"a": "10.10.0.1"},
+			wantRefused: "the hub's own address",
+		},
+		{
+			name:        "a prefix is not a host address",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a"},
+			rows:        map[string]string{"a": "10.10.0.2/24"},
+			wantRefused: "not a comma-separated list",
+		},
+		{
+			name:        "a hostname is refused",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a"},
+			rows:        map[string]string{"a": "spoke.example.com"},
+			wantRefused: "not a comma-separated list",
+		},
+		{
+			name:        "a hole in the list is refused",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a"},
+			rows:        map[string]string{"a": "10.10.0.2,,10.10.0.3"},
+			wantRefused: "not a comma-separated list",
+		},
+		{
+			name:        "two rows naming one address are both refused",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a", "b"},
+			rows:        map[string]string{"a": "10.10.0.2", "b": "10.10.0.2"},
+			wantRefused: "cannot tell which spoke owns it",
+		},
+		{
+			name:        "one row naming it twice is refused",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a"},
+			rows:        map[string]string{"a": "10.10.0.2,10.10.0.2"},
+			wantRefused: "named twice",
+		},
+		{
+			// The one address written two ways is the one address, and that is the
+			// rule that needs validatePeerIP's own unmap on this path.
+			name:        "one address written two ways is a duplicate",
+			net:         "10.10.0.1/24",
+			peers:       []string{"a", "b"},
+			rows:        map[string]string{"a": "::ffff:10.10.0.2", "b": "10.10.0.2"},
+			wantRefused: "cannot tell which spoke owns it",
+		},
+		{
+			// The subtle one, and the reason the two steps run in this order. "broken"
+			// does name 10.10.0.2, the same address "good" holds — but its row does
+			// not parse, so step 1 drops it and it is not in the assignment by the
+			// time the sweep runs. It must not be able to cost the sound row its
+			// address: the refusal names "broken" alone, and "good" is not reported
+			// as holding a contested address. An implementation that counted a
+			// dropped row as a duplicate participant would refuse both spokes and
+			// point at a conflict that does not exist between the two of them.
+			name: "only rows step 1 kept take part in the duplicate sweep",
+			net:  "10.10.0.1/24",
+			peers: []string{
+				"broken", "good",
+			},
+			rows:        map[string]string{"broken": "10.10.0.2,not-an-address", "good": "10.10.0.2"},
+			wantRefused: `"broken"`,
+			// "good" is sound: it is in the hub's subnet and no other row survives
+			// to contest its address, so nothing about it may appear in the refusal.
+			notRefused: `"good"`,
+		},
+		{
+			name: "the hub's own address written its other way is refused",
+			net:  "10.10.0.1/24",
+			peers: []string{
+				"a",
+			},
+			rows:        map[string]string{"a": "::ffff:10.10.0.1"},
+			wantRefused: "the hub's own address",
+		},
+		{
+			name:        "an exhausted subnet is refused by the door too",
+			net:         "10.10.0.1/30",
+			peers:       []string{"a", "b", "c"},
+			rows:        map[string]string{"a": "", "b": "", "c": ""},
+			wantRefused: "no address free",
+		},
+		{
+			name:        "a blank row with no subnet at all is refused",
+			net:         "",
+			peers:       []string{"a"},
+			rows:        map[string]string{"a": ""},
+			wantRefused: "no subnet configured",
+		},
+		{
+			// A hub with no net is one broken hub, not a set of broken rows: there is
+			// no subnet for an address to be outside of, so a typed row is neither
+			// refused nor blamed for anything, and only the duplicate sweep still
+			// applies. Both doors exempt it, and this is where that exemption shows.
+			name: "a typed row on a hub with no subnet is not the subnet's business",
+			net:  "",
+			peers: []string{
+				"a", "b",
+			},
+			rows: map[string]string{"a": "10.10.0.2", "b": "10.10.0.3"},
+		},
+		{
+			name:        "a duplicate is still a duplicate with no subnet",
+			net:         "",
+			peers:       []string{"a", "b"},
+			rows:        map[string]string{"a": "10.10.0.2", "b": "10.10.0.2"},
+			wantRefused: "cannot tell which spoke owns it",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			settled, err := AllocatePeerIPs(tc.peers, tc.rows, tc.net)
+			if tc.wantRefused != "" {
+				if err == nil {
+					t.Fatalf("AllocatePeerIPs accepted %v on %q, want a refusal naming %q", tc.rows, tc.net, tc.wantRefused)
+				}
+				if !strings.Contains(err.Error(), tc.wantRefused) {
+					t.Fatalf("AllocatePeerIPs = %v, want a refusal naming %q", err, tc.wantRefused)
+				}
+				if tc.notRefused != "" && strings.Contains(err.Error(), tc.notRefused) {
+					t.Fatalf("AllocatePeerIPs = %v, want no mention of %s: that row is sound", err, tc.notRefused)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("AllocatePeerIPs = %v, want it accepted", err)
+			}
+
+			// The agreement itself: whatever the door settled, the hub keeps whole.
+			// Built with the same net and run through the filter the hub applies at
+			// Run and at a save, with no authorizer set so nothing else is involved.
+			hub := NewTunTunnel(
+				IDOption(hubID),
+				NetOption(tc.net),
+				PeersOption(tc.peers...),
+			).(*tunTunnel)
+			kept := hub.honorablePeerIPs(settled, xlogger.Nop())
+			if len(kept) != len(settled) {
+				t.Errorf("the hub kept %v of %d rows the door settled (%v), want all of them", kept, len(settled), settled)
+			}
+			for peer, want := range settled {
+				got, ok := kept[peer]
+				if !ok {
+					t.Errorf("the hub dropped row %q = %q, which the door had settled", peer, want)
+					continue
+				}
+				if got != want {
+					t.Errorf("the hub changed row %q from %q to %q, want it kept byte for byte", peer, want, got)
+				}
+			}
+		})
 	}
 }
 
