@@ -101,8 +101,9 @@ func parsePeerIPs(spec string) ([]netip.Addr, bool) {
 }
 
 // validatePeerIP reports why a typed address cannot be assigned: it is not an
-// address at all, it is the hub's own, or it is outside every subnet the hub's
-// device is on. err is nil when it is fine.
+// address at all, it is the hub's own, it is an address its own subnet reserves,
+// or it is outside every subnet the hub's device is on. err is nil when it is
+// fine.
 //
 // self is the half of parseHubNets that a prefix cannot carry, and it is checked
 // here rather than only in assignPeerIPs because that leaves the two paths
@@ -111,6 +112,16 @@ func parsePeerIPs(spec string) ([]netip.Addr, bool) {
 // and the spoke would be turned away at registration by x's self-loop guard, with a
 // message pointing nowhere near the cause. Refusing it here is what makes the two
 // paths say the same thing.
+//
+// The addresses a subnet reserves are the same argument. freeAddrIn starts above
+// the network address and skips the broadcast address where one exists, so it
+// hands out neither; a validator that accepted either would bless a row the
+// allocator would then never produce, and the row the hub saved would name an
+// address that is the subnet's identity rather than a host's. Nothing below stops
+// the kernel from carrying traffic to such an address — that was checked against a
+// real tun device, and a /24's network address is a working host address to
+// Linux, bound, routed and delivered like any other — which is why this is a rule
+// and not a workaround for a kernel that would refuse anyway.
 //
 // It names the offending value in the message, because this error goes back to
 // whoever typed it through the API and the UI. A bare "invalid" tells an operator
@@ -136,15 +147,53 @@ func validatePeerIP(host string, prefixes []netip.Prefix, self []netip.Addr) err
 	}
 	// An IPv4 address is not inside an IPv6 prefix, and netip.Prefix.Contains
 	// says so itself, so a mixed-family hub needs no special case here.
+	//
+	// A prefix that contains the address can still keep it for itself. The address
+	// is only refused when every prefix holding it keeps it: two subnets one inside
+	// the other are one range the operator listed twice, allocation scans them in
+	// order and hands the address out as soon as one of them has it free, so a
+	// refusal here would contradict an allocator that would produce the row.
+	role, roleOf := "", netip.Prefix{}
 	for _, prefix := range prefixes {
-		if prefix.Contains(addr) {
+		if !prefix.Contains(addr) {
+			continue
+		}
+		if prefixReservedAddr(prefix, addr) == "" {
 			return nil
 		}
+		if role == "" {
+			role, roleOf = prefixReservedAddr(prefix, addr), prefix.Masked()
+		}
+	}
+	if role != "" {
+		return fmt.Errorf("%s is %s of %s, which no spoke may claim", addr, role, roleOf)
 	}
 	if len(prefixes) == 0 {
 		return fmt.Errorf("%s is outside the hub's subnets: the hub has no subnet configured", addr)
 	}
 	return fmt.Errorf("%s is outside the hub's subnets (%s)", addr, joinPrefixes(prefixes))
+}
+
+// prefixReservedAddr is the role prefix gives addr when prefix keeps it for
+// itself, and "" when prefix hands it out. It is the one place either address is
+// recognized, so freeAddrIn and validatePeerIP cannot come to disagree about
+// which addresses a subnet holds back — the same pairing hasNetworkAddr and
+// hasBroadcastAddr provide for the two rules themselves.
+//
+// A prefix that keeps no address at all answers "" for all of them: a /31 or /32
+// in IPv4, and every IPv6 prefix as far as the broadcast goes.
+func prefixReservedAddr(prefix netip.Prefix, addr netip.Addr) string {
+	masked := prefix.Masked()
+	if !masked.Contains(addr) {
+		return ""
+	}
+	if hasNetworkAddr(masked) && addr == masked.Addr() {
+		return "the network address"
+	}
+	if hasBroadcastAddr(masked) && addr == lastAddrIn(masked) {
+		return "the broadcast address"
+	}
+	return ""
 }
 
 // assignPeerIPs fills the rows that name no address, in order, with the next free
@@ -325,6 +374,10 @@ func nextFreeAddr(prefixes []netip.Prefix, taken map[netip.Addr]struct{}) (netip
 // The scan starts at Next() of the masked prefix address, not at the masked
 // address: 10.10.0.0 in 10.10.0.0/24 is the network, and a spoke cannot hold it.
 // hasNetworkAddr below is the rule for the prefixes where that is true at all.
+// The broadcast address is skipped at the other end of the range for the same
+// reason, and prefixReservedAddr is what tells validatePeerIP about both of them,
+// so the two paths cannot come to disagree about which addresses a subnet holds
+// back.
 func freeAddrIn(prefix netip.Prefix, taken map[netip.Addr]struct{}) (netip.Addr, bool) {
 	masked := prefix.Masked()
 	last := lastAddrIn(masked)
@@ -355,6 +408,22 @@ func freeAddrIn(prefix netip.Prefix, taken map[netip.Addr]struct{}) (netip.Addr,
 // with no network address, and a /32 is a single host. That is the whole reason
 // this is a named predicate and not a constant compared against Bits() at the
 // call site — the two cases behave differently and both have to be right.
+//
+// The threshold is the IPv4 one and the rule is stated for IPv4 only, because
+// Bits() counts to 128 for IPv6 and so this is false for every IPv6 prefix: not
+// for /127 and /128 either, which are IPv6's /31 and /32. An fd00::1/64 hub
+// therefore does not reserve fd00::, and its first spoke is handed exactly that —
+// the subnet-router anycast address of RFC 3306. That is deliberate rather than
+// an oversight, and two things make it safe here: the subnet is not a shared
+// broadcast domain (a spoke's tun device is point-to-point to the hub over the
+// p2p stream, so no other node on it can also answer to fd00::), and validation
+// refuses nothing allocation hands out, so the two paths agree about it. What it
+// does mean is that fd00:: is not free for a spoke to be given on a v6 subnet,
+// and the v4 rule cannot be widened to take it without changing what allocation
+// produces.
+//
+// hasBroadcastAddr below is stated for IPv4 too, for a different reason: IPv6
+// has no broadcast address at all, so a v6 prefix never holds back its last one.
 func hasNetworkAddr(prefix netip.Prefix) bool {
 	return prefix.Bits() < 31
 }

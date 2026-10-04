@@ -102,7 +102,8 @@ func TestParsePeerIPs(t *testing.T) {
 // configured is a third reason, and the message says that rather than blaming the
 // address. So is the hub's own address: the half of "net" that the prefix cannot
 // carry is exactly what this needs, and refusing it here is what makes validation
-// agree with allocation.
+// agree with allocation. And so are the addresses a subnet keeps back — its
+// network address, and the broadcast address of an IPv4 subnet that has one.
 func TestValidatePeerIP(t *testing.T) {
 	prefixes := mustPrefixes(t, "10.10.0.0/24", "fd00::/64")
 	self := mustAddrs(t, "10.10.0.1", "fd00::1")
@@ -113,10 +114,11 @@ func TestValidatePeerIP(t *testing.T) {
 	if err := validatePeerIP("fd00::2", prefixes, self); err != nil {
 		t.Errorf("validatePeerIP(fd00::2) = %v, want nil", err)
 	}
-	// Both endpoints of a subnet are inside it; the network address is refused
-	// only by assignment, not by this check.
-	if err := validatePeerIP("10.10.0.255", prefixes, self); err != nil {
-		t.Errorf("validatePeerIP(10.10.0.255) = %v, want nil", err)
+	// The last address of a /24 is the broadcast, which allocation never hands out,
+	// so validation refuses it — unlike the last address of a /30, which it does.
+	if err := validatePeerIP("10.10.0.255", prefixes, self); err == nil ||
+		!strings.Contains(err.Error(), "the broadcast address of 10.10.0.0/24") {
+		t.Errorf("validatePeerIP(10.10.0.255) = %v, want the broadcast address refused", err)
 	}
 	// The hub's own addresses are refused, and the message says why rather than
 	// blaming a subnet they are inside: 10.10.0.1 is in 10.10.0.0/24, so a walk
@@ -173,7 +175,224 @@ func TestValidatePeerIP(t *testing.T) {
 	}
 }
 
-// TestAssignPeerIPsSkipsTheHubsOwnAddress: the first spoke must not be given the
+// TestValidatePeerIPAgreesWithAllocation: the property the two halves of the
+// policy rest on — for every address of a hub's subnet, validation accepts it if
+// and only if allocation is able to produce it.
+//
+// It is written as a walk of freeAddrIn to exhaustion rather than as a second
+// hand-written list of the addresses a /24 keeps back, because a list written out
+// twice is a list that can agree with itself and disagree with the code. Every
+// address the prefix contains is checked, so a subnet too large to enumerate
+// (/64 and shorter) is checked on the addresses allocation walked to, and its
+// held-back addresses — which between them are all a prefix can reserve.
+//
+// Nothing in a kernel objects to either of the addresses this refuses: against a
+// real tun device, Linux accepts 10.253.98.0/24 and 10.253.98.255/24, gives both
+// scope-host local routes and delivers to sockets bound on them. So the rule is
+// the hub's, not a workaround, and it is checked here because the API would
+// otherwise store an address the allocator will never produce.
+func TestValidatePeerIPAgreesWithAllocation(t *testing.T) {
+	// fd00::1/64 is in the list because it is the prefix where the two families'
+	// rules part company, and the /64 is also the one prefix here too large to
+	// enumerate — see walkAddresses.
+	for _, netSpec := range []string{
+		"10.10.0.1/24", "10.10.0.1/30", "10.10.0.1/29", "10.10.0.1/31", "10.10.0.5/32",
+		"fd00::1/64", "fd00::1/126", "fd00::1/125", "fd00::1/127", "fd00::9/128",
+	} {
+		t.Run(netSpec, func(t *testing.T) {
+			// self is left empty on purpose: the hub's own address would be refused
+			// for a second and better reason, which is its own case above.
+			prefixes, _ := parseHubNets(netSpec)
+			prefix := prefixes[0]
+
+			producible, walked := walkAddresses(prefix)
+
+			// Every address allocation is able to produce must be accepted. This
+			// direction is the one that matters: an address the hub would hand out
+			// and validation refused is a save the API rejects and the hub honours.
+			for _, addr := range walked {
+				if err := validatePeerIP(addr.String(), prefixes, nil); err != nil {
+					t.Errorf("validatePeerIP(%s) = %v, but freeAddrIn hands it out on %s: the two disagree about the same subnet",
+						addr, err, prefix)
+				}
+			}
+
+			// And nothing else may be, for any address of the subnet that the walk
+			// did not reach. Only a prefix small enough to enumerate can be closed
+			// this way, and that is what makes it exhaustive rather than sampled.
+			for _, addr := range enumeratePrefix(prefix) {
+				if _, ok := producible[addr]; ok {
+					continue
+				}
+				if err := validatePeerIP(addr.String(), prefixes, nil); err == nil {
+					t.Errorf("validatePeerIP(%s) = nil, but freeAddrIn would never hand it out on %s: the two disagree about the same subnet",
+						addr, prefix)
+				}
+			}
+		})
+	}
+}
+
+// walkAddresses asks freeAddrIn for one address at a time until it stops, which
+// is exactly the set assignPeerIPs can produce from this prefix, and how far it
+// got in the order it produces them.
+//
+// A prefix small enough to list is walked to exhaustion, so `producible` is
+// complete and the closing half of the property can be exhaustive. A prefix too
+// large to walk is walked to its first eight addresses only, which is where the
+// first address a prefix reserves would be; the closing half is skipped for
+// those, which is why the /64's last address is pinned by name in the table
+// below rather than here.
+func walkAddresses(prefix netip.Prefix) (map[netip.Addr]struct{}, []netip.Addr) {
+	limit := 8
+	if all := enumeratePrefix(prefix); len(all) > 0 {
+		limit = len(all)
+	}
+	produced := make(map[netip.Addr]struct{}, limit)
+	var walked []netip.Addr
+	for len(walked) < limit {
+		addr, ok := freeAddrIn(prefix, produced)
+		if !ok {
+			break
+		}
+		walked = append(walked, addr)
+		produced[addr] = struct{}{}
+	}
+	return produced, walked
+}
+
+// enumeratePrefix is every address of prefix, or nil when there are too many to
+// list. /24 and /126 and everything tighter come back whole; /64 does not.
+func enumeratePrefix(prefix netip.Prefix) []netip.Addr {
+	masked := prefix.Masked()
+	hostBits := masked.Addr().BitLen() - prefix.Bits()
+	if hostBits > 12 {
+		return nil
+	}
+	all := make([]netip.Addr, 0, 1<<hostBits)
+	for addr := masked.Addr(); masked.Contains(addr); addr = addr.Next() {
+		all = append(all, addr)
+	}
+	return all
+}
+
+// TestValidatePeerIPRefusesTheAddressesASubnetKeepsBack: the refusal an
+// operator reads, for both families, and the point where their rules differ — a
+// /24 keeps back two addresses, a /30 one, a /31 none, and an IPv6 prefix none at
+// all, which is why fd00:: is a host address below and 10.10.0.0 is not.
+//
+// The messages are pinned because they are what the API returns: an operator who
+// typed 10.10.0.255 has to be told which address of theirs is wrong and why, not
+// that the value is invalid.
+func TestValidatePeerIPRefusesTheAddressesASubnetKeepsBack(t *testing.T) {
+	cases := []struct {
+		name   string
+		net    string
+		refuse map[string]string
+		accept []string
+	}{
+		{
+			// .0 is the network address and .255 the broadcast; .1 is the hub's own
+			// and .2.. are ordinary hosts.
+			name:   "an IPv4 /24 keeps back its network and broadcast addresses",
+			net:    "10.10.0.1/24",
+			refuse: map[string]string{"10.10.0.0": "is the network address of 10.10.0.0/24", "10.10.0.255": "is the broadcast address of 10.10.0.0/24"},
+			accept: []string{"10.10.0.2", "10.10.0.254"},
+		},
+		{
+			// Where the broadcast convention stops: .3 is a host.
+			name:   "an IPv4 /30 keeps back its network address only",
+			net:    "10.10.0.1/30",
+			refuse: map[string]string{"10.10.0.0": "is the network address of 10.10.0.0/30"},
+			accept: []string{"10.10.0.2", "10.10.0.3"},
+		},
+		{
+			// RFC 3021: a /31 has no network address, so the first address is a host
+			// — the case a "skip the network address" rule gets wrong.
+			name:   "an IPv4 /31 keeps nothing back",
+			net:    "10.10.0.1/31",
+			accept: []string{"10.10.0.0", "10.10.0.1"},
+		},
+		{
+			name:   "an IPv4 /32 keeps nothing back",
+			net:    "10.10.0.5/32",
+			accept: []string{"10.10.0.5"},
+		},
+		{
+			// The asymmetry, stated rather than left to be discovered: hasNetworkAddr
+			// is false for every IPv6 prefix, so an fd00::1/64 hub hands out fd00::,
+			// the subnet-router anycast address, and validation must accept it. The
+			// last address of the same prefix is a host address for the other reason
+			// that IPv6 has no broadcast at all.
+			name:   "an IPv6 /64 keeps nothing back",
+			net:    "fd00::1/64",
+			accept: []string{"fd00::", "fd00::1", "fd00::2", "fd00::ffff:ffff:ffff:ffff"},
+		},
+		{
+			name:   "an IPv6 /127 keeps nothing back",
+			net:    "fd00::1/127",
+			accept: []string{"fd00::", "fd00::1"},
+		},
+		{
+			// A /126 is the IPv6 counterpart of a /30, and it behaves like one: no
+			// network address and no broadcast address, so all four are hosts.
+			name:   "an IPv6 /126 keeps nothing back either",
+			net:    "fd00::1/126",
+			accept: []string{"fd00::", "fd00::1", "fd00::2", "fd00::3"},
+		},
+		{
+			name:   "an IPv6 /128 keeps nothing back",
+			net:    "fd00::9/128",
+			accept: []string{"fd00::9"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// self is left empty on purpose: what a prefix keeps back is a question
+			// about the prefix, and the hub's own address would refuse half these
+			// addresses for a different and better-explained reason.
+			prefixes, _ := parseHubNets(tc.net)
+			for addr, want := range tc.refuse {
+				err := validatePeerIP(addr, prefixes, nil)
+				if err == nil {
+					t.Errorf("validatePeerIP(%s) = nil, want it refused: %s", addr, want)
+					continue
+				}
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("validatePeerIP(%s) = %q, want it to say %q", addr, err, want)
+				}
+				if !strings.Contains(err.Error(), "which no spoke may claim") {
+					t.Errorf("validatePeerIP(%s) = %q, want it to say why the spoke may not have it", addr, err)
+				}
+			}
+			for _, addr := range tc.accept {
+				if err := validatePeerIP(addr, prefixes, nil); err != nil {
+					t.Errorf("validatePeerIP(%s) = %v, want nil: it is a host address of %s", addr, err, tc.net)
+				}
+			}
+		})
+	}
+}
+
+// TestValidatePeerIPAndNestedSubnets: two subnets of one hub may be one inside
+// the other. An address the inner subnet reserves may still be a host address of
+// the outer one, and allocation scans them in order and hands it out as soon as
+// one of them has it free — so validation must not refuse it, or the API would
+// refuse a row the hub would then have allocated itself.
+func TestValidatePeerIPAndNestedSubnets(t *testing.T) {
+	prefixes := mustPrefixes(t, "10.10.0.0/24", "10.0.0.0/8")
+
+	if err := validatePeerIP("10.10.0.0", prefixes, nil); err != nil {
+		t.Errorf("validatePeerIP(10.10.0.0) = %v, want nil: 10.0.0.0/8 holds it as a host address", err)
+	}
+	// Reserved by both, so there is nothing to hand it out as.
+	outer := mustPrefixes(t, "10.0.0.0/8", "172.16.0.0/12")
+	if err := validatePeerIP("172.16.0.0", outer, nil); err == nil {
+		t.Error("validatePeerIP(172.16.0.0) = nil, want it refused: both subnets reserve it")
+	}
+}
+
 // hub's own address. That is what the self half of parseHubNets is for — the
 // prefix 10.10.0.0/24 cannot say which address inside it the hub holds, and
 // 10.10.0.1 is the one every hub takes.

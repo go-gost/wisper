@@ -1978,6 +1978,52 @@ func TestUpdateTunnelPeersRejectsAPrefix(t *testing.T) {
 	}
 }
 
+// TestUpdateTunnelPeersRejectsAnAddressItsSubnetKeepsBack: the two addresses a
+// /24 holds for itself — the network address and the broadcast address — are
+// refused where they were typed, naming the spoke, the address, and which of the
+// two it is.
+//
+// Nothing in the kernel would have refused them: checked against a real tun
+// device, Linux accepts 10.10.0.0/24 and 10.10.0.255/24, gives both scope-host
+// local routes and delivers to a socket bound on either. So this is the hub's own
+// rule, and the reason it has to be enforced at the request rather than left to
+// the hub's filter is the same as for every other refusal: the hub would drop such
+// a row as an event the request is no longer around to explain, leaving the spoke
+// saved with no address at all.
+func TestUpdateTunnelPeersRejectsAnAddressItsSubnetKeepsBack(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	key := strings.Repeat("C", 43)
+	for _, tc := range []struct {
+		addr string
+		role string
+	}{
+		{"10.10.0.0", "is the network address of 10.10.0.0/24"},
+		{"10.10.0.255", "is the broadcast address of 10.10.0.0/24"},
+	} {
+		t.Run(tc.addr, func(t *testing.T) {
+			id := closedHub(t, "10.10.0.1/24")
+
+			resp, body := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+				"peers": []map[string]any{{"key": key, "ip": tc.addr}},
+			})
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("%s = %d: %v, want 400", tc.addr, resp.StatusCode, body)
+			}
+			msg, _ := body["error"].(string)
+			for _, want := range []string{key, tc.addr, tc.role} {
+				if !strings.Contains(msg, want) {
+					t.Errorf("the refusal %q does not name %q", msg, want)
+				}
+			}
+			if got := tunnel.Get(id).Options(); len(got.Peers) != 0 || len(got.PeerIPs) != 0 {
+				t.Errorf("the hub after a refused save = %v / %v, want it untouched", got.Peers, got.PeerIPs)
+			}
+		})
+	}
+}
+
 // TestUpdateTunnelPeersRejectsADuplicateAddress: two rows naming one address. The
 // hub's route table is last-writer-wins per address, so the second spoke to
 // register silently takes the first one's route and its traffic goes to the wrong
