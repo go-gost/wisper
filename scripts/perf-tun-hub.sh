@@ -46,6 +46,11 @@ INJECT_FOR="${INJECT_FOR:-20}"
 INJECT_MIN_BPS="${INJECT_MIN_BPS:-1000000}"
 INJECT_MAX_DESYNC="${INJECT_MAX_DESYNC:-3}"
 INJECT_DEGRADED_RATIO="${INJECT_DEGRADED_RATIO:-0.5}"
+# The session-death/rebuild fields this run gates on are Debug level in p2p, and
+# the API config PUT does not move the running logger's level — only the startup
+# flag does. So the injection tier asks for debug on the command line.
+LOG_LEVEL="${LOG_LEVEL:-}"
+if [ "$INJECT" = 1 ] && [ -z "$LOG_LEVEL" ]; then LOG_LEVEL=debug; fi
 # A 10s run cannot hold three injections; only stretch the default, never an
 # explicit IPERF_SEC.
 if [ "$INJECT" = 1 ] && [ -z "$IPERF_SEC_WAS_SET" ]; then IPERF_SEC=150; fi
@@ -135,7 +140,7 @@ pids+=($!)
 DERPER_PID=$!
 for _ in $(seq 1 50); do curl -sk --max-time 1 "https://$BR_IP:$DERP_PORT/" >/dev/null 2>&1 && break; sleep 0.2; done
 
-start_wisper() { ip netns exec "$1" env XDG_CONFIG_HOME="$2" "$WISPER_BIN" -addr "$3" >"$2/wisper.log" 2>&1 & pids+=($!); }
+start_wisper() { ip netns exec "$1" env XDG_CONFIG_HOME="$2" "$WISPER_BIN" -addr "$3" ${LOG_LEVEL:+-log.level "$LOG_LEVEL"} >"$2/wisper.log" 2>&1 & pids+=($!); }
 wait_api() { for _ in $(seq 1 50); do curl -s --max-time 1 "http://$1/api/p2p" >/dev/null 2>&1 && return 0; sleep 0.2; done; return 1; }
 pubkey() { curl -s "http://$1/api/p2p" | sed -n 's/.*"public_key":"\([^"]*\)".*/\1/p'; }
 
@@ -151,8 +156,12 @@ done
 
 # wisper writes its structured log under its own configDir, not next to the
 # process's stderr. The session-death/rebuild fields this run gates on are Debug
-# level, which is why the config above turns the level up.
+# level, which is why the log level is turned up on the command line above: the
+# API config PUT does not move a running logger's level.
+# Both sides are collected: which peer desyncs and which recovers is not fixed,
+# so a verdict that reads one side's log can miss the bug entirely.
 HUB_LOG=$(ls -1 "$HUB_CFG"/wisper/logs/*.log 2>/dev/null | head -1)
+SPOKE_LOG=$(ls -1 "$SPOKE_CFG"/wisper/logs/*.log 2>/dev/null | head -1)
 
 HUB_KEY=$(pubkey "$HUB_API"); SPOKE_KEY=$(pubkey "$SPOKE_API")
 say "hub=$HUB_KEY spoke=$SPOKE_KEY"
@@ -251,17 +260,56 @@ post_out=$(timeout 40 ip netns exec "$NS_HUB" \
 post_bps=$(printf '%s\n' "$post_out" | awk '/receiver/ {for (i=1;i<=NF;i++) if ($i=="Mbits/sec") print $(i-1)}' | tail -1)
 ip netns exec "$NS_SPOKE" pkill -f "iperf3 -s" || true
 
-# Verdict. The signal is the hub log, not the throughput alone: a session that
-# cannot realign logs a record-boundary failure on EVERY rebuild (the field saw
-# 69 of them over ~2.5h), whereas a pair that re-handshakes logs at most a
-# transient one while it learns of the new key.
-desync=$(grep -c -e 'bad secure record length' -e 'secure record auth failed' "$HUB_LOG" 2>/dev/null)
-rebuilds=$(grep -c 'relay session rebuilt' "$HUB_LOG" 2>/dev/null)
-killed=$(grep -c 'peer session killed' "$HUB_LOG" 2>/dev/null)
-reasons=$(grep -o '"relayReason":"[a-z-]*"' "$HUB_LOG" 2>/dev/null | sort | uniq -c | tr '\n' ' ')
-say "hub log: $HUB_LOG"
-say "hub log: session kills=$killed rebuilds=$rebuilds record-boundary failures=$desync"
-say "kill reasons: ${reasons:-none}"
+# Verdict. A COUNT cannot tell a healed pair from a permanently desynced one: a
+# self-healing pair still logs a few record-boundary failures while it learns of
+# the new key, so any fixed budget is either too tight to pass a good run or too
+# loose to catch the bug. The discriminating signal is TEMPORAL — after the last
+# relay session came up, the pair must log no further boundary failure. The bug
+# this fixes fails on EVERY rebuild and can never produce that quiet tail.
+#
+# Both sides are checked, and neither alone is enough: the side that desyncs and
+# the side that recovers can be different peers, and the observed run failed on
+# the spoke while the hub rebuilt cleanly throughout.
+#
+# Note the log format: wisper's handler folds slog attrs into the message text
+# as key=value, so "relayReason" never appears as a JSON key. Grep for the
+# key=value form or the tally comes out empty.
+boundary_failures_after_last_up() {
+  [ -n "$1" ] && [ -f "$1" ] || { echo 0; return; }
+  awk '
+    /peer relay session up/ { up = NR }
+    { line[NR] = $0 }
+    END {
+      n = 0
+      for (i = up + 1; i <= NR; i++)
+        if (line[i] ~ /bad secure record length/ || line[i] ~ /secure record auth failed/) n++
+      print n + 0
+    }
+  ' "$1"
+}
+
+# self_healed reports 0 when the log shows the fix doing its job: a kill that
+# actually dropped the secure session, followed by a fresh relay session on the
+# rebuilt keys.
+self_healed() {
+  [ -n "$1" ] && [ -f "$1" ] || return 1
+  awk '
+    /dropSecure=true/ { dropped = NR }
+    /peer relay session up/ { if (dropped && !healed) healed = 1 }
+    END { exit !(dropped && healed) }
+  ' "$1"
+}
+
+for role in hub spoke; do
+  eval "log=\${${role^^}_LOG}"
+  say "$role log: $log"
+  say "$role log: session kills=$(grep -c 'peer session killed' "$log" 2>/dev/null)" \
+      "rebuilds=$(grep -c 'relay session rebuilt' "$log" 2>/dev/null)" \
+      "session-ups=$(grep -c 'peer relay session up' "$log" 2>/dev/null)" \
+      "boundary failures (all)=$(grep -c -e 'bad secure record length' -e 'secure record auth failed' "$log" 2>/dev/null)" \
+      "boundary failures (after last session up)=$(boundary_failures_after_last_up "$log")"
+  say "$role kill reasons: $(grep -o 'relayReason=[a-z-]*' "$log" 2>/dev/null | sort | uniq -c | tr '\n' ' ' | sed 's/  */ /g')"
+done
 
 recovered=no
 if awk "BEGIN{exit !($post_bps >= $INJECT_MIN_BPS)}" 2>/dev/null; then recovered=yes; fi
@@ -269,27 +317,40 @@ degraded=no
 if [ -n "${base_bps:-}" ] && [ "$base_bps" != "0" ] && \
    awk "BEGIN{exit !($post_bps < $base_bps * $INJECT_DEGRADED_RATIO)}" 2>/dev/null; then degraded=yes; fi
 
-if [ "$desync" -gt "$INJECT_MAX_DESYNC" ]; then
-  say "FAIL: $desync record-boundary failures (> $INJECT_MAX_DESYNC) — the pair never realigned. This is the bug this plan fixes."
+# Throughput is reported, NOT gated: it measures the data plane, not the relay
+# secure-session fix, and in this environment the tun pair's own datagram link
+# can drop on its own. The log signature below is the signal.
+say "throughput (informational): post=${post_bps:-0} Mbit/s baseline=${base_bps:-0} Mbit/s recovered=$recovered degraded=$degraded"
+
+# Fail first, on the one thing that is unambiguous: a boundary failure AFTER the
+# last session came up means the pair is still desynced with nothing left to fix
+# it. This is the bug, and no amount of rebuilding hides it.
+worst=0
+for role in hub spoke; do
+  eval "log=\${${role^^}_LOG}"
+  n=$(boundary_failures_after_last_up "$log")
+  [ "$n" -gt "$worst" ] && worst=$n
+done
+if [ "$worst" -gt "$INJECT_MAX_DESYNC" ]; then
+  say "FAIL: $worst record-boundary failure(s) logged AFTER the last relay session came up (> $INJECT_MAX_DESYNC) — the pair never realigned. This is the bug this plan fixes."
   exit 1
 fi
-# Throughput is reported, NOT gated. The datagram link dies on its own in this
-# environment (cause 1 in docs/tun-hub-bandwidth-e2e.md, explicitly out of this
-# plan's scope), which zeroes the data plane before and after any injection — so
-# a throughput verdict would measure that, not the relay secure-session fix. The
-# log signature above is the discriminating signal.
-say "throughput (informational, gated by out-of-scope cause 1): post=${post_bps:-0} Mbit/s baseline=${base_bps:-0} Mbit/s recovered=$recovered degraded=$degraded"
-# Refuse to pass vacuously. "0 record-boundary failures" means nothing if no
-# relay session was ever built and nothing was ever replaced — that is the case
-# when the data plane never came up at all (cause 1), and it must read as
-# INCONCLUSIVE, never as PASS.
-if [ "$rebuilds" -eq 0 ] || [ "$killed" -eq 0 ]; then
-  say "INCONCLUSIVE: $rebuilds rebuild(s), $killed kill(s) — no relay session was ever replaced, so the fix was never exercised"
+
+# Refuse to pass vacuously. A quiet tail means nothing if the fix was never
+# exercised, so require the drop-then-rebuild sequence to appear on AT LEAST ONE
+# side — that is the proof the injection reached the relay path and the pair
+# healed. One side is the right bar, not both: a peer recovering via rekey keeps
+# its secure session by design (resetPeerSession must not drop it), so a healthy
+# pair only ever shows dropSecure=true on the side that actually desynced.
+healed_sides=""
+for role in hub spoke; do
+  eval "log=\${${role^^}_LOG}"
+  if self_healed "$log"; then healed_sides="$healed_sides $role"; fi
+done
+if [ -z "$healed_sides" ]; then
+  say "INCONCLUSIVE: neither side logged a dropSecure=true kill followed by a fresh relay session — the fix was never exercised, so a quiet tail proves nothing"
   exit 3
 fi
-if [ "$desync" -eq 0 ]; then
-  say "PASS: $rebuilds rebuild(s), $killed kill(s), 0 record-boundary failures — every rebuild re-handshaked cleanly"
-  exit 0
-fi
-say "PASS (with $desync transient record-boundary failure(s), within the $INJECT_MAX_DESYNC budget)"
+
+say "PASS: $healed_sides dropped the secure session and re-handshaked onto a fresh relay session; no side logged a boundary failure after its last session came up"
 exit 0
