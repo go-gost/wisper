@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -434,64 +435,322 @@ func TestTunHubAllocatesPeerAddresses(t *testing.T) {
 	}
 }
 
-// TestTunHubRejectsAnAddressOutsideItsSubnet: the allocation above only ever
-// produces addresses the hub's device is on. A typed one is checked before it is
-// saved, and the hub refuses to run rather than authorize a claim the API should
-// never have let through — an address outside every subnet the hub holds cannot be
-// routed by the hub at all, so authorizing it would register a route to nowhere.
-func TestTunHubRejectsAnAddressOutsideItsSubnet(t *testing.T) {
-	prefixes, self := parseHubNets("10.10.0.1/24")
+// TestTunHubDropsRowsItCannotHonour: the hub is the allocator of record, so a row
+// naming something it cannot honour is dropped where the operator can see it — when
+// the hub starts, and when an assignment is saved — rather than reaching the
+// authorizer and being refused later, from a spoke that simply will not register and
+// a route-table entry pointing at an address nothing delivers to.
+//
+// Three rows are in that class: an address outside every subnet the hub's device is
+// on (the listener adds a connected route for the hub's own net and a hub asks for no
+// routes at all, so such a spoke registers, believes it holds the address, and is
+// unreachable at it); an address that is not an address at all; and, in
+// TestTunHubDropsBothSidesOfADuplicate below, an address another row names too.
+//
+// Each is dropped whole, none of them is an error, and the sound rows beside them
+// keep working: one typo must not cost a whole subnet's worth of spokes, and must not
+// make every later save fail until the operator hand-edits the file.
+//
+// Both chokepoints are run over the same rows, because what is saved and what
+// authorizes are one fact — and a hub started from a hand-edited file has to land on
+// exactly the assignment a save would have written.
+func TestTunHubDropsRowsItCannotHonour(t *testing.T) {
+	const hubID = "hub-drops"
+	event.Seed(hubID, nil) // isolate: the store is process-wide
+	t.Cleanup(func() { event.Seed(hubID, nil) })
 
-	if err := validatePeerIP("192.168.9.9", prefixes); err == nil {
-		t.Error("an address outside every hub subnet was accepted")
-	}
-	if err := validatePeerIP("10.10.0.2", prefixes); err != nil {
-		t.Errorf("an address inside the hub subnet was refused: %v", err)
-	}
-	// The allocation cannot produce an outside address either, which is why the
-	// check above is belt-and-braces rather than the only thing standing there.
-	got, err := assignPeerIPs([]string{"a"}, nil, prefixes, self)
-	if err != nil {
-		t.Fatalf("assignPeerIPs: %v", err)
-	}
-	if err := validatePeerIP(got["a"], prefixes); err != nil {
-		t.Errorf("the allocator produced %q, which is outside the hub subnet: %v", got["a"], err)
-	}
-
-	// An allowlist row that does not parse is refused as an unknown peer, not as a
-	// spoke with no address: the two are different states and only one of them is
-	// what a typo is. The API rejects such a row before it is saved, so reaching
-	// the authorizer with one is the belt-and-braces case — and it must still fail
-	// closed.
-	hub := NewTunTunnel(IDOption("hub-outside"), NetOption("10.10.0.1/24")).(*tunTunnel)
-	hub.authz = hub.newAuthorizer(xlogger.Nop())
-	if err := hub.SetPeerIPs(context.Background(), map[string]string{"p1": "10.10.0.2/24"}); err != nil {
-		t.Fatalf("SetPeerIPs: %v", err)
-	}
-	if hub.authz.Authorize(context.Background(), "p1", []net.IP{net.ParseIP("10.10.0.2").To16()}) {
-		t.Error("a row that does not parse authorized a claim, want refused")
-	}
-	// Claiming nothing is the other half of the distinction, and the half a mistake
-	// in the conversion would get wrong: a row kept as present-but-empty would let
-	// a typo'd spoke through as a spoke that may claim nothing, where dropping the
-	// key refuses it as a peer this hub does not know. Only the reason differs, so
-	// it is asserted as the event an operator reads.
-	if hub.authz.Authorize(context.Background(), "p1", nil) {
-		t.Error("a spoke whose row does not parse was authorized to claim nothing, want refused as unknown")
+	rows := map[string]string{
+		"good":    "10.10.0.2",    // stays: inside the hub's subnet
+		"offsite": "192.168.9.9",  // dropped: in no subnet the hub holds
+		"junk":    "10.10.0.9/24", // dropped: a prefix is not a host address
+		"empty":   "",             // stays: the state that means "may claim nothing"
 	}
 
-	// An empty row is a different thing entirely: the key stays, and it says the
-	// spoke may claim nothing.
-	if err := hub.SetPeerIPs(context.Background(), map[string]string{"p1": ""}); err != nil {
-		t.Fatalf("SetPeerIPs: %v", err)
+	for _, cp := range []struct {
+		name string
+		// apply hands the rows to the hub the way Run or a save does, and returns
+		// the authorizer now in force.
+		apply func(t *testing.T, hub *tunTunnel) *spokeAuthorizer
+	}{
+		{"at Run", func(t *testing.T, hub *tunTunnel) *spokeAuthorizer {
+			// Run builds its authorizer from the rows already in the options.
+			return hub.newAuthorizer(xlogger.Nop())
+		}},
+		{"at save", func(t *testing.T, hub *tunTunnel) *spokeAuthorizer {
+			// Started from an empty assignment, so the drops below are this save's
+			// own rather than the Run filter's — the Run filter is the other half of
+			// this table, and counting both would double every one of them.
+			hub.authz = newSpokeAuthorizer(hub.opts.ID, nil, xlogger.Nop())
+			if err := hub.SetPeerIPs(context.Background(), rows); err != nil {
+				t.Fatalf("SetPeerIPs: %v", err)
+			}
+			return hub.authz
+		}},
+	} {
+		t.Run(cp.name, func(t *testing.T) {
+			event.Seed(hubID, nil)
+			hub := NewTunTunnel(
+				IDOption(hubID),
+				NetOption("10.10.0.1/24"),
+				PeersOption("good", "offsite", "junk", "empty"),
+				PeerIPsOption(rows),
+			).(*tunTunnel)
+			authz := cp.apply(t, hub)
+
+			// The saved assignment is what authorizes, and not merely a superset of
+			// it: a row left in the config that the authorizer does not hold is a row
+			// the operator can see and the hub is not honouring.
+			saved := hub.Options().PeerIPs
+			if len(saved) != 2 || saved["good"] != "10.10.0.2" || saved["empty"] != "" {
+				t.Fatalf("PeerIPs = %v, want the two rows the hub can honour: good and empty", saved)
+			}
+			for _, peer := range []string{"offsite", "junk"} {
+				if _, ok := saved[peer]; ok {
+					t.Errorf("PeerIPs kept the dropped row %q: %v", peer, saved)
+				}
+			}
+
+			// One warning per dropped row, under the hub's ID, naming the row and
+			// why — asserted before the claims below, because a refusal records an
+			// event of its own and would land in the same count.
+			want := []string{
+				`spoke "offsite" dropped from the hub's address assignment: 192.168.9.9 is outside the hub's subnets (10.10.0.0/24)`,
+				`spoke "junk" dropped from the hub's address assignment: its row "10.10.0.9/24" is not a comma-separated list of IP addresses`,
+			}
+			if got := warnMessages(hubID); !sameMessages(got, want) {
+				t.Errorf("the hub's warnings = %v, want %v", got, want)
+			}
+			// The hub's ID, not the peer's key: a peer key names an object the
+			// operator has no page for.
+			if got := event.List("offsite"); len(got) != 0 {
+				t.Errorf("a drop was filed under the peer key: %v", got)
+			}
+
+			ctx := context.Background()
+			// The sound rows still serve their spokes: dropping one row is not the
+			// hub deciding it has had enough rows.
+			if !authz.Authorize(ctx, "good", claimOf("10.10.0.2")) {
+				t.Error(`the spoke with the sound row was refused its own address`)
+			}
+			if !authz.Authorize(ctx, "empty", nil) {
+				t.Error(`the spoke with the empty row was refused a claim of nothing`)
+			}
+			if authz.Authorize(ctx, "empty", claimOf("10.10.0.2")) {
+				t.Error(`the spoke with the empty row was authorized to claim an address`)
+			}
+
+			// A dropped row is refused as a peer this hub does not know — including
+			// a claim of nothing, which is the half a "normalise the bad row to an
+			// empty one" mistake gets wrong: that would come back as "this spoke may
+			// claim nothing" and lock the spoke out with a reason pointing nowhere.
+			for _, peer := range []string{"offsite", "junk"} {
+				if authz.Authorize(ctx, peer, claimOf("10.10.0.2")) {
+					t.Errorf("%s: a spoke whose row was dropped was authorized to claim an address", peer)
+				}
+				if authz.Authorize(ctx, peer, nil) {
+					t.Errorf("%s: a spoke whose row was dropped was authorized to claim nothing, want refused as not in the hub's assignment", peer)
+				}
+			}
+		})
 	}
-	ctx := context.Background()
-	if !hub.authz.Authorize(ctx, "p1", nil) {
-		t.Error("an empty row refused a spoke claiming nothing, want authorized")
+}
+
+// TestTunHubDropsBothSidesOfADuplicate: two rows naming one address is the case the
+// whole feature exists to prevent, because the hub's route table is
+// last-writer-wins per address — the second spoke to register silently takes the
+// first one's route and its traffic goes to the wrong device.
+//
+// One of the two cannot be kept, and the only order available to choose it by is Go's
+// randomized map order: a hub that picked a winner would hand out a different answer
+// on the next save, which is a network that changes under a running config. Both rows
+// go instead — the address is ambiguous, dropping both sides does not depend on
+// iteration order, and both spokes are refused as unknown, the same fail-closed
+// answer a malformed row gets.
+//
+// The repetition is the point. With one run, an implementation that kept whichever
+// row the map happened to yield first would pass; the outcome has to be the same
+// every time. Both chokepoints are exercised, because a hand-edited file and a save
+// reach the same filter by different paths.
+func TestTunHubDropsBothSidesOfADuplicate(t *testing.T) {
+	const hubID = "hub-dup"
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	rows := map[string]string{
+		"first":  "10.10.0.2",
+		"second": "10.10.0.2",
+		"other":  "10.10.0.3",
 	}
-	if hub.authz.Authorize(ctx, "p1", []net.IP{net.ParseIP("10.10.0.2").To16()}) {
-		t.Error("an empty row authorized a spoke claiming an address, want refused")
+	want := []string{
+		`spoke "first" dropped from the hub's address assignment: 10.10.0.2 appears 2 times in the assignment, so the hub cannot tell which row owns it`,
+		`spoke "second" dropped from the hub's address assignment: 10.10.0.2 appears 2 times in the assignment, so the hub cannot tell which row owns it`,
 	}
+
+	for _, cp := range []struct {
+		name  string
+		apply func(t *testing.T, hub *tunTunnel) *spokeAuthorizer
+	}{
+		{"at Run", func(t *testing.T, hub *tunTunnel) *spokeAuthorizer {
+			return hub.newAuthorizer(xlogger.Nop())
+		}},
+		{"at save", func(t *testing.T, hub *tunTunnel) *spokeAuthorizer {
+			hub.authz = newSpokeAuthorizer(hub.opts.ID, nil, xlogger.Nop())
+			if err := hub.SetPeerIPs(context.Background(), rows); err != nil {
+				t.Fatalf("SetPeerIPs: %v", err)
+			}
+			return hub.authz
+		}},
+	} {
+		t.Run(cp.name, func(t *testing.T) {
+			for i := range 50 {
+				// Reseeded per run: event.Record folds a repeat of the newest event
+				// into it, so a fixed id would carry one entry with a rising count
+				// instead of this run's two drops.
+				event.Seed(hubID, nil)
+				hub := NewTunTunnel(IDOption(hubID), NetOption("10.10.0.1/24"), PeerIPsOption(rows)).(*tunTunnel)
+				authz := cp.apply(t, hub)
+
+				saved := hub.Options().PeerIPs
+				if len(saved) != 1 || saved["other"] != "10.10.0.3" {
+					t.Fatalf("run %d: PeerIPs = %v, want only the row naming 10.10.0.3: both sides of the duplicate are dropped", i, saved)
+				}
+				if got := warnMessages(hubID); !sameMessages(got, want) {
+					t.Fatalf("run %d: the hub's warnings = %v, want %v", i, got, want)
+				}
+
+				ctx := context.Background()
+				if !authz.Authorize(ctx, "other", claimOf("10.10.0.3")) {
+					t.Errorf("run %d: the spoke whose row was untouched was refused its own address", i)
+				}
+				for _, peer := range []string{"first", "second"} {
+					if authz.Authorize(ctx, peer, claimOf("10.10.0.2")) {
+						t.Errorf("run %d: %s, one side of the duplicate, was authorized to claim the contested address", i, peer)
+					}
+					if authz.Authorize(ctx, peer, nil) {
+						t.Errorf("run %d: %s, one side of the duplicate, was authorized to claim nothing, want refused as not in the hub's assignment", i, peer)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestTunHubDropsARowThatRepeatsItsAddress: the same ambiguity inside one row. No
+// claim can ever match "10.10.0.2,10.10.0.2" — the authorizer's sweep consumes, so
+// the second copy finds its address already taken — and a row that can authorize
+// nothing is a row the hub cannot honour. It is said once, not twice: the count in
+// the reason already tells the operator what is wrong.
+func TestTunHubDropsARowThatRepeatsItsAddress(t *testing.T) {
+	const hubID = "hub-repeat-row"
+	event.Seed(hubID, nil)
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	hub := NewTunTunnel(
+		IDOption(hubID),
+		NetOption("10.10.0.1/24"),
+		PeerIPsOption(map[string]string{"twice": "10.10.0.2,10.10.0.2", "good": "10.10.0.3"}),
+	).(*tunTunnel)
+	authz := hub.newAuthorizer(xlogger.Nop())
+
+	saved := hub.Options().PeerIPs
+	if len(saved) != 1 || saved["good"] != "10.10.0.3" {
+		t.Fatalf("PeerIPs = %v, want only the sound row", saved)
+	}
+	want := []string{
+		`spoke "twice" dropped from the hub's address assignment: 10.10.0.2 appears 2 times in the assignment, so the hub cannot tell which row owns it`,
+	}
+	if got := warnMessages(hubID); !sameMessages(got, want) {
+		t.Errorf("the hub's warnings = %v, want %v — one event for the row, one sentence in it", got, want)
+	}
+	if authz.Authorize(context.Background(), "twice", claimOf("10.10.0.2")) {
+		t.Error("a spoke whose row repeats an address was authorized to claim it once")
+	}
+}
+
+// TestTunHubWithNoSubnetKeepsEveryRow: a hub with no net configured is one broken
+// hub, not a set of broken rows, and the two are deliberately not treated alike.
+// There is no subnet for an address to be inside or outside of, so neither rule can
+// say anything: an off-subnet row stays, a duplicated one stays, and nothing is
+// warned about.
+//
+// Dropping everything here would turn one missing "net" into an assignment of
+// nothing — every spoke refused, with warnings blaming rows the operator never wrote,
+// and a hub that reads as a broken allowlist. The mistake is already reported where it
+// is made: assignPeerIPs refuses to allocate an address on a hub with no subnet, and
+// validatePeerIP names the missing subnet to whoever typed one.
+//
+// A net that does not parse is the same hub: parseHubNets skips an entry it cannot
+// read, so a hub whose only entry is junk has no subnet either.
+func TestTunHubWithNoSubnetKeepsEveryRow(t *testing.T) {
+	const hubID = "hub-nosubnet"
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	rows := map[string]string{
+		"offsite": "192.168.9.9",
+		"first":   "10.10.0.2",
+		"second":  "10.10.0.2",
+	}
+
+	for _, tc := range []struct{ name, netSpec string }{
+		{"no net at all", ""},
+		{"a net that does not parse", "not-a-cidr"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			event.Seed(hubID, nil)
+			hub := NewTunTunnel(IDOption(hubID), NetOption(tc.netSpec), PeerIPsOption(rows)).(*tunTunnel)
+			authz := hub.newAuthorizer(xlogger.Nop())
+
+			saved := hub.Options().PeerIPs
+			if len(saved) != len(rows) {
+				t.Fatalf("PeerIPs = %v, want every row kept: with no subnet there is nothing to judge a row against", saved)
+			}
+			for peer, want := range rows {
+				if saved[peer] != want {
+					t.Errorf("PeerIPs[%q] = %q, want %q", peer, saved[peer], want)
+				}
+			}
+			if got := warnMessages(hubID); len(got) != 0 {
+				t.Errorf("a hub with no subnet warned about rows it cannot judge: %v", got)
+			}
+
+			// Kept and in force, not merely saved: the filter is a no-op on both
+			// sides of the saved-is-what-authorizes invariant.
+			if !authz.Authorize(context.Background(), "first", claimOf("10.10.0.2")) {
+				t.Error("the spoke whose row was kept was refused its own address")
+			}
+		})
+	}
+}
+
+// claimOf is the shape a spoke's claim arrives in: 16 bytes per address, which is
+// what x writes on the wire, so an IPv4 address reaches Authorize as ::ffff:a.b.c.d.
+func claimOf(addr string) []net.IP {
+	return []net.IP{net.ParseIP(addr).To16()}
+}
+
+// warnMessages returns the warnings filed under id, oldest first. A repeat of the
+// newest one is folded into it with a count, so this is one entry per distinct
+// message rather than one per occurrence.
+func warnMessages(id string) []string {
+	var msgs []string
+	for _, ev := range event.List(id) {
+		if ev.Level == event.LevelWarn {
+			msgs = append(msgs, ev.Message)
+		}
+	}
+	return msgs
+}
+
+// sameMessages compares two sets of messages without regard to order. The store's
+// order follows the order the rows were ranged over and Go randomizes map order, so
+// an order-sensitive comparison would be a scheduler bet rather than an assertion.
+func sameMessages(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	a, b := slices.Clone(got), slices.Clone(want)
+	slices.Sort(a)
+	slices.Sort(b)
+	return slices.Equal(a, b)
 }
 
 // TestTunHubAllocationIsStableAcrossSaves: allocation is idempotent. The second

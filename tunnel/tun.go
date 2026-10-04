@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,7 @@ import (
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	// Both x packages are named "tun": the aliases keep them apart.
 	tunhandler "github.com/go-gost/x/handler/tun"
 	tunlistener "github.com/go-gost/x/listener/tun"
@@ -185,13 +187,175 @@ func (s *tunTunnel) init() error {
 // last-writer-wins per address, so a claim that is not checked takes a neighbour's
 // route with nothing anywhere saying so.
 //
+// The rows are filtered first (honorablePeerIPs) and what survives is both what the
+// authorizer holds and what the hub saves, so a hub started from a hand-edited file
+// lands on exactly the assignment a save through the API would have written.
+//
 // The identity handed to it is s.opts.ID — the hub's — because that is what
 // event.Record files a refusal under: a peer key names an object the operator has
 // no page for, and a route's name is not an object either. A hub built without one
 // has no assignment loaded, so every claim is refused as unknown rather than
 // passing unchecked.
 func (s *tunTunnel) newAuthorizer(log logger.Logger) *spokeAuthorizer {
-	return newSpokeAuthorizer(s.opts.ID, s.opts.PeerIPs, log)
+	s.mu.RLock()
+	rows := s.opts.PeerIPs
+	s.mu.RUnlock()
+
+	kept := s.honorablePeerIPs(rows, log)
+	// The filtered rows go back into the options, not only into the authorizer:
+	// spokeAuthorizer.set is written on the invariant that what is saved and what is
+	// authorizing are one fact, and a hub that kept a dropped row in its config would
+	// break it on the next SaveConfig — showing the operator a row the hub is not
+	// honouring.
+	s.mu.Lock()
+	s.opts.PeerIPs = kept
+	s.mu.Unlock()
+
+	return newSpokeAuthorizer(s.opts.ID, kept, log)
+}
+
+// honorablePeerIPs returns the rows of peerIPs this hub can honour. It is the only
+// place that answer is computed, and both chokepoints — the authorizer Run builds
+// and SetPeerIPs — apply the result to s.opts.PeerIPs and to the authorizer alike.
+//
+// Three rows are not honorable, and each is dropped whole: never emptied, never
+// turned into an error.
+//
+//   - A row that does not parse. It could not authorize a claim either, and the API
+//     rejects such a row before it is ever saved, so reaching here with one means the
+//     file was hand-edited.
+//   - A row naming an address outside every subnet the hub's device is on. The
+//     listener adds a connected route for the hub's own net and nothing else, and a
+//     hub deliberately asks for no routes at all, so nothing would ever be delivered
+//     to such a spoke: it would register, believe it held the address, and be
+//     unreachable at it, leaving a route-table entry behind.
+//   - A row naming an address another live row names too. Both go, not one of them:
+//     the tie cannot be broken by iteration order (Go randomizes map order), and a hub
+//     that picked a winner would give a different answer on the next save, while the
+//     route table would hand the address to whichever spoke registered last — the
+//     silent route theft the whole assignment exists to prevent.
+//
+// Dropping is the answer spokeAuthorizer.set already gives a row that does not
+// parse: the peer is absent, so every claim from it is refused as not in the hub's
+// assignment. Emptying the row instead would be the present-with-nil failure — a
+// typo would come back as "this spoke may claim nothing" and lock the spoke out with
+// a reason pointing nowhere. Failing the save instead would be worse still: one bad
+// row in the file would make every later save fail until the operator hand-edited
+// the yaml, where failing closed per row needs nothing.
+//
+// A hub with no subnet configured is one broken hub rather than a set of broken
+// rows, and it passes through untouched: there is no subnet for an address to be
+// inside or outside of, so neither rule can say anything, and dropping every row
+// would turn one missing "net" into a hub that authorizes nothing at all — a worse
+// outcome than the misconfiguration, and one that reads as a broken allowlist.
+// assignPeerIPs already refuses to allocate on such a hub and validatePeerIP already
+// names the missing subnet to whoever typed the address, so the mistake is reported
+// where it is made.
+func (s *tunTunnel) honorablePeerIPs(peerIPs map[string]string, log logger.Logger) map[string]string {
+	// s.opts.Net and s.opts.ID are set at construction and never written again, so
+	// they are read here without the lock the assignment itself needs.
+	prefixes, _ := parseHubNets(s.opts.Net)
+	if len(prefixes) == 0 {
+		return peerIPs
+	}
+
+	type row struct {
+		peer  string
+		spec  string
+		addrs []netip.Addr
+	}
+	rows := make([]row, 0, len(peerIPs))
+	for peer, spec := range peerIPs {
+		addrs, ok := parsePeerIPs(spec)
+		if !ok {
+			s.dropPeerIP(peer, fmt.Sprintf("its row %q is not a comma-separated list of IP addresses", spec), log)
+			continue
+		}
+		// Unmapped before anything else looks at it: a row written ::ffff:10.10.0.2
+		// names the same address as 10.10.0.2, and netip.Prefix.Contains reports an
+		// IPv4-mapped address as outside an IPv4 prefix — without this an ordinary
+		// row would be dropped as off-subnet. The value kept is the operator's own
+		// text, byte for byte.
+		addrs = unmapAll(addrs)
+
+		// Checked here rather than with the duplicates below, so that a row the hub
+		// cannot route at all is gone before any address is counted: an address named
+		// only by a row that was dropped for another reason cannot collide with
+		// anything, and must not take a neighbour's good row down with it.
+		var why []string
+		for _, addr := range distinctAddrs(addrs) {
+			if err := validatePeerIP(addr.String(), prefixes); err != nil {
+				why = append(why, err.Error())
+			}
+		}
+		if len(why) > 0 {
+			s.dropPeerIP(peer, strings.Join(why, "; "), log)
+			continue
+		}
+		rows = append(rows, row{peer: peer, spec: spec, addrs: addrs})
+	}
+
+	// claims counts, over the rows that survived above, how many row slots name each
+	// address — including twice in one row, which is an ambiguity too: no claim can
+	// ever match such a row, because the authorizer's sweep consumes and the second
+	// copy finds its address already taken.
+	claims := make(map[netip.Addr]int, len(rows))
+	for _, r := range rows {
+		for _, addr := range r.addrs {
+			claims[addr]++
+		}
+	}
+
+	kept := make(map[string]string, len(rows))
+	for _, r := range rows {
+		var why []string
+		for _, addr := range distinctAddrs(r.addrs) {
+			if n := claims[addr]; n > 1 {
+				why = append(why, fmt.Sprintf("%s appears %d times in the assignment, so the hub cannot tell which row owns it", addr, n))
+			}
+		}
+		if len(why) > 0 {
+			s.dropPeerIP(r.peer, strings.Join(why, "; "), log)
+			continue
+		}
+		// An empty row survives: it is the state that means "this spoke may claim
+		// nothing", and it is what allocation fills.
+		kept[r.peer] = r.spec
+	}
+	return kept
+}
+
+// dropPeerIP records one row the hub cannot honour. One format and both sinks, and
+// under the hub's ID, for the same reason spokeAuthorizer.refuse files a refusal
+// there: the operator who has to act on this is looking at the hub's page, and a
+// peer key names an object wisper has none for.
+//
+// log may be nil — a save has no logger of its own, and the event is the record the
+// operator reads either way — which is why the sink is guarded rather than assumed.
+func (s *tunTunnel) dropPeerIP(peer, reason string, log logger.Logger) {
+	format := "spoke %q dropped from the hub's address assignment: %s"
+	args := []any{peer, reason}
+	if log != nil {
+		log.Warnf(format, args...)
+	}
+	event.Record(s.opts.ID, event.LevelWarn, format, args...)
+}
+
+// distinctAddrs keeps a row's first occurrence of each address, in the row's own
+// order. A row naming the same address twice is one thing to say out loud, and an
+// event that repeated the same sentence twice would read as two problems where there
+// is one.
+func distinctAddrs(addrs []netip.Addr) []netip.Addr {
+	seen := make(map[netip.Addr]struct{}, len(addrs))
+	out := make([]netip.Addr, 0, len(addrs))
+	for _, addr := range addrs {
+		if _, ok := seen[addr]; ok {
+			continue
+		}
+		seen[addr] = struct{}{}
+		out = append(out, addr)
+	}
+	return out
 }
 
 func (s *tunTunnel) Run() (err error) {
@@ -420,11 +584,14 @@ func (s *tunTunnel) SetPeers(ctx context.Context, peers []string, aliases map[st
 // withdrawn, and a claim on that route would be refused with no route to fall
 // back on.
 //
-// The rows are handed to the authorizer as they are. A row that does not parse is
-// dropped there and refused as an unknown peer, which is the fail-closed answer:
-// the API rejects such a row before it is ever saved, so reaching this point with
-// one is belt-and-braces, and the alternative — treating it as an empty row —
-// would leave that spoke silently claiming nothing with no event to explain it.
+// The rows are filtered before they are applied (honorablePeerIPs), and what
+// survives is both what the options carry and what the authorizer holds — so what a
+// save writes and what authorizes are the same rows. A row naming an address outside
+// the hub's subnets, or one another row names too, is dropped and warned about here,
+// at the moment the operator can act on it, rather than refused later from a spoke
+// that simply will not register. The save itself still cannot fail on one: failing it
+// would make every later save fail until the file was hand-edited, where failing
+// closed per row needs nothing.
 func (s *tunTunnel) SetPeerIPs(ctx context.Context, peerIPs map[string]string) error {
 	if s.IsClosed() {
 		return ErrTunnelClosed
@@ -435,10 +602,16 @@ func (s *tunTunnel) SetPeerIPs(ctx context.Context, peerIPs map[string]string) e
 	if authz == nil {
 		return errors.New("tun hub is not running")
 	}
+
+	// Filtered outside the lock: a drop records an event, and holding the options
+	// lock across that would put the config's writer behind the event store for no
+	// reason. The rows are the caller's map, and only the kept ones are stored, so
+	// neither the caller's map nor the one saved here is ever edited in place.
+	kept := s.honorablePeerIPs(peerIPs, nil)
 	s.mu.Lock()
-	s.opts.PeerIPs = peerIPs
+	s.opts.PeerIPs = kept
 	s.mu.Unlock()
-	authz.set(peerIPs)
+	authz.set(kept)
 	return nil
 }
 

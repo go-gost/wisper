@@ -59,6 +59,12 @@ func newSpokeAuthorizer(hubID string, assigned map[string]string, log logger.Log
 // map, read from the config, and an authorizer that held it would see a later
 // in-place edit appear without a save — making "what is saved" and "what is
 // authorizing" two different things with no event between them.
+//
+// A row that does not parse is dropped here too, by the same rule the hub applies
+// before it gets this far (tunTunnel.honorablePeerIPs), because this type is kept
+// deliberately subnet-agnostic — it knows what a spoke's row says and nothing about
+// whether the hub could honour it. Applied twice it is a no-op; applied once it is
+// the reason a spoke with a malformed row is refused rather than authorized from it.
 func (a *spokeAuthorizer) set(assigned map[string]string) {
 	parsed := make(map[string][]netip.Addr, len(assigned))
 	for peer, spec := range assigned {
