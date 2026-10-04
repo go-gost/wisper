@@ -88,8 +88,17 @@ func (a *spokeAuthorizer) Authorize(ctx context.Context, peer string, ips []net.
 		return false
 	}
 
-	// Loaded once, here, and not re-read: a decision made against half of one
-	// assignment and half of its replacement would be a decision against neither.
+	// The co-precondition that makes reading the assignment safe here is not this
+	// being the only Load — it is that set never edits a stored map in place. It
+	// builds a fresh one and stores that, so a map a decision is reading is never
+	// written to underneath it, and a second Load partway through would be just as
+	// safe: it would return the same map or its replacement, and never half of
+	// either. If set ever started mutating the stored map instead, no number of Loads
+	// would help — two goroutines would be reading and writing one map at once.
+	//
+	// Loading once here is still what makes the decision take one snapshot by
+	// construction rather than by luck, and it is where the nil check belongs: before
+	// any set, there is nothing to authorize against.
 	addrs := a.assigned.Load()
 	if addrs == nil {
 		return a.refuse(peer, ips, nil, "the hub has no assignment loaded")
@@ -204,14 +213,17 @@ func assigned(want []netip.Addr, addr netip.Addr) bool {
 // mutex-guarded history, where a plugin auther's RPC to another process could wait
 // on anything.
 func (a *spokeAuthorizer) refuse(peer string, ips []net.IP, want []netip.Addr, reason string) bool {
-	assigned := joinAddrs(want)
-	if assigned == "" {
-		assigned = "(none)"
+	// Not named assigned: that is the package-level function above, and a local
+	// shadowing it compiles today and then breaks the first edit that calls it, with
+	// a message about a string rather than about the shadow.
+	assignedText := joinAddrs(want)
+	if assignedText == "" {
+		assignedText = "(none)"
 	}
 	// One format, both sinks: a log line and an event that disagree about what was
 	// refused are worse than either alone.
 	format := "spoke %q refused: %s — claimed %v, assigned %s"
-	args := []any{peer, reason, ips, assigned}
+	args := []any{peer, reason, ips, assignedText}
 	if a.log != nil {
 		a.log.Warnf(format, args...)
 	}

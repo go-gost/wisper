@@ -5,6 +5,7 @@ import (
 	"context"
 	"net"
 	"net/netip"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -437,38 +438,89 @@ func TestAuthorizeStopsOnACancelledContext(t *testing.T) {
 // assignment while spokes are registering, and it must take effect without the
 // tun device being re-created — which would need the privilege the hub was started
 // with. So the assignment sits behind an atomic pointer rather than a mutex: a
-// registration reads it once and a save never waits for one.
+// registration reads it and a save never waits for one.
+//
+// Two halves, because one loop cannot carry both claims honestly. The first half
+// asserts that a swap is *seen*, and it is deterministic: each swap is performed on
+// another goroutine and waited for, so each observation after it is guaranteed. The
+// second half is the concurrency itself — a save running free, unsynchronized,
+// against decisions being made — and what it asserts is deliberately only what holds
+// under *every* interleaving, because which row is live when a decision is made is
+// not observable from outside.
+//
+// The earlier version of the second half counted how many claims were allowed and
+// how many refused and wanted both. That is not a test, it is a bet on the scheduler:
+// at GOMAXPROCS=1 the loop finishes in about a millisecond of straight-line code
+// before the flipper is ever scheduled, and it failed 20 runs out of 20 — and with
+// -race, which is the command the gate runs, 4 full-package runs out of 6. A gate that
+// goes red on a single-core runner or a cpus: 1 container is worse than a weaker test.
 func TestAuthorizeSeesAnAssignmentSwappedUnderIt(t *testing.T) {
 	ctx := context.Background()
 	a := newSpokeAuthorizer("hub-swap", map[string]string{"p1": "10.10.0.2"}, xlogger.Nop())
-	old := []net.IP{net.ParseIP("10.10.0.2").To16()}
+	two := []net.IP{net.ParseIP("10.10.0.2").To16(), net.ParseIP("10.10.0.3").To16()}
+	one := []net.IP{two[0]}
 
-	if !a.Authorize(ctx, "p1", old) {
+	// The row one spoke is assigned, and the row it is assigned after a save. The two
+	// differ in count as well as in content, so a decision that mixed them could not
+	// be mistaken for a decision from either: one of the two claims below is
+	// authorized under one row and refused under the other.
+	oneRow := map[string]string{"p1": "10.10.0.2"}
+	twoRow := map[string]string{"p1": "10.10.0.2,10.10.0.3"}
+
+	// First half: a swap is visible, from another goroutine, in both directions.
+	if !a.Authorize(ctx, "p1", one) {
 		t.Fatal("the initial assignment refused its own claim")
 	}
+	for round, row := range []struct {
+		stored map[string]string
+		claim  []net.IP
+		other  []net.IP
+	}{
+		{twoRow, two, one},
+		{oneRow, one, two},
+		{twoRow, two, one},
+	} {
+		// The set runs on another goroutine and is waited for, which is what makes
+		// the observations below guaranteed rather than likely. Waiting here is not
+		// what the second half below is about; that half deliberately does not wait.
+		stored := make(chan struct{})
+		go func() {
+			defer close(stored)
+			a.set(row.stored)
+		}()
+		<-stored
 
-	a.set(map[string]string{"p1": "10.10.0.3"})
-	if a.Authorize(ctx, "p1", old) {
-		t.Error("the old assignment still authorizes after a save, want refused")
-	}
-	if !a.Authorize(ctx, "p1", []net.IP{net.ParseIP("10.10.0.3").To16()}) {
-		t.Error("the new assignment did not take effect, want authorized")
+		if !a.Authorize(ctx, "p1", row.claim) {
+			t.Errorf("round %d: the row stored from another goroutine did not take effect, want its own claim authorized", round)
+		}
+		if a.Authorize(ctx, "p1", row.other) {
+			t.Errorf("round %d: a claim of the other row's addresses was authorized, want refused", round)
+		}
 	}
 
-	// Then with a save running in another goroutine, which is the shape this
-	// actually runs in: -race checks that the swap and the decision do not touch
-	// the same memory, and both outcomes being seen proves the loop observed the
-	// swap rather than one assignment.
-	var wg sync.WaitGroup
+	// Second half: the same two rows swapped continuously while decisions are being
+	// made, with nothing between the two goroutines after the start — no lock, no
+	// rendezvous, no wait. This is what -race is here for, and it is why the
+	// assertion below is one that no interleaving can violate: a claim of a repeated
+	// address is refused under both rows, so the loop is checking that every decision
+	// is a whole decision about one coherent row.
+	started := make(chan struct{})
 	stop := make(chan struct{})
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		// Stored before started is closed, and it is not the row the test began on,
+		// so "the swap ran" can never be confused with "the flipper never ran" — the
+		// earlier version stored the starting row first and made the two
+		// indistinguishable.
+		a.set(twoRow)
+		close(started)
 		for i := 0; ; i++ {
 			if i%2 == 0 {
-				a.set(map[string]string{"p1": "10.10.0.2"})
+				a.set(oneRow)
 			} else {
-				a.set(map[string]string{"p1": "10.10.0.2,10.10.0.3"})
+				a.set(twoRow)
 			}
 			select {
 			case <-stop:
@@ -477,22 +529,32 @@ func TestAuthorizeSeesAnAssignmentSwappedUnderIt(t *testing.T) {
 			}
 		}
 	}()
+	<-started
 
-	both := []net.IP{old[0], net.ParseIP("10.10.0.3").To16()}
-	var allowed, refused int
+	// A repeated address: one claim, two spellings of the same address, so the
+	// refusal is about the repeat rather than about the canonicalization.
+	repeat := []net.IP{net.ParseIP("10.10.0.2").To16(), net.ParseIP("10.10.0.2").To4()}
 	for i := 0; i < 2000; i++ {
-		if a.Authorize(ctx, "p1", both) {
-			allowed++
-		} else {
-			refused++
+		if i == 0 {
+			// Hand the goroutine a turn before deciding anything, so that at least one
+			// swap lands *during* this loop even with a single P: the loop is short
+			// enough to finish before the scheduler would otherwise come back for it.
+			// Gosched is not a synchronization point, so it orders nothing and the
+			// accesses stay unordered — which is the property -race needs to see.
+			runtime.Gosched()
 		}
+		if a.Authorize(ctx, "p1", repeat) {
+			t.Fatalf("iteration %d: a claim of a repeated address was authorized while the assignment was being swapped, want refused under either row", i)
+		}
+		// A claim of one row or the other, decided against whichever row is live:
+		// refused under one, authorized under the other, so the outcome is not
+		// asserted — but the decisions are made, against the map the flipper is
+		// replacing.
+		a.Authorize(ctx, "p1", two)
+		a.Authorize(ctx, "p1", one)
 	}
 	close(stop)
 	wg.Wait()
-
-	if allowed == 0 || refused == 0 {
-		t.Errorf("the loop saw %d allowed and %d refused claims, want both: the swap was not observed", allowed, refused)
-	}
 }
 
 // TestSpokeAuthorizerSatisfiesPeerAuthorizer: structural, not behavioural. This is
