@@ -1984,12 +1984,19 @@ func TestUpdateTunnelPeersRejectsAPrefix(t *testing.T) {
 // two it is.
 //
 // Nothing in the kernel would have refused them: checked against a real tun
-// device, Linux accepts 10.10.0.0/24 and 10.10.0.255/24, gives both scope-host
-// local routes and delivers to a socket bound on either. So this is the hub's own
-// rule, and the reason it has to be enforced at the request rather than left to
-// the hub's filter is the same as for every other refusal: the hub would drop such
-// a row as an event the request is no longer around to explain, leaving the spoke
-// saved with no address at all.
+// device, Linux accepts 10.10.0.0/24 and 10.10.0.255/24 and gives both
+// scope-host local routes. They are not equally usable, though. The network
+// address carries traffic and delivers to a socket bound on it, whereas lookups
+// go on classifying the broadcast address as broadcast — ip route get reports
+// broadcast even with an explicit /32 unicast host route installed and never
+// used — and ping refuses it. So refusing the broadcast address is the safer of
+// the two rules rather than the pedantic one, and the two cases below differ for
+// reasons the kernel supplies, not for uniformity's sake.
+//
+// Both are the hub's own rule, and the reason it has to be enforced at the
+// request rather than left to the hub's filter is the same as for every other
+// refusal: the hub would drop such a row as an event the request is no longer
+// around to explain, leaving the spoke saved with no address at all.
 func TestUpdateTunnelPeersRejectsAnAddressItsSubnetKeepsBack(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()
