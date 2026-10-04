@@ -101,16 +101,38 @@ func parsePeerIPs(spec string) ([]netip.Addr, bool) {
 }
 
 // validatePeerIP reports why a typed address cannot be assigned: it is not an
-// address at all, or it is outside every subnet the hub's device is on. err is
-// nil when it is fine.
+// address at all, it is the hub's own, or it is outside every subnet the hub's
+// device is on. err is nil when it is fine.
+//
+// self is the half of parseHubNets that a prefix cannot carry, and it is checked
+// here rather than only in assignPeerIPs because that leaves the two paths
+// disagreeing: allocation skips the hub's own address, so a validator that accepted
+// one would bless a row the hub will never hand out — the API would report it saved
+// and the spoke would be turned away at registration by x's self-loop guard, with a
+// message pointing nowhere near the cause. Refusing it here is what makes the two
+// paths say the same thing.
 //
 // It names the offending value in the message, because this error goes back to
 // whoever typed it through the API and the UI. A bare "invalid" tells an operator
 // nothing they did not already know.
-func validatePeerIP(host string, prefixes []netip.Prefix) error {
+func validatePeerIP(host string, prefixes []netip.Prefix, self []netip.Addr) error {
 	addr, err := netip.ParseAddr(strings.TrimSpace(host))
 	if err != nil {
 		return fmt.Errorf("%q is not an IP address", host)
+	}
+	// Unmapped before anything compares it. A row written ::ffff:10.10.0.2 names the
+	// same address as 10.10.0.2, and neither netip.Prefix.Contains nor a plain
+	// comparison against the hub's own addresses would match it as it stands — so
+	// the hub would refuse a row that is in its own subnet, and refuse the hub's own
+	// address as though it were somewhere else entirely.
+	addr = addr.Unmap()
+	// Before the subnet walk, and not as a subnet question: the hub's own address is
+	// inside its own prefix by construction, so asking whether it is in one of the
+	// hub's subnets would answer yes and say nothing about why it is refused.
+	for _, own := range self {
+		if own == addr {
+			return fmt.Errorf("%s is the hub's own address, which no spoke may claim", addr)
+		}
 	}
 	// An IPv4 address is not inside an IPv6 prefix, and netip.Prefix.Contains
 	// says so itself, so a mixed-family hub needs no special case here.

@@ -666,28 +666,51 @@ func TestTunHubDropsARowThatRepeatsItsAddress(t *testing.T) {
 	}
 }
 
-// TestTunHubWithNoSubnetKeepsEveryRow: a hub with no net configured is one broken
-// hub, not a set of broken rows, and the two are deliberately not treated alike.
-// There is no subnet for an address to be inside or outside of, so neither rule can
-// say anything: an off-subnet row stays, a duplicated one stays, and nothing is
-// warned about.
+// TestTunHubWithNoSubnetChecksDuplicatesOnly: a hub with no net configured is one
+// broken hub, not a set of broken rows, and the two are deliberately not treated
+// alike. The two checks are independent, and only one of them needs a subnet to
+// answer.
 //
-// Dropping everything here would turn one missing "net" into an assignment of
+// It does not: two rows naming the same address is a comparison among the rows
+// themselves. So the duplicate check still runs here — and it must, because that
+// address is just as routable on this hub as on any other, so leaving both rows in
+// force is the silent route theft the whole feature exists to prevent, in the one
+// configuration where nothing else warns about it.
+//
+// What is skipped is the question that has no answer without a subnet: an address
+// cannot be outside a subnet the hub does not have, so an off-subnet row stays — and
+// so does a row naming the address the hub *would* hold if it had a net, because
+// this hub holds nothing and that value is an ordinary address to it. Dropping rows
+// on the missing "net" instead would turn one absent field into an assignment of
 // nothing — every spoke refused, with warnings blaming rows the operator never wrote,
-// and a hub that reads as a broken allowlist. The mistake is already reported where it
-// is made: assignPeerIPs refuses to allocate an address on a hub with no subnet, and
-// validatePeerIP names the missing subnet to whoever typed one.
+// and a hub that reads as a broken allowlist. The mistake is already reported where
+// it is made: assignPeerIPs refuses to allocate on a hub with no subnet, and
+// validatePeerIP names the missing subnet to whoever typed an address.
 //
 // A net that does not parse is the same hub: parseHubNets skips an entry it cannot
 // read, so a hub whose only entry is junk has no subnet either.
-func TestTunHubWithNoSubnetKeepsEveryRow(t *testing.T) {
+func TestTunHubWithNoSubnetChecksDuplicatesOnly(t *testing.T) {
 	const hubID = "hub-nosubnet"
 	t.Cleanup(func() { event.Seed(hubID, nil) })
 
-	rows := map[string]string{
+	// The rows this hub cannot judge: one in no subnet it has, one naming what would
+	// be its own address if it had a net. Both are ordinary rows here.
+	unjudgeable := map[string]string{
 		"offsite": "192.168.9.9",
+		"wouldbe": "10.10.0.1",
 		"first":   "10.10.0.2",
-		"second":  "10.10.0.2",
+		"second":  "10.10.0.3",
+	}
+	// And the one thing it can judge, because the answer does not depend on a subnet:
+	// two rows naming one address.
+	contested := map[string]string{
+		"first":  "10.10.0.2",
+		"second": "10.10.0.2",
+		"other":  "10.10.0.3",
+	}
+	wantContested := []string{
+		`spoke "first" dropped from the hub's address assignment: 10.10.0.2 appears 2 times in the assignment, so the hub cannot tell which row owns it`,
+		`spoke "second" dropped from the hub's address assignment: 10.10.0.2 appears 2 times in the assignment, so the hub cannot tell which row owns it`,
 	}
 
 	for _, tc := range []struct{ name, netSpec string }{
@@ -695,29 +718,132 @@ func TestTunHubWithNoSubnetKeepsEveryRow(t *testing.T) {
 		{"a net that does not parse", "not-a-cidr"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			event.Seed(hubID, nil)
-			hub := NewTunTunnel(IDOption(hubID), NetOption(tc.netSpec), PeerIPsOption(rows)).(*tunTunnel)
-			authz := hub.newAuthorizer(xlogger.Nop())
+			t.Run("rows it cannot judge are kept", func(t *testing.T) {
+				event.Seed(hubID, nil)
+				hub := NewTunTunnel(IDOption(hubID), NetOption(tc.netSpec), PeerIPsOption(unjudgeable)).(*tunTunnel)
+				authz := hub.newAuthorizer(xlogger.Nop())
 
-			saved := hub.Options().PeerIPs
-			if len(saved) != len(rows) {
-				t.Fatalf("PeerIPs = %v, want every row kept: with no subnet there is nothing to judge a row against", saved)
-			}
-			for peer, want := range rows {
-				if saved[peer] != want {
-					t.Errorf("PeerIPs[%q] = %q, want %q", peer, saved[peer], want)
+				saved := hub.Options().PeerIPs
+				if len(saved) != len(unjudgeable) {
+					t.Fatalf("PeerIPs = %v, want every row kept: with no subnet there is nothing to judge a row against", saved)
 				}
-			}
-			if got := warnMessages(hubID); len(got) != 0 {
-				t.Errorf("a hub with no subnet warned about rows it cannot judge: %v", got)
-			}
+				for peer, want := range unjudgeable {
+					if saved[peer] != want {
+						t.Errorf("PeerIPs[%q] = %q, want %q", peer, saved[peer], want)
+					}
+				}
+				if got := warnMessages(hubID); len(got) != 0 {
+					t.Errorf("a hub with no subnet warned about rows it cannot judge: %v", got)
+				}
 
-			// Kept and in force, not merely saved: the filter is a no-op on both
-			// sides of the saved-is-what-authorizes invariant.
-			if !authz.Authorize(context.Background(), "first", claimOf("10.10.0.2")) {
-				t.Error("the spoke whose row was kept was refused its own address")
-			}
+				// Kept and in force, not merely saved: the skipped step is a no-op on
+				// both sides of the saved-is-what-authorizes invariant.
+				if !authz.Authorize(context.Background(), "first", claimOf("10.10.0.2")) {
+					t.Error("the spoke whose row was kept was refused its own address")
+				}
+			})
+
+			t.Run("contested rows are still dropped", func(t *testing.T) {
+				event.Seed(hubID, nil)
+				hub := NewTunTunnel(IDOption(hubID), NetOption(tc.netSpec), PeerIPsOption(contested)).(*tunTunnel)
+				authz := hub.newAuthorizer(xlogger.Nop())
+
+				saved := hub.Options().PeerIPs
+				if len(saved) != 1 || saved["other"] != "10.10.0.3" {
+					t.Fatalf("PeerIPs = %v, want only the row naming 10.10.0.3: a duplicate needs no subnet to spot", saved)
+				}
+				if got := warnMessages(hubID); !sameMessages(got, wantContested) {
+					t.Errorf("the hub's warnings = %v, want %v", got, wantContested)
+				}
+
+				ctx := context.Background()
+				if !authz.Authorize(ctx, "other", claimOf("10.10.0.3")) {
+					t.Error("the spoke whose row was untouched was refused its own address")
+				}
+				for _, peer := range []string{"first", "second"} {
+					if authz.Authorize(ctx, peer, claimOf("10.10.0.2")) {
+						t.Errorf("%s, one side of the duplicate, was authorized to claim the contested address on a hub with no subnet", peer)
+					}
+				}
+			})
 		})
+	}
+}
+
+// TestTunHubDropsARowNamingItsOwnAddress: a row naming the address the hub's own
+// device holds is one the hub can never honour, and dropping it is what stops the
+// failure this feature was designed around: x's self-loop guard turns such a spoke
+// away at registration with a message pointing nowhere near the cause, so an
+// operator would be left with a spoke that "will not connect" and a hub that says
+// nothing.
+//
+// It is the same filter, the same event and the same consequence as an off-subnet
+// row, because it is the same class of thing: an address this hub does not give.
+// parseHubNets returns the hub's own address as a second return value precisely
+// because the prefix cannot carry it, so this costs the rule rather than a mechanism.
+//
+// The other half of it is what happens on a hub with no net: there is no subnet for
+// the address to be outside of, and no address the hub holds at all, so 10.10.0.1 is
+// an ordinary value to that hub and the row is kept. That is the same reasoning the
+// off-subnet pass-through rests on, applied to the own-address check because it is
+// part of the same step.
+func TestTunHubDropsARowNamingItsOwnAddress(t *testing.T) {
+	const hubID = "hub-self"
+	event.Seed(hubID, nil)
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	hub := NewTunTunnel(
+		IDOption(hubID),
+		NetOption("10.10.0.1/24"),
+		PeerIPsOption(map[string]string{"greedy": "10.10.0.1", "good": "10.10.0.2"}),
+	).(*tunTunnel)
+	authz := hub.newAuthorizer(xlogger.Nop())
+
+	saved := hub.Options().PeerIPs
+	if len(saved) != 1 || saved["good"] != "10.10.0.2" {
+		t.Fatalf("PeerIPs = %v, want only the sound row: the hub's own address is nobody's to hand out", saved)
+	}
+	want := []string{
+		`spoke "greedy" dropped from the hub's address assignment: 10.10.0.1 is the hub's own address, which no spoke may claim`,
+	}
+	if got := warnMessages(hubID); !sameMessages(got, want) {
+		t.Errorf("the hub's warnings = %v, want %v", got, want)
+	}
+	if got := event.List("greedy"); len(got) != 0 {
+		t.Errorf("a drop was filed under the peer key: %v", got)
+	}
+
+	ctx := context.Background()
+	// The row beside it is untouched: dropping one row is not the hub deciding it
+	// has had enough rows.
+	if !authz.Authorize(ctx, "good", claimOf("10.10.0.2")) {
+		t.Error("the spoke with the sound row was refused its own address")
+	}
+	if authz.Authorize(ctx, "greedy", claimOf("10.10.0.1")) {
+		t.Error("a spoke whose row named the hub's own address was authorized to claim it")
+	}
+	if authz.Authorize(ctx, "greedy", nil) {
+		t.Error("a spoke whose row named the hub's own address was authorized to claim nothing, want refused as not in the hub's assignment")
+	}
+
+	// The same value on a hub with no net, where the hub holds no address at all and
+	// there is no subnet for this one to be outside of.
+	event.Seed(hubID, nil)
+	nosub := NewTunTunnel(
+		IDOption(hubID),
+		NetOption(""),
+		PeerIPsOption(map[string]string{"anybody": "10.10.0.1"}),
+	).(*tunTunnel)
+	nosubAuthz := nosub.newAuthorizer(xlogger.Nop())
+
+	if saved := nosub.Options().PeerIPs; len(saved) != 1 || saved["anybody"] != "10.10.0.1" {
+		t.Errorf("PeerIPs on a hub with no net = %v, want the row kept: that hub holds no address of its own", saved)
+	}
+	if got := warnMessages(hubID); len(got) != 0 {
+		t.Errorf("a hub with no net dropped a row naming what would be its own address: %v", got)
+	}
+	if !nosubAuthz.Authorize(ctx, "anybody", claimOf("10.10.0.1")) {
+		t.Error("on a hub that holds no address of its own, a spoke was refused 10.10.0.1")
 	}
 }
 

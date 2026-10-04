@@ -97,23 +97,52 @@ func TestParsePeerIPs(t *testing.T) {
 // TestValidatePeerIP: the error says which address is refused and why, because
 // it is what the API hands an operator who typed one. A hub that has no subnet
 // configured is a third reason, and the message says that rather than blaming the
-// address.
+// address. So is the hub's own address: the half of "net" that the prefix cannot
+// carry is exactly what this needs, and refusing it here is what makes validation
+// agree with allocation.
 func TestValidatePeerIP(t *testing.T) {
 	prefixes := mustPrefixes(t, "10.10.0.0/24", "fd00::/64")
+	self := mustAddrs(t, "10.10.0.1", "fd00::1")
 
-	if err := validatePeerIP("10.10.0.2", prefixes); err != nil {
+	if err := validatePeerIP("10.10.0.2", prefixes, self); err != nil {
 		t.Errorf("validatePeerIP(10.10.0.2) = %v, want nil", err)
 	}
-	if err := validatePeerIP("fd00::2", prefixes); err != nil {
+	if err := validatePeerIP("fd00::2", prefixes, self); err != nil {
 		t.Errorf("validatePeerIP(fd00::2) = %v, want nil", err)
 	}
 	// Both endpoints of a subnet are inside it; the network address is refused
 	// only by assignment, not by this check.
-	if err := validatePeerIP("10.10.0.255", prefixes); err != nil {
+	if err := validatePeerIP("10.10.0.255", prefixes, self); err != nil {
 		t.Errorf("validatePeerIP(10.10.0.255) = %v, want nil", err)
 	}
+	// The hub's own addresses are refused, and the message says why rather than
+	// blaming a subnet they are inside: 10.10.0.1 is in 10.10.0.0/24, so a walk
+	// over the prefixes would wave it through and say nothing.
+	for _, own := range []string{"10.10.0.1", "fd00::1"} {
+		err := validatePeerIP(own, prefixes, self)
+		if err == nil {
+			t.Errorf("validatePeerIP(%s) = nil, want the hub's own address refused", own)
+			continue
+		}
+		if !strings.Contains(err.Error(), "the hub's own address") || !strings.Contains(err.Error(), own) {
+			t.Errorf("validatePeerIP(%s) = %q, want it named as the hub's own address", own, err)
+		}
+	}
+	// The same address written in the form that arrives off the wire is the same
+	// address: unmapped here, or the hub would refuse its own address as though it
+	// were outside every subnet.
+	if err := validatePeerIP("::ffff:10.10.0.1", prefixes, self); err == nil ||
+		!strings.Contains(err.Error(), "the hub's own address") {
+		t.Errorf("validatePeerIP(::ffff:10.10.0.1) = %v, want the hub's own address refused", err)
+	}
+	// 10.10.0.1 is nobody's own address on a hub that does not say it holds one, so
+	// the same value passes: the rule is about the hub's own address, not about a
+	// shape an address happens to have.
+	if err := validatePeerIP("10.10.0.1", prefixes, nil); err != nil {
+		t.Errorf("validatePeerIP(10.10.0.1) on a hub not holding it = %v, want nil", err)
+	}
 
-	err := validatePeerIP("192.168.9.9", prefixes)
+	err := validatePeerIP("192.168.9.9", prefixes, self)
 	if err == nil {
 		t.Fatal("validatePeerIP(192.168.9.9) = nil, want an error: it is in none of the hub's subnets")
 	}
@@ -123,14 +152,21 @@ func TestValidatePeerIP(t *testing.T) {
 		}
 	}
 
-	if err = validatePeerIP("10.10.0.2/24", prefixes); err == nil ||
+	if err = validatePeerIP("10.10.0.2/24", prefixes, self); err == nil ||
 		!strings.Contains(err.Error(), "not an IP address") {
 		t.Errorf("validatePeerIP(10.10.0.2/24) = %v, want a not-an-address error", err)
 	}
 
-	if err = validatePeerIP("10.10.0.2", nil); err == nil ||
+	if err = validatePeerIP("10.10.0.2", nil, nil); err == nil ||
 		!strings.Contains(err.Error(), "no subnet") {
 		t.Errorf("validatePeerIP with no hub subnet = %v, want an error saying the hub has none", err)
+	}
+	// The hub's own address is refused even on a hub with no subnet, because the
+	// address is the hub's whatever else is true of the hub — and this check is the
+	// one the hub's own filter skips on such a hub, so the two must not be confused.
+	if err = validatePeerIP("10.10.0.1", nil, self); err == nil ||
+		!strings.Contains(err.Error(), "the hub's own address") {
+		t.Errorf("validatePeerIP of the hub's own address with no subnet = %v, want it refused as the hub's own", err)
 	}
 }
 
@@ -138,6 +174,12 @@ func TestValidatePeerIP(t *testing.T) {
 // hub's own address. That is what the self half of parseHubNets is for — the
 // prefix 10.10.0.0/24 cannot say which address inside it the hub holds, and
 // 10.10.0.1 is the one every hub takes.
+//
+// The validator agrees with it, which is what makes the two halves worth having:
+// everything allocation hands out is something validation accepts, and the one value
+// allocation refuses to produce is one validation refuses to accept. Without that, an
+// operator could type the hub's own address for a spoke, be told it was fine, and
+// watch the spoke be turned away at registration.
 func TestAssignPeerIPsSkipsTheHubsOwnAddress(t *testing.T) {
 	prefixes, self := parseHubNets("10.10.0.1/24")
 
@@ -147,6 +189,12 @@ func TestAssignPeerIPsSkipsTheHubsOwnAddress(t *testing.T) {
 	}
 	if got["a"] != "10.10.0.2" {
 		t.Errorf("a = %q, want 10.10.0.2 — .0 is the network address and .1 is the hub's own", got["a"])
+	}
+	if err := validatePeerIP(got["a"], prefixes, self); err != nil {
+		t.Errorf("validatePeerIP refused what assignPeerIPs produced (%q): %v", got["a"], err)
+	}
+	if err := validatePeerIP(self[0].String(), prefixes, self); err == nil {
+		t.Errorf("validatePeerIP accepted %q, which assignPeerIPs would never hand out", self[0])
 	}
 }
 

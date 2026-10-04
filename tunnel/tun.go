@@ -218,46 +218,58 @@ func (s *tunTunnel) newAuthorizer(log logger.Logger) *spokeAuthorizer {
 // place that answer is computed, and both chokepoints — the authorizer Run builds
 // and SetPeerIPs — apply the result to s.opts.PeerIPs and to the authorizer alike.
 //
-// Three rows are not honorable, and each is dropped whole: never emptied, never
-// turned into an error.
+// It is two independent steps, and keeping them independent is the point:
 //
-//   - A row that does not parse. It could not authorize a claim either, and the API
-//     rejects such a row before it is ever saved, so reaching here with one means the
-//     file was hand-edited.
-//   - A row naming an address outside every subnet the hub's device is on. The
-//     listener adds a connected route for the hub's own net and nothing else, and a
-//     hub deliberately asks for no routes at all, so nothing would ever be delivered
-//     to such a spoke: it would register, believe it held the address, and be
-//     unreachable at it, leaving a route-table entry behind.
-//   - A row naming an address another live row names too. Both go, not one of them:
-//     the tie cannot be broken by iteration order (Go randomizes map order), and a hub
-//     that picked a winner would give a different answer on the next save, while the
-//     route table would hand the address to whichever spoke registered last — the
-//     silent route theft the whole assignment exists to prevent.
+//  1. Can this hub route the address at all? A row that does not parse names no
+//     address to judge and could never authorize a claim either. A row naming an
+//     address outside every subnet the hub's device is on, or naming the hub's own
+//     address, is one the hub cannot honour: the listener adds a connected route for
+//     the hub's own net and nothing else, and a hub deliberately asks for no routes
+//     at all, so a spoke holding such an address registers, believes it holds it, and
+//     is unreachable at it — leaving a route-table entry behind for the hub's own
+//     address case, where x's self-loop guard turns the spoke away at registration
+//     with a message pointing nowhere near the cause.
 //
+//     The subnet and own-address halves of this step need the hub's subnets, so they
+//     are asked only of a hub that has any; a row that does not parse is dropped on
+//     every hub, since it names no address to be inside or outside of.
+//     A hub with no net configured is one broken hub rather than a set of broken
+//     rows: there is no subnet for an address to be inside or outside of, so the
+//     question has no answer, and refusing every row would turn one missing "net"
+//     into a hub that authorizes nothing at all — a worse outcome than the
+//     misconfiguration, and one that reads as a broken allowlist. The mistake is
+//     already reported where it is made: assignPeerIPs refuses to allocate on such a
+//     hub and this error names the missing subnet to whoever typed an address.
+//
+//  2. Is this address claimed twice? Two rows naming one address need no prefixes
+//     to detect — it is a comparison among the rows themselves — and it is the case
+//     this feature exists to prevent, because the hub's route table is
+//     last-writer-wins per address: the second spoke to register silently takes the
+//     first one's route and its traffic goes to the wrong device. It is asked on
+//     every hub, subnet or not, because in a no-subnet config that address is still
+//     routable and the theft is still silent.
+//
+//     Both rows go, not one of them: the tie cannot be broken by iteration order (Go
+//     randomizes map order), and a hub that picked a winner would give a different
+//     answer on the next save, which is a network that changes under a running
+//     config.
+//
+// Only rows step 1 left are counted, and that is the order the two run in: a row that
+// is not in force cannot take a route from anyone, so it must not be able to cost a
+// sound row its address either.
+//
+// Every row dropped is dropped whole — never emptied, never turned into an error.
 // Dropping is the answer spokeAuthorizer.set already gives a row that does not
 // parse: the peer is absent, so every claim from it is refused as not in the hub's
 // assignment. Emptying the row instead would be the present-with-nil failure — a
 // typo would come back as "this spoke may claim nothing" and lock the spoke out with
 // a reason pointing nowhere. Failing the save instead would be worse still: one bad
-// row in the file would make every later save fail until the operator hand-edited
-// the yaml, where failing closed per row needs nothing.
-//
-// A hub with no subnet configured is one broken hub rather than a set of broken
-// rows, and it passes through untouched: there is no subnet for an address to be
-// inside or outside of, so neither rule can say anything, and dropping every row
-// would turn one missing "net" into a hub that authorizes nothing at all — a worse
-// outcome than the misconfiguration, and one that reads as a broken allowlist.
-// assignPeerIPs already refuses to allocate on such a hub and validatePeerIP already
-// names the missing subnet to whoever typed the address, so the mistake is reported
-// where it is made.
+// row in the file would make every later save fail until the operator hand-edited the
+// yaml, where failing closed per row needs nothing.
 func (s *tunTunnel) honorablePeerIPs(peerIPs map[string]string, log logger.Logger) map[string]string {
 	// s.opts.Net and s.opts.ID are set at construction and never written again, so
 	// they are read here without the lock the assignment itself needs.
-	prefixes, _ := parseHubNets(s.opts.Net)
-	if len(prefixes) == 0 {
-		return peerIPs
-	}
+	prefixes, self := parseHubNets(s.opts.Net)
 
 	type row struct {
 		peer  string
@@ -272,33 +284,33 @@ func (s *tunTunnel) honorablePeerIPs(peerIPs map[string]string, log logger.Logge
 			continue
 		}
 		// Unmapped before anything else looks at it: a row written ::ffff:10.10.0.2
-		// names the same address as 10.10.0.2, and netip.Prefix.Contains reports an
-		// IPv4-mapped address as outside an IPv4 prefix — without this an ordinary
-		// row would be dropped as off-subnet. The value kept is the operator's own
-		// text, byte for byte.
+		// names the same address as 10.10.0.2, and neither a prefix's Contains nor
+		// the hub's own-address list would match it as it stands. The value kept is
+		// the operator's own text, byte for byte.
 		addrs = unmapAll(addrs)
 
-		// Checked here rather than with the duplicates below, so that a row the hub
-		// cannot route at all is gone before any address is counted: an address named
-		// only by a row that was dropped for another reason cannot collide with
-		// anything, and must not take a neighbour's good row down with it.
-		var why []string
-		for _, addr := range distinctAddrs(addrs) {
-			if err := validatePeerIP(addr.String(), prefixes); err != nil {
-				why = append(why, err.Error())
+		// Step 1, asked only of a hub that has a subnet to ask about. Every reason
+		// the row has, in the row's own order: one row, one event, so an operator
+		// fixing the row sees everything wrong with it at once.
+		if len(prefixes) > 0 {
+			var why []string
+			for _, addr := range distinctAddrs(addrs) {
+				if err := validatePeerIP(addr.String(), prefixes, self); err != nil {
+					why = append(why, err.Error())
+				}
 			}
-		}
-		if len(why) > 0 {
-			s.dropPeerIP(peer, strings.Join(why, "; "), log)
-			continue
+			if len(why) > 0 {
+				s.dropPeerIP(peer, strings.Join(why, "; "), log)
+				continue
+			}
 		}
 		rows = append(rows, row{peer: peer, spec: spec, addrs: addrs})
 	}
 
-	// claims counts, over the rows that survived above, how many row slots name each
-	// address — including twice in one row, which is an ambiguity too: no claim can
-	// ever match such a row, because the authorizer's sweep consumes and the second
-	// copy finds its address already taken.
+	// Step 2, on every hub: how many row slots name each address, including twice in
+	// one row — which is the same ambiguity, since no claim can ever match such a row
+	// (the authorizer's sweep consumes, so the second copy finds its address already
+	// taken) and a row that can authorize nothing is one the hub cannot honour.
 	claims := make(map[netip.Addr]int, len(rows))
 	for _, r := range rows {
 		for _, addr := range r.addrs {
@@ -318,8 +330,8 @@ func (s *tunTunnel) honorablePeerIPs(peerIPs map[string]string, log logger.Logge
 			s.dropPeerIP(r.peer, strings.Join(why, "; "), log)
 			continue
 		}
-		// An empty row survives: it is the state that means "this spoke may claim
-		// nothing", and it is what allocation fills.
+		// An empty row survives both steps: it is the state that means "this spoke
+		// may claim nothing", and it is what allocation fills.
 		kept[r.peer] = r.spec
 	}
 	return kept
@@ -587,11 +599,11 @@ func (s *tunTunnel) SetPeers(ctx context.Context, peers []string, aliases map[st
 // The rows are filtered before they are applied (honorablePeerIPs), and what
 // survives is both what the options carry and what the authorizer holds — so what a
 // save writes and what authorizes are the same rows. A row naming an address outside
-// the hub's subnets, or one another row names too, is dropped and warned about here,
-// at the moment the operator can act on it, rather than refused later from a spoke
-// that simply will not register. The save itself still cannot fail on one: failing it
-// would make every later save fail until the file was hand-edited, where failing
-// closed per row needs nothing.
+// the hub's subnets, the hub's own address, or an address another row names too, is
+// dropped and warned about here, at the moment the operator can act on it, rather
+// than refused later from a spoke that simply will not register. The save itself
+// still cannot fail on one: failing it would make every later save fail until the
+// file was hand-edited, where failing closed per row needs nothing.
 func (s *tunTunnel) SetPeerIPs(ctx context.Context, peerIPs map[string]string) error {
 	if s.IsClosed() {
 		return ErrTunnelClosed
