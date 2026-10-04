@@ -471,10 +471,14 @@ func TestAssignPeerIPsIgnoresARowThatNamesNoAddress(t *testing.T) {
 // silently drops a row, which is the failure the whole feature exists to prevent — a
 // spoke refused at registration with a message pointing nowhere near the cause.
 //
-// The cases are the ones the two disagree about first, when they do. The last one is
-// the rule that was unpinned by anything: only rows step 1 kept take part in the
-// duplicate sweep, so a row dropped for being off-subnet cannot cost a sound row its
-// address by naming it too.
+// The cases are the ones the two disagree about first, when they do.
+//
+// What this table cannot do is reach the *filter's* survivor rule — that only rows
+// step 1 kept take part in its duplicate sweep — because it only runs the filter on
+// cases the door accepted, and on those step 1 has nothing to drop. That rule is
+// pinned in tun_test.go instead ("contested" in TestTunHubDropsRowsItCannotHonour),
+// where the filter is driven directly. What the table does reach is the door's own
+// version of the same idea, which is a separate property and has its own case below.
 func TestAllocatePeerIPsAgreesWithHonorablePeerIPs(t *testing.T) {
 	const hubID = "hub-agrees"
 	event.Seed(hubID, nil) // isolate: the store is process-wide
@@ -577,15 +581,26 @@ func TestAllocatePeerIPsAgreesWithHonorablePeerIPs(t *testing.T) {
 			wantRefused: "cannot tell which spoke owns it",
 		},
 		{
-			// The subtle one, and the reason the two steps run in this order. "broken"
-			// does name 10.10.0.2, the same address "good" holds — but its row does
-			// not parse, so step 1 drops it and it is not in the assignment by the
-			// time the sweep runs. It must not be able to cost the sound row its
-			// address: the refusal names "broken" alone, and "good" is not reported
-			// as holding a contested address. An implementation that counted a
-			// dropped row as a duplicate participant would refuse both spokes and
-			// point at a conflict that does not exist between the two of them.
-			name: "only rows step 1 kept take part in the duplicate sweep",
+			// The door's own survivor rule, which is a real property and distinct
+			// from the filter's version of it. "broken" does name 10.10.0.2, the same
+			// address "good" holds — but its row does not parse, so it contributes
+			// nothing to the sweep and must not be reported as a second claimant.
+			// Otherwise the sound row is refused too, pointing at a conflict that
+			// does not exist between the two of them.
+			//
+			// What is defended here is the seam rather than the order of statements
+			// below: parsePeerIPs hands back an empty slice when it says no, so
+			// there is nothing for the claims loop to count even if the door read
+			// past the failure. That contract has its own test in TestParsePeerIPs;
+			// this case pins the consequence, which is the one that matters to an
+			// operator — make parsePeerIPs keep the half of a row it understood and
+			// the sound row is refused with it, which is what this case catches.
+			//
+			// The row-dropped-by-*validation* version of the rule is a different
+			// one, and it is pinned where the filter is driven directly —
+			// "contested" in TestTunHubDropsRowsItCannotHonour — because this table
+			// cannot reach it.
+			name: "a row that does not parse is in no sweep",
 			net:  "10.10.0.1/24",
 			peers: []string{
 				"broken", "good",

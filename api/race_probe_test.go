@@ -27,7 +27,15 @@ import (
 // answers would pass on a torn read. Sequential tests cannot reach this at all —
 // the suite is serial by construction, which is why the race survived a green
 // gate.
+//
+// It also skips itself when the build has no race detector. Every race it can find
+// is a detector finding, so without -race it cannot detect the thing it exists for
+// and would spend its ~24 seconds doing nothing; skip rather than pay for a test
+// that cannot fail. See raceEnabled.
 func TestTunHubOptionsIsSafeUnderConcurrentPeersSave(t *testing.T) {
+	if !raceEnabled {
+		t.Skip("needs -race: every race this probe can find is a detector finding")
+	}
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	srv := setupTestServer(t)
 	defer srv.Close()
@@ -61,8 +69,12 @@ func TestTunHubOptionsIsSafeUnderConcurrentPeersSave(t *testing.T) {
 			for r := 0; r < rounds; r++ {
 				peers := []map[string]any{}
 				for i, key := range keys {
-					// A different address per writer, so the two are not writing the
-					// same bytes and the race is on the struct, not the contents.
+					// Each writer rotates the assignment among the three, so the
+					// saves are not all writing the same values. It is not what
+					// makes the race — every save allocates fresh maps, and the
+					// contention is on the struct fields either way — it just keeps
+					// the writers from agreeing on one state and passing over a
+					// stale copy of it.
 					peers = append(peers, map[string]any{
 						"key": key,
 						"ip":  []string{"10.11.0.2", "10.11.0.3", "10.11.0.4"}[(i+w)%3],
@@ -77,6 +89,15 @@ func TestTunHubOptionsIsSafeUnderConcurrentPeersSave(t *testing.T) {
 				if err != nil {
 					t.Errorf("save: %v", err)
 					return
+				}
+				// Checked, not discarded: a change that made every concurrent save
+				// fail would otherwise leave this green, since the post-conditions
+				// only assert the assignment is non-empty and the priming save
+				// already made it so. Errorf rather than Fatalf because the
+				// failure is safe to call from a goroutine and one broken writer
+				// should not hide the others.
+				if resp.StatusCode != http.StatusOK {
+					t.Errorf("concurrent save by writer %d = %d, want 200", w, resp.StatusCode)
 				}
 				resp.Body.Close()
 			}
