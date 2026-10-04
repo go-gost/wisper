@@ -51,6 +51,12 @@ a **peer key**; a socket hub's is a UDP address.
 stable across reconnections. See `core/` for the unrelated `router.Router`,
 which queries the operating system's route table for a gateway.
 
+**address assignment** — what a hub has granted one peer the right to claim:
+the host addresses that peer's registration may carry. The peer still declares
+them; the assignment is what makes the declaration true or false. Distinct from
+the allowlist, which admits a peer at all, and from the handshake, which only
+reports.
+
 **stream** — one inbound connection from one peer. A peer has at most one at a
 time, but reconnects get new ones under the same peer key. A peer key names who;
 a stream names one connection to them.

@@ -1,5 +1,36 @@
 # wisper 集成 tun 组网 评估
 
+> **状态（2026-10-04，hub 成为地址的分配方）**：hub 的准入不再靠凭据。**白名单里每个 spoke 那一行现在
+> 写着它可以声明哪些地址**，地址必须取自 hub 自己的 `net`；spoke 注册时声明的地址与该行**完全一致**
+> （集合相等，不多不少，顺序无关）才放行，否则这次注册不生效——不建路由，也不回 keepalive 回显——并在
+> hub 的事件里记一条 warn（事件挂在 hub 上，不是挂在那个 peer key 下）。形状：config `peer_ips`
+> （peer key → 逗号分隔的**主机地址**，不是前缀）、API `Peers[].ip`、peers 页上每行一个地址框；留空的行
+> 由 hub 从自己的网段按白名单顺序分配。**没有新增 token**：p2p 的 peer key 早已完成认证（它就是把这条流
+> 路由进来的那份白名单），缺的只是授权。
+>
+> 下面 2026-09-24 那段「准入改由 tun server 的 `auther` 承担（`username` = spoke 的 tun IP、
+> `password` = 该 spoke 的 `token`）」**已作废**：wisper 的 tun hub 不再读 `username`/`password`，
+> `tunnel/tun.go` 里实现它的那段接线已删除（`9d6ce96`）——这两个字段还在 Options 里，别的隧道类型还在用。
+> 它当时也不可能是对的：p2p hub 的 handler 内部 auther 恒为 nil（`x/handler/tun/p2phandler.go`，p2p 侧的
+> 身份就是那份白名单），而 x 询问 auther 时用的用户名是 spoke **声称的**设备地址
+> （`x/handler/tun/router.go`），所以它问的其实是「这个 peer 能不能用它刚声称的地址」——那是授权，不是
+> 认证。照旧建议配出来的只是一个从不准入的运维专用配置。
+>
+> 运维要知道的三件事：
+> ① **改 hub 的 `net` 不用重启**。peers 页保存走 `PUT /api/tunnels/{id}/peers`，就地换掉地址分配，设备
+> 与路由都不动；hub 详情页保存则用请求里的 `net` 重建并重新跑起来（`handleUpdateTunnel` 关旧、
+> `RunWithContext` 起新），保存返回时新 `net` 已经生效。
+> ② **没动过的地址就是没动过**。页面上没碰过的行不发 `ip` 字段，含义是「保持不变」；只有**清空**一格
+> 才算「重新分配」。
+> ③ **不合规的行怎么落地，取决于是从哪儿进来的**。走 API 的三个入口（新建、hub 详情页的 PUT、peers 页的
+> PUT）共用同一套校验：不解析、不在 hub 网段内、写的是 hub 自己的地址、同一地址被两行写——这次保存被
+> **拒绝**，400 里点名是哪个 spoke、哪个地址。绕开 API 的那条路（从手改的配置启动的 hub）没有这个校验：
+> 不满足的行被**整行丢掉**并记一条 warn 事件——不清空、不变成「可声明空」把 spoke 锁在门外、也不影响别的
+> 行，所以一个坏行不会让后面每次保存都失败。没配 `net` 的 hub 不做网段判断（没有网段可问），已有的行
+> 全部保留；只有要**新分配**时才报 `no subnet configured`。
+> 换网段是唯一要绕一下的：hub 详情页保存会连各行地址一起带上，旧地址不在新网段里就会被拒。要换就先在
+> peers 页把 spoke 删掉，改完 `net` 再加回来（留空的行按新网段分配）。
+
 > **状态（2026-10-02，再次修订）**：hub 已**重新作为 wisper 类型落地**（`tunnel/tun.go`，实现取回
 > `8411554`，并在 `Run` 里补上 `CleanStop` 分类）。理由与下面 2026-09-24 那段相反：为普通用户，
 > UI 驱动的部署比手写 gost YAML 更容易，代价是 **hub 上的 wisper 需要特权**（root / CAP_NET_ADMIN，
