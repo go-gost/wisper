@@ -919,6 +919,360 @@ func TestAllocatePeerIPsAgreesWithHonorablePeerIPs(t *testing.T) {
 	}
 }
 
+// TestAllocatePeerIPsOnItsOwnTerms: the exported door, pinned by itself.
+//
+// It is covered from api/ end to end, and that is a weaker pin than it looks. The
+// api case has to go through a hub, a request and a JSON round trip to reach one
+// call, and it can only assert the status code and whatever else that test
+// happened to check — while the door duplicates a policy that
+// TestAllocatePeerIPsAgreesWithHonorablePeerIPs compares against the filter. A
+// message rewritten, a row added to the sweep or dropped from it, a family
+// confused: the agreement test would still pass, because the filter changed with
+// it. This one cannot drift, because it names what the door says rather than
+// asking whether two things still agree.
+//
+// Refusals are pinned whole rather than by substring, since the string is the
+// product: it is what the API returns to whoever typed the row, and "no address
+// free for \"b\" in the hub's subnets (10.10.0.0/30)" is actionable where "no
+// address free" is not.
+//
+// One rule is deliberately absent. The filter lets only its step-1 survivors join
+// the duplicate sweep, so a row already dropped for being out of the subnet
+// cannot cost a sound row its address. This door has no such step: it returns on
+// the first failure, so it has no survivor set to sweep. The rule is real and is
+// pinned in tun_test.go ("contested" in TestTunHubDropsRowsItCannotHonour),
+// where the filter is driven directly; what is pinned here is the door's own
+// version of the idea — the first row to fail is the one reported — which is a
+// separate property and would be a false expectation if it were left implicit.
+func TestAllocatePeerIPsOnItsOwnTerms(t *testing.T) {
+	cases := []struct {
+		name  string
+		net   string
+		peers []string
+		rows  map[string]string
+		// want is the assignment the door returns, checked whole and in order
+		// independent: no allocation and no refusal means these rows and no others.
+		want map[string]string
+		// wantErr is the whole refusal, empty when the door accepts.
+		wantErr string
+	}{
+		{
+			// The whole reason the door exists: a spoke listed with no address is
+			// given one from the hub's subnet, and .1 is the hub's own.
+			name:  "blank rows are filled in allowlist order",
+			net:   "10.10.0.1/24",
+			peers: []string{"a", "b", "c"},
+			rows:  map[string]string{"a": "", "b": "", "c": ""},
+			want:  map[string]string{"a": "10.10.0.2", "b": "10.10.0.3", "c": "10.10.0.4"},
+		},
+		{
+			// The order is the allowlist's, not the map's, so the same hub settles
+			// the same way every time and the answer matches the rows as shown.
+			name:  "the allowlist order decides, not the map's",
+			net:   "10.10.0.1/24",
+			peers: []string{"c", "b", "a"},
+			rows:  map[string]string{"a": "", "b": "", "c": ""},
+			want:  map[string]string{"c": "10.10.0.2", "b": "10.10.0.3", "a": "10.10.0.4"},
+		},
+		{
+			name:  "a typed in-subnet row is kept and counts as taken",
+			net:   "10.10.0.1/24",
+			peers: []string{"a", "b"},
+			rows:  map[string]string{"a": "10.10.0.9", "b": ""},
+			want:  map[string]string{"a": "10.10.0.9", "b": "10.10.0.2"},
+		},
+		{
+			// The spelling is the operator's, byte for byte: the row is not
+			// normalized on the way through.
+			name:  "a typed row is not rewritten",
+			net:   "10.10.0.1/24",
+			peers: []string{"a", "b"},
+			rows:  map[string]string{"a": "::ffff:10.10.0.9", "b": ""},
+			want:  map[string]string{"a": "::ffff:10.10.0.9", "b": "10.10.0.2"},
+		},
+		{
+			name:  "a row may name several addresses",
+			net:   "10.10.0.1/24",
+			peers: []string{"a", "b"},
+			rows:  map[string]string{"a": "10.10.0.2,10.10.0.3", "b": ""},
+			want:  map[string]string{"a": "10.10.0.2,10.10.0.3", "b": "10.10.0.4"},
+		},
+		{
+			name:    "a prefix is not a host address",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "10.10.0.2/24"},
+			wantErr: `spoke "a": "10.10.0.2/24" is not a comma-separated list of IP addresses`,
+		},
+		{
+			name:    "a hostname is not an address",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "spoke.example.com"},
+			wantErr: `spoke "a": "spoke.example.com" is not a comma-separated list of IP addresses`,
+		},
+		{
+			name:    "an address that does not parse is not one",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "10.10.0.300"},
+			wantErr: `spoke "a": "10.10.0.300" is not a comma-separated list of IP addresses`,
+		},
+		{
+			// A partially parsed row is worse than none: the caller could not tell
+			// which half of it was understood.
+			name:    "a hole in the list is refused whole",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "10.10.0.2,,10.10.0.3"},
+			wantErr: `spoke "a": "10.10.0.2,,10.10.0.3" is not a comma-separated list of IP addresses`,
+		},
+		{
+			name:    "an address off every subnet is refused",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "192.168.9.9"},
+			wantErr: `spoke "a": 192.168.9.9 is outside the hub's subnets (10.10.0.0/24)`,
+		},
+		{
+			// The two doors disagree deliberately here and neither is wrong: the
+			// filter drops the row and warns, while the door has a request in hand to
+			// answer and says so in the reply.
+			name:    "the hub's own address is refused",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "10.10.0.1"},
+			wantErr: `spoke "a": 10.10.0.1 is the hub's own address, which no spoke may claim`,
+		},
+		{
+			// The one address written two ways, and the one place validatePeerIP's
+			// own unmap is load-bearing on this path: the tunnel layer unmapped
+			// every row already, so a call made here is the only place it runs. The
+			// message names the unmapped address, which is the address itself.
+			name:    "the hub's own address in its other spelling is refused",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "::ffff:10.10.0.1"},
+			wantErr: `spoke "a": 10.10.0.1 is the hub's own address, which no spoke may claim`,
+		},
+		{
+			// What allocation would never hand out, and what the api case pins at
+			// 400: this is the coherence rule reaching the door.
+			name:    "the subnet's own network address is refused",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "10.10.0.0"},
+			wantErr: `spoke "a": 10.10.0.0 is the network address of 10.10.0.0/24, which no spoke may claim`,
+		},
+		{
+			name:    "the subnet's own broadcast address is refused",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "10.10.0.255"},
+			wantErr: `spoke "a": 10.10.0.255 is the broadcast address of 10.10.0.0/24, which no spoke may claim`,
+		},
+		{
+			// A /30's last address is a host address, so the rule that refused .255
+			// on the /24 does not fire here. The door is asking the prefix, not the
+			// shape of the value.
+			name:  "a /30 hands out the address a /24 would have refused",
+			net:   "10.10.0.1/30",
+			peers: []string{"a"},
+			rows:  map[string]string{"a": "10.10.0.3"},
+			want:  map[string]string{"a": "10.10.0.3"},
+		},
+		{
+			name:    "two rows naming one address are refused",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a", "b"},
+			rows:    map[string]string{"a": "10.10.0.2", "b": "10.10.0.2"},
+			wantErr: `spoke "a": 10.10.0.2 is also named by spoke "b", so the hub cannot tell which spoke owns it`,
+		},
+		{
+			name:    "one row naming it twice is refused",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": "10.10.0.2,10.10.0.2"},
+			wantErr: `spoke "a": 10.10.0.2 is named twice in the same row, which no spoke's claim could ever match`,
+		},
+		{
+			// The one address written two ways. Note what the message names: the
+			// spelling the operator typed, not the unmapped address it resolves to,
+			// because that is the text they have to go and fix. The hub's-own-address
+			// refusal below is the other way round — validatePeerIP unmaps before it
+			// reports — and the two look inconsistent until you know which side of
+			// the door each is on.
+			name:    "one address written two ways is one duplicate",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a", "b"},
+			rows:    map[string]string{"a": "::ffff:10.10.0.2", "b": "10.10.0.2"},
+			wantErr: `spoke "a": ::ffff:10.10.0.2 is also named by spoke "b", so the hub cannot tell which spoke owns it`,
+		},
+		{
+			// The door's own survivor rule, and the whole of what it has instead of
+			// the filter's: it stops at the first row that fails, so a later row with
+			// a different problem is not reported and a sound row is not implicated.
+			name:    "the first row to fail is the one reported",
+			net:     "10.10.0.1/24",
+			peers:   []string{"a", "b"},
+			rows:    map[string]string{"a": "192.168.9.9", "b": "10.10.0.1"},
+			wantErr: `spoke "a": 192.168.9.9 is outside the hub's subnets (10.10.0.0/24)`,
+		},
+		{
+			// Every reason one row has, in the row's own order, so an operator
+			// fixing it sees everything wrong with it at once.
+			name:  "one row's several problems come back together",
+			net:   "10.10.0.1/24",
+			peers: []string{"a"},
+			rows:  map[string]string{"a": "192.168.9.9,10.10.0.1"},
+			wantErr: `spoke "a": 192.168.9.9 is outside the hub's subnets (10.10.0.0/24); ` +
+				`10.10.0.1 is the hub's own address, which no spoke may claim`,
+		},
+		{
+			// A hub with no net is one broken hub rather than a set of broken rows:
+			// there is no subnet for an address to be outside of, so a typed row is
+			// neither refused nor blamed, and only allocation needs a subnet.
+			name:    "a blank row with no subnet at all is refused",
+			net:     "",
+			peers:   []string{"a"},
+			rows:    map[string]string{"a": ""},
+			wantErr: `no address free for "a": the hub has no subnet configured`,
+		},
+		{
+			name:  "a typed row on a hub with no subnet is the hub's business, not the row's",
+			net:   "",
+			peers: []string{"a", "b"},
+			rows:  map[string]string{"a": "10.10.0.2", "b": "fd00::2"},
+			want:  map[string]string{"a": "10.10.0.2", "b": "fd00::2"},
+		},
+		{
+			name:    "a duplicate is still a duplicate with no subnet",
+			net:     "",
+			peers:   []string{"a", "b"},
+			rows:    map[string]string{"a": "10.10.0.2", "b": "10.10.0.2"},
+			wantErr: `spoke "a": 10.10.0.2 is also named by spoke "b", so the hub cannot tell which spoke owns it`,
+		},
+		{
+			// Mixed families: each blank row takes the first subnet that still has an
+			// address, so a mixed hub fills from IPv4 until IPv4 is full.
+			name:  "a mixed hub fills each blank from the first subnet with room",
+			net:   "10.10.0.1/24,fd00::1/64",
+			peers: []string{"a", "b", "c"},
+			rows:  map[string]string{"a": "", "b": "", "c": "fd00::2"},
+			want:  map[string]string{"a": "10.10.0.2", "b": "10.10.0.3", "c": "fd00::2"},
+		},
+		{
+			// The /30 is full after two rows, and the third falls through to the IPv6
+			// subnet rather than being refused or given a duplicate. fd00:: is what
+			// an IPv6 subnet hands out first, because no IPv6 prefix reserves its
+			// first address.
+			name:  "a mixed hub falls through to the second family when the first is full",
+			net:   "10.10.0.1/30,fd00::1/64",
+			peers: []string{"a", "b", "c"},
+			rows:  map[string]string{"a": "", "b": "", "c": ""},
+			want:  map[string]string{"a": "10.10.0.2", "b": "10.10.0.3", "c": "fd00::"},
+		},
+		{
+			// Nothing left anywhere: the refusal names the peer that could not be
+			// served and the subnets it was looked for in, because "no address free"
+			// alone leaves an operator with nothing to widen.
+			name:    "an exhausted subnet is refused by the door too",
+			net:     "10.10.0.1/30",
+			peers:   []string{"a", "b", "c"},
+			rows:    map[string]string{"a": "", "b": "", "c": ""},
+			wantErr: `no address free for "c" in the hub's subnets (10.10.0.0/30)`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// rows is the caller's map and must come back untouched either way:
+			// assignPeerIPs returns a merged copy rather than writing in place, so
+			// the difference between what is saved and what is running stays
+			// observable.
+			caller := make(map[string]string, len(tc.rows))
+			for peer, spec := range tc.rows {
+				caller[peer] = spec
+			}
+
+			got, err := AllocatePeerIPs(tc.peers, caller, tc.net)
+
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("AllocatePeerIPs(%v) = %v, want the refusal %q", tc.peers, got, tc.wantErr)
+				}
+				if err.Error() != tc.wantErr {
+					t.Fatalf("AllocatePeerIPs(%v) = %q, want %q", tc.peers, err, tc.wantErr)
+				}
+				// A refusal is no partial answer: the caller has something to report
+				// and must not use what was managed alongside the error.
+				if got != nil {
+					t.Errorf("AllocatePeerIPs returned %v alongside a refusal, want nil", got)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("AllocatePeerIPs(%v) = %v, want it accepted", tc.peers, err)
+				}
+				if len(got) != len(tc.want) {
+					t.Fatalf("AllocatePeerIPs(%v) = %v, want %v", tc.peers, got, tc.want)
+				}
+				for peer, want := range tc.want {
+					if got[peer] != want {
+						t.Errorf("AllocatePeerIPs(%v)[%q] = %q, want %q", tc.peers, peer, got[peer], want)
+					}
+				}
+			}
+
+			for peer, spec := range tc.rows {
+				if caller[peer] != spec {
+					t.Errorf("the caller's row %q = %q, want it untouched (%q)", peer, caller[peer], spec)
+				}
+			}
+			if len(caller) != len(tc.rows) {
+				t.Errorf("the caller's map grew to %v, want it untouched", caller)
+			}
+		})
+	}
+}
+
+// TestAllocatePeerIPsIsDeterministic: the same input settled twice gives the same
+// answer, on every call. TestAssignPeerIPsFollowsTheAllowlistOrder pins the
+// substantive property — that the order comes from the allowlist — but only once
+// through, so an allocator that read the assigned map instead would still pass
+// it on the run that happened to come out in order.
+//
+// Go randomizes map iteration per range, so a map-driven allocator disagrees
+// with itself across calls and this catches it; the repetition is what a single
+// pass cannot ask for.
+func TestAllocatePeerIPsIsDeterministic(t *testing.T) {
+	peers := []string{"a", "b", "c", "d", "e"}
+	rows := map[string]string{"a": "", "b": "", "c": "", "d": "", "e": ""}
+
+	first, err := AllocatePeerIPs(peers, rows, "10.10.0.1/24")
+	if err != nil {
+		t.Fatalf("AllocatePeerIPs = %v, want five addresses", err)
+	}
+
+	// Many settlements of the one input, each from a fresh copy of the rows, since
+	// the door promises not to write into the caller's map and a caller that broke
+	// that promise would get a different answer rather than a different map.
+	for i := range 25 {
+		fresh := make(map[string]string, len(rows))
+		for peer, spec := range rows {
+			fresh[peer] = spec
+		}
+		got, err := AllocatePeerIPs(peers, fresh, "10.10.0.1/24")
+		if err != nil {
+			t.Fatalf("settlement %d = %v, want five addresses", i, err)
+		}
+		for peer, want := range first {
+			if got[peer] != want {
+				t.Fatalf("settlement %d gave %q = %q, want %q: the door is not deterministic", i, peer, got[peer], want)
+			}
+		}
+	}
+}
+
 func mustPrefixes(t *testing.T, specs ...string) []netip.Prefix {
 	t.Helper()
 	prefixes := make([]netip.Prefix, 0, len(specs))
