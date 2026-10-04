@@ -481,10 +481,15 @@ func (s *tunTunnel) Run() (err error) {
 
 	s.mu.Lock()
 	s.ln, s.device, s.authz = peerLn, deviceLn, authz
+	forward := s.forward
 	s.mu.Unlock()
 
 	go func() {
-		serveErr := s.forward.Serve()
+		// The service is read once, here, rather than off the field: Close sets
+		// s.forward to nil, and a full-tunnel PUT calls it on this very tunnel
+		// while this goroutine is starting. What is served is the service built
+		// above either way — Close closes that same object, which is the point.
+		serveErr := forward.Serve()
 		if CleanStop(serveErr) {
 			log.Info("tun tunnel stopped")
 			s.setErr(nil)
@@ -497,8 +502,15 @@ func (s *tunTunnel) Run() (err error) {
 	return nil
 }
 
+// Status is the underlying gost service's status, read under the lock for the same
+// reason p2pTunnel's is: Close clears the field, and this is reached from the API's
+// response builder on the way past a PUT that is doing exactly that.
 func (s *tunTunnel) Status() *xservice.Status {
-	if ss, _ := s.forward.(ServiceStatus); ss != nil {
+	s.mu.RLock()
+	forward := s.forward
+	s.mu.RUnlock()
+
+	if ss, _ := forward.(ServiceStatus); ss != nil {
 		return ss.Status()
 	}
 	return nil
