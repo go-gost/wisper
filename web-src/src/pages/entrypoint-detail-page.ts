@@ -920,6 +920,12 @@ export class EntrypointDetailPage extends LitElement {
                   ? html`
                     <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
                     <div class="p2p-hint">${t('tunPeerHint')}</div>
+                    <!-- What makes the two ends agree. The hub's assignment
+                         lives on the hub's own peers page, which this page has
+                         no view of — it knows only the net being typed here and
+                         the hub's key — so the hint points there rather than
+                         restating a subnet it cannot know. -->
+                    <div class="p2p-hint">${t('tunNetMatchesHub')}</div>
                   `
                   : ''}
 

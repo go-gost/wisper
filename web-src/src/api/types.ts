@@ -56,6 +56,11 @@ export interface Peer {
   /** Switched off: the peer keeps its place on the list but gets no route, so
    *  its new streams are closed while established ones drain. */
   disabled?: boolean;
+  /** The address this peer may claim on the hub's device network (host
+   *  addresses, comma-separated; never a prefix). Absent when the row holds
+   *  none — the hub allocates one on the next save. A p2p tunnel has no device
+   *  network, so its rows never carry it. */
+  ip?: string;
 }
 
 export interface TunnelOptions {

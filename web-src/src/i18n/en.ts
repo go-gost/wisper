@@ -171,12 +171,17 @@ const en: Record<string, string> = {
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating it fails with "operation not permitted" otherwise.',
   tunPeerHint:
     'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
+  tunNetMatchesHub:
+    'This must be the address the hub assigned to this peer — copy it from the hub\'s peers page.',
   peersTitle: 'Allowed peers',
   peersEntryDesc: '{n} allowed — manage the list',
   peersNoAlias: 'No alias',
   peersAdd: 'Add peer',
   peersAliasPlaceholder: 'alias (optional)',
   peersKeyPlaceholder: 'Base64 public key',
+  peersIPPlaceholder: 'e.g. 10.10.0.2',
+  peersIPHint:
+    'The address this spoke may use on the hub\'s network. Leave empty and the hub assigns one from its own subnet; a spoke must be configured with the same address.',
   peersKeyRequired: 'A key is required.',
   peersKeyInvalid: 'Not a base64 32-byte public key.',
   peersKeyDuplicate: 'Listed twice.',

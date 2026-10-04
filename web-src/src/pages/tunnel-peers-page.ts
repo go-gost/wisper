@@ -17,6 +17,23 @@ interface PeerRow {
   alias: string;
   /** Switched off: kept on the list, given no route. */
   disabled: boolean;
+  /** The address this spoke may claim on the hub's device network, '' when the
+   *  row holds none. */
+  ip: string;
+  /**
+   * Whether the operator has edited this row's address, and the only thing
+   * that says which of two requests the row is: no address field at all means
+   * "leave it as it is", an empty one means "clear it, give it another". The
+   * field's own text cannot carry that distinction — a box the operator
+   * emptied reads as '', and so does a row that had no address to begin with
+   * — so the editor records which of the two it means.
+   *
+   *  Drafts only (see `_startEdit`, `_startAdd`) — never a saved row. A saved
+   *  row with an address is never reallocated, and the flag must not outlive the
+   *  edit that set it, or clearing the field once would reallocate the address
+   *  on every later save of the page.
+   */
+  ipTouched?: boolean;
 }
 
 /**
@@ -39,6 +56,7 @@ function rowsOf(t2: Tunnel | null): PeerRow[] {
     key: p.key,
     alias: p.alias ?? '',
     disabled: p.disabled === true,
+    ip: p.ip ?? '',
   }));
 }
 
@@ -59,8 +77,11 @@ export class TunnelPeersPage extends LitElement {
   @state() private _rows: PeerRow[] = [];
   /** Index of the row being edited, or 'new' for the draft row. */
   @state() private _editing: number | 'new' | null = null;
-  /** The row's edit buffer. */
-  @state() private _draft: PeerRow = { key: '', alias: '', disabled: false };
+  /** The row's edit buffer. `ipTouched` starts false whatever the address
+   *  field holds — it records whether the operator has edited it, not what it
+   *  says — so an editor opened and closed again saves as "unchanged" about
+   *  it. */
+  @state() private _draft: PeerRow = { key: '', alias: '', disabled: false, ip: '', ipTouched: false };
   @state() private _saving = false;
   @state() private _rowError = '';
   @state() private _confirmDelete: number | null = null;
@@ -104,21 +125,34 @@ export class TunnelPeersPage extends LitElement {
     }
   }
 
+  /** _startEdit opens the editor over a saved row. The address field is
+   *  prefilled with the address the row holds, so the operator can read it (the
+   *  hub's allocation of record) and change it; `ipTouched` stays false until the
+   *  field is actually typed into, so an editor that is opened and closed again
+   *  still saves as "unchanged" rather than restating — or worse, clearing —
+   *  that address. */
   private _startEdit(i: number) {
     this._editing = i;
-    this._draft = { ...this._rows[i] };
+    this._draft = { ...this._rows[i], ipTouched: false };
     this._rowError = '';
   }
 
   private _startAdd() {
     this._editing = 'new';
-    this._draft = { key: '', alias: '', disabled: false };
+    this._draft = { key: '', alias: '', disabled: false, ip: '', ipTouched: false };
     this._rowError = '';
   }
 
   private _cancelEdit() {
     this._editing = null;
     this._rowError = '';
+  }
+
+  /** Whether this tunnel's peers hold an address at all. Only a hub's do: a
+   *  p2p tunnel has no device network, so its rows carry none and the host
+   *  ignores the field — a box there would take typing and do nothing. */
+  private get _isHub(): boolean {
+    return this._tunnel?.type === 'tun';
   }
 
   /** _toggleRow switches a peer off or back on and saves. Off keeps the row
@@ -132,7 +166,9 @@ export class TunnelPeersPage extends LitElement {
   /** _addPending puts a requesting key on this tunnel's list: the peers page is
    *  the attribution — the knock itself does not say which tunnel it wanted. */
   private _addPending = async (key: string) => {
-    if (await this._save([...this._rows, { key, alias: '', disabled: false }])) {
+    // ip: '' with no ipTouched: the row asks for no address of its own, which
+    // is what a spoke new to the hub should ask for — it is given one anyway.
+    if (await this._save([...this._rows, { key, alias: '', disabled: false, ip: '' }])) {
       this._pending = this._pending.filter(p => p.key !== key);
     }
   };
@@ -157,11 +193,16 @@ export class TunnelPeersPage extends LitElement {
 
   /** _saveRow persists the draft (replacing or appending) and re-reads the list. */
   private _saveRow = async () => {
-    const draft = {
+    const draft: PeerRow = {
       key: this._draft.key.trim(),
       alias: this._draft.alias.trim(),
       // The editor does not touch the switch; an edited row keeps its state.
       disabled: this._draft.disabled === true,
+      // The address as the operator left it, and whether they left it at all:
+      // the two travel together, because _save needs the pair to say what the
+      // row is asking for.
+      ip: this._draft.ip.trim(),
+      ipTouched: this._draft.ipTouched === true,
     };
     if (!validPeerKey(draft.key)) {
       this._rowError = t('peersKeyInvalid');
@@ -196,7 +237,19 @@ export class TunnelPeersPage extends LitElement {
     try {
       const t2 = await updatePeers(
         this.tunnelId,
-        rows.map(r => ({ key: r.key, alias: r.alias || undefined, disabled: r.disabled || undefined })),
+        rows.map(r => ({
+          key: r.key,
+          alias: r.alias || undefined,
+          disabled: r.disabled || undefined,
+          // The address rides as a pointer server side, and its two states
+          // mean opposite things: no field keeps the address the spoke holds,
+          // an empty one clears it so the hub allocates another. So the field
+          // goes out only for a row whose address the operator actually
+          // edited (see `ipTouched`), and every other row leaves it out —
+          // which is what every save of this page means by "nothing to
+          // change".
+          ...(r.ipTouched ? { ip: r.ip.trim() } : {}),
+        })),
       );
       this._tunnel = t2;
       this._rows = rowsOf(t2);
@@ -251,6 +304,21 @@ export class TunnelPeersPage extends LitElement {
             this._draft = { ...this._draft, key: (e.target as HTMLInputElement).value };
             this._rowError = '';
           }}>
+        <!-- The address this spoke may claim on the hub's network. The box is
+             prefilled from the row, so it is the hub's allocation of record
+             to read or change; any edit marks the draft, and only a marked
+             draft ever sends the field (see ipTouched). Emptying it is an
+             edit like any other, and it asks the hub for a new address. -->
+        ${this._isHub
+          ? html`
+            <input class="form-input ip" .value=${this._draft.ip}
+              placeholder=${t('peersIPPlaceholder')}
+              @input=${(e: Event) => {
+                this._draft = { ...this._draft, ip: (e.target as HTMLInputElement).value, ipTouched: true };
+              }}>
+            <div class="field-hint">${t('peersIPHint')}</div>
+          `
+          : nothing}
         ${this._rowError ? html`<div class="row-error">${this._rowError}</div>` : nothing}
       </div>
     `;
@@ -501,6 +569,13 @@ export class TunnelPeersPage extends LitElement {
       font-family: var(--font-mono, monospace);
       font-size: var(--font-xs);
     }
+    /* The address field. Not a credential, but it is read and compared as
+       text, so it gets the key field's monospace. */
+    .form-input.ip {
+      margin-top: 6px;
+      font-family: var(--font-mono, monospace);
+      font-size: var(--font-xs);
+    }
     .form-input.invalid {
       border-color: var(--red);
     }
@@ -536,6 +611,15 @@ export class TunnelPeersPage extends LitElement {
       padding-top: 6px;
       font-size: var(--font-xs);
       color: var(--red);
+    }
+
+    /* The address field's explanation. It is about the field above it rather
+       than about the page, so it sits inside the row and hugs it. */
+    .field-hint {
+      padding-top: 6px;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
     }
 
     .add-row {
