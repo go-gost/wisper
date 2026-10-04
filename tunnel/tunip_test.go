@@ -471,6 +471,61 @@ func TestAssignPeerIPsFollowsTheAllowlistOrder(t *testing.T) {
 	}
 }
 
+// TestAssignPeerIPsIsDeterministic: the same rows and the same allowlist settle
+// to the same addresses every time, on every call.
+//
+// TestAssignPeerIPsFollowsTheAllowlistOrder above pins the substantive property,
+// that the order comes from the allowlist rather than from the map — but it runs
+// each order once, so an allocator that drew its order from a map would still
+// pass it whenever the map happened to come out in order. Go randomizes map
+// iteration per range, so repeating the one input is what turns "usually right"
+// into a failure.
+//
+// The input is built so that repetition is the only thing that can catch it. Five
+// rows, a /30 with one free address and a /64 behind it, and a typed row on the
+// far side of the split: the fourth row onwards is served from whichever subnet
+// is scanned first, so an allocator that walked a map of prefixes would hand out
+// 10.10.0.2 to a different spoke on each call. One call cannot tell the two
+// orderings apart from the order it happened to run in; fifty can.
+func TestAssignPeerIPsIsDeterministic(t *testing.T) {
+	prefixes, self := parseHubNets("10.10.0.1/30,fd00::1/64")
+	order := []string{"a", "b", "c", "d", "e"}
+	assigned := map[string]string{"e": "10.10.0.3"}
+
+	first, err := assignPeerIPs(order, assigned, prefixes, self)
+	if err != nil {
+		t.Fatalf("assignPeerIPs = %v, want five addresses", err)
+	}
+	// The premise of the whole test: the /30 is spent after the first row, so the
+	// rest are served from the second subnet and which one that is decides the
+	// answer. Stated so that a future change to the input cannot quietly make this
+	// test unable to fail.
+	if first["a"] != "10.10.0.2" || first["b"] != "fd00::" || first["e"] != "10.10.0.3" {
+		t.Fatalf("assignPeerIPs = %v, want the /30 spent after a and the rest from fd00::/64", first)
+	}
+
+	for i := range 50 {
+		// The caller's map is reused deliberately: allocation returns a copy
+		// rather than writing in place, so a caller may hand the same one to every
+		// save — and if it were written into, the second call would see the first
+		// one's answer and agree with it for the wrong reason.
+		got, err := assignPeerIPs(order, assigned, prefixes, self)
+		if err != nil {
+			t.Fatalf("allocation %d = %v, want five addresses", i, err)
+		}
+		for peer, want := range first {
+			if got[peer] != want {
+				t.Fatalf("allocation %d gave %q = %q, want %q: allocation is not deterministic",
+					i, peer, got[peer], want)
+			}
+		}
+	}
+
+	if len(assigned) != 1 || assigned["e"] != "10.10.0.3" {
+		t.Errorf("the caller's map = %v, want the one row it started with", assigned)
+	}
+}
+
 // TestAssignPeerIPsAcceptsMultipleTypedAddressesInOneRow: a row may name several
 // addresses — a device with more than one, or a peer that claimed a range. Both
 // are the operator's to give, both are counted as taken, and neither is
@@ -578,11 +633,16 @@ func TestAssignPeerIPsFallsThroughToTheSecondPrefix(t *testing.T) {
 }
 
 // TestAssignPeerIPsReservesTheNetworkAndBroadcastAddresses: which addresses a
-// subnet keeps for itself. Below /30 the last address is the broadcast and is not
-// a spoke's; at /30 and tighter it is an ordinary host address. A /31 is a
-// point-to-point link and a /32 a single host, so neither reserves a network
-// address — which is also the one case where the masked address itself is
-// handable.
+// subnet keeps for itself, across both families. Below /30 the last address is
+// the broadcast and is not a spoke's; at /30 and tighter it is an ordinary host
+// address. A /31 is a point-to-point link and a /32 a single host, so neither
+// reserves a network address — which is also the one case where the masked
+// address itself is handable.
+//
+// The IPv6 cases are in the same table rather than beside it, because the
+// asymmetry is the point: an IPv6 prefix reserves neither end, so the two rules
+// are not two halves of one rule and a change to either has to be made where the
+// other can be seen.
 func TestAssignPeerIPsReservesTheNetworkAndBroadcastAddresses(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -600,6 +660,58 @@ func TestAssignPeerIPsReservesTheNetworkAndBroadcastAddresses(t *testing.T) {
 				"a": "10.10.0.2", "b": "10.10.0.3", "c": "10.10.0.4",
 				"d": "10.10.0.5", "e": "10.10.0.6",
 			},
+			wantFail: true,
+		},
+		{
+			// The same eight addresses as the /29 above, and the whole asymmetry in
+			// one case: an IPv6 prefix reserves neither end. fd00:: is the
+			// subnet-router anycast address of RFC 3306 and fd00::7 is the prefix's
+			// last address, and allocation treats both as hosts — which is why an
+			// fd00::1/64 hub hands its first spoke fd00::. The rules are stated for
+			// IPv4 (hasNetworkAddr is Bits() < 31, false for every IPv6 prefix) and
+			// hasBroadcastAddr checks the family, so this is deliberate rather than
+			// accidental: it is stated here so that a change to either predicate
+			// cannot be made without changing something a test can see.
+			//
+			// Eight addresses, one of them the hub's own: seven spokes fit, against
+			// the five the /29 above served from the same eight.
+			name:  "an IPv6 /125 reserves neither its first nor its last address",
+			net:   "fd00::1/125",
+			order: []string{"a", "b", "c", "d", "e", "f", "g", "h"},
+			want: map[string]string{
+				"a": "fd00::", "b": "fd00::2", "c": "fd00::3", "d": "fd00::4",
+				"e": "fd00::5", "f": "fd00::6", "g": "fd00::7",
+			},
+			wantFail: true,
+		},
+		{
+			// The hub's own address is skipped on an IPv6 subnet exactly as on an
+			// IPv4 one — the rule is about the address, not the family — and the
+			// rest of the prefix is handed out from the bottom up.
+			name:  "an IPv6 /64 hands out its first address",
+			net:   "fd00::1/64",
+			order: []string{"a", "b", "c"},
+			want:  map[string]string{"a": "fd00::", "b": "fd00::2", "c": "fd00::3"},
+		},
+		{
+			// IPv6's counterpart of the /31: two addresses, no network address
+			// reserved, so the first is a host — but the hub holds the second, so
+			// the subnet serves exactly one spoke.
+			name:     "an IPv6 /127 serves one spoke",
+			net:      "fd00::1/127",
+			order:    []string{"a", "b"},
+			want:     map[string]string{"a": "fd00::"},
+			wantFail: true,
+		},
+		{
+			// IPv6's counterpart of the /30, and unlike the /30 it reserves
+			// nothing at all: all four addresses are hosts, one of which is the
+			// hub's own, so three spokes fit and the fourth is refused rather than
+			// given a duplicate or the network address.
+			name:     "an IPv6 /126 reserves nothing",
+			net:      "fd00::1/126",
+			order:    []string{"a", "b", "c", "d"},
+			want:     map[string]string{"a": "fd00::", "b": "fd00::2", "c": "fd00::3"},
 			wantFail: true,
 		},
 		{
