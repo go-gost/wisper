@@ -47,6 +47,12 @@ type PeerSetter interface {
 	SetPeers(ctx context.Context, peers []string, aliases map[string]string, disabled []string) error
 }
 
+// PeerIPSetter is implemented by a tunnel that allocates device addresses to
+// its peers. A p2p tunnel does not: it has no device network to allocate from.
+type PeerIPSetter interface {
+	SetPeerIPs(ctx context.Context, peerIPs map[string]string) error
+}
+
 // p2pTunnel exposes a local service to peers over the process-wide p2p host:
 // the peer dials the host by its base64 public key through the DERP relay, the
 // manager routes the inbound stream to this tunnel's peer route, and a

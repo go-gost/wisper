@@ -320,6 +320,11 @@ type Tunnel struct {
 	// closed while established ones drain. Empty means every peer is enabled.
 	PeerDisabled []string `yaml:"peer_disabled,omitempty" json:"peer_disabled,omitempty"`
 
+	// PeerIPs is a tun hub's address assignment: peer key → the comma-separated
+	// host addresses that peer may claim. Empty means the hub allocates nothing and
+	// every registration is refused.
+	PeerIPs map[string]string `yaml:"peer_ips,omitempty" json:"peer_ips,omitempty"`
+
 	// Net is a tun device's address: a CIDR, or several comma-separated. It is
 	// what the device advertises (and, for a spoke, what it registers with the
 	// hub's tun server).

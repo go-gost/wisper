@@ -33,6 +33,7 @@ var (
 	_ PeerStatsReporter = (*tunTunnel)(nil)
 	_ PeerStatsUpdater  = (*tunTunnel)(nil)
 	_ PeerSetter        = (*tunTunnel)(nil)
+	_ PeerIPSetter      = (*tunTunnel)(nil)
 )
 
 // tunTunnel is the hub half of a virtual network: it holds a tun device and
@@ -51,8 +52,13 @@ type tunTunnel struct {
 	// ln is the p2p route, released on Close; device is the tun listener, kept
 	// only so it can be closed there — its accepted conn is the device the hub
 	// runs on, so it is not closed on the way out of Run.
-	ln            net.Listener
-	device        listener.Listener
+	ln     net.Listener
+	device listener.Listener
+	// authz is the hub's address assignment, held so a save can replace it in
+	// place. It is nil until Run builds it — there is no hub to allocate for
+	// before that — and Close clears it with ln and device, because both mean the
+	// same thing here: nothing is running.
+	authz         *spokeAuthorizer
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
@@ -172,6 +178,22 @@ func (s *tunTunnel) init() error {
 	return nil
 }
 
+// newAuthorizer builds the hub's address assignment: the whole of the admission
+// policy a spoke is checked against, since a spoke's stream arrives on a route the
+// p2p allowlist already decided to give it. A spoke may then hold exactly the
+// addresses its own row names, and nothing else — the hub's route table is
+// last-writer-wins per address, so a claim that is not checked takes a neighbour's
+// route with nothing anywhere saying so.
+//
+// The identity handed to it is s.opts.ID — the hub's — because that is what
+// event.Record files a refusal under: a peer key names an object the operator has
+// no page for, and a route's name is not an object either. A hub built without one
+// has no assignment loaded, so every claim is refused as unknown rather than
+// passing unchecked.
+func (s *tunTunnel) newAuthorizer(log logger.Logger) *spokeAuthorizer {
+	return newSpokeAuthorizer(s.opts.ID, s.opts.PeerIPs, log)
+}
+
 func (s *tunTunnel) Run() (err error) {
 	if s.IsClosed() {
 		return ErrTunnelClosed
@@ -261,12 +283,11 @@ func (s *tunTunnel) Run() (err error) {
 	// A p2p hub has no TTL and no keepalive setting: a peer announces its
 	// departure by closing its stream, so nothing here is parsed from metadata.
 	handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
-	// Nil authorizer: this hub's identity is the p2p allowlist that routed a
-	// spoke's stream here, so the username/password pair this argument used to
-	// take had nothing to check — an auther is consulted with the spoke's
-	// *claimed* address as the user name, which nothing ever supplied. Per-spoke
-	// address authorization arrives with the tun-hub IP allocation work.
-	h := tunhandler.NewP2PHandler(deviceConn, nil,
+	// The hub is the allocator of record; see newAuthorizer. A hub with no
+	// assignment refuses every claim, which is the safe default — the alternative
+	// is a last-writer-wins route table with nothing checking what went into it.
+	authz := s.newAuthorizer(log)
+	h := tunhandler.NewP2PHandler(deviceConn, authz,
 		handler.LoggerOption(handlerLogger),
 		handler.ServiceOption(s.opts.Name),
 	)
@@ -283,7 +304,7 @@ func (s *tunTunnel) Run() (err error) {
 	)
 
 	s.mu.Lock()
-	s.ln, s.device = peerLn, deviceLn
+	s.ln, s.device, s.authz = peerLn, deviceLn, authz
 	s.mu.Unlock()
 
 	go func() {
@@ -387,6 +408,40 @@ func (s *tunTunnel) SetPeers(ctx context.Context, peers []string, aliases map[st
 	return nil
 }
 
+// SetPeerIPs replaces the hub's address assignment. ctx is accepted for the
+// same reason SetPeers takes one — a save may be named in a log line — and is
+// not otherwise used here.
+//
+// It cannot fail once it has decided to apply: the assignment is parsed into a
+// fresh map and the pointer to it is swapped, and neither step touches the
+// network. That is why it is safe to call after SetPeers has reconciled the
+// routes. Reconciling first and assigning second is the order that matters —
+// the reverse would leave a spoke holding a route whose assignment had been
+// withdrawn, and a claim on that route would be refused with no route to fall
+// back on.
+//
+// The rows are handed to the authorizer as they are. A row that does not parse is
+// dropped there and refused as an unknown peer, which is the fail-closed answer:
+// the API rejects such a row before it is ever saved, so reaching this point with
+// one is belt-and-braces, and the alternative — treating it as an empty row —
+// would leave that spoke silently claiming nothing with no event to explain it.
+func (s *tunTunnel) SetPeerIPs(ctx context.Context, peerIPs map[string]string) error {
+	if s.IsClosed() {
+		return ErrTunnelClosed
+	}
+	s.mu.RLock()
+	authz := s.authz
+	s.mu.RUnlock()
+	if authz == nil {
+		return errors.New("tun hub is not running")
+	}
+	s.mu.Lock()
+	s.opts.PeerIPs = peerIPs
+	s.mu.Unlock()
+	authz.set(peerIPs)
+	return nil
+}
+
 func (s *tunTunnel) Close() error {
 	defer func() {
 		select {
@@ -398,7 +453,7 @@ func (s *tunTunnel) Close() error {
 
 	s.mu.Lock()
 	forward, ln, device := s.forward, s.ln, s.device
-	s.forward, s.ln, s.device = nil, nil, nil
+	s.forward, s.ln, s.device, s.authz = nil, nil, nil, nil
 	s.mu.Unlock()
 
 	var err error

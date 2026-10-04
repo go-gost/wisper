@@ -99,6 +99,12 @@ type Options struct {
 	// (and shown on the peers page) but given no route, so their new streams
 	// are closed while established ones drain.
 	PeerDisabled []string
+	// PeerIPs is a tun hub's address assignment: peer key → the comma-separated
+	// host addresses that peer may claim. A hub is the allocator of record — the
+	// allowlist alone says a spoke may connect, this says which device address it
+	// owns, and without it every claim is refused. A p2p tunnel has no device, so
+	// it carries nothing here.
+	PeerIPs map[string]string
 	// Net is a tun device's address: a CIDR, or several comma-separated.
 	// A hub tunnel and a spoke entrypoint both carry it.
 	Net string
@@ -247,6 +253,43 @@ func PeerDisabledOption(disabled []string) Option {
 	return func(opts *Options) {
 		opts.PeerDisabled = disabled
 	}
+}
+
+// PeerIPsOption sets a tun hub's address assignment (peer key → the
+// comma-separated host addresses that peer may claim). An empty assignment means
+// the hub authorizes nothing, so every spoke is refused until one is saved.
+func PeerIPsOption(peerIPs map[string]string) Option {
+	return func(opts *Options) {
+		opts.PeerIPs = peerIPs
+	}
+}
+
+// NormalizePeerIPs keeps only the assignment rows of keys that are still
+// allowlisted, modelled on NormalizePeerDisabled: a spoke removed from the hub's
+// allowlist must not linger in the config holding an address, or it would come
+// back already entitled to it if it were ever added again. The values themselves
+// are the operator's (or the allocator's) and are kept byte for byte — this drops
+// keys, it does not re-parse or re-render addresses, so a hub that restarts
+// authorizes exactly what it authorized before. Nil when nothing is left, which is
+// what a hub with no assignment is written as.
+func NormalizePeerIPs(peers []string, known map[string]string) map[string]string {
+	if len(peers) == 0 || len(known) == 0 {
+		return nil
+	}
+	listed := make(map[string]bool, len(peers))
+	for _, p := range peers {
+		listed[p] = true
+	}
+	out := make(map[string]string, len(known))
+	for p, ips := range known {
+		if listed[p] {
+			out[p] = ips
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // NetOption sets a tun device's address (a CIDR, or several comma-separated).
@@ -507,6 +550,7 @@ func RestartRunning() {
 			Peers:        p.opts.Peers,
 			PeerAliases:  p.opts.PeerAliases,
 			PeerDisabled: p.opts.PeerDisabled,
+			PeerIPs:      p.opts.PeerIPs,
 			Protocol:     p.opts.Protocol,
 			Net:          p.opts.Net,
 			MTU:          p.opts.MTU,
@@ -605,6 +649,7 @@ func LoadConfig() {
 			Peers:         cfg.Peers,
 			PeerAliases:   NormalizePeerAliases(cfg.Peers, cfg.PeerAliases),
 			PeerDisabled:  NormalizePeerDisabled(cfg.Peers, cfg.PeerDisabled),
+			PeerIPs:       NormalizePeerIPs(cfg.Peers, cfg.PeerIPs),
 			Net:           cfg.Net,
 			MTU:           cfg.MTU,
 			DeviceName:    cfg.DeviceName,
@@ -662,6 +707,7 @@ func SaveConfig() error {
 			Peers:         opts.Peers,
 			PeerAliases:   opts.PeerAliases,
 			PeerDisabled:  opts.PeerDisabled,
+			PeerIPs:       opts.PeerIPs,
 			Net:           opts.Net,
 			MTU:           opts.MTU,
 			DeviceName:    opts.DeviceName,
@@ -711,6 +757,7 @@ func TunnelOptions(opts Options) []Option {
 		PeersOption(opts.Peers...),
 		PeerAliasesOption(opts.PeerAliases),
 		PeerDisabledOption(opts.PeerDisabled),
+		PeerIPsOption(opts.PeerIPs),
 		NetOption(opts.Net),
 		MTUOption(opts.MTU),
 		DeviceNameOption(opts.DeviceName),
