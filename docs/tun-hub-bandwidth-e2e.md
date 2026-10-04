@@ -121,3 +121,78 @@ e2e 注入档位已就绪但**尚未能实际验证**，要等根因 ①（datag
 - 测试覆盖同一代码树下当前状态；另有两个基线观察：
   - `scripts/smoke-tun.sh`（仅 ping 检查）全部通过，不覆盖 TCP 吞吐。
   - `s/p2p/engine` 的 smux keepAlive 改为 3s/15s，记录在 `p2p/internal/host/engine.go:512`。
+
+---
+
+## 2026-10-04 复测：e2e 跑通，判据再次改写（并推翻上面两处结论）
+
+上一节的两条结论都错了，此节更正。
+
+### 更正 1：会话一直都建立了，"根因 ①"不成立
+
+`PUT /api/config {"log":{"level":"debug"}}` **不会改变运行中 logger 的级别**，只有启动
+参数 `-log.level debug` 会。所以之前每一轮 e2e 都在 info 级别跑，p2p 的会话字段全是
+Debug，一条都没落盘——"relay 会话从未建立"是这么来的。开启 debug 后：
+
+```
+peer relay session up peer=P client=false secure=true
+datagram link up
+datagram link down
+```
+
+会话一直正常建立，datagram link 也确实 down 了（这正是注入造成的），随后恢复。
+所谓"根因 ① datagram link 意外终止"其实是注入本身的效果，不是独立故障。
+
+### 更正 2：修复生效，会自愈
+
+spoke 侧完整时序（真实运行）：
+
+| 时刻 | 事件 |
+|------|------|
+| 12:27:33.219 | `peer relay session up secure=true` |
+| 12:27:33.223 | `datagram link up` |
+| 12:27:35.740 | `datagram link down` ← 注入点 |
+| 12:27:37.741 | `bad secure record length 626654040` 失步 #1 |
+| 12:27:39.744 | 失步 #2 |
+| 12:27:43.745 | 失步 #3 == 阈值 |
+| 12:27:51.746 | 失步 #4（仍在 kill 之前） |
+| 12:28:03.220 | `peer session killed relayReason=adapter-closed dropSecure=true` |
+| 12:28:07.747 | `peer relay session up secure=true` ← **已恢复** |
+| 12:28:07.748 | `datagram link up` |
+| 12:29:12.442 | `link-lost` EOF（脚本收尾） |
+
+恢复耗时约 **34.5s**（30s smux keepalive 超时 + ~4.5s 重新握手）。
+
+**同时出现的 2 次 `build-failed ... encryption required` 不是失败终点**，而是同一次握手里
+两个并发调用者的败者；胜者 4.5s 后就绪了。之前把这两次 kill 当成结论，是误判。
+
+### 判据第三次改写：计数 → 时序 + 两侧
+
+- 计数无法区分好坏：会自愈的对在学到新 key 期间也会产生几条记录边界失败，任何固定预算
+  要么过严要么过松。**判别信号是时序的**——最后一次 relay session 建立之后，必须不再出现
+  任何记录边界失败。原 bug 每次重建都失败，永远产生不了这个"安静尾巴"。
+- **两侧都要看**：实测失步在 spoke，而 hub 全程干净重建；只读 hub 会看到 0 次失败而空过。
+  任一侧出现失败即 FAIL；"已被验证"的条件是**至少一侧**出现 `dropSecure=true` kill 后接
+  新的 session（健康的对走 rekey 路径，按设计不丢弃 secure 会话，所以不能要求两侧都丢）。
+- 之前 `grep '"relayReason":"..."'` 永远为空：wisper 的 handler 把 slog attrs 以
+  `key=value` 折进 msg，不是 JSON 字段。
+
+### 门禁确实有区分力（不是"跑绿了"而已）
+
+| p2p 版本 | e2e 退出码 | spoke kill / 边界失败 / session up |
+|---------|-----------|-----------------------------------|
+| `2075288`（含修复） | **0 PASS** | 5 / 5（末次 up 后 **0**）/ 4 |
+| `3627a4f`（修复前） | **3 INCONCLUSIVE** | 51 / 110 / 52 |
+
+FAIL 分支同样可达：`3627a4f` 的日志在末次 session up 之后仍有 2 次失败，
+`INJECT_MAX_DESYNC=1` 即可触发。
+
+### 吞吐仍为 0（与本修复无关，且归因存疑）
+
+修复前后吞吐都是 0 Mbit/s，注入前后都是 0。数据面在本环境跑不通，但这**不是**"datagram
+link 自己断了"（更正 1 已推翻该归因，link 会自己 up 回来）。这是一个独立且**仍未查清**的
+问题。它对本修复不构成任何证据，所以判据里吞吐只打印不判定。
+
+### 仍然成立
+
+ping-only smoke 不算门禁的理由不变：ping 走控制面小包，密文层即使永久错位也通。
