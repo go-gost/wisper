@@ -72,6 +72,10 @@ type peerJSON struct {
 	// Disabled keeps the peer on the list without giving it a route: its new
 	// streams are closed while established ones drain.
 	Disabled bool `json:"disabled,omitempty"`
+	// IP is the address this peer may claim on the hub's device network: a
+	// comma-separated list of host addresses, never a prefix. Empty means the
+	// hub allocates one. A p2p tunnel ignores it — it has no device network.
+	IP string `json:"ip,omitempty"`
 }
 
 type tunnelOptionsResp struct {
@@ -93,6 +97,11 @@ type tunnelOptionsResp struct {
 	// Peers is a p2p tunnel's or a tun hub's inbound allowlist. Empty is valid
 	// for a p2p tunnel — it runs and routes nothing — but a tun hub rejects it.
 	Peers []peerJSON `json:"peers,omitempty"`
+	// PeerIPs is a tun hub's address assignment whole, as the config file carries
+	// it: peer key → the addresses that spoke may claim. It is the same values
+	// Peers holds one row at a time, so a client may read either; a p2p tunnel
+	// has no device and carries none.
+	PeerIPs map[string]string `json:"peer_ips,omitempty"`
 	// A tun entrypoint's device: its address, MTU, name, routed subnets and
 	// DNS servers.
 	Net        string `json:"net,omitempty"`
@@ -113,10 +122,18 @@ type statsResponse struct {
 	OutputRateBytes uint64  `json:"output_rate_bytes"`
 }
 
-// peersJSON pairs each allowlisted key with its display alias and whether it is
-// switched off. A key without an alias (a config older than aliases) is
-// normalized on the way out, so the UI always has a name to show.
-func peersJSON(peers []string, aliases map[string]string, disabled []string) []peerJSON {
+// peersJSON pairs each allowlisted key with its display alias, whether it is
+// switched off, and the address it may claim. A key without an alias (a config
+// older than aliases) is normalized on the way out, so the UI always has a name
+// to show.
+//
+// peerIPs is a tun hub's assignment — the map every response builds its rows
+// from, since it is the one place the answers are already kept. It is passed
+// rather than read from a tunnel so this stays a pure builder, and it is looked
+// up per key: a p2p tunnel's rows have no address to carry and a spoke with none
+// assigned yet comes back with the field absent, which is what makes an empty
+// value "allocate me one" rather than "hold nothing".
+func peersJSON(peers []string, aliases map[string]string, disabled []string, peerIPs map[string]string) []peerJSON {
 	normalized := tunnel.NormalizePeerAliases(peers, aliases)
 	off := make(map[string]bool, len(disabled))
 	for _, k := range disabled {
@@ -127,7 +144,7 @@ func peersJSON(peers []string, aliases map[string]string, disabled []string) []p
 	for _, k := range peers {
 		if a, ok := normalized[k]; ok && !seen[k] {
 			seen[k] = true
-			out = append(out, peerJSON{Key: k, Alias: a, Disabled: off[k]})
+			out = append(out, peerJSON{Key: k, Alias: a, Disabled: off[k], IP: peerIPs[k]})
 		}
 	}
 	return out
@@ -187,7 +204,8 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			RecordMode:  opts.RecordMode,
 			Peer:        opts.Peer,
 			Protocol:    opts.Protocol,
-			Peers:       peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled),
+			Peers:       peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled, opts.PeerIPs),
+			PeerIPs:     opts.PeerIPs,
 			Net:         opts.Net,
 			MTU:         opts.MTU,
 			DeviceName:  opts.DeviceName,
@@ -290,7 +308,9 @@ type tunnelCreateRequest struct {
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
 	// Peers is a p2p tunnel's inbound allowlist; an entry's alias is optional
-	// and generated when omitted.
+	// and generated when omitted. A tun hub's spokes arrive the same way, and an
+	// entry's ip is the address that spoke may claim — the field a full-tunnel PUT
+	// has to carry, or the hub it rebuilds comes back with no assignment at all.
 	Peers []peerJSON `json:"peers,omitempty"`
 	// Net is a tun device's address (CIDR, comma-separated for several).
 	Net string `json:"net,omitempty"`
@@ -309,6 +329,14 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 	peers := make([]string, 0, len(r.Peers))
 	aliases := make(map[string]string, len(r.Peers))
 	var disabled []string
+	// peerIPs is a tun hub's assignment, read off the same rows the allowlist is:
+	// one field on the wire, one map in the options. It is gathered for a hub only,
+	// because a p2p tunnel has no device to allocate from and a row carrying an
+	// address there is a client sending a field nothing reads.
+	var peerIPs map[string]string
+	if r.Type == tunnel.TunTunnel {
+		peerIPs = make(map[string]string, len(r.Peers))
+	}
 	for _, p := range r.Peers {
 		peers = append(peers, p.Key)
 		if p.Alias != "" {
@@ -316,6 +344,9 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		}
 		if p.Disabled {
 			disabled = append(disabled, p.Key)
+		}
+		if peerIPs != nil {
+			peerIPs[p.Key] = strings.TrimSpace(p.IP)
 		}
 	}
 	aliases = tunnel.NormalizePeerAliases(peers, aliases)
@@ -337,6 +368,11 @@ func (r *tunnelCreateRequest) toOptions() []tunnel.Option {
 		tunnel.PeersOption(peers...),
 		tunnel.PeerAliasesOption(aliases),
 		tunnel.PeerDisabledOption(tunnel.NormalizePeerDisabled(peers, disabled)),
+		// Not optional, and the reason is the full-tunnel PUT: it rebuilds the hub
+		// from this request, so an assignment missing here is a hub restarted with
+		// none, every spoke refused as unknown, and SaveConfig writing peer_ips back
+		// as null — a working network turned off by an unrelated edit.
+		tunnel.PeerIPsOption(tunnel.NormalizePeerIPs(peers, peerIPs)),
 		tunnel.NetOption(r.Net),
 		tunnel.MTUOption(r.MTU),
 		tunnel.DeviceNameOption(r.DeviceName),
@@ -530,6 +566,11 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	if tunnelType == "" {
 		tunnelType = old.Type()
 	}
+	// Back onto the request, so toOptions reads the type this hub is actually being
+	// rebuilt as. A request that omits it is the common case on the detail page, and
+	// without this a tun hub whose peers carry their addresses would be rebuilt as
+	// though it were not one — dropping the assignment on the floor.
+	req.Type = tunnelType
 
 	if err := validateTunnelRequest(tunnelType, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -724,6 +765,11 @@ type tunnelPeersRequest struct {
 // (for a hub) its tun device all keep running.
 //
 // Only the two p2p types answer this; anything else has no allowlist to manage.
+//
+// On a tun hub the same request carries the address assignment: the hub is the
+// allocator of record, so a row is checked and filled here, while the request
+// that carried it can still be refused with a reason, rather than left to the
+// hub's own filter to drop it later as an event with nobody to answer.
 func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	old := tunnel.Get(id)
@@ -744,6 +790,12 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	peers := make([]string, 0, len(req.Peers))
 	aliases := make(map[string]string, len(req.Peers))
 	var disabled []string
+	// ip is a tun hub's assignment, keyed like aliases and absent on a p2p tunnel:
+	// it has no device network, so a row's ip is a field nothing there reads.
+	var ip map[string]string
+	if old.Type() == tunnel.TunTunnel {
+		ip = make(map[string]string, len(req.Peers))
+	}
 	seen := make(map[string]bool, len(req.Peers))
 	for _, p := range req.Peers {
 		key := strings.TrimSpace(p.Key)
@@ -763,6 +815,29 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		if p.Disabled {
 			disabled = append(disabled, key)
 		}
+		if ip != nil {
+			ip[key] = strings.TrimSpace(p.IP)
+		}
+	}
+
+	// The assignment is settled before anything is applied, so a row that names an
+	// address outside the hub's subnets, the hub's own address, or an address
+	// another row names too is refused here with the spoke and the subnet named.
+	// SetPeerIPs cannot refuse it: the hub filters what it is given, and a row it
+	// drops is a spoke refused at registration with a message pointing nowhere near
+	// the cause — and an empty row that is never filled is a spoke that may hold
+	// nothing, which is not a state anyone asked for.
+	if ip != nil {
+		// The error is checked before the map is used, and that order is the whole
+		// point: assignPeerIPs hands back the rows it managed alongside its error,
+		// and taking the map first would answer a refused save with a partial
+		// assignment — the request said no and the response saved half of it.
+		merged, err := tunnel.AllocatePeerIPs(peers, ip, old.Options().Net)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		ip = merged
 	}
 
 	// The list is taken in place: the routes are reconciled on the
@@ -774,9 +849,20 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "tunnel does not take a peer list")
 		return
 	}
+	// Order is load-bearing. SetPeers reconciles the p2p routes and can fail; on
+	// failure it has changed nothing, so the assignment is still the old one and
+	// the pair stays consistent. SetPeerIPs only swaps a pointer and cannot fail.
+	// Running them the other way round would leave a spoke holding a route whose
+	// assignment had just been withdrawn — a black hole with nothing to show for it.
 	if err := setter.SetPeers(r.Context(), peers, aliases, disabled); err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
+	}
+	if s, ok := old.(tunnel.PeerIPSetter); ok {
+		if err := s.SetPeerIPs(r.Context(), ip); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)

@@ -205,6 +205,124 @@ func assignPeerIPs(order []string, assigned map[string]string, prefixes []netip.
 	return merged, nil
 }
 
+// AllocatePeerIPs is the exported door onto the four functions above, for a caller
+// in another package — the REST handler, which has to answer a typed address
+// while the operator is still looking at the form. It takes the hub's "net" field
+// rather than the two halves of it, because parseHubNets is the only thing that
+// produces both and the caller cannot reach it.
+//
+// It is the whole of what a hub does to a row (tunTunnel.honorablePeerIPs) plus
+// the allocation, and it fails where that filter drops: the API has to say why a
+// save was refused, and the only other answer is a row quietly gone and a spoke
+// turned away later with a message pointing nowhere near the cause. The two are
+// written to agree — same order (a row that is not in force must not be able to
+// cost a sound row its address either) and same exemption (a hub with no subnet
+// is one broken hub rather than a set of broken rows; only allocation needs a
+// subnet, and it says so itself).
+//
+// The returned map is a fresh one, never the caller's, and nil on error:
+// assignPeerIPs hands back what it managed alongside its error and the caller must
+// not use that, and returning nil here is the rule made unbreakable by the
+// signature rather than by the caller's care.
+func AllocatePeerIPs(peers []string, rows map[string]string, netSpec string) (map[string]string, error) {
+	prefixes, self := parseHubNets(netSpec)
+
+	parsed := make(map[string][]netip.Addr, len(peers))
+	// claims is which row names each address, unmapped: an address two rows name is
+	// one the hub's route table cannot arbitrate, and the check is among the rows
+	// themselves, so it needs no subnet and is asked on every hub.
+	claims := make(map[netip.Addr][]string, len(peers))
+	for _, peer := range peers {
+		addrs, ok := parsePeerIPs(rows[peer])
+		if !ok {
+			return nil, fmt.Errorf("spoke %q: %q is not a comma-separated list of IP addresses", peer, rows[peer])
+		}
+		parsed[peer] = addrs
+		for _, addr := range addrs {
+			canonical := addr.Unmap()
+			claims[canonical] = append(claims[canonical], peer)
+		}
+	}
+
+	// The subnet and the hub's own address, asked only of a hub that has a subnet
+	// to ask about. The addresses go in spelled as the operator wrote them, which is
+	// what makes validatePeerIP's own unmap the thing that decides a row written
+	// ::ffff:10.10.0.2: on the tunnel layer that branch is redundant, an unmapAll
+	// has already run, so this call is the only place it is ever load-bearing.
+	if len(prefixes) > 0 {
+		for _, peer := range peers {
+			var why []string
+			for _, addr := range spelledAddrs(parsed[peer]) {
+				if err := validatePeerIP(addr.String(), prefixes, self); err != nil {
+					why = append(why, err.Error())
+				}
+			}
+			if len(why) > 0 {
+				return nil, fmt.Errorf("spoke %q: %s", peer, strings.Join(why, "; "))
+			}
+		}
+	}
+
+	// Two rows naming one address, and one row naming it twice: the same ambiguity,
+	// because no claim could ever match such a row and the hub's table would hand
+	// the route to whichever spoke registered last. Every row involved is refused,
+	// as the filter drops every row involved — the tie cannot be broken by
+	// iteration order, and a winner would change on the next save.
+	for _, peer := range peers {
+		var why []string
+		for _, addr := range spelledAddrs(parsed[peer]) {
+			owners := claims[addr.Unmap()]
+			if len(owners) < 2 {
+				continue
+			}
+			// The other row is named where there is one: an address a neighbour holds
+			// is a hub configuration problem, and a repeat is a row typed wrongly, and
+			// the two need different fixes.
+			other := ""
+			for _, owner := range owners {
+				if owner != peer {
+					other = owner
+					break
+				}
+			}
+			if other == "" {
+				why = append(why, fmt.Sprintf("%s is named twice in the same row, which no spoke's claim could ever match", addr))
+				continue
+			}
+			why = append(why, fmt.Sprintf("%s is also named by spoke %q, so the hub cannot tell which spoke owns it", addr, other))
+		}
+		if len(why) > 0 {
+			return nil, fmt.Errorf("spoke %q: %s", peer, strings.Join(why, "; "))
+		}
+	}
+
+	merged, err := assignPeerIPs(peers, rows, prefixes, self)
+	if err != nil {
+		return nil, err
+	}
+	return merged, nil
+}
+
+// spelledAddrs keeps each address of a row once, in the row's own order, spelled
+// the way the operator wrote it rather than canonicalized. The dedupe is by address
+// — one address written two ways is one address, and a message that says the same
+// thing about it twice reads as two problems where there is one — but the spelling
+// is kept, because it is the input validatePeerIP needs to be exercised by a row
+// carrying ::ffff:.
+func spelledAddrs(addrs []netip.Addr) []netip.Addr {
+	seen := make(map[netip.Addr]struct{}, len(addrs))
+	out := make([]netip.Addr, 0, len(addrs))
+	for _, addr := range addrs {
+		canonical := addr.Unmap()
+		if _, ok := seen[canonical]; ok {
+			continue
+		}
+		seen[canonical] = struct{}{}
+		out = append(out, addr)
+	}
+	return out
+}
+
 // nextFreeAddr is the first address of prefixes that nothing has taken, scanning
 // the prefixes in the order the hub listed them. It is deliberately not a single
 // combined range: two prefixes the operator wrote are two subnets with a gap
