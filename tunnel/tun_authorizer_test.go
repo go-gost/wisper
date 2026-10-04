@@ -141,6 +141,82 @@ func TestAuthorizeComparesTheSetNotTheSequence(t *testing.T) {
 	}
 }
 
+// TestAuthorizeRefusesARepeatedAddress: the third way a claim can be the wrong
+// length of correct, and the one a containment sweep cannot see.
+//
+// Assigned 10.10.0.2, 10.10.0.3, 10.10.0.4 and claiming 10.10.0.2, 10.10.0.2,
+// 10.10.0.3 is the same count, every claimed address assigned, and neither the
+// assignment nor a subset of it — 10.10.0.4 was never claimed. Nothing is stolen,
+// so a sweep that only asks "is this address mine?" passes it, and the invariant
+// the whole feature rests on stops being true. The sweep consumes instead: the
+// second 10.10.0.2 finds its entry already taken.
+func TestAuthorizeRefusesARepeatedAddress(t *testing.T) {
+	ctx := context.Background()
+	v4 := func(s string) net.IP { return net.ParseIP(s).To16() }
+	three := []net.IP{v4("10.10.0.2"), v4("10.10.0.3"), v4("10.10.0.4")}
+	repeat := []net.IP{v4("10.10.0.2"), v4("10.10.0.2"), v4("10.10.0.3")}
+
+	a := newSpokeAuthorizer("hub-repeat", map[string]string{"p1": "10.10.0.2,10.10.0.3,10.10.0.4"}, xlogger.Nop())
+	// The fixture has to work before the refusals below can prove anything: the
+	// whole set, claimed once each, in every order.
+	for name, claim := range map[string][]net.IP{
+		"row order": three,
+		"reversed":  {three[2], three[1], three[0]},
+	} {
+		if !a.Authorize(ctx, "p1", claim) {
+			t.Fatalf("%s: a claim of the row's three addresses was refused, want authorized", name)
+		}
+	}
+
+	if a.Authorize(ctx, "p1", repeat) {
+		t.Errorf("a spoke assigned 10.10.0.2,10.10.0.3,10.10.0.4 claimed %v, want refused: the count matches, every address is assigned, and .4 was never claimed", repeat)
+	}
+
+	// A row that names an address twice is refused whatever the spoke claims with
+	// it. Task 7's API validation rejects such a row before it can be saved, so this
+	// is belt and braces — but this is the enforcement point, and a row that repeats
+	// an address has no set to be equal to.
+	dup := newSpokeAuthorizer("hub-duprow", map[string]string{"p1": "10.10.0.2,10.10.0.2"}, xlogger.Nop())
+	if dup.Authorize(ctx, "p1", []net.IP{v4("10.10.0.2"), v4("10.10.0.2")}) {
+		t.Error("a spoke whose row names 10.10.0.2 twice claimed it twice, want refused: the row is not a set")
+	}
+	if dup.Authorize(ctx, "p1", []net.IP{v4("10.10.0.2")}) {
+		t.Error("a spoke whose row names 10.10.0.2 twice claimed it once, want refused: the counts differ")
+	}
+
+	// The repeat is also told apart from an address that belongs to a neighbour, so
+	// an operator is not sent looking at the wrong problem.
+	const hubID = "hub-repeat-two"
+	event.Seed(hubID, nil) // isolate: the store is process-wide
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	two := newSpokeAuthorizer(hubID, map[string]string{"p1": "10.10.0.2,10.10.0.3"}, xlogger.Nop())
+	if two.Authorize(ctx, "p1", []net.IP{v4("10.10.0.2"), v4("10.10.0.2")}) {
+		t.Error("a spoke assigned 10.10.0.2,10.10.0.3 claimed 10.10.0.2 twice, want refused")
+	}
+	if two.Authorize(ctx, "p1", []net.IP{v4("10.10.0.2"), v4("10.10.0.9")}) {
+		t.Error("a spoke assigned 10.10.0.2,10.10.0.3 claimed 10.10.0.9, want refused")
+	}
+
+	var reasons []string
+	for _, ev := range event.List(hubID) {
+		if ev.Level == event.LevelWarn {
+			reasons = append(reasons, ev.Message)
+		}
+	}
+	for _, want := range []string{"claimed 10.10.0.2 more than once", "claimed 10.10.0.9, which is not assigned to it"} {
+		found := false
+		for _, msg := range reasons {
+			if strings.Contains(msg, want) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("no refusal says %q; history: %v", want, reasons)
+		}
+	}
+}
+
 // TestAuthorizeRefusesASupersetClaim: the rule this authorizer exists for. Before
 // it, any allowlisted spoke could claim any address, and the route table is
 // last-writer-wins per address — so a claim of a neighbour's address took that

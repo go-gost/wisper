@@ -122,7 +122,8 @@ func (a *spokeAuthorizer) Authorize(ctx context.Context, peer string, ips []net.
 		claim = append(claim, addr.Unmap())
 	}
 
-	// The claim must be the assigned set, and — the whole point — no subset of it.
+	// The claim must be exactly the assigned set, and — the whole point — no subset
+	// of it.
 	//
 	// Order is not part of the rule. The claim arrives as a []net.IP parsed out of a
 	// frame that came over the network, and nothing in the protocol pins its order to
@@ -132,29 +133,53 @@ func (a *spokeAuthorizer) Authorize(ctx context.Context, peer string, ips []net.
 	// nowhere near the cause. Nothing downstream needs the order: x's peerTable.set
 	// is keyed per address, so the routes registered are the same either way.
 	//
-	// The length check comes first, and it is what makes the sweep below set
-	// equality rather than a subset test. Every claimed address being assigned, with
-	// as many addresses claimed as assigned, leaves no room for an extra one: a spoke
-	// entitled to 10.10.0.2 cannot reach 10.10.0.3 that way, because claiming it
-	// would make the claim the longer of the two. Dropping the length check is
-	// exactly what would turn this into the subset bug the authorizer exists to
-	// prevent — it is the first half of the comparison, not a shortcut past it.
+	// The check is the length first, then a sweep that consumes. Both halves are
+	// load-bearing and neither is a shortcut past the other:
+	//
+	//   - The length check rules out the directions a sweep cannot see: a spoke
+	//     entitled to 10.10.0.2 that also claims 10.10.0.3 has made the claim the
+	//     longer of the two, and one that claims nothing of two assigned addresses
+	//     has made it the shorter. This is the half that keeps the sweep from being a
+	//     subset test, and dropping it is the subset bug the authorizer exists to
+	//     prevent.
+	//   - The sweep consumes: the assigned addresses go into a set and each claimed
+	//     address takes one out. So a claim of an address nobody is assigned fails on
+	//     the first test, and a claim of the same address twice fails on the second,
+	//     because the first claim already took it. Containment without consuming
+	//     would accept a spoke assigned 10.10.0.2, 10.10.0.3, 10.10.0.4 that claims
+	//     10.10.0.2, 10.10.0.2, 10.10.0.3 — the right count, every address of it
+	//     assigned, and neither the assignment nor a subset of it, because .4 was
+	//     never claimed at all.
+	//
+	// Together the two are set equality: same count, and each claim a distinct
+	// assigned address. The count is what closes the other end — once every claim
+	// has consumed a distinct assigned address, none can be left over.
 	if len(want) != len(claim) {
 		return a.refuse(peer, ips, want, fmt.Sprintf("claimed %d addresses, assigned %d", len(claim), len(want)))
 	}
+	left := make(map[netip.Addr]struct{}, len(want))
+	for _, w := range want {
+		left[w] = struct{}{}
+	}
 	for _, claimed := range claim {
-		if !assigned(want, claimed) {
+		if _, ok := left[claimed]; !ok {
+			// The two ways to miss are told apart, because an operator needs to know
+			// which: an address that belongs to a neighbour is a hub configuration
+			// problem, and a repeat is a spoke announcing itself wrongly.
+			if assigned(want, claimed) {
+				return a.refuse(peer, ips, want, fmt.Sprintf("claimed %s more than once", claimed))
+			}
 			return a.refuse(peer, ips, want, fmt.Sprintf("claimed %s, which is not assigned to it", claimed))
 		}
+		delete(left, claimed)
 	}
 	return true
 }
 
 // assigned reports whether want holds addr.
 //
-// A containment sweep rather than a sorted copy of each side: a row names one or two
-// addresses, and the decision runs inside the hub's registration loop, so it
-// allocates nothing.
+// Used only to tell a repeated claim from one that is nobody's, and it is here
+// rather than a second map so the sweep allocates once.
 func assigned(want []netip.Addr, addr netip.Addr) bool {
 	for _, w := range want {
 		if w == addr {
