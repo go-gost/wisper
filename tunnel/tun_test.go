@@ -464,6 +464,18 @@ func TestTunHubDropsRowsItCannotHonour(t *testing.T) {
 		"offsite": "192.168.9.9",  // dropped: in no subnet the hub holds
 		"junk":    "10.10.0.9/24", // dropped: a prefix is not a host address
 		"empty":   "",             // stays: the state that means "may claim nothing"
+		// The row that pins "only rows step 1 kept take part in the duplicate
+		// sweep". It parses — both elements are bare host addresses — and is
+		// dropped by the subnet half of step 1 on its second address. It names
+		// "good"'s address on the way out, so a sweep that counted dropped rows
+		// would find 10.10.0.2 claimed twice and drop the sound row with it: one
+		// bad row silently emptying a whole hub's assignment.
+		//
+		// The shape matters, and it took two tries to find. "10.10.0.2,bad" fails
+		// at the parse step and contributes no addresses at all, so it says nothing
+		// about the sweep — it belongs to the "junk" row above. The rule is about
+		// rows dropped by validation, which is why this one has to parse.
+		"contested": "10.10.0.2,192.168.9.9",
 	}
 
 	for _, cp := range []struct {
@@ -492,7 +504,7 @@ func TestTunHubDropsRowsItCannotHonour(t *testing.T) {
 			hub := NewTunTunnel(
 				IDOption(hubID),
 				NetOption("10.10.0.1/24"),
-				PeersOption("good", "offsite", "junk", "empty"),
+				PeersOption("good", "offsite", "junk", "empty", "contested"),
 				PeerIPsOption(rows),
 			).(*tunTunnel)
 			authz := cp.apply(t, hub)
@@ -504,7 +516,7 @@ func TestTunHubDropsRowsItCannotHonour(t *testing.T) {
 			if len(saved) != 2 || saved["good"] != "10.10.0.2" || saved["empty"] != "" {
 				t.Fatalf("PeerIPs = %v, want the two rows the hub can honour: good and empty", saved)
 			}
-			for _, peer := range []string{"offsite", "junk"} {
+			for _, peer := range []string{"offsite", "junk", "contested"} {
 				if _, ok := saved[peer]; ok {
 					t.Errorf("PeerIPs kept the dropped row %q: %v", peer, saved)
 				}
@@ -516,6 +528,7 @@ func TestTunHubDropsRowsItCannotHonour(t *testing.T) {
 			want := []string{
 				`spoke "offsite" dropped from the hub's address assignment: 192.168.9.9 is outside the hub's subnets (10.10.0.0/24)`,
 				`spoke "junk" dropped from the hub's address assignment: its row "10.10.0.9/24" is not a comma-separated list of IP addresses`,
+				`spoke "contested" dropped from the hub's address assignment: 192.168.9.9 is outside the hub's subnets (10.10.0.0/24)`,
 			}
 			if got := warnMessages(hubID); !sameMessages(got, want) {
 				t.Errorf("the hub's warnings = %v, want %v", got, want)
@@ -543,7 +556,7 @@ func TestTunHubDropsRowsItCannotHonour(t *testing.T) {
 			// a claim of nothing, which is the half a "normalise the bad row to an
 			// empty one" mistake gets wrong: that would come back as "this spoke may
 			// claim nothing" and lock the spoke out with a reason pointing nowhere.
-			for _, peer := range []string{"offsite", "junk"} {
+			for _, peer := range []string{"offsite", "junk", "contested"} {
 				if authz.Authorize(ctx, peer, claimOf("10.10.0.2")) {
 					t.Errorf("%s: a spoke whose row was dropped was authorized to claim an address", peer)
 				}
