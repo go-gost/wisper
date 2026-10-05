@@ -155,7 +155,12 @@ func (s *tunEntryPoint) init() error {
 	node.Addr = s.peer
 	node.Connector = &xconfig.ConnectorConfig{Type: "forward"}
 	node.Dialer = &xconfig.DialerConfig{Type: "udp"}
-	node.Metadata = map[string]any{"p2p": s.provider}
+	// p2p.network "ip" is not a third transport: it is the datagram link the
+	// "udp" dialer already asks for, marked session-scoped on the p2p host, so
+	// the host ends the link when the hub's peer session is lost and this side
+	// re-dials — which resends the address registration the hub routes by. The
+	// "udp" link stays transparent; only this tun link is session-scoped.
+	node.Metadata = map[string]any{"p2p": s.provider, "p2p.network": "ip"}
 
 	s.config = &xconfig.Config{
 		Services: []*xconfig.ServiceConfig{svc},
