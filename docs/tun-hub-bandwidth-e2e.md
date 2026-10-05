@@ -3,6 +3,11 @@
 > 测试日期：2026-10-04（第一轮），2026-10-04 14:0x（第二轮，p2p relay session desync 修复后复测）
 > 可复现脚本：`scripts/perf-tun-hub.sh`（需要 root + /dev/net/tun + docker+`gogost/derper`）
 
+> ⚠️ **本文结论已被后续工作推翻，不要据本文判断当前上限。** 根因不是"重建后残留字节未对齐"，
+> 而是中继 record 层在有损数据报路径上失步；p2p 侧已改为 record 层之下走 KCP
+> （pair 级会话），同一路径实测 354 MB @ 94.4 Mbit/s、desync=0、link down=0、TCP 重传=0。
+> 详见文末「后续状态」。下文保留第一/第二轮的原始观测，仅作历史记录。
+
 ## 结论
 
 **默认 smux 配置下，tun hub 的端到端带宽上限约等于 0 Mbit/s（持续）。**
@@ -256,3 +261,46 @@ ping-only smoke 不算门禁的理由不变：ping 走控制面小包，密文�
       导致 32s 级别的重连空窗，其间 hub 侧路由得不到 keepalive 刷新而永久失效。
 - 建议下一步：先给"链路为何在 1–2s 内死"加一条可观测（当前两端都只有 `datagram link down`，
   没有原因），再验证 (b) 是否已在最新 p2p 提交中解决（本轮使用的即最新提交）。
+
+## 后续状态：本文结论已被推翻（2026-10-04 晚）
+
+第二轮把瓶颈归到 (b)「`secureSession`/cryptoConn 在 mux session 重建后字节流未对齐」，
+并据此推断出「持续带宽上限 ~0」。**这个诊断是错的，后续工作已修掉真正的根因并实测通过。**
+
+### 真正的根因
+
+不是 `cryptoConn.rbuf` / `peerConn.inbound queue` 里残留了陈旧字节，而是：中继是**有损数据报**
+路径，而 record 层直接架在它上面——丢一个 frame 就永久破坏密文记录的分帧，后续每个包都
+报 `bad secure record length`。smux 会话被重建也无济于事，因为新会话重握手时对端已经花掉了
+nonce 计数器的不同区间（这正是第一轮"每轮 5–18 次 `secure record auth failed`、第二轮只有
+1 次"所反映的东西：自愈变慢，不是自愈成功）。
+
+### 修复
+
+p2p 侧把 KCP 放到 record 层**之下**，并且 KCP 会话是 **pair 级**的——一次 clean kill 只换
+adapter，KCP 会话（及其序号 epoch）跨重建存活，所以重建后密钥与 nonce 天然对齐，不需要重握手。
+详见 `p2p` 仓库 `docs/2026-10-04-p2p-relay-kcp-reliability-design.md`（spec + 实测结果）。
+
+### 实测（同一条仅中继路径，`direct:false`）
+
+| 指标 | 第二轮（本文） | 修复后 |
+|---|---|---|
+| 传输量 | ~2 MB 后崩溃 | **354,025,472 B** |
+| 吞吐 | 持续 ~0（90s 平均 140 Kbit/s） | **94.4 Mbit/s**，30s 跑满 |
+| `secure record desync` | 每轮 5–18 次 | **0** |
+| `datagram link down` | 有，且不恢复 | **0** |
+| 重连空窗 | ~32s | **无**（`relay session rebuilt`=0、`relay kcp pair reset`=0） |
+| TCP retransmits | — | **0**（丢包由更底层 KCP 吸收） |
+
+因此本文"结论"节的 ~0 Mbit/s 与 32s 重连空窗**均不再成立**。
+
+### 仍未测 / 本文的诚实边界
+
+- 上述 354 MB 是在 `go.work` 链接本地 p2p 的构建上测的，**不是**已发布版本；本文第二轮用的是
+  当时的最新提交。
+- 5% 丢包的端到端 e2e **仍未实测**：当时"无法注入丢包"的结论对当时的 harness 依然成立。
+  该缺口现已部分关闭——`faults` 已透传到 wisper 的 settings（wisper `7e6d11b` / p2p `454c761`），
+  但丢包下的吞吐与重传开销仍待补测；丢包下的**正确性**已由 p2p 仓库内的
+  `TestRelayToleratesDroppedDataFrames`（注入 2% `frameData` 丢包、2 MiB 载荷）覆盖。
+- 直连平面另有一个**预先存在**的 re-punch 竞态（`TestDirectRepunchAfterMissedPeerGone` 间歇
+  超时），与本文的中继问题无关，本文数据全部取自 `direct:false`，不受其影响。
