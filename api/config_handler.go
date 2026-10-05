@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-gost/p2p"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/runner"
 	"github.com/go-gost/wisper/runner/task"
@@ -28,11 +29,12 @@ type configResponse struct {
 // P2PSettingsResp mirrors config.P2PSettings (secure is a pointer so an
 // omitted value keeps the "verify" default).
 type P2PSettingsResp struct {
-	Derp   string `json:"derp"`
-	Secure *bool  `json:"secure,omitempty"`
-	CAFile string `json:"ca_file,omitempty"`
-	Stun   string `json:"stun,omitempty"`
-	Direct *bool  `json:"direct,omitempty"`
+	Derp   string            `json:"derp"`
+	Secure *bool             `json:"secure,omitempty"`
+	CAFile string            `json:"ca_file,omitempty"`
+	Stun   string            `json:"stun,omitempty"`
+	Direct *bool             `json:"direct,omitempty"`
+	Faults *p2p.FaultsConfig `json:"faults,omitempty"`
 }
 
 func handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +58,7 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			CAFile: settings.P2P.CAFile,
 			Stun:   settings.P2P.Stun,
 			Direct: settings.P2P.Direct,
+			Faults: settings.P2P.Faults,
 		}
 	}
 
@@ -107,7 +110,8 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			prev.CAFile != req.P2P.CAFile ||
 			prev.Stun != req.P2P.Stun ||
 			!boolPtrEqual(prev.Secure, req.P2P.Secure) ||
-			!boolPtrEqual(prev.Direct, req.P2P.Direct)
+			!boolPtrEqual(prev.Direct, req.P2P.Direct) ||
+			!faultsEqual(prev.Faults, req.P2P.Faults)
 	}
 
 	if req.Server != nil {
@@ -140,6 +144,7 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			CAFile: req.P2P.CAFile,
 			Stun:   req.P2P.Stun,
 			Direct: req.P2P.Direct,
+			Faults: req.P2P.Faults,
 		}
 	}
 
@@ -173,6 +178,16 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 // boolPtrEqual reports whether two optional bools hold the same value:
 // two nils are equal, nil vs. non-nil is not.
 func boolPtrEqual(a, b *bool) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+// faultsEqual reports whether two fault configs enable the same knobs. It is
+// nil-aware; p2p.FaultsConfig is fully comparable, so the deref compares by
+// value.
+func faultsEqual(a, b *p2p.FaultsConfig) bool {
 	if a == nil || b == nil {
 		return a == b
 	}

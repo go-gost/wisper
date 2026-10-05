@@ -217,6 +217,40 @@ func TestUpdateConfigP2PDirect(t *testing.T) {
 	}
 }
 
+// TestUpdateConfigP2PFaults: the fault-injection block survives the settings
+// round trip the manual harness drives (PUT /api/config, then the host reads it
+// back on acquire), so a faults config set through the API reaches the engine
+// rather than being silently dropped by the response type.
+func TestUpdateConfigP2PFaults(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	resp, _ := putJSON(t, srv.URL+"/api/config", map[string]any{
+		"p2p": map[string]any{
+			"derp": "wss://relay.example/derp",
+			"faults": map[string]any{
+				"dropDataRate": 0.05,
+			},
+		},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	_, body := getJSON(t, srv.URL+"/api/config")
+	p2p, _ := body["p2p"].(map[string]any)
+	if p2p == nil {
+		t.Fatalf("config has no p2p block: %v", body)
+	}
+	faults, _ := p2p["faults"].(map[string]any)
+	if faults == nil {
+		t.Fatalf("config has no p2p.faults block: %v", body)
+	}
+	if rate, ok := faults["dropDataRate"].(float64); !ok || rate != 0.05 {
+		t.Errorf("dropDataRate = %v, want 0.05", faults["dropDataRate"])
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tunnel list/get/delete tests (using pre-registered, non-running tunnels)
 // ---------------------------------------------------------------------------

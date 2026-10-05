@@ -241,6 +241,7 @@ func (m *p2pHostManager) acquire(ctx context.Context) (*endpoint.Endpoint, error
 			Direct: &direct,
 		}
 		conf.TLS = P2PTLSConfig(settings)
+		conf.Faults = P2PFaults(settings)
 		host, err := endpoint.New(conf)
 		if err != nil {
 			return nil, fmt.Errorf("p2p host: %w", err)
@@ -300,8 +301,19 @@ func p2pHostSig(s *cfg.Settings) string {
 		return ""
 	}
 	p := s.P2P
-	return fmt.Sprintf("derp=%s|stun=%s|direct=%s|secure=%s|ca=%s",
-		p.Derp, p.Stun, triState(p.Direct), triState(p.Secure), p.CAFile)
+	return fmt.Sprintf("derp=%s|stun=%s|direct=%s|secure=%s|ca=%s|faults=%s",
+		p.Derp, p.Stun, triState(p.Direct), triState(p.Secure), p.CAFile, p2pFaultsSig(p.Faults))
+}
+
+// p2pFaultsSig renders a faults config as a stable build signature component
+// (empty when unset), so a changed knob rebuilds the host the way a changed
+// relay or direct path does.
+func p2pFaultsSig(f *p2p.FaultsConfig) string {
+	if f == nil {
+		return ""
+	}
+	return fmt.Sprintf("dropCtrl=%v|dropData=%v|dropPong=%v|dropDataRate=%g|silenceFor=%s|silenceEvery=%s",
+		f.DropCtrl, f.DropData, f.DropPong, f.DropDataRate, f.SilenceFor, f.SilenceEvery)
 }
 
 // triState renders an optional bool so a nil (unset, meaning the default) is

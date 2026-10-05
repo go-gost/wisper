@@ -1,10 +1,12 @@
 package tunnel
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-gost/core/observer/stats"
+	"github.com/go-gost/p2p"
 	cfg "github.com/go-gost/wisper/config"
 )
 
@@ -622,5 +625,46 @@ func TestP2PHostRebuildsOnSettingsChange(t *testing.T) {
 	}
 	if host3 != host2 {
 		t.Fatal("acquire rebuilt the host with unchanged settings")
+	}
+}
+
+// TestAcquireThreadsFaultsToEngine pins the full settings→engine wiring: a
+// faults block on settings.p2p must reach the shared host's engine, where the
+// engine itself announces the active knobs at startup. The assertion is the
+// engine's own warning line, not a copy of the struct — a config that reached
+// only p2p.Config.Faults and never newFaults would log nothing.
+func TestAcquireThreadsFaultsToEngine(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{
+		Derp:   "wss://127.0.0.1:1/derp",
+		Direct: &directOff,
+		Faults: &p2p.FaultsConfig{DropDataRate: 0.5},
+	}}})
+
+	m := p2pHost
+	if m.refs != 0 || m.host != nil {
+		t.Fatal("manager is not idle: a previous test leaked a reference")
+	}
+	defer func() {
+		for m.refs > 0 {
+			m.release()
+		}
+	}()
+
+	if _, err := m.acquire(context.Background()); err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "fault injection is on") {
+		t.Fatalf("the engine did not announce the threaded faults: %q", got)
+	}
+	if !strings.Contains(got, "dropDataRate(0.5)") {
+		t.Fatalf("the engine did not name the threaded knob: %q", got)
 	}
 }

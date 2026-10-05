@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/p2p"
 	"github.com/go-gost/wisper/event"
 	xconfig "github.com/go-gost/x/config"
 	logger_parser "github.com/go-gost/x/config/parsing/logger"
@@ -277,6 +278,9 @@ type P2PSettings struct {
 	// Direct attempts a direct (hole-punched) path, falling back to the relay.
 	// nil = true.
 	Direct *bool `yaml:",omitempty" json:"direct,omitempty"`
+	// Faults injects deliberate transport failures on the shared host (debug
+	// only — see p2p.FaultsConfig). Nil or zero means nothing is injected.
+	Faults *p2p.FaultsConfig `yaml:"faults,omitempty" json:"faults,omitempty"`
 }
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.

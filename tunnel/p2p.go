@@ -234,6 +234,17 @@ func P2PTLSConfig(s *cfg.Settings) *p2p.TLSConfig {
 	return &p2p.TLSConfig{Secure: s.P2P.Secure, CAFile: s.P2P.CAFile}
 }
 
+// P2PFaults returns the fault-injection knobs for the shared host, or nil
+// (everything off) when settings.p2p.faults is unset. The value is read
+// directly, not copied: the config update path hands over a freshly decoded
+// p2p.FaultsConfig, so no one mutates it after it is set.
+func P2PFaults(s *cfg.Settings) *p2p.FaultsConfig {
+	if s == nil || s.P2P == nil {
+		return nil
+	}
+	return s.P2P.Faults
+}
+
 // Run joins the process-wide p2p host, claims this tunnel's peer routes on it
 // and serves them with a standard gost service forwarding to Endpoint. Peers
 // is an allowlist, not a requirement: an empty list runs the tunnel, it just
