@@ -583,10 +583,7 @@ func RestartRunning() {
 // ChainConfig builds a GOST chain configuration that connects to the tunnel server.
 func ChainConfig(id string, name string, recordMode string) *xconfig.ChainConfig {
 	s := config.Get().Settings
-	secure := true
-	if s != nil && s.Insecure {
-		secure = false
-	}
+	secure := s == nil || !s.Insecure
 
 	rm := recordMode
 	if rm == "" {

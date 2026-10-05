@@ -1,0 +1,20 @@
+# golangci-lint configuration (v2).
+#
+# v2 removed the default exclusion presets that v1 applied implicitly
+# (EXC0001 and friends), so a tree that was clean under v1 reports ~50
+# new findings under v2 for the same code. The presets below restore the
+# exclusions this repo relied on, but now explicitly: the list is the
+# policy, not something a linter version decided for us.
+#
+# std-error-handling is the important one — it covers the unchecked
+# error from Close/Flush/os.Remove/print-family calls, which is the bulk
+# of the difference. The others cover the remaining v1 defaults.
+version: "2"
+
+linters:
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
