@@ -1,13 +1,14 @@
 # wisper tun hub 端到端性能测试报告（默认 smux 配置）
 
-> 测试日期：2026-10-04
+> 测试日期：2026-10-04（第一轮），2026-10-04 14:0x（第二轮，p2p relay session desync 修复后复测）
 > 可复现脚本：`scripts/perf-tun-hub.sh`（需要 root + /dev/net/tun + docker+`gogost/derper`）
 
 ## 结论
 
 **默认 smux 配置下，tun hub 的端到端带宽上限约等于 0 Mbit/s（持续）。**
-实测只在 TCP 连接的最初约 1 秒看到 8–20 Mbit/s 的突发，随后窗口坍缩、靠重传维持、
+实测只在 TCP 连接的最初约 1 秒看到 8–23 Mbit/s 的突发，随后窗口坍缩、靠重传维持、
 整个连接停滞；UDP 同样无法持续通送（所有 UDP 数据报在首个链路死亡后穿不过）。
+**p2p 侧 relay session desync 的修复没有改变这一结论**（第二轮数据见文末）。
 
 ## 测试条件
 
@@ -196,3 +197,62 @@ link 自己断了"（更正 1 已推翻该归因，link 会自己 up 回来）�
 ### 仍然成立
 
 ping-only smoke 不算门禁的理由不变：ping 走控制面小包，密文层即使永久错位也通。
+
+---
+
+## 第二轮复测（p2p relay session desync 修复后，2026-10-04 14:0x）
+
+涉及提交（p2p）：`5ed2f4f` re-handshake relay secure session when the mux session is replaced、
+`cdfb8d1` force secure re-handshake after repeated record-boundary failures、
+`057f07b`/`0c99783`/`2075288` 会话死亡与重建原因的结构化日志。
+
+### 复测数据（长窗口，避免 10s 短测低估）
+
+| 用例 | 结果 |
+|---|---|
+| TCP hub→spoke，60s（+30s 挂住不关） | 总量 **1.50 MB / 平均 140 Kbit/s**；第 1 秒 14–23 Mbit/s 后 `Cwnd` 冻结在 90.8 KB，直到结束都是 0.00 Bytes/s |
+| TCP spoke→hub，30s | 0.00 Bytes（控制连接都回不来） |
+| UDP hub→spoke，1 Mbit/s 目标，30s | 0 数据报速率（低速档也过不去） |
+| `ping` | 正常，0.6–0.8 ms |
+
+### 事件时间线（hub 与 spoke 日志对齐）
+
+```
+14:04:40.578  spoke: datagram link up            hub: new route: 10.10.0.2 -> <peer> / keepalive from <peer>
+14:04:41.766  spoke: datagram link down           hub: route 10.10.0.2: io: read/write on closed pipe
+14:04:41.767                                          hub: route dropped: 10.10.0.2 -> <peer>
+14:04:43.767  link: open presentation ... error=...: p2p: bad secure record length 4285709425
+14:04:45.768  （同上，退避重试）
+14:04:49.769  （同上）
+14:04:57.770  （同上）
+14:05:13.771  spoke: datagram link up             ← 32s 后才恢复，且 hub 侧整段只有第一次 keepalive 记录
+```
+
+### 修复后的变化与仍存在的问题
+
+**已修好的部分（可观测）**
+
+- 密文层错位不再无限循环：第一轮每轮 5–18 次 `secure record auth failed`，第二轮整轮只有 1 次。
+- 链路能自己恢复：`datagram link up` 在 ~32s 后重新出现（第一轮会被永久毒化）。
+
+**仍然卡死的部分（决定带宽上限的就是它）**
+
+1. **首个 datagram link 仍在注册后 1.2–2.2s 内被杀**（本轮 1.19s），两侧同一毫秒断开，
+   hub 随即 `route dropped`，回程（spoke→hub，TCP ACK / iperf 控制通道）随之全断。
+2. **重连仍被密文层挡住**：`bad secure record length 4285709425` 连续 4 次（2s/4s/8s 退避），
+   直到 ~32s 才成功——修复只让"重握手"发生得更晚，没有让 cryptoConn 的字节流在
+   session 重建后重新对齐（陈旧字节仍在 cryptoConn `rbuf` / peerConn inbound queue 里）。
+3. **hub 的路由再也没回来**：整轮 2 分钟里 hub 只记录到一次 `keepalive from`，
+   路由丢失后没有任何 keepalive 到达（spoke 的 15s keepalive 全被链路死亡吞掉），
+   于是 hub 对 `10.10.0.2` 持续 `no route for 10.10.0.2, packet discarded`。
+
+### 结论（第二轮）
+
+- **默认 smux 配置下 tun hub 的持续带宽上限仍为 ~0**（90s 平均 140 Kbit/s，
+  其中全部来自首秒 1.5–2.75 MB 的突发；低速 UDP 同样 0）。
+- 瓶颈已定位到两处，且都不是 smux 窗口本身：
+  (a) datagram link 在首个流量突发期间被关闭；
+  (b) relay `secureSession`/cryptoConn 在 mux session 重建后字节流未对齐，
+      导致 32s 级别的重连空窗，其间 hub 侧路由得不到 keepalive 刷新而永久失效。
+- 建议下一步：先给"链路为何在 1–2s 内死"加一条可观测（当前两端都只有 `datagram link down`，
+  没有原因），再验证 (b) 是否已在最新 p2p 提交中解决（本轮使用的即最新提交）。
