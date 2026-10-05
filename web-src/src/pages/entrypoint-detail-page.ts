@@ -920,12 +920,6 @@ export class EntrypointDetailPage extends LitElement {
                   ? html`
                     <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
                     <div class="p2p-hint">${t('tunPeerHint')}</div>
-                    <!-- What makes the two ends agree. The hub's assignment
-                         lives on the hub's own peers page, which this page has
-                         no view of — it knows only the net being typed here and
-                         the hub's key — so the hint points there rather than
-                         restating a subnet it cannot know. -->
-                    <div class="p2p-hint">${t('tunNetMatchesHub')}</div>
                   `
                   : ''}
 
@@ -954,7 +948,12 @@ export class EntrypointDetailPage extends LitElement {
                       <label class="form-label">${t('fieldNet')}</label>
                       <input class="form-input" .value=${this._net} placeholder="10.10.0.2/24"
                         @input=${(e: Event) => { this._net = (e.target as HTMLInputElement).value; }}>
-                      <div class="p2p-hint">${t('fieldNetHint')}</div>
+                      <!-- What makes the two ends agree. The hub's assignment
+                           lives on the hub's own peers page, which this page has
+                           no view of — it knows only the net being typed here and
+                           the hub's key — so the hint points there rather than
+                           restating a subnet it cannot know. -->
+                      <div class="p2p-hint">${t('tunNetMatchesHub')}</div>
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t('fieldMTU')}</label>

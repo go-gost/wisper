@@ -165,7 +165,7 @@ const zh: Record<string, string> = {
     '还没有对端——设备已就绪，但在 peers 页面添加之前没有流量能到达。',
   peersCount: '已允许 {n} 个',
   tunPrivilegeHint:
-    'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。否则创建设备会报 “operation not permitted”。',
+    'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。',
   tunPeerHint:
     '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
   tunNetMatchesHub: '这里必须填 hub 分配给该 peer 的地址，从 hub 的 peers 页复制。',
@@ -176,6 +176,7 @@ const zh: Record<string, string> = {
   peersAliasPlaceholder: '别名（可选）',
   peersKeyPlaceholder: 'Base64 公钥',
   peersIPPlaceholder: '例如 10.10.0.2',
+  peersIP: 'IP',
   peersIPHint: '该 spoke 在 hub 网络上可用的地址。留空则由 hub 从自己的网段分配；spoke 侧必须配置成同一个地址。',
   peersKeyRequired: '必须填公钥。',
   peersKeyInvalid: '不是 base64 的 32 字节公钥。',

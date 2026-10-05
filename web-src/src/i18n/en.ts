@@ -168,7 +168,7 @@ const en: Record<string, string> = {
     'No peers yet — the device is up, but nothing can reach it until one is added on the peers page.',
   peersCount: '{n} allowed',
   tunPrivilegeHint:
-    'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator. Creating it fails with "operation not permitted" otherwise.',
+    'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator.',
   tunPeerHint:
     'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
   tunNetMatchesHub:
@@ -180,6 +180,7 @@ const en: Record<string, string> = {
   peersAliasPlaceholder: 'alias (optional)',
   peersKeyPlaceholder: 'Base64 public key',
   peersIPPlaceholder: 'e.g. 10.10.0.2',
+  peersIP: 'IP',
   peersIPHint:
     'The address this spoke may use on the hub\'s network. Leave empty and the hub assigns one from its own subnet; a spoke must be configured with the same address.',
   peersKeyRequired: 'A key is required.',

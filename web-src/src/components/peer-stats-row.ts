@@ -129,6 +129,10 @@ export class PeerStatsRow extends LitElement {
           ${this.rowActions}
         </div>
         <div class="peer-key">${this.showKeys ? p?.key : maskKey(p?.key ?? '')}</div>
+        <!-- The address the hub assigned this peer on its device network. Only a
+             hub's rows hold one (a p2p tunnel has no device network), so it is
+             absent — and this line with it — everywhere else. -->
+        ${p?.ip ? html`<div class="peer-ip">${t('peersIP')}: ${p.ip}</div>` : nothing}
         ${s
           ? html`<div class="peer-stats">
               <span>${formatNumber(s.current_conns)} ${t('p2pColConns')}</span>
@@ -194,6 +198,16 @@ export class PeerStatsRow extends LitElement {
       gap: 2px;
     }
     .peer-key {
+      padding-top: 2px;
+      font-family: var(--font-mono, monospace);
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      overflow-wrap: anywhere;
+      line-height: 1.4;
+    }
+    /* The hub's assignment, read the way the key above it is (monospace), so the
+       two stack as one block of row facts. */
+    .peer-ip {
       padding-top: 2px;
       font-family: var(--font-mono, monospace);
       font-size: var(--font-xs);
