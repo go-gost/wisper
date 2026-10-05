@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/go-gost/p2p/endpoint"
 )
@@ -73,9 +74,51 @@ func logMutations(next http.Handler) http.Handler {
 	})
 }
 
+// registerDebugPprof mounts the runtime profiling endpoints on mux.
+//
+// Off unless -debug.pprof (WISPER_DEBUG_PPROF) is set, and it stays in the tree
+// permanently rather than being a local patch: the p2p tunnel's throughput is
+// CPU-bound on its host, so separating "per-packet cost" from "the path is slow"
+// needs a CPU profile, and finding that out should not need a rebuild.
+//
+// Registered: Index (which serves heap, allocs, goroutine, block, mutex and the
+// rest by name) plus profile and symbol, which Index does not cover.
+//
+// Deliberately NOT registered:
+//   - cmdline, which hands the process argv to whoever asks. This API has no
+//     authentication, so that is a way to read whatever was passed on the
+//     command line.
+//   - trace, a heavy runtime trace that answers no question a CPU profile
+//     does not.
+//
+// The net/http/pprof blank import (the usual `import _ "net/http/pprof"`) is
+// not usable here: it registers on http.DefaultServeMux, and this server serves
+// its own mux, so that import would have no effect at all.
+func registerDebugPprof(mux *http.ServeMux) {
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+}
+
+// hideDebugPprof reserves the /debug/pprof/ subtree while the endpoints are off.
+//
+// Without this the embedded web UI answers instead: its catch-all serves
+// index.html for any unmatched path, so a disabled /debug/pprof/ returns 200
+// text/html. No profiling data leaks that way, but the state becomes
+// unreadable — a status-code check reports the endpoints as present, and
+// /debug/pprof/profile?seconds=600 looks like it is collecting while it is
+// really just the SPA. An explicit 404 makes "off" mean off, and keeps the
+// subtree from being shadowed by the catch-all should it ever be mounted.
+func hideDebugPprof(mux *http.ServeMux) {
+	mux.HandleFunc("/debug/pprof/", func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	})
+}
+
 // NewHandler returns the root HTTP handler with all API routes registered.
 // If webHandler is non-nil, non-API requests are served by it (embedded Lit web UI).
-func NewHandler(webHandler http.Handler) http.Handler {
+// debugPprof mounts /debug/pprof; see registerDebugPprof for why it is opt-in.
+func NewHandler(webHandler http.Handler, debugPprof bool) http.Handler {
 	mux := http.NewServeMux()
 
 	// Tunnel endpoints
@@ -121,6 +164,12 @@ func NewHandler(webHandler http.Handler) http.Handler {
 	mux.HandleFunc("DELETE /api/p2p/pending/{key}", handleDismissPendingPeer)
 	// Diagnostic report, rendered in-process (the relay's liveness is real here).
 	mux.HandleFunc("GET /api/p2p/doctor", handleGetP2PDoctor)
+
+	if debugPprof {
+		registerDebugPprof(mux)
+	} else {
+		hideDebugPprof(mux)
+	}
 
 	// Serve embedded web UI for non-API requests.
 	if webHandler != nil {

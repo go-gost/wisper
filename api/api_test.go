@@ -50,7 +50,7 @@ func setupTestServer(t *testing.T) *httptest.Server {
 	// is dropped here too: a case asserting on it must not see an earlier one's.
 	event.ClearGlobal()
 
-	return httptest.NewServer(NewHandler(nil))
+	return httptest.NewServer(NewHandler(nil, false))
 }
 
 // preRegisterTunnel creates a tunnel object (without calling Run) and
@@ -1574,7 +1574,7 @@ func TestMutationLogCarriesActionID(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(old) })
 
-	h := NewHandler(nil)
+	h := NewHandler(nil, false)
 
 	// The UI's id is logged as given.
 	buf.Reset()

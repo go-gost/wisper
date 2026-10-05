@@ -27,6 +27,13 @@ var (
 	stopOnce   sync.Once
 )
 
+// debugPprofFlag is set by main from -debug.pprof, whose default is the same
+// env var, so precedence is flag > env. It is a package var rather than a Start
+// parameter because Start is also called from the cgo/Android shim (lib.go), and
+// this is a process diagnostic switch, not a config-file setting — the same
+// reason -web-dir is a var (see webDirFlag).
+var debugPprofFlag bool
+
 // Start initializes wisper and starts the HTTP server in a background goroutine.
 //
 //	configDir: path for config/logs (empty = OS user config dir).
@@ -65,7 +72,7 @@ func Start(configDir, addr string, opts ...config.Option) (err error) {
 		slog.Error("start stats runner", "err", err)
 	}
 
-	handler := api.NewHandler(webFileServer())
+	handler := api.NewHandler(webFileServer(), debugPprofFlag)
 	srv := &http.Server{Handler: handler}
 	httpServer.Store(srv)
 
