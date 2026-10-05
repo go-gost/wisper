@@ -124,7 +124,7 @@ func TestPprofOmitsCmdlineAndTrace(t *testing.T) {
 // report the endpoints as live.
 func TestPprofOffWithWebHandlerStill404(t *testing.T) {
 	web := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("web:" + r.URL.Path))
+		_, _ = w.Write([]byte("web:" + r.URL.Path))
 	})
 	h := NewHandler(web, false)
 
@@ -143,7 +143,7 @@ func TestPprofOffWithWebHandlerStill404(t *testing.T) {
 // the pprof subtree would be swallowed by it and every profile 404s.
 func TestPprofEnabledWithWebHandler(t *testing.T) {
 	web := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("web:" + r.URL.Path))
+		_, _ = w.Write([]byte("web:" + r.URL.Path))
 	})
 	h := NewHandler(web, true)
 
