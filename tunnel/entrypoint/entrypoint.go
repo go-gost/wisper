@@ -202,6 +202,8 @@ func Restart(id string) EntryPoint {
 	// state a later call would read.
 	opts := ep.Options()
 	typ := ep.Type()
+	stats := ep.Stats()
+	statsBaseline := ep.StatsBaseline()
 
 	ep.Close()
 
@@ -209,6 +211,13 @@ func Restart(id string) EntryPoint {
 	if newEP == nil {
 		return nil
 	}
+
+	// The replacement re-reads what the old run captured when it started, but
+	// the counters stay the old run's: dropping them while keeping a
+	// post-reset baseline pins the displayed totals at zero (the underflow
+	// guard) while the rates keep moving.
+	newEP.SetStats(stats)
+	newEP.SetStatsBaseline(statsBaseline)
 
 	// Set preserves the favorite state from the entrypoint it replaces.
 	Set(newEP)
