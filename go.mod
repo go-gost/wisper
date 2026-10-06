@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/go-gost/core v0.6.1
-	github.com/go-gost/p2p v0.13.0
+	github.com/go-gost/p2p v0.13.1
 	github.com/go-gost/x v0.21.0
 	github.com/google/uuid v1.6.0
 	gopkg.in/yaml.v3 v3.0.1
