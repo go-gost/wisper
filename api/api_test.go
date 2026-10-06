@@ -1508,6 +1508,74 @@ func TestStopForVpnRevokeNoHolder(t *testing.T) {
 	}
 }
 
+// TestRestartForVpnSwapRestartsTheHolder: the VpnService rebuilt the device
+// under a running tun entrypoint, so the holder must be restarted — a new
+// entrypoint object whose run re-reads the device — with an event saying why.
+// A second call with nobody holding the device is a no-op.
+func TestRestartForVpnSwapRestartsTheHolder(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	// Created but not started: the seam only needs the entrypoint registered
+	// and holding the device, which the claim below does exactly as a running
+	// Android tun entrypoint would.
+	ep := entrypoint.NewTunEntryPoint(
+		tunnel.NameOption("spoke"),
+		tunnel.PeerOption("dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"),
+	)
+	entrypoint.Add(ep)
+	id := ep.ID()
+	defer tunnel.ReleaseTunDevice(id)
+
+	if owner, ok := tunnel.ClaimTunDevice(id, ep.Name()); !ok {
+		t.Fatalf("claim device: already held by %q", owner)
+	}
+
+	done := make(chan struct{})
+	var name string
+	var ok bool
+	go func() {
+		name, ok = RestartForVpnSwap()
+		close(done)
+	}()
+
+	// The restart re-registers the entrypoint before it runs, so the new object
+	// is observable even while the new run is still starting.
+	deadline := time.Now().Add(3 * time.Second)
+	for entrypoint.Get(id) == ep && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := entrypoint.Get(id); got == nil || got == ep {
+		t.Fatal("the holder was not recreated")
+	}
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("RestartForVpnSwap did not return")
+	}
+	if !ok || name != ep.Name() {
+		t.Fatalf("RestartForVpnSwap = (%q, %v), want (%q, true)", name, ok, ep.Name())
+	}
+	if evs := event.List(id); len(evs) == 0 {
+		t.Fatal("want an event recording the restart")
+	}
+}
+
+// TestRestartForVpnSwapNoHolder: with no device claimed, the swap path is a
+// no-op rather than a restart of some unrelated entrypoint.
+func TestRestartForVpnSwapNoHolder(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	if id, _ := tunnel.TunDeviceOwner(); id != "" {
+		t.Fatalf("a previous case left the device claimed by %q", id)
+	}
+	if name, ok := RestartForVpnSwap(); ok || name != "" {
+		t.Fatalf("RestartForVpnSwap with no holder = (%q, %v), want (\"\", false)", name, ok)
+	}
+}
+
 func TestGlobalEventsEndpoint(t *testing.T) {
 	srv := setupTestServer(t)
 	defer srv.Close()

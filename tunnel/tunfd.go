@@ -23,18 +23,27 @@ var (
 // it is closed when it is replaced or cleared, so the caller must have given up
 // its own copy. Pass a negative fd to release the device.
 //
+// It reports whether the hand-off replaced a live device with a different one.
+// That is the one case where a running tun entrypoint is left holding a dead
+// fd — it captured its device when it started, and the VpnService rebuilt it
+// underneath — so the caller must restart the holder rather than let it read a
+// closed descriptor. A first set, a re-set of the same fd, and a release all
+// report false.
+//
 // reason names the call site that handed the fd over (an Android service
 // method — "onRevoke", "TunVpnService.release", …). It is carried through the
 // JNI so the Go line reads beside logcat's wisper-tunfd lines and "who released
 // the device" has an answer on both sides; the logcat record proved unreliable
 // on the device, this one did not. Empty when the caller has no name to give.
-func SetTunFD(fd int, reason string) {
+func SetTunFD(fd int, reason string) (swapped bool) {
 	tunFDMu.Lock()
 	prev := tunFD
 	tunFD = fd
 	close(tunFDSet)
 	tunFDSet = make(chan struct{})
 	tunFDMu.Unlock()
+
+	swapped = prev > 0 && fd > 0 && prev != fd
 
 	// One line per hand-off, so the Go timeline reads beside logcat's
 	// wisper-tunfd lines and "who has the device" has an answer on both sides:
@@ -59,6 +68,8 @@ func SetTunFD(fd int, reason string) {
 			_ = f.Close()
 		}
 	}
+
+	return
 }
 
 // The device above is one device for the whole app, and every tun entrypoint

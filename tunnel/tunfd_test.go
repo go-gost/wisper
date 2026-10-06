@@ -55,6 +55,36 @@ func TestTunFDPresentAndReplaced(t *testing.T) {
 	}
 }
 
+// TestSetTunFDReportsSwap: a hand-off that replaces a live device is the one
+// case where a running tun entrypoint is left holding a dead fd — the VpnService
+// rebuilt the device under it — so the caller must be told to restart it. A
+// first set, a re-set of the same fd, and a release are not swaps, and a set
+// after a release is a fresh device rather than a swap either.
+func TestSetTunFDReportsSwap(t *testing.T) {
+	defer SetTunFD(-1, "")
+
+	SetTunFD(-1, "")
+
+	first := openTestFD(t)
+	if swapped := SetTunFD(first, "test.establish"); swapped {
+		t.Error("the first device is not a swap")
+	}
+	if swapped := SetTunFD(first, "test.establish"); swapped {
+		t.Error("re-setting the same fd is not a swap")
+	}
+	second := openTestFD(t)
+	if swapped := SetTunFD(second, "test.establish"); !swapped {
+		t.Error("replacing a live fd with a different one is a swap")
+	}
+	if swapped := SetTunFD(-1, "TunVpnService.release"); swapped {
+		t.Error("a release is not a swap")
+	}
+	third := openTestFD(t)
+	if swapped := SetTunFD(third, "test.establish"); swapped {
+		t.Error("setting after a release is not a swap")
+	}
+}
+
 // TestSetTunFDLogsReason: the hand-off line names the call site that caused it,
 // so a release can be attributed from the Go log alone — and a caller with no
 // name to give reads exactly as before (no reason field).

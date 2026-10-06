@@ -184,6 +184,42 @@ func Delete(id string) {
 	}
 }
 
+// Restart recreates a single entrypoint so its new run re-reads what the old
+// one captured when it started. The case that needs it is an Android tun
+// entrypoint whose VpnService rebuilt the device underneath it: the fd the
+// running run holds is closed, and only a fresh run asks for the new one. The
+// old run is closed before the new one starts, so a device or a relay
+// registration is never held by two runs at once; ID, options, favorite state
+// and stats carry over. A stopped or unknown entrypoint is left alone and nil
+// is returned.
+func Restart(id string) EntryPoint {
+	ep := Get(id)
+	if ep == nil || ep.IsClosed() {
+		return nil
+	}
+
+	// Captured before Close: the values are the old run's, and Close may clear
+	// state a later call would read.
+	opts := ep.Options()
+	typ := ep.Type()
+
+	ep.Close()
+
+	newEP := createEntryPoint(typ, opts)
+	if newEP == nil {
+		return nil
+	}
+
+	// Set preserves the favorite state from the entrypoint it replaces.
+	Set(newEP)
+	// The caller is a device event on the VpnService's own thread, which must
+	// not wait for the new run — an Android tun run never returns, and unlike a
+	// boot restore there is no caller waiting to report a start failure: restore
+	// logs it and closes the run itself.
+	go Start(context.Background(), newEP)
+	return newEP
+}
+
 // RestartRunning recreates all running entrypoints so they pick up the current
 // config (e.g. a changed server address). Stopped entrypoints are left as-is.
 // Endpoints are closed before new ones start to avoid conflicts on the relay

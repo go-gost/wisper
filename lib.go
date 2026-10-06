@@ -31,7 +31,13 @@ func wisperStopGo() {
 func wisperSetTunFdGo(fd C.int, reason *C.char) {
 	// C.GoString(nil) is "", so an older caller that sends no reason logs exactly
 	// as it did before the reason existed.
-	tunnel.SetTunFD(int(fd), C.GoString(reason))
+	if tunnel.SetTunFD(int(fd), C.GoString(reason)) {
+		// The device was replaced under a running tun entrypoint: its fd is now
+		// closed, and only a fresh run asks for the new one.
+		if name, ok := api.RestartForVpnSwap(); ok {
+			slog.Info("vpn device swapped: restarted tun entrypoint", "name", name)
+		}
+	}
 }
 
 //export wisperVpnTakenGo
