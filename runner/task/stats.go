@@ -23,6 +23,7 @@ type updateStatsTask struct {
 	peers     map[string]string
 	punches   map[string]p2p.PeerDiagnostic
 	probe     map[string]*probeState
+	liveness  map[string]*livenessState
 	relay     relaySample
 	relaySeen bool
 	hostOn    bool
@@ -166,6 +167,24 @@ func (t *updateStatsTask) updateEntrypoint() error {
 
 		// After SetStats so the watchdog reads this tick's acked count.
 		t.checkProbe(ep)
+
+		// Direction: InputBytes enter the service from the device
+		// (spoke→hub uplink), OutputBytes leave it toward the device
+		// (hub→spoke downlink) — the same reading as the UI's
+		// Upload=input / Download=output grid. Underflow-guarded like
+		// the rates above: a restart can reset the cumulative counters.
+		var upDelta, downDelta uint64
+		if stats.InputBytes >= oldStats.InputBytes {
+			upDelta = stats.InputBytes - oldStats.InputBytes
+		} else {
+			upDelta = stats.InputBytes
+		}
+		if stats.OutputBytes >= oldStats.OutputBytes {
+			downDelta = stats.OutputBytes - oldStats.OutputBytes
+		} else {
+			downDelta = stats.OutputBytes
+		}
+		t.checkLiveness(ep, upDelta, downDelta)
 	}
 
 	return entrypoint.SaveConfig()

@@ -195,6 +195,20 @@ export class EntrypointDetailPage extends LitElement {
     return n > 1 ? `${e.message} ×${n}` : e.message;
   }
 
+  /** Whether the hub is currently not returning traffic: the newest liveness
+   *  verdict in the history. A warn with no later recovery means the stall is
+   *  still on; anything else (or nothing) means it is not. The markers are
+   *  substrings of the backend's constant messages (see msgLivenessNoReflow /
+   *  msgLivenessRecovered in wisper/runner/task/hub_liveness.go), so a
+   *  coalesced ×N suffix never matters — the count rides separately. */
+  private _hubNoReflow(events?: WisperEvent[]): boolean {
+    for (const e of events ?? []) {
+      if (e.message.includes('uplink without downlink')) return true;
+      if (e.message.includes('downlink recovered')) return false;
+    }
+    return false;
+  }
+
   private _enterEdit() {
     if (this._entrypoint) {
       this._populateForm(this._entrypoint);
@@ -417,6 +431,19 @@ export class EntrypointDetailPage extends LitElement {
     .status-banner.error {
       background: var(--red-bg); color: var(--red-text);
       border: 1px solid var(--red-border);
+    }
+    /* Running yet one-way (see the degraded banner below the status): amber,
+       not red — the entrypoint itself is healthy, it is the far side that is
+       not returning traffic. */
+    .status-banner.degraded {
+      margin-top: 8px; cursor: pointer;
+      background: color-mix(in srgb, var(--amber) 12%, transparent);
+      color: var(--amber);
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+    }
+    .degraded-hint {
+      font-weight: 400; font-size: var(--font-xs); line-height: 1.5;
+      opacity: 0.9; margin-top: 2px;
     }
 
     .status-dot-mini {
@@ -770,6 +797,21 @@ export class EntrypointDetailPage extends LitElement {
               ${ep.error ? html` — ${ep.error}` : ''}
               <span class="status-spacer"></span>
             </div>
+            <!-- Running yet one-way: uplink without downlink, still on. The
+                 events derive it (see _hubNoReflow), so the banner survives
+                 the instantaneous rates flickering and clears on recovery. -->
+            ${this.entrypointType === 'tun' && ep.status === 'running' && this._hubNoReflow(ep.events)
+              ? html`
+                <div class="status-banner degraded" @click=${() => this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`)}>
+                  <span class="status-dot-mini"></span>
+                  <div style="flex:1;">
+                    <div>${t('hubNoReflowTitle')}</div>
+                    <div class="degraded-hint">${t('hubNoReflowHint')}</div>
+                  </div>
+                  <span style="color:var(--text-muted);">&rarr;</span>
+                </div>
+              `
+              : nothing}
 
             <div class="section">
               <div class="card">

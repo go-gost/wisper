@@ -180,6 +180,9 @@ const zh: Record<string, string> = {
     'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。',
   tunPeerHint:
     '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
+  hubNoReflowTitle: 'hub 无回流：只发包、无回包',
+  hubNoReflowHint:
+    '已持续约 1 分钟只有上行、没有下行。排查：hub 是否在运行、本机地址是否在 hub 白名单、token 是否一致；点此看历史事件。',
   tunNetMatchesHub: '这里必须填 hub 分配给该 peer 的地址，从 hub 的 peers 页复制。',
   peersTitle: '允许的对端',
   peersEntryDesc: '{n} 个已允许 — 管理列表',

@@ -184,6 +184,9 @@ const en: Record<string, string> = {
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator.',
   tunPeerHint:
     'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
+  hubNoReflowTitle: 'No return traffic from the hub',
+  hubNoReflowHint:
+    'Uplink only, no downlink for about a minute. Check: is the hub running, is this address on the hub allowlist, does the token match; tap to see the event history.',
   tunNetMatchesHub:
     'This must be the address the hub assigned to this peer — copy it from the hub\'s peers page.',
   peersTitle: 'Allowed peers',
