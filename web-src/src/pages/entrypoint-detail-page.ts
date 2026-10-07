@@ -46,7 +46,7 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _keepalive = true;
   /** A tun entrypoint's device probe: a self-addressed packet every 30s
    *  proving the device fd still delivers; the watchdog restarts on stall. */
-  @state() private _probe = true;
+  @state() private _probe = false;
 
   // tun peer fields: this node's own device (see tunPeerHint)
   @state() private _net = '';
@@ -115,7 +115,11 @@ export class EntrypointDetailPage extends LitElement {
     this._showTransportDetail = false;
     this._protocol = 'tcp';
     this._keepalive = true;
-    this._probe = true;
+    // Probe defaults to OFF everywhere: the loopback it depends on does not
+    // work on all platforms (Android: sent advances, acked stays zero), and
+    // a broken probe restarts the entrypoint every ~10min via the watchdog.
+    // Enable it only deliberately, where the loopback is known good.
+    this._probe = false;
     this._net = '';
     this._mtu = 0;
     this._deviceName = '';
@@ -134,10 +138,9 @@ export class EntrypointDetailPage extends LitElement {
     }
     this._protocol = ep.options?.protocol === 'udp' ? 'udp' : 'tcp';
     this._keepalive = ep.options?.keepalive ?? true;
-    // Edit refill defaults to OFF, unlike keepalive: an old stored config has
-    // no probe key (backend: off), and refilling true would silently enable
-    // the probe — with its auto-restart — on an unrelated save. Create keeps
-    // the true default in _resetForm.
+    // Edit refill reads the stored value (absent key = off, the backend
+    // zero value); create takes the false default from _resetForm. Neither
+    // path silently enables the probe — with its auto-restart — on save.
     this._probe = ep.options?.probe ?? false;
     this._net = ep.options?.net ?? '';
     this._mtu = ep.options?.mtu ?? 0;
