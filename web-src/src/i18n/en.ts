@@ -169,7 +169,7 @@ const en: Record<string, string> = {
   keepaliveHint:
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
   probeHint:
-    'Send a loopback packet through the device every 30s. Off disables the stall watchdog: a dead device then looks the same as an idle one.',
+    'Probe the VPN device every 30s. On: a stall warns after ~1min and auto-restarts the entrypoint after ~2min (e.g. a VPN flap left a dead device behind). Off: a dead device looks the same as idle — no warning, no restart.',
   tunHubHint:
     'This device is the network: peers join it as ordinary tun clients over p2p. A peer that is not on the allowlist is refused before any dial.',
   peersLabel: 'Peers',

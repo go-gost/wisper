@@ -165,7 +165,7 @@ const zh: Record<string, string> = {
   protocolTcp: 'TCP',
   protocolUdp: 'UDP',
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
-  probeHint: '每 30 秒经设备发一个回环包。关闭则停滞看门狗停用：死设备与空闲看起来一样。',
+  probeHint: '每 30 秒探测一次 VPN 设备。开启后：停滞约 1 分钟告警、约 2 分钟自动重启（如 VPN 切换后留下死设备）。关闭后：死设备与空闲看起来一样，无告警也不重启。',
   tunHubHint:
     '设备就是网络本身：各对端用标准 tun 客户端经 p2p 接入。未列入允许列表的对端在拨号前就会被拒绝。',
   peersLabel: '对端',
