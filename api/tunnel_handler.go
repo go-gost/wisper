@@ -143,6 +143,8 @@ type statsResponse struct {
 	OutputBytes     uint64  `json:"output_bytes"`
 	InputRateBytes  uint64  `json:"input_rate_bytes"`
 	OutputRateBytes uint64  `json:"output_rate_bytes"`
+	ProbeSent       uint64  `json:"probe_sent"`
+	ProbeAcked      uint64  `json:"probe_acked"`
 }
 
 // peersJSON pairs each allowlisted key with its display alias, whether it is
@@ -255,6 +257,8 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			OutputBytes:     safeSub(s.OutputBytes, bl.OutputBytes),
 			InputRateBytes:  s.InputRateBytes,
 			OutputRateBytes: s.OutputRateBytes,
+			ProbeSent:       safeSub(s.ProbeSent, bl.ProbeSent),
+			ProbeAcked:      safeSub(s.ProbeAcked, bl.ProbeAcked),
 		},
 	}
 	// The p2p host's current state per peer, when this object has p2p peers —
