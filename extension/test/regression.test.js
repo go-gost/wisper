@@ -311,6 +311,22 @@ describe('HTTP basic auth: isAuthorized', () => {
   it('supports an empty configured password', () => {
     assert.equal(isAuthorized(authHeader('Basic ' + b64('u:')), { username: 'u', password: '' }), true);
   });
+
+  it('auth does not depend on the backend TLS flag (plain-HTTP local backends stay usable)', () => {
+    // enableTLS selects forwarder→backend http vs https only; the visitor leg
+    // arrives over the encrypted relay (wss) + https entrypoint regardless.
+    // Correct credentials must validate with the flag off, undefined, or on.
+    const good = authHeader('Basic ' + b64('admin:p:ss'));
+    assert.equal(isAuthorized(good, auth, false), true);
+    assert.equal(isAuthorized(good, auth, undefined), true);
+    assert.equal(isAuthorized(good, auth, true), true);
+  });
+
+  it('still rejects wrong credentials regardless of the backend TLS flag', () => {
+    const bad = authHeader('Basic ' + b64('admin:nope'));
+    assert.equal(isAuthorized(bad, auth, false), false);
+    assert.equal(isAuthorized({}, auth, false), false);
+  });
 });
 
 describe('HTTP basic auth: handleRequest 401', () => {
@@ -335,6 +351,29 @@ describe('HTTP basic auth: handleRequest 401', () => {
     assert.match(out, /^HTTP\/1\.1 401 Unauthorized\r\n/);
     assert.match(out, /WWW-Authenticate: Basic\r\n/);
     assert.equal(stream.closed, true);
+  });
+
+  it('forwards correct credentials to a plain-HTTP backend (enableTLS:false is not a 401)', async () => {
+    // Backend TLS off must not reject valid visitor credentials: enableTLS
+    // only selects the forwarder→backend scheme, not visitor transport.
+    const { calls, restore } = captureFetch();
+    try {
+      const stream = mockStream();
+      const req = {
+        method: 'GET', path: '/', body: null,
+        headers: authHeader('Basic ' + b64('admin:x')),
+      };
+      await handleRequest(stream, req, {
+        localEndpoint: '127.0.0.1:1', enableTLS: false,
+        auth: { username: 'admin', password: 'x' },
+      });
+      const out = stream.text();
+      assert.doesNotMatch(out, /^HTTP\/1\.1 401 Unauthorized\r\n/);
+      assert.equal(calls.length, 1, 'valid creds must reach the backend fetch');
+      assert.equal(calls[0].url, 'http://127.0.0.1:1/');
+    } finally {
+      restore();
+    }
   });
 });
 
