@@ -297,6 +297,7 @@ type Tunnel struct {
 	RewriteHost bool   `yaml:"rewriteHost,omitempty"`
 	FileUpload  bool   `yaml:"fileUpload,omitempty"`
 	Keepalive   bool   `yaml:",omitempty"`
+	Probe       bool   `yaml:"probe,omitempty"`
 	TTL         int    `yaml:"ttl,omitempty"`
 
 	// RecordMode controls traffic recording: "full", "headers", "off".
@@ -457,4 +458,6 @@ type ServiceStats struct {
 	InputRateBytes  uint64
 	OutputBytes     uint64
 	OutputRateBytes uint64
+	ProbeSent       uint64
+	ProbeAcked      uint64
 }

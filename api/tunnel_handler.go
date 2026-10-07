@@ -105,6 +105,7 @@ type tunnelOptionsResp struct {
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
 	FileUpload  bool   `json:"file_upload,omitempty"`
 	Keepalive   bool   `json:"keepalive,omitempty"`
+	Probe       bool   `json:"probe,omitempty"`
 	TTL         int    `json:"ttl,omitempty"`
 	RecordMode  string `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
@@ -230,6 +231,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			RewriteHost: opts.RewriteHost,
 			FileUpload:  opts.FileUpload,
 			Keepalive:   opts.Keepalive,
+			Probe:       opts.Probe,
 			TTL:         opts.TTL,
 			RecordMode:  opts.RecordMode,
 			Peer:        opts.Peer,

@@ -82,6 +82,7 @@ const en: Record<string, string> = {
   switchEnableTLS: 'Enable TLS',
   switchFileUpload: 'File Upload',
   switchKeepalive: 'Keepalive',
+  switchProbe: 'Device probe',
 
   // Status
   labelStatistics: 'Statistics',
@@ -167,6 +168,8 @@ const en: Record<string, string> = {
   protocolUdp: 'UDP',
   keepaliveHint:
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
+  probeHint:
+    'Send a loopback packet through the device every 30s. Off disables the stall watchdog: a dead device then looks the same as an idle one.',
   tunHubHint:
     'This device is the network: peers join it as ordinary tun clients over p2p. A peer that is not on the allowlist is refused before any dial.',
   peersLabel: 'Peers',

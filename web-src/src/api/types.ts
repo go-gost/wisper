@@ -208,6 +208,7 @@ export interface TunnelCreateRequest {
 
 export interface EntrypointOptions {
   keepalive: boolean;
+  probe: boolean;
   ttl: number;
   /** Remote peer's base64 public key (p2p entrypoints). */
   peer?: string;
@@ -251,6 +252,7 @@ export interface EntrypointCreateRequest {
   endpoint: string;
   tunnel_id?: string;
   keepalive?: boolean;
+  probe?: boolean;
   ttl?: number;
   /** Remote peer's base64 public key (p2p entrypoints). */
   peer?: string;

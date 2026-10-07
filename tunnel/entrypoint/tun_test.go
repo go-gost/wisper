@@ -10,6 +10,44 @@ import (
 	tp "github.com/go-gost/wisper/tunnel"
 )
 
+func TestProbeOptionFlowsToSavedConfig(t *testing.T) {
+	ep := NewTunEntryPoint(
+		tp.IDOption("ep-tun-probe"),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.0.2/24"),
+		tp.ProbeOption(true),
+	)
+	if !ep.Options().Probe {
+		t.Fatal("Options().Probe = false, want true after ProbeOption(true)")
+	}
+	Add(ep)
+	defer Delete("ep-tun-probe")
+
+	if err := SaveConfig(); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+	saved := cfg.Get().EntryPoints
+	if len(saved) != 1 {
+		t.Fatalf("saved %d entrypoints, want 1", len(saved))
+	}
+	if !saved[0].Probe {
+		t.Error("persisted Probe = false, want true")
+	}
+}
+
+// TestTunnelOptionsCarriesProbe: TunnelOptions is the funnel Restart and
+// stop→start rebuild through. Dropping Probe there would switch the probe
+// off on the watchdog's own restart path.
+func TestTunnelOptionsCarriesProbe(t *testing.T) {
+	var got tp.Options
+	for _, o := range tp.TunnelOptions(tp.Options{Probe: true}) {
+		o(&got)
+	}
+	if !got.Probe {
+		t.Error("TunnelOptions dropped Probe: got false, want true")
+	}
+}
+
 // TestTunEntryPointServiceConfig: the described service is the whole contract
 // with x. The chain (and no forwarder) is what makes the tun handler run in
 // client mode — with a forwarder hop, or without a chain at all, it would run

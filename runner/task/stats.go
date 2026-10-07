@@ -13,6 +13,7 @@ import (
 	"github.com/go-gost/wisper/runner"
 	"github.com/go-gost/wisper/tunnel"
 	"github.com/go-gost/wisper/tunnel/entrypoint"
+	xstats "github.com/go-gost/x/observer/stats"
 )
 
 type updateStatsTask struct {
@@ -21,6 +22,7 @@ type updateStatsTask struct {
 	service   map[string]serviceState
 	peers     map[string]string
 	punches   map[string]p2p.PeerDiagnostic
+	probe     map[string]*probeState
 	relay     relaySample
 	relaySeen bool
 	hostOn    bool
@@ -137,6 +139,8 @@ func (t *updateStatsTask) updateEntrypoint() error {
 			stats.OutputBytes = s.Get(stats_pkg.KindOutputBytes)
 			stats.TotalConns = s.Get(stats_pkg.KindTotalConns)
 			stats.TotalErrs = s.Get(stats_pkg.KindTotalErrs)
+			stats.ProbeSent = s.Get(xstats.KindProbeSent)
+			stats.ProbeAcked = s.Get(xstats.KindProbeAcked)
 			stats.Time = time.Now()
 		}
 
@@ -159,6 +163,9 @@ func (t *updateStatsTask) updateEntrypoint() error {
 		stats.RequestRate = float64(reqRate) / d.Seconds()
 
 		ep.SetStats(stats)
+
+		// After SetStats so the watchdog reads this tick's acked count.
+		t.checkProbe(ep)
 	}
 
 	return entrypoint.SaveConfig()

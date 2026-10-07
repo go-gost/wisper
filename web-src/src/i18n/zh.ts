@@ -82,6 +82,7 @@ const zh: Record<string, string> = {
   switchEnableTLS: '启用 TLS',
   switchFileUpload: '文件上传',
   switchKeepalive: '保活',
+  switchProbe: '设备探针',
 
   // Status
   labelStatistics: '统计',
@@ -164,6 +165,7 @@ const zh: Record<string, string> = {
   protocolTcp: 'TCP',
   protocolUdp: 'UDP',
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
+  probeHint: '每 30 秒经设备发一个回环包。关闭则停滞看门狗停用：死设备与空闲看起来一样。',
   tunHubHint:
     '设备就是网络本身：各对端用标准 tun 客户端经 p2p 接入。未列入允许列表的对端在拨号前就会被拒绝。',
   peersLabel: '对端',
