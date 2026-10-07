@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -114,6 +116,18 @@ func (s *tunEntryPoint) IsFavorite() bool        { return s.favorite.Load() }
 // refresh — a p2p peer announces that it has left by closing its stream. The
 // options remain on the entrypoint because the udp one uses them.
 func (s *tunEntryPoint) init() error {
+	// No explicit routes means this device's own subnet: the hub registers
+	// the routes (not the net) for direct peer delivery, and without this
+	// default a spoke would be reachable but reach nothing back. A Net that
+	// is empty or has no mask parses to nothing, so routes stays empty —
+	// the listener validates it the same way it validates an explicit one.
+	routes := strings.TrimSpace(s.opts.Routes)
+	if routes == "" {
+		if _, ipNet, err := net.ParseCIDR(strings.TrimSpace(s.opts.Net)); err == nil {
+			routes = ipNet.String()
+		}
+	}
+
 	svc := &xconfig.ServiceConfig{
 		Name: s.opts.Name,
 		// The tun listener binds no socket: the address only labels the service.
@@ -131,7 +145,7 @@ func (s *tunEntryPoint) init() error {
 				"name":   s.opts.DeviceName,
 				"mtu":    s.opts.MTU,
 				"net":    s.opts.Net,
-				"routes": s.opts.Routes,
+				"routes": routes,
 				"dns":    s.opts.DNS,
 			},
 		},

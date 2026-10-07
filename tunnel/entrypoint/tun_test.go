@@ -131,6 +131,48 @@ func TestTunEntryPointServiceConfig(t *testing.T) {
 	}
 }
 
+// TestTunEntryPointDefaultsRoutesToOwnSubnet: a spoke with no explicit routes
+// announces its own subnet, so hub-side direct delivery covers the whole
+// virtual network (hub + other peers) without typing the CIDR twice. An
+// explicit routes value always wins; a missing or maskless Net leaves routes
+// empty instead of panicking on a bad parse.
+func TestTunEntryPointDefaultsRoutesToOwnSubnet(t *testing.T) {
+	metadataRoutes := func(t *testing.T, opts ...tp.Option) any {
+		t.Helper()
+		ep := NewTunEntryPoint(opts...)
+		s, ok := ep.(*tunEntryPoint)
+		if !ok {
+			t.Fatalf("NewTunEntryPoint returned %T, want *tunEntryPoint", ep)
+		}
+		if err := s.init(); err != nil {
+			t.Fatalf("init: %v", err)
+		}
+		return s.config.Services[0].Listener.Metadata["routes"]
+	}
+
+	if got := metadataRoutes(t, tp.NetOption("10.10.100.250/24")); got != "10.10.100.0/24" {
+		t.Errorf("routes = %v, want 10.10.100.0/24 (own subnet)", got)
+	}
+	if got := metadataRoutes(t,
+		tp.NetOption("10.10.100.250/24"),
+		tp.RoutesOption("0.0.0.0/0"),
+	); got != "0.0.0.0/0" {
+		t.Errorf("routes = %v, want the explicit 0.0.0.0/0 kept", got)
+	}
+	if got := metadataRoutes(t,
+		tp.NetOption("10.10.100.250/24"),
+		tp.RoutesOption("   "),
+	); got != "10.10.100.0/24" {
+		t.Errorf("routes = %v, want whitespace-only treated as unset", got)
+	}
+	if got := metadataRoutes(t); got != "" {
+		t.Errorf("routes = %v, want empty when Net is empty", got)
+	}
+	if got := metadataRoutes(t, tp.NetOption("10.10.100.250")); got != "" {
+		t.Errorf("routes = %v, want empty when Net has no mask", got)
+	}
+}
+
 // TestTunEntryPointRequiresPeer: a missing hub key fails loudly, before the
 // shared host is touched.
 func TestTunEntryPointRequiresPeer(t *testing.T) {
