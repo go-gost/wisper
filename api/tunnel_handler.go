@@ -88,10 +88,12 @@ type peerJSON struct {
 }
 
 type tunnelOptionsResp struct {
-	Prefix      string `json:"prefix,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	Username    string `json:"username,omitempty"`
-	Password    string `json:"password,omitempty"`
+	Prefix   string `json:"prefix,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
+	Username string `json:"username,omitempty"`
+	// No Password: the response never echoes the secret (CWE-522). The
+	// username plus BasicAuth below are the only auth signals clients get;
+	// updates resubmit the secret via tunnelCreateRequest.Password.
 	BasicAuth   bool   `json:"basic_auth"`
 	EnableTLS   bool   `json:"enableTLS,omitempty"`
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
@@ -309,19 +311,25 @@ func errStr(err error) string {
 
 // tunnelCreateRequest is the JSON body for creating a new tunnel.
 type tunnelCreateRequest struct {
-	Name        string `json:"name"`
-	Type        string `json:"type"`
-	Endpoint    string `json:"endpoint"`
-	Prefix      string `json:"prefix,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	Username    string `json:"username,omitempty"`
-	Password    string `json:"password,omitempty"`
-	EnableTLS   bool   `json:"enableTLS,omitempty"`
-	RewriteHost bool   `json:"rewriteHost,omitempty"`
-	FileUpload  bool   `json:"file_upload,omitempty"`
-	Keepalive   bool   `json:"keepalive,omitempty"`
-	TTL         int    `json:"ttl,omitempty"`
-	RecordMode  string `json:"record_mode,omitempty"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Endpoint string `json:"endpoint"`
+	Prefix   string `json:"prefix,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
+	Username string `json:"username,omitempty"`
+	// Password is a pointer so the full-tunnel PUT can tell "says nothing,
+	// keep the stored secret" (nil, field absent) from "clear it" (pointer
+	// to ""). The response never echoes it (CWE-522), so the UI's edit form
+	// always submits nil unless the operator typed a new secret — without
+	// this, every unrelated edit would wipe auth. Same nil-vs-empty
+	// sentence the spoke IP field speaks.
+	Password    *string `json:"password,omitempty"`
+	EnableTLS   bool    `json:"enableTLS,omitempty"`
+	RewriteHost bool    `json:"rewriteHost,omitempty"`
+	FileUpload  bool    `json:"file_upload,omitempty"`
+	Keepalive   bool    `json:"keepalive,omitempty"`
+	TTL         int     `json:"ttl,omitempty"`
+	RecordMode  string  `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
 	Peer string `json:"peer,omitempty"`
 	// Peers is a p2p tunnel's inbound allowlist; an entry's alias is optional
@@ -393,6 +401,15 @@ func settlePeerIPs(tunnelType string, rows []peerJSON, current map[string]string
 	return tunnel.AllocatePeerIPs(peers, resolved, netSpec)
 }
 
+// derefPassword unwraps an optional request password: absent means "no
+// secret supplied" and settles to "" for the option layer.
+func derefPassword(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string) []tunnel.Option {
 	peers := make([]string, 0, len(r.Peers))
 	aliases := make(map[string]string, len(r.Peers))
@@ -415,7 +432,7 @@ func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string) []tunnel.Opti
 		tunnel.PrefixOption(r.Prefix),
 		tunnel.HostnameOption(r.Hostname),
 		tunnel.UsernameOption(r.Username),
-		tunnel.PasswordOption(r.Password),
+		tunnel.PasswordOption(derefPassword(r.Password)),
 		tunnel.EnableTLSOption(r.EnableTLS),
 		tunnel.RewriteHostOption(r.RewriteHost),
 		tunnel.FileUploadOption(r.FileUpload),
@@ -663,6 +680,15 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+
+	// The response never echoes the password, so a PUT that omits it means
+	// "unchanged", not "cleared" — carry the stored secret forward. An
+	// explicit "" still clears (see tunnelCreateRequest.Password). Read
+	// before the Close below: after it the options are the only copy left.
+	if req.Password == nil {
+		pw := old.Options().Password
+		req.Password = &pw
 	}
 
 	// A p2p tunnel cannot be replaced while it lives: the process-wide host
