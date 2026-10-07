@@ -116,7 +116,15 @@ type Options struct {
 	// "cidr [gw]" pairs.
 	Routes string
 	// DNS is the device's DNS servers, comma-separated.
-	DNS           string
+	DNS string
+	// ShareLAN lists the hub-side LAN subnets a tun hub shares with its
+	// spokes, comma-separated CIDRs. Empty disables sharing. When set, the
+	// hub NATs spoke traffic into the LAN (kernel MASQUERADE first, userspace
+	// TCP/UDP fallback) so no static route on the LAN gateway is needed.
+	ShareLAN string
+	// ShareMode pins the sharing implementation: auto (default), kernel, or
+	// userspace. Auto tries the kernel path and falls back with an event.
+	ShareMode     string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -325,6 +333,20 @@ func RoutesOption(routes string) Option {
 func DNSOption(dns string) Option {
 	return func(opts *Options) {
 		opts.DNS = dns
+	}
+}
+
+// ShareLANOption sets the hub-side LAN subnets a tun hub shares (comma-separated CIDRs).
+func ShareLANOption(spec string) Option {
+	return func(opts *Options) {
+		opts.ShareLAN = spec
+	}
+}
+
+// ShareModeOption pins the sharing implementation (auto/kernel/userspace).
+func ShareModeOption(mode string) Option {
+	return func(opts *Options) {
+		opts.ShareMode = NormalizeShareMode(mode)
 	}
 }
 
@@ -557,6 +579,8 @@ func RestartRunning() {
 			DeviceName:   p.opts.DeviceName,
 			Routes:       p.opts.Routes,
 			DNS:          p.opts.DNS,
+			ShareLAN:     p.opts.ShareLAN,
+			ShareMode:    p.opts.ShareMode,
 			CreatedAt:    p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -652,6 +676,8 @@ func LoadConfig() {
 			DeviceName:    cfg.DeviceName,
 			Routes:        cfg.Routes,
 			DNS:           cfg.DNS,
+			ShareLAN:      cfg.ShareLAN,
+			ShareMode:     cfg.ShareMode,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -710,6 +736,8 @@ func SaveConfig() error {
 			DeviceName:    opts.DeviceName,
 			Routes:        opts.Routes,
 			DNS:           opts.DNS,
+			ShareLAN:      opts.ShareLAN,
+			ShareMode:     opts.ShareMode,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -760,6 +788,8 @@ func TunnelOptions(opts Options) []Option {
 		DeviceNameOption(opts.DeviceName),
 		RoutesOption(opts.Routes),
 		DNSOption(opts.DNS),
+		ShareLANOption(opts.ShareLAN),
+		ShareModeOption(opts.ShareMode),
 	}
 }
 

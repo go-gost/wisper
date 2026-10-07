@@ -64,6 +64,15 @@ type tunTunnel struct {
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
+	// shareEffective is the LAN-sharing backend Run settled on ("kernel",
+	// "userspace", or "" when sharing is disabled). Set once in Run under
+	// the lock, cleared in Close, read by ShareState for the detail badge —
+	// so the UI shows what is actually running, not what was configured.
+	shareEffective string
+	// shareCleanup removes the kernel NAT rules Run applied. Nil unless the
+	// kernel path was taken — the userspace fallback installs nothing on
+	// the host, so there is nothing to tear down.
+	shareCleanup func()
 
 	// peerStats is the last per-peer snapshot the stats task took, with rates;
 	// peerStatsAt times the window those rates average over. Same fields, and
@@ -140,6 +149,22 @@ func (s *tunTunnel) Options() Options {
 func (s *tunTunnel) Favorite(b bool)  { s.favorite.Store(b) }
 func (s *tunTunnel) IsFavorite() bool { return s.favorite.Load() }
 
+// ShareState reports LAN sharing for the detail badge: the configured LAN
+// spec and mode, plus the backend Run actually settled on and whether auto
+// downgraded to it. The downgrade is derived, not stored — effective
+// userspace under auto can only mean the kernel path was unavailable, so a
+// stored flag could only ever disagree with the two fields it came from.
+func (s *tunTunnel) ShareState() (spec, configured, effective string, downgraded bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	effective = s.shareEffective
+	if s.opts.ShareLAN == "" {
+		return "", "", "", false
+	}
+	return s.opts.ShareLAN, NormalizeShareMode(s.opts.ShareMode),
+		effective, effective == ShareUserspace && NormalizeShareMode(s.opts.ShareMode) == ShareAuto
+}
+
 // listenerMetadata is the tun listener's device configuration. Keys follow
 // x/listener/tun: name, mtu, net, routes, dns. Empty values are ignored by the
 // listener, so an unset optional field is simply absent behavior.
@@ -185,6 +210,12 @@ func (s *tunTunnel) handlerMetadata() map[string]any {
 // device over the p2p host directly, so there is no socket and no endpoint for
 // a paired p2p tunnel to repeat.
 func (s *tunTunnel) init() error {
+	// A malformed share-LAN fails the start here, not mid-Run after the
+	// device and routes exist: failing late would unwind all three for a
+	// typo the operator could have been told about up front.
+	if _, err := ParseShareLANNets(s.opts.ShareLAN); err != nil {
+		return fmt.Errorf("tun hub share_lan %q is not a comma-separated list of CIDRs: %v", s.opts.ShareLAN, err)
+	}
 	// An endpoint left over from the socket form is refused rather than
 	// ignored: silently dropping it would run a hub in a different shape than
 	// its config says, and the paired p2p tunnel that repeated the address would
@@ -487,6 +518,28 @@ func (s *tunTunnel) Run() (err error) {
 	// accepted conns itself: hand it the stats the service reports.
 	peerLn.setStats(pStats)
 
+	// LAN sharing is host-level NAT, applied once the hub's routes exist and
+	// torn down in Close: a hub that fails to start leaves no rules behind.
+	// A pinned-kernel failure unwinds exactly like a handler failure below.
+	shareEffective, shareDowngraded, shareCleanup, err := setupShareLAN(
+		s.opts.Net, s.opts.ShareLAN, s.opts.ShareMode, probeShareKernel(), shareExec)
+	if err != nil {
+		p2pHost.unregister(peerLn)
+		p2pHost.release()
+		deviceLn.Close()
+		return err
+	}
+	// The downgrade is the one case that must never be silent: ping works
+	// through the kernel and dies in userspace, and without this event that
+	// looks like the network breaking for no reason.
+	if shareEffective == ShareKernel {
+		log.Infof("sharing LAN %s via kernel NAT", s.opts.ShareLAN)
+		event.Record(s.opts.ID, event.LevelInfo, "sharing LAN %s via kernel NAT", s.opts.ShareLAN)
+	} else if shareDowngraded {
+		log.Warnf("kernel NAT unavailable, sharing LAN %s via userspace TCP/UDP: ping will not reach the LAN", s.opts.ShareLAN)
+		event.Record(s.opts.ID, event.LevelWarn, "kernel NAT unavailable, sharing LAN %s via userspace TCP/UDP: ping will not reach the LAN", s.opts.ShareLAN)
+	}
+
 	// A p2p hub has no TTL and no keepalive setting: a peer announces its
 	// departure by closing its stream, so nothing here is parsed from metadata.
 	handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
@@ -494,11 +547,36 @@ func (s *tunTunnel) Run() (err error) {
 	// assignment refuses every claim, which is the safe default — the alternative
 	// is a last-writer-wins route table with nothing checking what went into it.
 	authz := s.newAuthorizer(log)
-	h := tunhandler.NewP2PHandler(deviceConn, authz,
+	// The userspace fallback wraps the device before the handler is built: the
+	// handler reads this conn and only this conn, so LAN-bound packets it
+	// writes enter the stack while the handler's routing sees the stack's
+	// replies as ordinary device packets. The shim owns the stack — its Close
+	// (via the handler's Close) stops both — so a handler failure below must
+	// close it, or the stack's goroutines outlive the failed start.
+	handlerDevice := net.Conn(deviceConn)
+	var shareShim *shareDevice
+	if shareEffective == ShareUserspace {
+		lans, lanErr := ParseShareLANNets(s.opts.ShareLAN)
+		if lanErr != nil {
+			p2pHost.unregister(peerLn)
+			p2pHost.release()
+			deviceLn.Close()
+			return lanErr
+		}
+		shareShim = newShareDevice(deviceConn, lans, newShareStack(s.opts.MTU))
+		handlerDevice = shareShim
+	}
+	h := tunhandler.NewP2PHandler(handlerDevice, authz,
 		handler.LoggerOption(handlerLogger),
 		handler.ServiceOption(s.opts.Name),
 	)
 	if err = h.Init(mdx.NewMetadata(nil)); err != nil {
+		if shareShim != nil {
+			shareShim.Close()
+		}
+		if shareCleanup != nil {
+			shareCleanup()
+		}
 		p2pHost.unregister(peerLn)
 		p2pHost.release()
 		deviceLn.Close()
@@ -512,6 +590,7 @@ func (s *tunTunnel) Run() (err error) {
 
 	s.mu.Lock()
 	s.ln, s.device, s.authz = peerLn, deviceLn, authz
+	s.shareEffective, s.shareCleanup = shareEffective, shareCleanup
 	forward := s.forward
 	s.mu.Unlock()
 
@@ -681,7 +760,9 @@ func (s *tunTunnel) Close() error {
 
 	s.mu.Lock()
 	forward, ln, device := s.forward, s.ln, s.device
+	shareCleanup := s.shareCleanup
 	s.forward, s.ln, s.device, s.authz = nil, nil, nil, nil
+	s.shareEffective, s.shareCleanup = "", nil
 	s.mu.Unlock()
 
 	var err error
@@ -698,6 +779,11 @@ func (s *tunTunnel) Close() error {
 	// which is also the listener's, so the listener has nothing left to release.
 	if device != nil {
 		_ = device.Close()
+	}
+	// The NAT rules go last: the service is stopped, so nothing still needs
+	// them, and a Close that never ran setup holds nil here.
+	if shareCleanup != nil {
+		shareCleanup()
 	}
 	return err
 }

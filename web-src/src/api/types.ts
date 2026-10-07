@@ -89,7 +89,13 @@ export interface TunnelOptions {
   routes?: string;
   /** The device's DNS servers, comma-separated. */
   dns?: string;
+  /** Hub-side LAN subnets shared with spokes (comma-separated CIDRs, empty disables). */
+  share_lan?: string;
+  /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
+  share_mode?: string;
 }
+
+/** One peer's traffic during the tunnel's current run, plus the p2p host's
 
 /** One peer's traffic during the tunnel's current run, plus the p2p host's
  *  live diagnostic for it. The diagnostic fields are absent until the peer has
@@ -158,6 +164,10 @@ export interface Tunnel {
   peer_stats?: PeerStats[];
   /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
   peer_transport?: string;
+  /** tun hubs: the sharing backend actually settled on ('kernel'/'userspace', absent when disabled). */
+  share_effective?: string;
+  /** True when auto fell back to userspace — the badge that explains why ping fails. */
+  share_downgraded?: boolean;
   /** This object's recent history, newest first. */
   events?: WisperEvent[];
 }
@@ -188,6 +198,10 @@ export interface TunnelCreateRequest {
   /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
   routes?: string;
   dns?: string;
+  /** Hub-side LAN subnets shared with spokes (comma-separated CIDRs, empty disables). */
+  share_lan?: string;
+  /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
+  share_mode?: string;
 }
 
 // ─── Entrypoint ──────────────────────────────────────────────────────────────

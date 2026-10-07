@@ -7,7 +7,9 @@ require (
 	github.com/go-gost/p2p v0.13.1
 	github.com/go-gost/x v0.21.0
 	github.com/google/uuid v1.6.0
+	github.com/xjasonlyu/tun2socks/v2 v2.6.0
 	gopkg.in/yaml.v3 v3.0.1
+	gvisor.dev/gvisor v0.0.0-20250523182742-eede7a881b20
 )
 
 require (
@@ -27,6 +29,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
+	github.com/google/btree v1.1.3 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

@@ -32,6 +32,12 @@ type tunnelResponse struct {
 	// PeerTransport is where a p2p entrypoint's peer traffic goes right now:
 	// "direct" or "derp". Empty when it is not connected, or not a p2p object.
 	PeerTransport string `json:"peer_transport,omitempty"`
+	// ShareEffective is the LAN-sharing backend the hub actually settled on
+	// ("kernel", "userspace", or "" when sharing is disabled). ShareDowngraded
+	// is true when auto fell back to userspace — the badge that explains why
+	// ping does not reach the LAN.
+	ShareEffective  string `json:"share_effective,omitempty"`
+	ShareDowngraded bool   `json:"share_downgraded,omitempty"`
 	// Events is this object's recent history, newest first.
 	Events []eventResponse `json:"events"`
 }
@@ -120,6 +126,11 @@ type tunnelOptionsResp struct {
 	DeviceName string `json:"device_name,omitempty"`
 	Routes     string `json:"routes,omitempty"`
 	DNS        string `json:"dns,omitempty"`
+	// ShareLAN lists the hub-side LAN subnets shared with spokes
+	// (comma-separated CIDRs, empty disables). ShareMode pins the
+	// implementation: auto (default), kernel, or userspace.
+	ShareLAN  string `json:"share_lan,omitempty"`
+	ShareMode string `json:"share_mode,omitempty"`
 }
 
 type statsResponse struct {
@@ -230,6 +241,8 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			DeviceName:  opts.DeviceName,
 			Routes:      opts.Routes,
 			DNS:         opts.DNS,
+			ShareLAN:    opts.ShareLAN,
+			ShareMode:   tunnel.NormalizeShareMode(opts.ShareMode),
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
@@ -282,6 +295,15 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	}
 	if opts.Peer != "" {
 		resp.PeerTransport = transports[opts.Peer]
+	}
+	// The badge reads what is actually running, not what was configured:
+	// only a tun hub reports sharing state, so anything else stays absent.
+	if ss, ok := t.(interface {
+		ShareState() (string, string, string, bool)
+	}); ok {
+		_, _, eff, down := ss.ShareState()
+		resp.ShareEffective = eff
+		resp.ShareDowngraded = down
 	}
 	resp.Events = toEventResponses(event.List(t.ID()))
 	return resp
@@ -348,6 +370,11 @@ type tunnelCreateRequest struct {
 	Routes string `json:"routes,omitempty"`
 	// DNS is the device's DNS servers, comma-separated.
 	DNS string `json:"dns,omitempty"`
+	// ShareLAN lists the hub-side LAN subnets shared with spokes
+	// (comma-separated CIDRs, empty disables). ShareMode pins the
+	// implementation: auto (default), kernel, or userspace.
+	ShareLAN  string `json:"share_lan,omitempty"`
+	ShareMode string `json:"share_mode,omitempty"`
 }
 
 // settlePeerIPs applies a tun hub's address policy to the rows of a request, and
@@ -456,6 +483,8 @@ func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string) []tunnel.Opti
 		tunnel.DeviceNameOption(r.DeviceName),
 		tunnel.RoutesOption(r.Routes),
 		tunnel.DNSOption(r.DNS),
+		tunnel.ShareLANOption(r.ShareLAN),
+		tunnel.ShareModeOption(r.ShareMode),
 	}
 }
 
@@ -506,6 +535,12 @@ func validateTunTunnel(r *tunnelCreateRequest) error {
 	}
 	if err := validateTunNet(r.Net); err != nil {
 		return err
+	}
+	// A malformed share_lan is refused here rather than at Run: the create
+	// would otherwise answer 201 and the hub would fail to start, leaving a
+	// stored tunnel that never runs.
+	if _, err := tunnel.ParseShareLANNets(r.ShareLAN); err != nil {
+		return fmt.Errorf("share_lan %q is not a comma-separated list of CIDRs: %v", r.ShareLAN, err)
 	}
 	return nil
 }

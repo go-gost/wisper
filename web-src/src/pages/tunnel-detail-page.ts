@@ -62,6 +62,10 @@ export class TunnelDetailPage extends LitElement {
   @state() private _net = '';
   @state() private _mtu = 0;
   @state() private _deviceName = '';
+  // LAN sharing: the hub-side subnets spokes may reach (empty disables), and
+  // the backend to use — auto tries kernel NAT first, then userspace TCP/UDP.
+  @state() private _shareLAN = '';
+  @state() private _shareMode = 'auto';
   /** How many keys are knocking on the process-wide host; shown on the peers
    *  entry. The list is not per-tunnel — a p2p stream carries no destination —
    *  so this is a count, not a per-tunnel allowlist field. */
@@ -169,6 +173,8 @@ export class TunnelDetailPage extends LitElement {
     this._net = '';
     this._mtu = 0;
     this._deviceName = '';
+    this._shareLAN = '';
+    this._shareMode = 'auto';
   }
 
   private _populateForm(t: Tunnel) {
@@ -186,6 +192,8 @@ export class TunnelDetailPage extends LitElement {
     this._net = t.options.net ?? '';
     this._mtu = t.options.mtu ?? 0;
     this._deviceName = t.options.device_name ?? '';
+    this._shareLAN = t.options.share_lan ?? '';
+    this._shareMode = t.options.share_mode || 'auto';
   }
 
   /** _peerKeys is the allowlist verbatim, for the copy button: the keys go out
@@ -280,6 +288,8 @@ export class TunnelDetailPage extends LitElement {
         body.net = this._net.trim() || undefined;
         body.mtu = this._mtu || undefined;
         body.device_name = this._deviceName.trim() || undefined;
+        body.share_lan = this._shareLAN.trim() || undefined;
+        body.share_mode = this._shareMode || undefined;
       }
       if (this._isP2P && this.mode === 'edit') {
         // The allowlist is managed on its own page; an edit here must carry it
@@ -376,6 +386,17 @@ export class TunnelDetailPage extends LitElement {
   private _setRecordMode(mode: string) {
     this._recordMode = mode;
     this.requestUpdate();
+  }
+
+  private static readonly SHARE_MODES = ['auto', 'kernel', 'userspace'] as const;
+
+  /** The backend word for the mode cycle and the badge: auto/kernel/userspace. */
+  private _shareModeLabel(mode: string): string {
+    switch (mode) {
+      case 'kernel': return t('shareModeKernel');
+      case 'userspace': return t('shareModeUserspace');
+      default: return t('shareModeAuto');
+    }
   }
 
   // ── Styles ───────────────────────────────────────────────────────────
@@ -965,6 +986,28 @@ export class TunnelDetailPage extends LitElement {
                     ${t2.options.device_name
                       ? html`<div class="info-row"><span class="info-label">${t('fieldDeviceName')}</span><span class="info-value text">${t2.options.device_name}</span></div>`
                       : ''}
+                    <!-- LAN sharing: what is shared, and the backend actually
+                         running it. A downgraded hub says so in place, because
+                         ping dying without a reason reads as a broken network. -->
+                    ${t2.options.share_lan
+                      ? html`
+                        <div class="info-row">
+                          <span class="info-label">${t('fieldShareLAN')}</span>
+                          <span class="info-value text">${t2.options.share_lan}</span>
+                        </div>
+                        ${t2.share_effective
+                          ? html`
+                            <div class="info-row">
+                              <span class="info-label">${t('fieldShareMode')}</span>
+                              <span class="info-value text">${t2.share_effective === 'kernel' ? t('shareBackendKernel') : t('shareBackendUserspace')}</span>
+                            </div>
+                          `
+                          : ''}
+                        ${t2.share_downgraded
+                          ? html`<div class="p2p-hint warn">${t('shareDowngradedHint')}</div>`
+                          : ''}
+                      `
+                      : ''}
                     <div class="info-row">
                       <span class="info-label">${t('peersLabel')}</span>
                       ${t2.options.peers?.length
@@ -1264,6 +1307,25 @@ export class TunnelDetailPage extends LitElement {
                         @input=${(e: Event) => { this._deviceName = (e.target as HTMLInputElement).value; }}>
                       <div class="p2p-hint">${t('fieldDeviceNameHint')}</div>
                     </div>
+                    <!-- LAN sharing: the hub-side subnets spokes may reach, and
+                         which backend runs it. Empty LAN disables sharing. -->
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldShareLAN')}</label>
+                      <input class="form-input" .value=${this._shareLAN} placeholder="192.168.1.0/24"
+                        @input=${(e: Event) => { this._shareLAN = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldShareLANHint')}</div>
+                    </div>
+                    <div class="switch-row" @click=${() => {
+                      this._shareMode = this._cycleOption(this._shareMode, [...TunnelDetailPage.SHARE_MODES]);
+                      this.requestUpdate();
+                    }}>
+                      <span class="switch-label">${t('fieldShareMode')}</span>
+                      <span style="font-size:var(--font-sm);color:var(--text-muted);display:flex;align-items:center;gap:4px;">
+                        ${this._shareModeLabel(this._shareMode)}
+                        ${icon('chevron-right')}
+                      </span>
+                    </div>
+                    <div class="record-desc">${t('fieldShareModeHint')}</div>
                     <!-- No routes, no dns: both are client-side, and a hub runs
                          with host networking, so they would be applied to the
                          host's own routing and resolver. The API refuses them

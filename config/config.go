@@ -348,6 +348,14 @@ type Tunnel struct {
 	// DNS is the device's DNS servers, comma-separated.
 	DNS string `yaml:",omitempty" json:"dns,omitempty"`
 
+	// ShareLAN lists the hub-side LAN subnets a tun hub shares with its
+	// spokes, comma-separated CIDRs. Empty disables sharing.
+	ShareLAN string `yaml:"share_lan,omitempty" json:"share_lan,omitempty"`
+
+	// ShareMode pins the sharing implementation: auto (default), kernel, or
+	// userspace. Auto tries the kernel path and falls back with an event.
+	ShareMode string `yaml:"share_mode,omitempty" json:"share_mode,omitempty"`
+
 	// Events is this object's recent history, oldest first. Runtime state, like
 	// Stats: SaveConfig rewrites it on every stats tick.
 	Events []event.Event `yaml:"events,omitempty"`
