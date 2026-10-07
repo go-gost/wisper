@@ -7,6 +7,11 @@
 
 FROM alpine:3.23
 
+# Same reason as the root Dockerfile's runtime stage: without the iptables
+# CLI the hub cannot install its LAN-sharing MASQUERADE rules and falls
+# back to userspace TCP/UDP.
+RUN apk add --no-cache iptables
+
 COPY wisper /usr/local/bin/wisper
 
 EXPOSE 8900

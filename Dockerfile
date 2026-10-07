@@ -36,6 +36,12 @@ RUN xx-go build -ldflags "-s -w -X github.com/go-gost/wisper/version.Version=${V
 # ---- Stage 3: Runtime -----------------------------------------------
 FROM alpine:3.23
 
+# iptables is how a tun hub shares its LAN: probeShareKernel shells out to
+# the iptables CLI to install the MASQUERADE rules, and without it the hub
+# visibly downgrades to userspace TCP/UDP (no ping). Alpine's package is
+# nft-backed, so this one install covers both backends.
+RUN apk add --no-cache iptables
+
 COPY --from=go-builder /src/wisper /usr/local/bin/wisper
 
 EXPOSE 8900
