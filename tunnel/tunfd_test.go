@@ -58,8 +58,10 @@ func TestTunFDPresentAndReplaced(t *testing.T) {
 // TestSetTunFDReportsSwap: a hand-off that replaces a live device is the one
 // case where a running tun entrypoint is left holding a dead fd — the VpnService
 // rebuilt the device under it — so the caller must be told to restart it. A
-// first set, a re-set of the same fd, and a release are not swaps, and a set
-// after a release is a fresh device rather than a swap either.
+// first set, a re-set of the same fd, and a release are not swaps. A set after
+// a release is a swap only when the release observed a live holder (a flap
+// around a running entrypoint); with nobody holding it is a fresh device
+// (see TestSetTunFDFlapRestartsHolder).
 func TestSetTunFDReportsSwap(t *testing.T) {
 	defer SetTunFD(-1, "")
 
@@ -82,6 +84,42 @@ func TestSetTunFDReportsSwap(t *testing.T) {
 	third := openTestFD(t)
 	if swapped := SetTunFD(third, "test.establish"); swapped {
 		t.Error("setting after a release is not a swap")
+	}
+}
+
+// TestSetTunFDFlapRestartsHolder: a release observed while the device is
+// claimed, followed by a fresh establish, leaves the holder on a dead fd just
+// like a direct replace — the poller released and re-established the VPN around
+// a running entrypoint (2026-10-07真机直连黑洞). The establish must report a
+// swap so the JNI shim restarts the holder. A set after a release nobody held
+// stays a fresh device, not a swap.
+func TestSetTunFDFlapRestartsHolder(t *testing.T) {
+	defer SetTunFD(-1, "")
+	defer ReleaseTunDevice("flap-holder")
+
+	SetTunFD(-1, "")
+	if owner, ok := ClaimTunDevice("flap-holder", "spoke"); !ok {
+		t.Fatalf("claim device: already held by %q", owner)
+	}
+
+	live := openTestFD(t)
+	if swapped := SetTunFD(live, "test.establish"); swapped {
+		t.Error("the first device is not a swap")
+	}
+
+	// The VPN flaps around the running holder: release, then a new device.
+	SetTunFD(-1, "TunVpnService.release")
+	fresh := openTestFD(t)
+	if swapped := SetTunFD(fresh, "test.establish"); !swapped {
+		t.Error("establish after a release around a live holder is a swap")
+	}
+	ReleaseTunDevice("flap-holder")
+
+	// Nobody holds the device now: the same flap is a fresh device.
+	SetTunFD(-1, "TunVpnService.release")
+	other := openTestFD(t)
+	if swapped := SetTunFD(other, "test.establish"); swapped {
+		t.Error("setting after a release nobody held is not a swap")
 	}
 }
 

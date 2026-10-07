@@ -119,7 +119,18 @@ class WisperService : Service() {
      */
     private fun ensureVpn() {
         try {
-            val running = runningTunEntrypoint()?.optJSONObject("options")
+            // A failed fetch must skip the tick, not release the VPN: httpGet
+            // returns null when the backend is briefly unreachable, and
+            // treating that as "nothing wants a device" released and
+            // re-established the VPN around a running entrypoint — whose dup'd
+            // fd then pointed at the destroyed interface while the system
+            // routed new packets to the rebuilt one (2026-10-07真机直连黑洞).
+            val entrypointsBody = httpGet("/api/entrypoints")
+            if (entrypointsBody == null) {
+                Log.w(TAG, "entrypoints fetch failed, skipping VPN tick")
+                return
+            }
+            val running = findRunningTunEntrypoint(entrypointsBody)?.optJSONObject("options")
 
             // An arm that predates a takeover is stale: its device was taken
             // from under it, so re-establishing from it would race the app the
@@ -404,12 +415,11 @@ class WisperService : Service() {
     // VPN establishment
     // ---------------------------------------------------------------
 
-    /** The first *running* tun entrypoint, if any: the VPN exists to serve one,
+    /** The first *running* tun entrypoint in an /api/entrypoints body, if any: the VPN exists to serve one,
      *  so a stopped or failed entrypoint must not hold it up. A restored
      *  entrypoint counts as running from the moment it is listed — it is
      *  waiting for this app's device, not the other way round. */
-    private fun runningTunEntrypoint(): JSONObject? {
-        val body = httpGet("/api/entrypoints") ?: return null
+    private fun findRunningTunEntrypoint(body: String): JSONObject? {
         // The list endpoints answer a bare array — the {"entrypoints": …} shape
         // is /api/stats's, not this one's.
         val arr = JSONArray(body)

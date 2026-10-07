@@ -16,19 +16,37 @@ var (
 	tunFDMu  sync.Mutex
 	tunFD    = -1
 	tunFDSet = make(chan struct{}) // closed and replaced on every set, to wake waiters
+	// flapPending remembers a release observed while the device was claimed.
+	// The next establish then restarts the still-claimed holder, whose dup'd
+	// copy points at the destroyed interface. Guarded by tunFDMu. It is only
+	// ever touched while holding tunFDMu, and the holder check nests
+	// tunDeviceMu inside tunFDMu — the only place that order occurs.
+	flapPending bool
 )
+
+// holderExistsLocked reports whether the device is currently claimed. The
+// caller must hold tunFDMu.
+func holderExistsLocked() bool {
+	tunDeviceMu.Lock()
+	defer tunDeviceMu.Unlock()
+	return tunDeviceID != ""
+}
 
 // SetTunFD records the fd of a tun device created outside this process (the
 // Android VpnService) and wakes anything waiting for one. The fd becomes ours:
 // it is closed when it is replaced or cleared, so the caller must have given up
 // its own copy. Pass a negative fd to release the device.
 //
-// It reports whether the hand-off replaced a live device with a different one.
-// That is the one case where a running tun entrypoint is left holding a dead
-// fd — it captured its device when it started, and the VpnService rebuilt it
-// underneath — so the caller must restart the holder rather than let it read a
-// closed descriptor. A first set, a re-set of the same fd, and a release all
-// report false.
+// It reports whether the hand-off left a running tun entrypoint holding a dead
+// fd, in which case the caller must restart the holder rather than let it read
+// a closed descriptor. That is a direct replace (live fd swapped for a
+// different live one) and a flap (a release observed while the device was
+// claimed, followed by a fresh establish): the poller can release and
+// re-establish the VPN around a running entrypoint, and the entrypoint keeps
+// the copy it dup'd at start — which points at the destroyed interface — while
+// the system routes new packets to the rebuilt one. A first set, a re-set of
+// the same fd, and a release all report false, as does a set after a release
+// nobody held (a fresh device rather than a stale holder).
 //
 // reason names the call site that handed the fd over (an Android service
 // method — "onRevoke", "TunVpnService.release", …). It is carried through the
@@ -41,9 +59,26 @@ func SetTunFD(fd int, reason string) (swapped bool) {
 	tunFD = fd
 	close(tunFDSet)
 	tunFDSet = make(chan struct{})
-	tunFDMu.Unlock()
 
-	swapped = prev > 0 && fd > 0 && prev != fd
+	if fd < 0 {
+		// A release only matters when somebody holds the device: a running
+		// entrypoint keeps its dup'd copy while the VPN goes away, so the
+		// next establish must restart it. A release nobody held clears any
+		// earlier flap instead of restarting a future holder.
+		flapPending = holderExistsLocked()
+	} else if fd > 0 {
+		swapped = prev > 0 && prev != fd
+		if !swapped && flapPending && holderExistsLocked() {
+			// Flap: release-then-establish around a live holder. The holder
+			// never saw a direct replace (prev == -1 here), but its fd is
+			// just as dead.
+			swapped = true
+		}
+		// A set consumes the flap either way: a later starter is fresh and
+		// picks the current fd up via WaitTunFD.
+		flapPending = false
+	}
+	tunFDMu.Unlock()
 
 	// One line per hand-off, so the Go timeline reads beside logcat's
 	// wisper-tunfd lines and "who has the device" has an answer on both sides:
