@@ -1,7 +1,7 @@
 # Tun entrypoint L2 探针设计（device-fd 死亡看门狗）
 
 - 日期：2026-10-07
-- 状态：设计已确认，待实现计划
+- 状态：**已否决，不实现**（见末尾〈否决结论〉）。留档备查。
 - 背景：2026-10-07 真机直连黑洞——VPN flap（release→establish）绕过 running holder，
   holder 手里是已销毁 tun0 的 dup，系统把新包路由到 tun1。症状：双 tun 同 IP、
   entrypoint stats 双向冻结、hub 无 `no route`。idle 与 device-fd 死亡在 stats 上
@@ -88,3 +88,17 @@
 - 范围：单 spec 可覆盖（x 改动 + wisper 改动 + UI 开关），不拆分。
 - 歧义：`probeAcked` 推进指"本周期内 acked 增加"，实现时按周期快照差值判，
   不按累计值判（防重启清零/溢出误判）——实现计划里展开。
+
+## 否决结论（2026-10-07 真机 spike 后追加，不实现）
+
+- §1 方向先被证伪：x 自己组包经 `conn.Write` 发出，全程不经过 device fd——
+  flap 死的是 fd 而链路是好的，echo 照常来回，探针全绿、黑洞照黑。
+  只有从 fd 里 `Read` 出来的包才算穿过读侧，只有 `Write` 进 fd 的才算穿过写侧。
+- 替代方向（被动读内核计数器）也被证伪：`/sys/class/net/tun0/statistics/*`
+  连 shell 都 Permission denied（SELinux 挡 stat）；`/proc/net/dev` shell 可读
+  但 `run-as` 进 app 沙盒同样 Permission denied；`ip link` 也无权。
+  app 自己的 socket 流量又不进自己的 VPN——用户态在 Android 上没有 device
+  健康的地面真值，被动主动两条路都走不通。
+- 结论：探针整个砍掉。同类故障已有 cause-level 根治（`5a7e587` flapPending +
+  轮询失败不再 release）；`RestartForVpnSwap` 重启即记 event，
+  下次 stall 时间线上有嫌疑人。spoke 跑 Linux 那天（sysfs 可读）可复活此方案。
