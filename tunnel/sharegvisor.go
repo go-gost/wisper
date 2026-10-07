@@ -180,16 +180,18 @@ func (h *shareTransportHandler) handleTCP(ctx context.Context, origin adapter.TC
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		io.Copy(lan, origin)
+		// Copy errors end this direction; the other direction's EOF is the
+		// signal, so the counts and errors are intentionally discarded.
+		_, _ = io.Copy(lan, origin)
 		if cw, ok := lan.(interface{ CloseWrite() error }); ok {
-			cw.CloseWrite()
+			_ = cw.CloseWrite()
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		io.Copy(origin, lan)
+		_, _ = io.Copy(origin, lan)
 		if cw, ok := origin.(interface{ CloseWrite() error }); ok {
-			cw.CloseWrite()
+			_ = cw.CloseWrite()
 		}
 	}()
 	wg.Wait()
@@ -207,21 +209,23 @@ func (h *shareTransportHandler) handleUDP(ctx context.Context, origin adapter.UD
 	}
 	defer lan.Close()
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	// No derived context here: the loops below run on read/write deadlines
+	// and end together via the WaitGroup, so a cancellable context would
+	// have no reader and cancel nothing.
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		defer cancel()
 		buf := make([]byte, 65535)
 		for {
-			lan.SetReadDeadline(time.Now().Add(shareUDPTimeout))
+			// Deadline failures cannot happen on an open conn; a closed
+			// one fails the Read below, which is what ends the loop.
+			_ = lan.SetReadDeadline(time.Now().Add(shareUDPTimeout))
 			n, err := lan.Read(buf)
 			if err != nil {
 				return
 			}
-			origin.SetWriteDeadline(time.Now().Add(shareUDPTimeout))
+			_ = origin.SetWriteDeadline(time.Now().Add(shareUDPTimeout))
 			if _, err := origin.Write(buf[:n]); err != nil {
 				return
 			}
@@ -229,15 +233,14 @@ func (h *shareTransportHandler) handleUDP(ctx context.Context, origin adapter.UD
 	}()
 	go func() {
 		defer wg.Done()
-		defer cancel()
 		buf := make([]byte, 65535)
 		for {
-			origin.SetReadDeadline(time.Now().Add(shareUDPTimeout))
+			_ = origin.SetReadDeadline(time.Now().Add(shareUDPTimeout))
 			n, err := origin.Read(buf)
 			if err != nil {
 				return
 			}
-			lan.SetWriteDeadline(time.Now().Add(shareUDPTimeout))
+			_ = lan.SetWriteDeadline(time.Now().Add(shareUDPTimeout))
 			if _, err := lan.Write(buf[:n]); err != nil {
 				return
 			}

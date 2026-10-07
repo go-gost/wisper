@@ -152,7 +152,9 @@ func TestShareDeviceRoutes(t *testing.T) {
 	reply := v4(6, "10.10.0.5")
 	st.out <- reply
 	buf := make([]byte, 1500)
-	shim.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if err := shim.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("SetReadDeadline: %v", err)
+	}
 	n, err := shim.Read(buf)
 	if err != nil {
 		t.Fatalf("Read stack reply: %v", err)
