@@ -89,7 +89,7 @@ export interface TunnelOptions {
   routes?: string;
   /** The device's DNS servers, comma-separated. */
   dns?: string;
-  /** Hub-side LAN subnets shared with spokes (comma-separated CIDRs, empty disables). */
+  /** Hub-side LAN subnets shared with peers (comma-separated CIDRs, empty disables). */
   share_lan?: string;
   /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
   share_mode?: string;
@@ -198,7 +198,7 @@ export interface TunnelCreateRequest {
   /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
   routes?: string;
   dns?: string;
-  /** Hub-side LAN subnets shared with spokes (comma-separated CIDRs, empty disables). */
+  /** Hub-side LAN subnets shared with peers (comma-separated CIDRs, empty disables). */
   share_lan?: string;
   /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
   share_mode?: string;

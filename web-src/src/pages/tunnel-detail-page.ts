@@ -62,7 +62,7 @@ export class TunnelDetailPage extends LitElement {
   @state() private _net = '';
   @state() private _mtu = 0;
   @state() private _deviceName = '';
-  // LAN sharing: the hub-side subnets spokes may reach (empty disables), and
+  // LAN sharing: the hub-side subnets peers may reach (empty disables), and
   // the backend to use — auto tries kernel NAT first, then userspace TCP/UDP.
   @state() private _shareLAN = '';
   @state() private _shareMode = 'auto';
@@ -1307,7 +1307,7 @@ export class TunnelDetailPage extends LitElement {
                         @input=${(e: Event) => { this._deviceName = (e.target as HTMLInputElement).value; }}>
                       <div class="p2p-hint">${t('fieldDeviceNameHint')}</div>
                     </div>
-                    <!-- LAN sharing: the hub-side subnets spokes may reach, and
+                    <!-- LAN sharing: the hub-side subnets peers may reach, and
                          which backend runs it. Empty LAN disables sharing. -->
                     <div class="form-group">
                       <label class="form-label">${t('fieldShareLAN')}</label>
