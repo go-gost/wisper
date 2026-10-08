@@ -138,13 +138,13 @@ const en: Record<string, string> = {
   settingsInterval3s: '3 seconds',
   settingsInterval5s: '5 seconds',
   settingsInterval10s: '10 seconds',
+  settingsInterval30s: '30 seconds',
 
   // Background activity (screen-off survival)
   batteryExemptTitle: 'Background activity',
   batteryExemptOn: 'Unrestricted',
   batteryExemptOff: 'Restricted',
   batteryExemptHint: 'Keep the tunnel alive while the screen is off.',
-  settingsInterval30s: '30 seconds',
 
   // Settings
   settingsFavorites: 'Favorites',

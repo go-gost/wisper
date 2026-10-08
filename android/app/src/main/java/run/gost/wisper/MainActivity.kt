@@ -474,6 +474,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ── JavaScript Bridge ──────────────────────────────────────────────
+    // Doze power-save exemption. Reporting "exempt" wrongly is the dangerous
+    // direction: it would promise a tunnel that dies on screen-off, so an
+    // unavailable PowerManager counts as NOT exempt. One place, so the log
+    // lands the same way whether the page is asking or the user just tapped.
+    private fun batteryExemptNow(): Boolean {
+        val pm = getSystemService(PowerManager::class.java)
+        if (pm == null) {
+            Log.w("MainActivity", "PowerManager unavailable: reporting not exempt")
+            return false
+        }
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
     private inner class JsBridge {
         // Arms the VPN for a tun entrypoint the web UI is about to create: the
         // device must exist before the entrypoint can, and only this side can
@@ -513,9 +526,7 @@ class MainActivity : AppCompatActivity() {
         // "Battery > Unrestricted", which the user can also flip by hand five
         // levels deep. The exemption is per-install (a reinstall drops it) and
         // forgotten silently, so the settings page shows the live state rather
-        // than assuming it. Reporting "exempt" wrongly is the dangerous
-        // direction: it would promise a tunnel that dies on screen-off, so an
-        // unavailable PowerManager counts as NOT exempt.
+        // than assuming it.
         @android.webkit.JavascriptInterface
         fun isBatteryExempt(callbackId: String) {
             // The callback name is interpolated into JS, so it must not be able
@@ -525,12 +536,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             runOnUiThread {
-                val pm = getSystemService(PowerManager::class.java)
-                if (pm == null) {
-                    Log.w("MainActivity", "PowerManager unavailable: reporting not exempt")
-                }
-                val exempt = pm?.isIgnoringBatteryOptimizations(packageName) == true
-                webView.evaluateJavascript("$callbackId($exempt)", null)
+                webView.evaluateJavascript("$callbackId(${batteryExemptNow()})", null)
             }
         }
 
@@ -545,22 +551,34 @@ class MainActivity : AppCompatActivity() {
         @android.webkit.JavascriptInterface
         fun requestBatteryExemption() {
             runOnUiThread {
-                val pm = getSystemService(PowerManager::class.java)
-                val exempt = pm?.isIgnoringBatteryOptimizations(packageName) == true
                 val target = Uri.parse("package:$packageName")
-                val intent = if (exempt) {
+                val intent = if (batteryExemptNow()) {
                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, target)
                 } else {
                     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, target)
                 }
                 if (intent.resolveActivity(packageManager) == null) {
+                    // Android 11+ filters resolveActivity() unless the intent is
+                    // declared in <queries> (see the manifest). With that in
+                    // place this is the "no such screen" case, and a silent
+                    // return would read as a dead row, so say something.
                     Log.w("MainActivity", "no activity for battery exemption request")
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Could not open battery settings",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     return@runOnUiThread
                 }
                 try {
                     startActivity(intent)
                 } catch (e: Exception) {
                     Log.w("MainActivity", "battery exemption request failed", e)
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Could not open battery settings",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }

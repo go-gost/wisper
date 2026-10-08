@@ -66,7 +66,8 @@ export class SettingsPage extends LitElement {
 
   private _unsubs: (() => void)[] = [];
   private _onWindowFocus?: () => void;
-  private _batteryTimer: ReturnType<typeof setInterval> | null = null;
+  private _batteryTimer: ReturnType<typeof setTimeout> | null = null;
+  private _batteryFastUntil = 0;
   private _backend = new GoBackend();
 
   connectedCallback() {
@@ -110,9 +111,11 @@ export class SettingsPage extends LitElement {
     this._fetchP2PIdentity();
     this._queryBatteryExempt();
 
-    // Fast path: regaining window focus usually means the system dialog just
-    // closed. It is not a guarantee — on a Pixel 9 the row stayed stale after
-    // granting — so the poll below is what actually makes it correct.
+    // Only for coming back to the app from another app: WebView throttles
+    // timers in the background, so the poll can be up to a tick stale on
+    // resume. It does NOT cover the grant dialog — that dialog delivers no
+    // focus event to the WebView at all (verified on a Pixel 9, where the row
+    // stayed stale after granting). The poll is what makes the row correct.
     this._onWindowFocus = () => this._queryBatteryExempt();
     window.addEventListener('focus', this._onWindowFocus);
     this._startBatteryWatch();
@@ -120,13 +123,28 @@ export class SettingsPage extends LitElement {
 
   /** Polls the exemption while this page is open. The system's answer is not
    *  delivered to the WebView — no focus, no visibilitychange — so without this
-   *  the row keeps the state from before the user answered the dialog. Cheap:
-   *  one synchronous system read per tick, and Lit skips the render when the
-   *  value has not changed. WebView suspends timers in the background, so this
-   *  costs nothing while the screen is off. */
+   *  the row keeps the state from before the user answered the dialog.
+   *
+   *  Fast for 30s around a tap or a change (that is when an answer is in
+   *  flight and the user is watching the row), then 10s: nothing changes this
+   *  state on its own, so a steady 2s tick would be 30 reads a minute of
+   *  power_manager for a value that has settled. Lit skips the render when the
+   *  value is unchanged, and WebView suspends timers in the background, so
+   *  this costs nothing while the screen is off. */
   private _startBatteryWatch() {
     if (!this._hasBatteryBridge) return;
-    this._batteryTimer = setInterval(() => this._queryBatteryExempt(), 2000);
+    const tick = () => {
+      this._queryBatteryExempt();
+      const delay = Date.now() < this._batteryFastUntil ? 2000 : 10000;
+      this._batteryTimer = setTimeout(tick, delay);
+    };
+    tick();
+  }
+
+  /** Widen the fast window: right after the user answered the dialog, and for
+   *  as long as the answer keeps arriving. */
+  private _batterySettle() {
+    this._batteryFastUntil = Date.now() + 30000;
   }
 
   /** The exemption lives on the Android side; without the bridge (desktop,
@@ -151,8 +169,11 @@ export class SettingsPage extends LitElement {
     const cbName = '__wisper_battery_callback__';
     if (!(window as any)[cbName]) {
       (window as any)[cbName] = (exempt: boolean) => {
-        // The poll below runs every tick; only a real change may render.
-        this._batteryExempt = exempt === true;
+        const next = exempt === true;
+        // Only a real change may render (Lit skips the rest) or widen the
+        // fast-poll window.
+        if (next !== this._batteryExempt) this._batterySettle();
+        this._batteryExempt = next;
       };
     }
     (window as any).WisperNative.isBatteryExempt(cbName);
@@ -165,6 +186,8 @@ export class SettingsPage extends LitElement {
    *  poll and the focus listener exist. */
   private _onBatteryExemptTap() {
     if (!this._hasBatteryBridge) return;
+    // The answer lands within a tick or two of the dialog closing.
+    this._batterySettle();
     (window as any).WisperNative.requestBatteryExemption();
   }
 
@@ -280,7 +303,7 @@ export class SettingsPage extends LitElement {
     super.disconnectedCallback();
     for (const fn of this._unsubs) fn();
     if (this._livenessTimer) clearTimeout(this._livenessTimer);
-    if (this._batteryTimer) clearInterval(this._batteryTimer);
+    if (this._batteryTimer) clearTimeout(this._batteryTimer);
     this._batteryTimer = null;
     if (this._onWindowFocus) window.removeEventListener('focus', this._onWindowFocus);
     this._onWindowFocus = undefined;

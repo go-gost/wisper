@@ -37,6 +37,16 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="http" />
         </intent>
+
+        <!-- Same filtering trap for the battery-exemption screens: without
+             these, resolveActivity() returns null and the settings row reads as
+             a dead tap, even though startActivity() would have worked. -->
+        <intent>
+            <action android:name="android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
+        </intent>
     </queries>
 
     <application
