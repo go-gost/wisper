@@ -148,9 +148,14 @@ export class SettingsPage extends LitElement {
   }
 
   /** The exemption lives on the Android side; without the bridge (desktop,
-   *  browser) there is nothing to read and the row is not rendered at all. */
+   *  browser) there is nothing to read and the row is not rendered at all.
+   *
+   *  Both methods are required, not just the reader: the row shows a value
+   *  AND is a button. Gating on the reader alone would render a live-looking
+   *  row whose tap throws if a platform ever shipped one without the other. */
   private get _hasBatteryBridge(): boolean {
-    return !!(window as any).WisperNative?.isBatteryExempt;
+    const bridge = (window as any).WisperNative;
+    return !!bridge?.isBatteryExempt && !!bridge?.requestBatteryExemption;
   }
 
   /** Reads the exemption through the bridge. Sets false when the bridge is
