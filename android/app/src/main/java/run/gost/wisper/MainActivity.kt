@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -505,6 +506,62 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 awaitVpn(callbackId)
+            }
+        }
+
+        // Doze power-save exemption — the same switch as the system's
+        // "Battery > Unrestricted", which the user can also flip by hand five
+        // levels deep. The exemption is per-install (a reinstall drops it) and
+        // forgotten silently, so the settings page shows the live state rather
+        // than assuming it. Reporting "exempt" wrongly is the dangerous
+        // direction: it would promise a tunnel that dies on screen-off, so an
+        // unavailable PowerManager counts as NOT exempt.
+        @android.webkit.JavascriptInterface
+        fun isBatteryExempt(callbackId: String) {
+            // The callback name is interpolated into JS, so it must not be able
+            // to carry any: the web UI sends its own identifier.
+            if (!callbackId.matches(Regex("^[A-Za-z0-9_]{1,64}$"))) {
+                Log.w("MainActivity", "isBatteryExempt: bad callback id")
+                return
+            }
+            runOnUiThread {
+                val pm = getSystemService(PowerManager::class.java)
+                if (pm == null) {
+                    Log.w("MainActivity", "PowerManager unavailable: reporting not exempt")
+                }
+                val exempt = pm?.isIgnoringBatteryOptimizations(packageName) == true
+                webView.evaluateJavascript("$callbackId($exempt)", null)
+            }
+        }
+
+        // Opens the system UI for the exemption. The system dialog owns the answer,
+        // so nothing here reports the new state — only isBatteryExempt writes
+        // it, and the settings page re-queries while it is open.
+        //
+        //  There is no API to remove an app from the power-save whitelist (that
+        //  needs the shell), so turning it back off can only happen in Settings.
+        //  Already exempt: land on this app's system page, where the user turns
+        //  it off. Not exempt: the grant dialog.
+        @android.webkit.JavascriptInterface
+        fun requestBatteryExemption() {
+            runOnUiThread {
+                val pm = getSystemService(PowerManager::class.java)
+                val exempt = pm?.isIgnoringBatteryOptimizations(packageName) == true
+                val target = Uri.parse("package:$packageName")
+                val intent = if (exempt) {
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, target)
+                } else {
+                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, target)
+                }
+                if (intent.resolveActivity(packageManager) == null) {
+                    Log.w("MainActivity", "no activity for battery exemption request")
+                    return@runOnUiThread
+                }
+                try {
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "battery exemption request failed", e)
+                }
             }
         }
 

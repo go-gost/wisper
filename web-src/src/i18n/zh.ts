@@ -138,6 +138,12 @@ const zh: Record<string, string> = {
   settingsInterval3s: '3 秒',
   settingsInterval5s: '5 秒',
   settingsInterval10s: '10 秒',
+
+  // 后台保活（息屏期间不断链）
+  batteryExemptTitle: '后台保活',
+  batteryExemptOn: '无限制',
+  batteryExemptOff: '优化',
+  batteryExemptHint: '息屏时保持隧道不断。',
   settingsInterval30s: '30 秒',
 
   // Settings
