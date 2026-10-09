@@ -483,9 +483,6 @@ git commit -m "feat(tun): route hub packets by prefix after exact match"
   // sends this spoke's share_lan as a claim and reads netviews until the conn
   // dies, redialing every second. Failures are logged at debug and retried.
   func RunControlChannel(ctx context.Context, cfg ControlChannelConfig)
-  ```
-
-```go
   type ControlChannelConfig struct {
       Host     endpoint // the shared p2p host, for PunchContext
       HubPeer  string   // the hub's peer key
