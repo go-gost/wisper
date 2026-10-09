@@ -408,7 +408,7 @@ func TestPrefixLookupLongestPrefixAndAllow(t *testing.T) {
 		t.Fatalf("dst outside the /24 resolved to %q, want peerWide", peer)
 	}
 	// A member's exact route still outranks any prefix.
-	pt.set("10.10.100.5", "peerA", nil)
+	pt.set(net.ParseIP("10.10.100.5"), "peerA")
 	if peer, _ := pt.lookupPrefix(net.ParseIP("10.10.100.5"), "peerA"); peer != "peerA" {
 		t.Fatal("an exact route must outrank a prefix")
 	}
@@ -421,18 +421,19 @@ func TestPrefixLookupLongestPrefixAndAllow(t *testing.T) {
 	}
 }
 
-func TestDispatchExactBeforePrefixThenNoRoute(t *testing.T) {
-	// Existing dispatch tests cover exact-match delivery; this one pins the
-	// new fall-through: an unknown destination with a prefix table present is
-	// delivered by prefix, and an unknown destination with no prefix is still
-	// the existing ErrNoRoute path.
-	... // follow the harness in x/handler/tun/p2p_test.go (newP2PHub + a device)
+func TestDispatchFallsThroughExactThenPrefixThenNoRoute(t *testing.T) {
+	// Follow the harness of TestP2PDispatchSendsToPeerNamedByDestination
+	// (p2p_test.go:302) and TestP2PDeliverReportsNoRoute (p2p_test.go:333).
+	// One destination in a claimed LAN is delivered by prefix, and the same
+	// destination with an empty prefix table still takes the existing
+	// ErrNoRoute path — so the fall-through added a case, not a new outcome.
+	...
 }
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cd /root/code/go-gost/x && GOWORK=off CGO_ENABLED=1 go test ./handler/tun/ -run 'TestPrefix|TestDispatchExactBefore' -count=1`
+Run: `cd /root/code/go-gost/x && GOWORK=off CGO_ENABLED=1 go test ./handler/tun/ -run 'TestPrefix|TestDispatchFallsThrough' -count=1`
 Expected: FAIL — `SetPrefixRoutes` undefined.
 
 - [ ] **Step 3: Implement**
