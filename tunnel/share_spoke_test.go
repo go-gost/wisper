@@ -339,3 +339,164 @@ func TestSpokeSharePumpDeathSurfaces(t *testing.T) {
 		t.Fatalf("stack closes = %d, want exactly 1", got)
 	}
 }
+
+// Wrap writing chain and shutdown reading it must be ordered: two
+// goroutines released by the same barrier, one Wraps while the other
+// Closes. Without a shared lock this is the data race on s.chain —
+// only -race can see it; the invariants below hold either way.
+func TestSpokeShareWrapCloseRace(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		st := newSpokeStack()
+		shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+		local, chain := net.Pipe()
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var conn net.Conn
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			conn = shim.Wrap(chain)
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			if err := shim.Close(); err != nil {
+				t.Errorf("shim.Close: %v", err)
+			}
+		}()
+		close(start)
+		wg.Wait()
+		local.Close()
+
+		if conn == nil {
+			t.Fatal("Wrap returned nil")
+		}
+		if got := st.closeCount(); got != 1 {
+			t.Fatalf("iter %d: stack closes = %d, want exactly 1", i, got)
+		}
+		if again := shim.Wrap(chain); again != conn {
+			t.Fatalf("iter %d: Wrap returned a different conn after the race", i)
+		}
+		if err := conn.Close(); err != nil {
+			t.Fatalf("iter %d: conn.Close: %v", i, err)
+		}
+		if got := st.closeCount(); got != 1 {
+			t.Fatalf("iter %d: stack closes after conn.Close = %d, want exactly 1", i, got)
+		}
+	}
+}
+
+// "Wrap racing pump death", probed: the pump starts via `go` at the end
+// of Wrap's once body, so the go statement orders every access it makes
+// (including shutdown's read of chain) after Wrap's write — the pair is
+// reachable only as an ordered sequence, never as a data race. This runs
+// it under -race anyway and pins the invariants: the death is reported
+// and the stack still closes exactly once.
+func TestSpokeShareWrapPumpDeathRace(t *testing.T) {
+	st := newSpokeStack()
+	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st)
+	local, chain := net.Pipe()
+	local.Close() // the chain is already dead when the pump first writes
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var conn net.Conn
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-start
+		conn = shim.Wrap(chain)
+	}()
+	st.out <- v4(6, "10.10.0.5") // buffered: waiting for the pump, not it
+	close(start)
+	wg.Wait()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for shim.PumpDeaths() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("pump death not reported")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if conn == nil {
+		t.Fatal("Wrap returned nil")
+	}
+	if got := st.closeCount(); got != 1 {
+		t.Fatalf("stack closes = %d, want exactly 1", got)
+	}
+	if err := shim.Close(); err != nil {
+		t.Fatalf("shim.Close after death: %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("conn.Close after death: %v", err)
+	}
+	if got := st.closeCount(); got != 1 {
+		t.Fatalf("stack closes after close paths = %d, want exactly 1", got)
+	}
+}
+
+// Close alone must release a reader blocked in chain.Read: the deadline
+// is set 30s out, so only Close's poke — not the deadline itself — can
+// wake it, and the reader must see the shim's cause, not the poke.
+func TestSpokeShareCloseUnblocksRead(t *testing.T) {
+	st := newSpokeStack()
+	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+	local, chain := net.Pipe()
+	defer local.Close()
+	conn := shim.Wrap(chain)
+	defer conn.Close()
+
+	if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		t.Fatalf("SetReadDeadline: %v", err)
+	}
+	res := make(chan error, 1)
+	go func() {
+		_, err := conn.Read(make([]byte, 1500))
+		res <- err
+	}()
+	time.Sleep(50 * time.Millisecond) // let the reader park in chain.Read
+
+	if err := shim.Close(); err != nil {
+		t.Fatalf("shim.Close: %v", err)
+	}
+	select {
+	case err := <-res:
+		if !errors.Is(err, net.ErrClosed) {
+			t.Fatalf("blocked Read after Close = %v, want net.ErrClosed (the cause, not the poke)", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Close did not release the blocked Read within 2s")
+	}
+	if got := st.closeCount(); got != 1 {
+		t.Fatalf("stack closes = %d, want exactly 1", got)
+	}
+}
+
+// Close winning before Wrap: the reversed order must not crash, double
+// close, or hand back a conn that looks alive — and under -race it must
+// not race either (chain is read by shutdown only under the shared lock).
+func TestSpokeShareWrapAfterClose(t *testing.T) {
+	st := newSpokeStack()
+	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+	local, chain := net.Pipe()
+	defer local.Close()
+
+	if err := shim.Close(); err != nil {
+		t.Fatalf("shim.Close: %v", err)
+	}
+	conn := shim.Wrap(chain)
+	if conn == nil {
+		t.Fatal("Wrap after Close returned nil")
+	}
+	if _, err := conn.Read(make([]byte, 1500)); !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("Read on a shim closed before Wrap = %v, want net.ErrClosed", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("conn.Close: %v", err)
+	}
+	if got := st.closeCount(); got != 1 {
+		t.Fatalf("stack closes = %d, want exactly 1", got)
+	}
+}

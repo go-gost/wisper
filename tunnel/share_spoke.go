@@ -61,8 +61,19 @@ type ChainShareShim struct {
 	stack ShareStackBackend
 
 	wrapOnce sync.Once
-	chain    net.Conn // the chain Wrap bound; nil until then
-	conn     *chainShareConn
+
+	// mu guards chain and conn — one lock for both sides of the access
+	// pair, which is what makes the ordering obvious: Wrap writes chain
+	// and conn here, shutdown reads chain for the deadline poke here.
+	// wrapOnce alone orders Wrap calls against each other, but shutdown
+	// runs under closeDo — a different once — so without mu the poke
+	// could read a chain that Wrap is concurrently writing. Lock order
+	// is always once-outer, mu-inner (the closeDo and wrapOnce bodies
+	// take mu; nothing holding mu ever enters a once body), so the two
+	// can never deadlock against each other.
+	mu    sync.Mutex
+	chain net.Conn // the chain Wrap bound; nil until then
+	conn  *chainShareConn
 
 	done    chan struct{}
 	closeDo sync.Once // exactly-once teardown: close(done) + stack.close()
@@ -87,11 +98,16 @@ func NewChainShareShim(lans []*net.IPNet, stack ShareStackBackend) *ChainShareSh
 // second pump would interleave writes into a chain it does not own.
 func (s *ChainShareShim) Wrap(chain net.Conn) net.Conn {
 	s.wrapOnce.Do(func() {
-		s.chain = chain
-		s.conn = &chainShareConn{s: s, chain: chain, buf: make([]byte, 65535)}
-		go s.conn.pumpStack()
+		c := &chainShareConn{s: s, chain: chain, buf: make([]byte, 65535)}
+		s.mu.Lock()
+		s.chain, s.conn = chain, c
+		s.mu.Unlock()
+		go c.pumpStack()
 	})
-	return s.conn
+	s.mu.Lock()
+	c := s.conn
+	s.mu.Unlock()
+	return c
 }
 
 // shutdown tears the shim down exactly once. The first caller wins the
@@ -115,8 +131,11 @@ func (s *ChainShareShim) shutdown(pumpErr error) {
 		// recorded error could wait for the next packet to surface.
 		// Best-effort — a chain that refuses deadlines still releases its
 		// reader when conn.Close closes the chain itself.
-		if s.chain != nil {
-			_ = s.chain.SetReadDeadline(time.Now())
+		s.mu.Lock()
+		chain := s.chain
+		s.mu.Unlock()
+		if chain != nil {
+			_ = chain.SetReadDeadline(time.Now())
 		}
 	})
 }
