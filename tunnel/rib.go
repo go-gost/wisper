@@ -380,6 +380,45 @@ func (r *rib) Snapshot() claimSet {
 	}
 }
 
+// PrefixRoute is one winner in the shape x's SetPrefixRoutes takes: the peer
+// key that reaches the prefix, and the members allowed to use it (empty = every
+// member).
+type PrefixRoute struct {
+	Peer  string
+	Allow []string
+}
+
+// Routes is the winners-only table, for the hub rather than for a spoke. It is
+// the other half of Snapshot: the snapshot says which prefixes exist and to
+// whom, and a spoke routes all of them to the hub; the hub itself has to know
+// which peer carries each one, which is not in the snapshot at all — a
+// claimEntry names the claiming peer, and for an injected route the peer that
+// reaches the LAN is a different fact from the "static" the snapshot reports.
+//
+// So Peer is the Origin of a dynamic claim, and for a static route the member
+// key its "via" resolved to. A static route written without a via has no Peer:
+// it names a destination no member reaches, and saying so is better than
+// naming a peer that carries it nowhere.
+//
+// Order is not meaningful in a map and none is needed — the consumer matches by
+// longest prefix. The map and its slices are freshly allocated, so the caller
+// owns what it gets and a table already handed to the handler cannot be edited
+// under the handler's feet.
+func (r *rib) Routes() map[netip.Prefix]PrefixRoute {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	routes := make(map[netip.Prefix]PrefixRoute, len(r.claims))
+	for prefix, c := range r.claims {
+		peer := c.Origin
+		if c.Static {
+			peer = c.Via
+		}
+		routes[prefix] = PrefixRoute{Peer: peer, Allow: slices.Clone(c.Allow)}
+	}
+	return routes
+}
+
 // report records one refusal or one conflict in the hub's log. One line per
 // occurrence, each naming the prefix and the origin involved, because this is
 // the only account the operator gets of a claim that did not take — the spoke
