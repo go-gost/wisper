@@ -2,7 +2,9 @@ package tunnel
 
 import (
 	"context"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/go-gost/core/router"
 )
@@ -134,5 +136,48 @@ func TestNetviewRouterGatewayDegradesToEmptyWithoutHubMember(t *testing.T) {
 	}
 	if rt.Gateway != "" {
 		t.Fatalf("no hub member yet: gateway must stay empty rather than guess: got %+v", rt)
+	}
+}
+
+// TestKeepClaimFresh: a claim is live only while its owner re-asserts it, so a
+// spoke that holds a LAN has to keep saying so. What it re-sends is the whole
+// claim, not a heartbeat: a refresh that said nothing about what it holds would
+// tell the hub the spoke exists and nothing about what it carries, and a spoke
+// that claimed a second LAN between refreshes would lose the first.
+func TestKeepClaimFresh(t *testing.T) {
+	hub, spoke := net.Pipe()
+	defer hub.Close()
+
+	claims := []string{"192.168.50.0/24"}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	// A short interval so the test does not take the 20s it takes in the
+	// field: the mechanism is the whole of what is under test.
+	go func() {
+		defer close(done)
+		keepClaimFresh(stop, hub, claims, testLogger(), 5*time.Millisecond)
+	}()
+
+	// The whole claim, more than once: every tick says the same thing, which
+	// is the point — the hub re-reads a claim it already holds.
+	for i := 0; i < 3; i++ {
+		_, claim, err := readMessage(spoke)
+		if err != nil {
+			t.Fatalf("refresh %d: %v", i, err)
+		}
+		if claim.Type != ctrlTypeClaim || len(claim.Add) != 1 || claim.Add[0] != "192.168.50.0/24" {
+			t.Fatalf("refresh %d re-asserted %+v, want the whole claim", i, claim)
+		}
+	}
+
+	// Ending the session stops the refreshes. A write already in flight is
+	// unblocked by the conn closing — the same teardown the session itself does
+	// — so the refresher exits instead of writing into a dead stream.
+	close(stop)
+	_ = hub.Close()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the refresher outlived its session")
 	}
 }

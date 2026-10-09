@@ -93,17 +93,44 @@ type controlPeer struct {
 // line naming the prefix and the spokes involved, because the operator reading
 // the hub's history is the only one who can act on a claim that did not take.
 func newControlHub(hubID string, allow map[string][]netip.Prefix, sink prefixSink, log logger.Logger) *controlHub {
-	return &controlHub{
+	ch := &controlHub{
 		hubID: hubID,
 		rib: newRIB(hubID, allow, func(format string, args ...any) {
 			if log != nil {
 				log.Warnf(format, args...)
 			}
-		}),
+		}, time.Now),
 		sink:  sink,
 		log:   log,
 		peers: make(map[string]*controlPeer),
 		done:  make(chan struct{}),
+	}
+
+	// The withdrawal sweep runs for the life of the hub. It is the one
+	// operation that removes a route nobody withdrew: a claim is live only
+	// while its owner re-asserts it, so a spoke that stopped talking exits
+	// the network within a TTL instead of blackholing it forever.
+	go ch.sweep()
+
+	return ch
+}
+
+// sweep drops claims whose owner stopped re-asserting them and republishes
+// whatever it took. A sweep that withdrew nothing publishes nothing: the rev
+// is what moves a spoke, and an unchanged rev costs no stream a write.
+func (ch *controlHub) sweep() {
+	ticker := time.NewTicker(claimSweepInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if withdrawn := ch.rib.Withdraw(claimTTL); len(withdrawn) > 0 {
+				ch.publish()
+			}
+		case <-ch.done:
+			return
+		}
 	}
 }
 

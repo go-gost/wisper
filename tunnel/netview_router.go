@@ -153,8 +153,23 @@ func netviewDst(dst string) (netip.Addr, bool) {
 	return netip.Addr{}, false
 }
 
-// controlRetryInterval is how long RunControlChannel waits between dials.
-const controlRetryInterval = time.Second
+// controlRetryInterval is how long RunControlChannel waits between dials, and
+// claimRefreshInterval how often a connected spoke re-asserts its LAN claims.
+// The pair matters: the hub keeps a claim for claimTTL (rib.go) without hearing
+// from its owner, so a refresh on time keeps a healthy spoke's LAN installed,
+// and a spoke that stops re-asserting exits within a TTL rather than
+// blackholing its LAN forever.
+const (
+	controlRetryInterval = time.Second
+	claimRefreshInterval = 20 * time.Second
+)
+
+// The refresh sits between two numbers, both of them the spoke's problem:
+// it must be shorter than claimTTL (rib.go), or a healthy spoke's LAN is
+// withdrawn for no reason, and it must be long enough that a hub carrying a
+// few hundred spokes is not reading a claim per spoke per second. 20s beats
+// the TTL with room for a couple of lost refreshes and stays under the
+// interval an idle NAT mapping is dropped at.
 
 // ControlChannelConfig is the spoke's control-channel wiring: the shared p2p
 // host to punch and dial through, the hub's peer key, this spoke's claims,
@@ -180,6 +195,41 @@ func controlLogger(log logger.Logger) logger.Logger {
 		return log
 	}
 	return xlogger.NewLogger(xlogger.OutputOption(io.Discard))
+}
+
+// keepClaimFresh re-sends this spoke's whole claim on an interval, stopping
+// when the session ends. It is the spoke's half of the TTL pair: the hub
+// withdraws a claim whose owner has gone quiet, so saying so every 20s is what
+// keeps a healthy spoke's LAN in the table.
+//
+// It sends the whole claim rather than a heartbeat. A refresh that said nothing
+// about what it holds would tell the hub the spoke exists and nothing about
+// what it carries, so a spoke that claimed a second LAN between refreshes
+// would lose the first — and the hub, which is what re-reads this, would have
+// no way to tell that from a spoke that claimed nothing at all.
+//
+// A write that fails means the stream is gone: it closes the conn, which is
+// what wakes the read loop this session is parked in.
+func keepClaimFresh(stop <-chan struct{}, conn net.Conn, claims []string, log logger.Logger, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := writeMessage(conn, claimMessage{
+				Type: ctrlTypeClaim,
+				V:    ctrlVersion,
+				Add:  claims,
+			}); err != nil {
+				log.Debugf("control channel: refreshing the claim failed: %v", err)
+				_ = conn.Close()
+				return
+			}
+		case <-stop:
+			return
+		}
+	}
 }
 
 // RunControlChannel dials the hub's peer key over a chain of the same shape
@@ -291,6 +341,10 @@ func controlSession(ctx context.Context, cfg ControlChannelConfig) error {
 	}); err != nil {
 		return err
 	}
+	// And then again on a timer, for as long as this session lives: a claim is
+	// live only while its owner says so. Closing the conn is what unblocks the
+	// read loop below, so the session ends the way an unreachable hub does.
+	go keepClaimFresh(stop, conn, cfg.ShareLAN, cfg.Log, claimRefreshInterval)
 
 	for {
 		// Exactly one of n and the claim is non-zero (ctrl.go's contract);

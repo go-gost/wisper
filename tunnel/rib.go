@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 // staticOrigin is the Origin of a route the hub's own configuration injected.
@@ -17,6 +18,20 @@ const staticOrigin = "static"
 // the second of the two layers, and the one that has nothing to do with
 // approval — who may use it.
 //
+// claimTTL is how long a claim lives without its owner re-sending it. It is
+// what the hub sweeps on, and a spoke refreshes on claimRefreshInterval — well
+// inside it — so a claim only expires when the spoke behind it is genuinely
+// gone: a control stream that died, a host that never came back.
+//
+// The numbers are paired deliberately: the refresh must be shorter than the TTL
+// (or a healthy spoke exits) and the sweep must come often enough that a dead
+// spoke's LAN is withdrawn promptly ("promptly" here meaning inside a minute,
+// not inside a second).
+const (
+	claimTTL           = 45 * time.Second
+	claimSweepInterval = 15 * time.Second
+)
+
 // Approval (lan_allow) decided whether this route could exist at all. Allow is
 // what an approved route is open to: empty means every member, which is the
 // default because the hub's allowlist is already whole-network membership, and
@@ -33,6 +48,12 @@ type lanClaim struct {
 	// which peer carries this destination — and they answer it in different
 	// fields, so the resolution has to be kept somewhere.
 	Via string
+
+	// Seen is when this route was last announced by its owner. A dynamic
+	// claim that has gone quiet is withdrawn (Withdraw); a static one carries
+	// a time too, so one comparison answers for the table, but is skipped
+	// because configuration is not something a peer can stop re-asserting.
+	Seen time.Time
 }
 
 // claimSet is one version of the RIB as a spoke is allowed to see it: the
@@ -67,6 +88,11 @@ type rib struct {
 	allow   map[string][]netip.Prefix
 	members []memberEntry
 	events  func(string, ...any)
+	// now is where the clock comes from. It is injected because the whole
+	// point of a TTL is the comparison it makes, and a RIB that read the
+	// clock itself could not be tested without a minute of sleeping — the
+	// tests would have to be the size of the race they check for.
+	now func() time.Time
 }
 
 // newRIB builds a hub's RIB. allow is the lan_allow policy: per peer, the
@@ -82,7 +108,7 @@ type rib struct {
 // its key, because "this spoke may claim nothing" and "this spoke is not
 // configured here" are different states and only the refusal message tells them
 // apart.
-func newRIB(hubID string, allow map[string][]netip.Prefix, events func(string, ...any)) *rib {
+func newRIB(hubID string, allow map[string][]netip.Prefix, events func(string, ...any), now func() time.Time) *rib {
 	rows := make(map[string][]netip.Prefix, len(allow))
 	for peer, supers := range allow {
 		row := make([]netip.Prefix, 0, len(supers))
@@ -97,6 +123,7 @@ func newRIB(hubID string, allow map[string][]netip.Prefix, events func(string, .
 		claims: make(map[netip.Prefix]*lanClaim),
 		allow:  rows,
 		events: events,
+		now:    now,
 	}
 }
 
@@ -154,9 +181,10 @@ func (r *rib) ApplyClaim(origin string, add, drop []netip.Prefix) []netip.Prefix
 		held, taken := r.claims[prefix]
 
 		// Already this origin's route. It is in force, so it is accepted — and
-		// nothing moves: this is what a reconnect's refresh is, and advancing
+		// nothing moves: this is what a re-claim's refresh is, and advancing
 		// the rev here would push the same netview to every spoke on the network.
 		if taken && held.Origin == origin {
+			held.Seen = r.now()
 			accepted = append(accepted, prefix)
 			continue
 		}
@@ -181,7 +209,7 @@ func (r *rib) ApplyClaim(origin string, add, drop []netip.Prefix) []netip.Prefix
 			continue
 		}
 
-		r.claims[prefix] = &lanClaim{Prefix: prefix, Origin: origin}
+		r.claims[prefix] = &lanClaim{Prefix: prefix, Origin: origin, Seen: r.now()}
 		r.rev++
 		accepted = append(accepted, prefix)
 	}
@@ -232,6 +260,47 @@ func (r *rib) memberIn(prefix netip.Prefix) (netip.Addr, string, bool) {
 		}
 	}
 	return netip.Addr{}, "", false
+}
+
+// Withdraw drops every dynamic claim whose owner has not re-sent it within
+// ttl, and returns what it dropped. It is the hub's only way back from the one
+// failure no claim can recover from: a spoke that stopped talking but whose
+// route is still installed, blackholing every packet aimed at its LAN.
+//
+// A withdrawn route has to reach every spoke, so it advances the rev — the same
+// signal the claim itself travelled on. An event rides along naming the prefix
+// and its origin, because an operator watching a LAN disappear needs to see
+// which spoke stopped re-asserting it.
+//
+// Static routes are skipped: their owner is the hub's own config, not a peer,
+// and a config file does not go quiet.
+func (r *rib) Withdraw(ttl time.Duration) []netip.Prefix {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := r.now()
+	var withdrawn []netip.Prefix
+	for prefix, claim := range r.claims {
+		if claim.Static {
+			continue
+		}
+		if now.Sub(claim.Seen) <= ttl {
+			continue
+		}
+		delete(r.claims, prefix)
+		withdrawn = append(withdrawn, prefix)
+		r.rev++
+	}
+	if len(withdrawn) == 0 {
+		return nil
+	}
+	// Longest-prefix-first, the order Snapshot publishes in, so the event
+	// reads like the change it describes.
+	slices.SortFunc(withdrawn, func(a, b netip.Prefix) int { return b.Bits() - a.Bits() })
+	for _, prefix := range withdrawn {
+		r.report("a claim on %s stopped being re-asserted: the route is withdrawn", prefix)
+	}
+	return withdrawn
 }
 
 // AddStatic injects a route the hub's own configuration asked for. spec is
@@ -288,7 +357,7 @@ func (r *rib) AddStatic(spec string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	claim := &lanClaim{Prefix: prefix, Origin: staticOrigin, Static: true, Allow: allow}
+	claim := &lanClaim{Prefix: prefix, Origin: staticOrigin, Static: true, Allow: allow, Seen: r.now()}
 	if via.IsValid() {
 		key, ok := r.memberKey(via)
 		if !ok {

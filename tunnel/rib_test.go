@@ -5,13 +5,14 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRIBApprovalGatesDynamicClaims(t *testing.T) {
 	var events []string
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) })
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, time.Now)
 
 	// Inside the approved supernet: accepted.
 	got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil)
@@ -34,7 +35,7 @@ func TestRIBApprovalGatesDynamicClaims(t *testing.T) {
 }
 
 func TestRIBConflictStaticWinsAndLPM(t *testing.T) {
-	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {})
+	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, time.Now)
 	// A "via" resolves against the members the hub knows.
 	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerB"}})
 
@@ -63,7 +64,7 @@ func TestRIBEqualLengthFirstWinsWithEvent(t *testing.T) {
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
 		"peerC": {netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) })
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, time.Now)
 
 	r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil)
 	if got := r.ApplyClaim("peerC", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 0 {
@@ -82,7 +83,7 @@ func TestRIBEqualLengthFirstWinsWithEvent(t *testing.T) {
 }
 
 func TestRIBSnapshotRevOnlyOnChange(t *testing.T) {
-	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {})
+	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, time.Now)
 	if s := r.Snapshot(); s.Rev != 1 {
 		t.Fatalf("first rev = %d, want 1", s.Rev)
 	}
@@ -108,7 +109,7 @@ func TestRIBRefusesAClaimOverAMemberTunAddress(t *testing.T) {
 	var events []string
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) })
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, time.Now)
 	r.SetMembers([]memberEntry{{IP: "10.10.100.5", Key: "peerA"}})
 
 	// The member's address exactly: the hub's own route to a spoke is the one
@@ -144,7 +145,7 @@ func TestRIBDropTakesOnlyItsOwnClaim(t *testing.T) {
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
 		"peerC": {netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(string, ...any) {})
+	}, func(string, ...any) {}, time.Now)
 	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerB"}})
 	if got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 1 {
 		t.Fatal("setup claim refused")
@@ -187,7 +188,7 @@ func TestRIBDropTakesOnlyItsOwnClaim(t *testing.T) {
 }
 
 func TestRIBRoutesCarryThePeerThatReachesThem(t *testing.T) {
-	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {})
+	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, time.Now)
 	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerB"}, {IP: "10.10.100.10", Key: "peerC"}})
 	if got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 1 {
 		t.Fatal("setup claim refused")
@@ -218,5 +219,76 @@ func TestRIBRoutesCarryThePeerThatReachesThem(t *testing.T) {
 	routes[netip.MustParsePrefix("192.168.50.0/24")] = PrefixRoute{Peer: "hacked"}
 	if r.Routes()[netip.MustParsePrefix("192.168.50.0/24")].Peer != "peerB" {
 		t.Fatal("routes aliases the RIB's own state")
+	}
+}
+
+// TestRIBWithdrawsAStaleClaim: a claim is live only while its owner re-sends
+// it. A spoke whose control stream died kept its LAN routed forever, which is
+// the one failure a hub cannot recover from on its own — so the claim carries
+// the time of its last re-claim, and a sweep past the TTL drops it, advancing
+// the rev so every spoke sees the withdrawal in a netview. The static route a
+// hub's own config asked for is not a claim and never expires.
+func TestRIBWithdrawsAStaleClaim(t *testing.T) {
+	var events []string
+	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	r := newRIB("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, func() time.Time { return now })
+
+	r.SetMembers([]memberEntry{{IP: "10.10.100.5", Key: "peerB"}})
+	if got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 1 {
+		t.Fatalf("setup claim refused: %v", got)
+	}
+	if err := r.AddStatic("192.168.60.0/24 via 10.10.100.5"); err != nil {
+		t.Fatal(err)
+	}
+	before := r.Snapshot()
+
+	// Half the TTL by: a spoke that is refreshing on time is untouched, and
+	// nothing publishes.
+	now = now.Add(claimTTL / 2)
+	if withdrawn := r.Withdraw(claimTTL); len(withdrawn) != 0 {
+		t.Fatalf("a claim half the TTL old was withdrawn: %v", withdrawn)
+	}
+	if r.Snapshot().Rev != before.Rev {
+		t.Fatal("a sweep that withdrew nothing advanced the rev")
+	}
+
+	// Past the TTL with no re-claim: the dynamic claim goes, with an event
+	// that names the prefix so an operator can see what the hub did, and the
+	// rev advances so spokes see it.
+	now = now.Add(claimTTL)
+	withdrawn := r.Withdraw(claimTTL)
+	if len(withdrawn) != 1 || withdrawn[0] != netip.MustParsePrefix("192.168.50.0/24") {
+		t.Fatalf("withdrawn = %v, want the stale claim's prefix", withdrawn)
+	}
+	after := r.Snapshot()
+	if after.Rev <= before.Rev {
+		t.Fatal("a withdrawal must advance the rev")
+	}
+	for _, claim := range after.Claims {
+		if claim.Origin == "peerB" && claim.Prefix == "192.168.50.0/24" {
+			t.Fatalf("the stale claim is still published: %v", after.Claims)
+		}
+	}
+	// The hub's own route stays: it is configuration, not a claim.
+	routes := r.Routes()
+	if _, ok := routes[netip.MustParsePrefix("192.168.60.0/24")]; !ok {
+		t.Fatal("a static route was withdrawn")
+	}
+	if len(events) == 0 || !strings.Contains(events[0], "192.168.50.0/24") {
+		t.Fatalf("a withdrawal must be reported: %v", events)
+	}
+
+	// A refresh is a new claim: the surviving spoke is not next to be dropped
+	// for having sat quiet while a neighbour's stream died.
+	now = now.Add(claimTTL / 2)
+	r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.77.0/24")}, nil)
+	now = now.Add(claimTTL / 2)
+	if withdrawn := r.Withdraw(claimTTL); len(withdrawn) != 0 {
+		t.Fatalf("a refreshed claim was withdrawn: %v", withdrawn)
+	}
+	if _, ok := r.Routes()[netip.MustParsePrefix("192.168.77.0/24")]; !ok {
+		t.Fatal("the refreshed claim is not routed")
 	}
 }
