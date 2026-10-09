@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-gost/core/logger"
@@ -510,7 +511,74 @@ func (m *p2pHostManager) dispatch(conn net.Conn) {
 		_ = conn.Close()
 		return
 	}
+	// A route whose tunnel serves a control channel demuxes its byte streams
+	// first (see demuxControlStream); a route that serves none never reads a
+	// stream before delivering it.
+	if ch := pl.controlHub(); ch != nil {
+		var claimed bool
+		conn, claimed = demuxControlStream(ch, peer, conn)
+		if claimed {
+			return
+		}
+	}
 	pl.deliver(conn)
+}
+
+// demuxControlStream decides whether one inbound byte stream belongs to the
+// control channel of the hub serving this peer, and hands it there when it
+// does. It returns the conn to deliver and whether it was claimed; a conn that
+// was not claimed comes back exactly as it arrived, except that a stream the
+// peek read bytes off is wrapped in a replayConn that puts them back.
+//
+// The order is the whole design, and each step is there for a reason:
+//
+//   - A datagram conn is a tun link. p2p marks those with "p2p.network" and
+//     hands them over as a net.PacketConn, so the shape alone names them, and
+//     reading one would take the first device packet off a spoke's stream.
+//     This is why the demux never costs the tun path anything.
+//   - A byte stream is asked to announce itself: consumeControlMagic reads the
+//     magic under a short deadline. A stream that matches is a spoke opening
+//     its control channel. A stream that does not — a tun link whose
+//     datagram shape was lost somewhere, or a stream that has not spoken yet —
+//     is delivered to the service with the bytes it did send replayed in
+//     front (see replayConn), so nothing it arrived with is lost.
+//
+// The peer key is not consulted first: a spoke's control stream may arrive
+// before its tun stream is accepted, and gating the demux on a registration
+// would push that stream into the tun handler as garbage.
+func demuxControlStream(ch *controlHub, peer string, conn net.Conn) (net.Conn, bool) {
+	if _, ok := conn.(net.PacketConn); ok {
+		return conn, false
+	}
+	prefix, ok := consumeControlMagic(conn)
+	if ok {
+		ch.deliver(peer, conn)
+		return conn, true
+	}
+	if len(prefix) > 0 {
+		conn = &replayConn{Conn: conn, prefix: prefix}
+	}
+	return conn, false
+}
+
+// replayConn is a conn whose first reads are served from bytes already taken
+// off it. dispatch peeks at a byte stream to learn whether it is a control
+// channel, and a stream that is not one keeps the bytes the peek read: they
+// are the spokes's first frames, and dropping them would corrupt the first
+// packet on what turns out to be its tun stream. Everything else is the
+// underlying conn's, untouched.
+type replayConn struct {
+	net.Conn
+	prefix []byte
+}
+
+func (c *replayConn) Read(b []byte) (int, error) {
+	if len(c.prefix) > 0 {
+		n := copy(b, c.prefix)
+		c.prefix = c.prefix[n:]
+		return n, nil
+	}
+	return c.Conn.Read(b)
 }
 
 // peerOf reports the dialing peer's key: the p2p listener carries it in the
@@ -530,6 +598,12 @@ type peerListener struct {
 	ch     chan net.Conn
 	closed chan struct{}
 	once   sync.Once
+
+	// control is the control channel of the hub whose spokes this route
+	// serves, and nil for a plain p2p tunnel. It is why dispatch demuxes:
+	// every spoke's control stream arrives on this route, keyed by the same
+	// peer key as its tun stream.
+	control atomic.Pointer[controlHub]
 
 	// stats is the service's stats object; accepted conns count into it, the
 	// way x listeners count via stats.WrapListener.
@@ -572,6 +646,21 @@ func (l *peerListener) peerTraffic() map[string]stats.Stats {
 // setStats attaches the serving service's stats to the route. It must be
 // called before the service starts accepting; nil leaves conns unwrapped.
 func (l *peerListener) setStats(s stats.Stats) { l.stats = s }
+
+// setControl attaches the hub's control channel to the route, so dispatch can
+// tell a control stream from a tun stream. It must be called before the
+// service starts accepting: a route that serves none never reads a stream
+// before delivering it, and a hub whose route already delivers is a race
+// between the demux and the service.
+//
+// It is a pointer rather than a field because the hub is built after the route
+// it serves, and it is stored atomically because dispatch reads it on the
+// host's accept loop for every inbound stream.
+func (l *peerListener) setControl(ch *controlHub) { l.control.Store(ch) }
+
+// controlHub is the control channel this route serves, or nil for a plain p2p
+// tunnel.
+func (l *peerListener) controlHub() *controlHub { return l.control.Load() }
 
 func newPeerListener(peers []string) *peerListener {
 	return &peerListener{peers: peers, ch: make(chan net.Conn, p2pBacklog), closed: make(chan struct{})}

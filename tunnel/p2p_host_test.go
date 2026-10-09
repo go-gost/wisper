@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -666,5 +667,107 @@ func TestAcquireThreadsFaultsToEngine(t *testing.T) {
 	}
 	if !strings.Contains(got, "dropDataRate(0.5)") {
 		t.Fatalf("the engine did not name the threaded knob: %q", got)
+	}
+}
+
+// TestP2PHostManagerDispatchDemuxesControlStream: a hub route demuxes its
+// inbound byte streams by their first bytes. The control magic goes to the
+// hub that owns the route's spokes; a datagram stream is a tun link and is not
+// read at all; anything else is a tun stream and keeps every byte it arrived
+// with, replayed after the peek.
+func TestP2PHostManagerDispatchDemuxesControlStream(t *testing.T) {
+	m := &p2pHostManager{routes: make(map[string]*peerListener)}
+	ln := newPeerListener([]string{"peerB", "peerC"})
+	m.routes["peerB"] = ln
+	m.routes["peerC"] = ln
+	defer func() {
+		ln.Close()
+		m.unregister(ln)
+	}()
+
+	h := newFakeP2PHandler()
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+	ln.setControl(ch)
+	if err := ch.Register("peerB"); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	defer ch.Unregister("peerB")
+
+	// A datagram stream first: the tun link, which must be delivered without
+	// the hub reading a single byte off it.
+	datagram, datagramFar := peerDatagramPipe("peerC")
+	defer datagramFar.Close()
+	m.dispatch(datagram)
+
+	accepted := make(chan net.Conn, 4)
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			accepted <- c
+		}
+	}()
+
+	got := acceptWithin(t, accepted, "the tun link's datagram stream")
+	if _, ok := got.(net.PacketConn); !ok {
+		t.Fatal("a datagram stream must keep its net.PacketConn shape")
+	}
+	go func() { _, _ = datagramFar.Write([]byte("ip")) }()
+	buf := make([]byte, 8)
+	_ = got.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if n, err := got.Read(buf); err != nil || string(buf[:n]) != "ip" {
+		t.Fatalf("read %q, %v; want ip, untouched by the peek", buf[:n], err)
+	}
+
+	// The control stream: the magic first, then a claim. It must reach the
+	// hub and not the service.
+	ctrl, ctrlFar := peerPipe("peerB")
+	defer ctrlFar.Close()
+	go func() {
+		_, _ = ctrlFar.Write(append(append([]byte(nil), ControlMagic...),
+			framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"192.168.50.0/24"}})...))
+	}()
+	m.dispatch(ctrl)
+
+	want := netip.MustParsePrefix("192.168.50.0/24")
+	waitFor(t, "the control stream must reach the hub", func() bool {
+		_, ok := h.installed()[want]
+		return ok
+	})
+
+	// A tun stream that announces nothing but its own first packet: the peek
+	// finds no magic, so the stream is delivered to the service whole.
+	tun, tunFar := peerPipe("peerC")
+	defer tunFar.Close()
+	go func() { _, _ = tunFar.Write([]byte("GOST-tun-link")) }()
+	m.dispatch(tun)
+
+	stream := acceptWithin(t, accepted, "the tun stream without the magic")
+	_ = stream.SetReadDeadline(time.Now().Add(3 * time.Second))
+	// Read to completion, as a handler does: the replayed prefix and the rest
+	// of the stream may arrive as separate reads.
+	replayed := make([]byte, len("GOST-tun-link"))
+	if _, err := io.ReadFull(stream, replayed); err != nil {
+		t.Fatalf("read the tun stream: %v", err)
+	}
+	if string(replayed) != "GOST-tun-link" {
+		t.Fatalf("read %q, want the spoke's bytes replayed", replayed)
+	}
+}
+
+// acceptWithin takes one conn off the service's accept queue, failing the test
+// with what none arrived for.
+func acceptWithin(t *testing.T, conns <-chan net.Conn, what string) net.Conn {
+	t.Helper()
+	select {
+	case c := <-conns:
+		return c
+	case <-time.After(3 * time.Second):
+		t.Fatalf("%s: nothing was accepted", what)
+		return nil
 	}
 }
