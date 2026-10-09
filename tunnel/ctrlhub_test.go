@@ -265,6 +265,21 @@ func TestControlRouteRegistersPeerOnAccept(t *testing.T) {
 		_, ok := h.installed()[want]
 		return ok
 	})
+
+	// A reconnect re-sends the whole claim, and a refresh is not a change: the
+	// same prefix re-asserted must not reinstall the table, and must not push
+	// the same netview to every spoke on the network. The counter is the only
+	// way to see that nothing moved.
+	go func() {
+		_, _ = spoke.Write(framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"192.168.50.0/24"}}))
+	}()
+	time.Sleep(100 * time.Millisecond)
+	if got := h.installs(); got != 1 {
+		t.Fatalf("the hub installed its table %d times, want once: a re-asserted claim must be a no-op", got)
+	}
+	if _, ok := h.installed()[want]; !ok {
+		t.Fatal("the refresh dropped the route it was re-asserting")
+	}
 }
 
 // TestP2PHandlerTakesPrefixRoutes: the hub installs its LAN routes into the
