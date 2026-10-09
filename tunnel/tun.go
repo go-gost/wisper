@@ -36,7 +36,15 @@ var (
 	_ PeerStatsUpdater  = (*tunTunnel)(nil)
 	_ PeerSetter        = (*tunTunnel)(nil)
 	_ PeerIPSetter      = (*tunTunnel)(nil)
+	_ LanStateReporter  = (*tunTunnel)(nil)
 )
+
+// LanStateReporter is implemented by the one object that carries LAN routes:
+// a tun hub. The API reads it to fill the doctor's two columns, and every
+// other type stays absent from both.
+type LanStateReporter interface {
+	LANState() LanState
+}
 
 // tunTunnel is the hub half of a virtual network: it holds a tun device and
 // serves it to its spokes over p2p. There is no socket here — a spoke's
@@ -611,6 +619,9 @@ func (s *tunTunnel) Run() (err error) {
 			ch.Close()
 			return staticErr
 		}
+		// The hub counts its LAN routing into the service's stats, which is
+		// where the API and the stats view read it from.
+		ch.SetCounter(pStats)
 		peerLn.setControl(ch)
 	} else {
 		log.Warn("the tun handler installs no prefix routes: LAN routing is disabled")
@@ -766,6 +777,19 @@ func (s *tunTunnel) controlHub() *controlHub {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.ctrl
+}
+
+// LANState is the hub's installed LAN routes and the claims they came from. A
+// hub that is not running, or whose handler installs no prefix routes, has
+// none — and says so with an empty state rather than an error, because a hub
+// without LAN routes is a hub that is working exactly as it did before the
+// feature existed.
+func (s *tunTunnel) LANState() LanState {
+	ch := s.controlHub()
+	if ch == nil {
+		return LanState{}
+	}
+	return ch.LanState()
 }
 
 // SetPeerIPs replaces the hub's address assignment. ctx is accepted for the

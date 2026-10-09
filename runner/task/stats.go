@@ -142,6 +142,9 @@ func (t *updateStatsTask) updateEntrypoint() error {
 			stats.TotalErrs = s.Get(stats_pkg.KindTotalErrs)
 			stats.ProbeSent = s.Get(xstats.KindProbeSent)
 			stats.ProbeAcked = s.Get(xstats.KindProbeAcked)
+			stats.LanRouted = s.Get(xstats.KindLanRouted)
+			stats.LanDenied = s.Get(xstats.KindLanDenied)
+			stats.LanWithdrawn = s.Get(xstats.KindLanWithdrawn)
 			stats.Time = time.Now()
 		}
 

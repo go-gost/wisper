@@ -9,13 +9,16 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/core/observer/stats"
 	tunhandler "github.com/go-gost/x/handler/tun"
+	xstats "github.com/go-gost/x/observer/stats"
 )
 
 const (
@@ -70,9 +73,46 @@ type controlHub struct {
 	// publishedRev is the rev last installed into the sink, so a settle that
 	// changed nothing does not reinstall the same table.
 	publishedRev uint64
-	closed       bool
-	done         chan struct{}
-	closeOnce    sync.Once
+	// installed is what is in the sink's table right now, so the counters can
+	// say what changed: a prefix that appeared and one that left.
+	installed map[netip.Prefix]struct{}
+	closed    bool
+	done      chan struct{}
+	closeOnce sync.Once
+
+	// counter is where the hub's LAN accounting lands: x's stats object by
+	// shape. It is optional — a hub with no stats object counts nowhere rather
+	// than panicking — and it is set from Run, which holds the shared stats
+	// the API reads.
+	counter statsCounter
+}
+
+// statsKind is the kind of LAN event being counted: x's kinds (KindLanRouted
+// and its siblings) are the values.
+type statsKind = stats.Kind
+
+// statsCounter is the one method the hub needs from the stats object: count an
+// event of a kind. It is satisfied by x's Stats, and by a test's counter.
+type statsCounter interface {
+	Add(kind statsKind, n int64)
+}
+
+// SetCounter gives the hub somewhere to count what it does. It is called from
+// Run, which owns the shared stats the API reads; a hub with no counter counts
+// nowhere, which is a test shape and nothing else.
+func (ch *controlHub) SetCounter(c statsCounter) {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	ch.counter = c
+}
+
+func (ch *controlHub) count(kind statsKind, n int64) {
+	ch.mu.Lock()
+	counter := ch.counter
+	ch.mu.Unlock()
+	if counter != nil && n > 0 {
+		counter.Add(kind, n)
+	}
 }
 
 // controlPeer is one spoke's slot: the channel its next control stream arrives
@@ -100,10 +140,11 @@ func newControlHub(hubID string, allow map[string][]netip.Prefix, sink prefixSin
 				log.Warnf(format, args...)
 			}
 		}, time.Now),
-		sink:  sink,
-		log:   log,
-		peers: make(map[string]*controlPeer),
-		done:  make(chan struct{}),
+		sink:      sink,
+		log:       log,
+		peers:     make(map[string]*controlPeer),
+		installed: make(map[netip.Prefix]struct{}),
+		done:      make(chan struct{}),
 	}
 
 	// The withdrawal sweep runs for the life of the hub. It is the one
@@ -215,6 +256,77 @@ func (ch *controlHub) SetStaticRoutes(specs []string) error {
 // carries.
 func (ch *controlHub) Snapshot() claimSet { return ch.rib.Snapshot() }
 
+// LanState is the hub's LAN routing the way an operator reads it: both owners
+// of every route, because a route's claimer and its carrier are different
+// things. A claim names the spoke that asked for the prefix; a route names the
+// member that reaches it — the same peer for a dynamic claim, the "via" member
+// for an injected one — and an operator debugging a LAN that is not working
+// needs both halves to say which they are looking at.
+type LanState struct {
+	// Routes is what the hub installed: every route in force, with both of
+	// its owners.
+	Routes []LanRoute
+}
+
+// LanRoute is one installed route: the CIDR, the spoke that claimed it (or
+// staticOrigin for the hub's own config), the member that carries it, and the
+// members allowed to use it.
+type LanRoute struct {
+	Prefix string
+	Origin string
+	Peer   string
+	Allow  []string
+}
+
+// PeerClaims is the per-spoke view of the same routes: what each spoke holds,
+// keyed by peer key. It is a spoke's row in the doctor — the LAN column — and
+// a hub's own injected route is deliberately absent, because it is not a
+// spoke's claim and an operator reading a spoke's row wants what that spoke
+// asked for.
+func (l LanState) PeerClaims() map[string][]string {
+	out := make(map[string][]string, len(l.Routes))
+	for _, r := range l.Routes {
+		if r.Origin == staticOrigin {
+			continue
+		}
+		out[r.Origin] = append(out[r.Origin], r.Prefix)
+	}
+	return out
+}
+
+// LanState is what the hub installed, as the doctor and the API read it. Both
+// lists come off one RIB read, so they can never disagree about what is in
+// force. A hub whose control channel never opened has installed nothing.
+func (ch *controlHub) LanState() LanState {
+	routes := ch.rib.Routes()
+	snap := ch.rib.Snapshot()
+
+	origins := make(map[string]string, len(snap.Claims))
+	for _, c := range snap.Claims {
+		origins[c.Prefix] = c.Origin
+	}
+
+	out := make([]LanRoute, 0, len(routes))
+	for prefix, route := range routes {
+		// A route whose Peer is empty is one the hub chose not to install
+		// (installRoutes skips them, for the same reason), so it is not in
+		// force and not shown.
+		if route.Peer == "" {
+			continue
+		}
+		out = append(out, LanRoute{
+			Prefix: prefix.String(),
+			Origin: origins[prefix.String()],
+			Peer:   route.Peer,
+			Allow:  route.Allow,
+		})
+	}
+	// One order, so the list a reader sees is the list the next reader sees and
+	// a UI can render without re-sorting.
+	slices.SortFunc(out, func(a, b LanRoute) int { return strings.Compare(a.Prefix, b.Prefix) })
+	return LanState{Routes: out}
+}
+
 // deliver hands the hub the spoke end of one accepted control stream, with
 // the magic already consumed. A peer with no slot gets one: a control stream
 // may arrive before its spoke's tun stream is accepted, and refusing it would
@@ -305,7 +417,15 @@ func (ch *controlHub) applyClaim(peer string, m claimMessage) {
 	if len(add) == 0 && len(drop) == 0 {
 		return
 	}
-	ch.rib.ApplyClaim(peer, add, drop)
+	// The difference between what the spoke asked for and what it got is what
+	// the hub refused: a claim the RIB turned down is invisible on the wire —
+	// the spoke is told nothing — so the counter is the only place an operator
+	// can see a claim being dropped.
+	before := len(add)
+	accepted := ch.rib.ApplyClaim(peer, add, drop)
+	if denied := before - len(accepted); denied > 0 {
+		ch.count(xstats.KindLanDenied, int64(denied))
+	}
 }
 
 // publish pushes the RIB's winners out: the prefix table into the handler, and
@@ -342,6 +462,16 @@ func (ch *controlHub) publish() {
 	}
 }
 
+// installed is the set of prefixes a route map carries, so the counters can
+// compare what the table is becoming against what it was.
+func installed(routes map[netip.Prefix]tunhandler.PrefixRoute) map[netip.Prefix]struct{} {
+	out := make(map[netip.Prefix]struct{}, len(routes))
+	for prefix := range routes {
+		out[prefix] = struct{}{}
+	}
+	return out
+}
+
 // installRoutes copies the RIB's winners into the shape x takes. It skips a
 // route whose Peer is empty — an injected route written without a "via" names
 // a destination no member reaches, and installing it would have x write those
@@ -358,6 +488,23 @@ func (ch *controlHub) installRoutes() {
 		}
 		out[prefix] = tunhandler.PrefixRoute{Peer: route.Peer, Allow: route.Allow}
 	}
+	// Counted against what is installed rather than against the RIB, so the
+	// two numbers describe the table an operator can see: a prefix that
+	// appeared is a LAN routed for, one that left is a LAN withdrawn.
+	var routed, withdrawn int
+	for prefix := range out {
+		if _, ok := ch.installed[prefix]; !ok {
+			routed++
+		}
+	}
+	for prefix := range ch.installed {
+		if _, ok := out[prefix]; !ok {
+			withdrawn++
+		}
+	}
+	ch.installed = installed(out)
+	ch.count(xstats.KindLanRouted, int64(routed))
+	ch.count(xstats.KindLanWithdrawn, int64(withdrawn))
 	ch.sink.SetPrefixRoutes(out)
 }
 

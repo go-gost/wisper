@@ -470,4 +470,10 @@ type ServiceStats struct {
 	OutputRateBytes uint64
 	ProbeSent       uint64
 	ProbeAcked      uint64
+	// LanRouted, LanDenied and LanWithdrawn count a tun hub's peer-LAN
+	// routing: the LANs routed for, the claims refused (never told to the
+	// spoke), and the LANs withdrawn when their owner went quiet.
+	LanRouted    uint64
+	LanDenied    uint64
+	LanWithdrawn uint64
 }

@@ -38,6 +38,10 @@ type tunnelResponse struct {
 	// ping does not reach the LAN.
 	ShareEffective  string `json:"share_effective,omitempty"`
 	ShareDowngraded bool   `json:"share_downgraded,omitempty"`
+	// Lan is a tun hub's installed LAN routes and each spoke's claim of them.
+	// Absent for every other type, which is what keeps a p2p tunnel's response
+	// free of a section nothing fills.
+	Lan *lanResponse `json:"lan,omitempty"`
 	// Events is this object's recent history, newest first.
 	Events []eventResponse `json:"events"`
 }
@@ -75,6 +79,12 @@ type peerStatsJSON struct {
 type peerJSON struct {
 	Key   string `json:"key"`
 	Alias string `json:"alias,omitempty"`
+	// LAN lists the CIDRs this spoke's hub routes for it: what the spoke
+	// claimed over the control channel and the hub approved. A p2p tunnel
+	// carries none — it has no hub to claim to — and a spoke claiming nothing
+	// has an empty column rather than an absent one, because "holds no LAN"
+	// is a state worth showing next to one that holds two.
+	LAN []string `json:"lan,omitempty"`
 	// Disabled keeps the peer on the list without giving it a route: its new
 	// streams are closed while established ones drain.
 	Disabled bool `json:"disabled,omitempty"`
@@ -140,6 +150,54 @@ type tunnelOptionsResp struct {
 	LanRoutes []string `json:"lan_routes,omitempty"`
 }
 
+// lanRouteJSON is one LAN route a tun hub installed: the CIDR, the spoke that
+// claimed it (or "static" for the hub's own config), the member that reaches
+// it, and the members allowed to use it.
+type lanRouteJSON struct {
+	Prefix string   `json:"prefix"`
+	Origin string   `json:"origin"`
+	Peer   string   `json:"peer"`
+	Allow  []string `json:"allow,omitempty"`
+}
+
+// lanResponse is a tun hub's LAN routing for the doctor: the installed table
+// and each spoke's claim. A hub that is not running, or whose handler installs
+// no prefix routes, carries an empty list — a hub with no LAN routes is a hub
+// working as it did before the feature existed.
+type lanResponse struct {
+	Routes []lanRouteJSON `json:"routes"`
+	// Claims is the same table per claimer, so a UI can show either the whole
+	// net or one spoke's row of it without asking twice.
+	Claims map[string]lanClaimJSON `json:"claims"`
+}
+
+// lanClaimJSON is one spoke's LAN: the CIDRs it holds and who may use them.
+type lanClaimJSON struct {
+	Prefixes []string `json:"prefixes"`
+	Allow    []string `json:"allow,omitempty"`
+}
+
+// lanJSON renders the hub's installed routes as the doctor's table, and
+// indexes the allow lists per claimer for the per-spoke column beside it.
+func lanJSON(lan tunnel.LanState) *lanResponse {
+	resp := &lanResponse{
+		Routes: make([]lanRouteJSON, 0, len(lan.Routes)),
+		Claims: make(map[string]lanClaimJSON),
+	}
+	for _, r := range lan.Routes {
+		resp.Routes = append(resp.Routes, lanRouteJSON{
+			Prefix: r.Prefix,
+			Origin: r.Origin,
+			Peer:   r.Peer,
+			Allow:  r.Allow,
+		})
+	}
+	for peer, claims := range lan.PeerClaims() {
+		resp.Claims[peer] = lanClaimJSON{Prefixes: claims}
+	}
+	return resp
+}
+
 type statsResponse struct {
 	CurrentConns    uint64  `json:"current_conns"`
 	TotalConns      uint64  `json:"total_conns"`
@@ -151,6 +209,11 @@ type statsResponse struct {
 	OutputRateBytes uint64  `json:"output_rate_bytes"`
 	ProbeSent       uint64  `json:"probe_sent"`
 	ProbeAcked      uint64  `json:"probe_acked"`
+	// The hub's LAN routing: LANs routed for, claims refused, LANs withdrawn.
+	// Only a tun hub carries values; every other type leaves them zero.
+	LanRouted    uint64 `json:"lan_routed"`
+	LanDenied    uint64 `json:"lan_denied"`
+	LanWithdrawn uint64 `json:"lan_withdrawn"`
 }
 
 // peersJSON pairs each allowlisted key with its display alias, whether it is
@@ -164,7 +227,12 @@ type statsResponse struct {
 // up per key: a p2p tunnel's rows have no address to carry, and a spoke with none
 // assigned yet comes back with the field absent, which is what makes an absent
 // value "keep what you have" rather than "hold nothing".
-func peersJSON(peers []string, aliases map[string]string, disabled []string, peerIPs map[string]string) []peerJSON {
+//
+// lan is the hub's LAN routing per spoke — what each spoke currently holds — and
+// it is passed for the same reason: the builder stays pure, a p2p tunnel passes
+// nil, and a spoke holding nothing comes back with an empty column rather than
+// an absent one, because "this spoke claims no LAN" is a state worth showing.
+func peersJSON(peers []string, aliases map[string]string, disabled []string, peerIPs map[string]string, lan map[string][]string) []peerJSON {
 	normalized := tunnel.NormalizePeerAliases(peers, aliases)
 	off := make(map[string]bool, len(disabled))
 	for _, k := range disabled {
@@ -183,6 +251,9 @@ func peersJSON(peers []string, aliases map[string]string, disabled []string, pee
 			// address, and no response should read that way.
 			if ips := peerIPs[k]; ips != "" {
 				peer.IP = &ips
+			}
+			if claims := lan[k]; len(claims) > 0 {
+				peer.LAN = claims
 			}
 			out = append(out, peer)
 		}
@@ -244,7 +315,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			RecordMode:  opts.RecordMode,
 			Peer:        opts.Peer,
 			Protocol:    opts.Protocol,
-			Peers:       peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled, opts.PeerIPs),
+			Peers:       peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled, opts.PeerIPs, nil),
 			PeerIPs:     opts.PeerIPs,
 			Net:         opts.Net,
 			MTU:         opts.MTU,
@@ -267,6 +338,9 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			OutputRateBytes: s.OutputRateBytes,
 			ProbeSent:       safeSub(s.ProbeSent, bl.ProbeSent),
 			ProbeAcked:      safeSub(s.ProbeAcked, bl.ProbeAcked),
+			LanRouted:       safeSub(s.LanRouted, bl.LanRouted),
+			LanDenied:       safeSub(s.LanDenied, bl.LanDenied),
+			LanWithdrawn:    safeSub(s.LanWithdrawn, bl.LanWithdrawn),
 		},
 	}
 	// The p2p host's current state per peer, when this object has p2p peers —
@@ -309,6 +383,19 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	}
 	if opts.Peer != "" {
 		resp.PeerTransport = transports[opts.Peer]
+	}
+	// The hub's LAN routing: only a tun hub reports it, and it fills both the
+	// per-spoke column above and the routes list below. Read once, because the
+	// two views are one RIB snapshot and a second read could disagree with
+	// the first about what is in force.
+	if ls, ok := t.(tunnel.LanStateReporter); ok {
+		lan := ls.LANState()
+		resp.Lan = lanJSON(lan)
+		for i := range resp.Options.Peers {
+			if claims := lan.PeerClaims()[resp.Options.Peers[i].Key]; len(claims) > 0 {
+				resp.Options.Peers[i].LAN = claims
+			}
+		}
 	}
 	// The badge reads what is actually running, not what was configured:
 	// only a tun hub reports sharing state, so anything else stays absent.

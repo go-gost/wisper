@@ -11,9 +11,27 @@ import (
 
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/logger"
+	"github.com/go-gost/core/observer/stats"
 	tunhandler "github.com/go-gost/x/handler/tun"
 	xlogger "github.com/go-gost/x/logger"
+	xstats "github.com/go-gost/x/observer/stats"
 )
+
+// fakeCounters is the stats object the hub counts into: one map, one method.
+type fakeCounters struct {
+	mu    sync.Mutex
+	total map[stats.Kind]int64
+}
+
+func newFakeCounters() *fakeCounters {
+	return &fakeCounters{total: map[stats.Kind]int64{}}
+}
+
+func (c *fakeCounters) Add(kind stats.Kind, n int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.total[kind] += n
+}
 
 // newFakeP2PHandler is the smallest stand-in for the hub side of x's tun
 // handler: one method, the routes it was last handed, under a mutex because
@@ -294,5 +312,87 @@ func TestSpokeAuthorizerMembers(t *testing.T) {
 	}
 	if got := a.Members(); len(got) != len(members) {
 		t.Fatalf("a second read changed length: %v vs %v", got, members)
+	}
+}
+
+// TestControlHubLanStateForTheDoctor: the hub's routes and each spoke's claim
+// are one RIB read, so they cannot disagree — and what the operator sees has to
+// name both owners, because a route's claimer and its carrier are different
+// things for an injected route (a claim names a spoke, a via names a member).
+func TestControlHubLanStateForTheDoctor(t *testing.T) {
+	h := newFakeP2PHandler()
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+	defer ch.Close()
+
+	ch.SetMembers([]memberEntry{{IP: "10.10.100.5", Key: "peerB"}})
+	ch.applyClaim("peerB", claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Add: []string{"192.168.50.0/24"}})
+	if err := ch.SetStaticRoutes([]string{"192.168.60.0/24 via 10.10.100.5 allow=peerB"}); err != nil {
+		t.Fatal(err)
+	}
+
+	lan := ch.LanState()
+	want := map[string]LanRoute{
+		"192.168.50.0/24": {Prefix: "192.168.50.0/24", Origin: "peerB", Peer: "peerB"},
+		"192.168.60.0/24": {Prefix: "192.168.60.0/24", Origin: staticOrigin, Peer: "peerB", Allow: []string{"peerB"}},
+	}
+	if len(lan.Routes) != len(want) {
+		t.Fatalf("LanState = %+v, want the two installed routes", lan)
+	}
+	for _, got := range lan.Routes {
+		w, ok := want[got.Prefix]
+		if !ok {
+			t.Fatalf("an installed route the doctor did not expect: %+v", got)
+		}
+		if got.Origin != w.Origin || got.Peer != w.Peer || len(got.Allow) != len(w.Allow) {
+			t.Fatalf("route %s = %+v, want %+v", got.Prefix, got, w)
+		}
+	}
+
+	// The per-spoke view is the same state filtered by claimer: a spoke's row
+	// shows what it holds, and nothing else.
+	byPeer := lan.PeerClaims()
+	if len(byPeer["peerB"]) != 1 || byPeer["peerB"][0] != "192.168.50.0/24" {
+		t.Fatalf("peerB's column = %v, want its own claim", byPeer["peerB"])
+	}
+	if _, ok := byPeer[staticOrigin]; ok {
+		t.Fatalf("a hub's own route is not a spoke's claim: %v", byPeer)
+	}
+}
+
+// TestControlHubCountsWhatItRouts: a refused claim is invisible on the wire —
+// the spoke is told nothing, and only the operator can act on it — so the hub
+// has to say so somewhere. The three counters are that somewhere, and they are
+// read against the table the hub installs, not against the RIB, because the
+// table is what an operator can see.
+func TestControlHubCountsWhatItRouts(t *testing.T) {
+	h := newFakeP2PHandler()
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+	defer ch.Close()
+
+	counts := newFakeCounters()
+	ch.SetCounter(counts)
+
+	// One prefix claimed and installed: a LAN routed for.
+	ch.applyClaim("peerB", claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Add: []string{"192.168.50.0/24"}})
+	ch.publish()
+	// A claim outside its allow row is refused, and counted as refused.
+	ch.applyClaim("peerB", claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Add: []string{"10.0.0.0/8"}})
+	ch.publish()
+	// The claim it was allowed to hold goes quiet, and the sweep takes it out.
+	ch.applyClaim("peerB", claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Drop: []string{"192.168.50.0/24"}})
+	ch.publish()
+
+	if got := counts.total[xstats.KindLanRouted]; got != 1 {
+		t.Errorf("lan routed = %d, want the one prefix that was installed", got)
+	}
+	if got := counts.total[xstats.KindLanDenied]; got != 1 {
+		t.Errorf("lan denied = %d, want the one claim the hub refused", got)
+	}
+	if got := counts.total[xstats.KindLanWithdrawn]; got != 1 {
+		t.Errorf("lan withdrawn = %d, want the prefix the drop took out", got)
 	}
 }

@@ -1050,13 +1050,13 @@ func TestPeerAliasesFlow(t *testing.T) {
 		t.Errorf("k1 alias = %q, want a generated peer-xxxx name", a)
 	}
 
-	out := peersJSON(opts.Peers, opts.PeerAliases, nil, opts.PeerIPs)
+	out := peersJSON(opts.Peers, opts.PeerAliases, nil, opts.PeerIPs, nil)
 	if len(out) != 2 || out[0].Alias != opts.PeerAliases["k1"] || out[1].Alias != "laptop" {
 		t.Errorf("response peers = %+v, want both aliases", out)
 	}
 
 	// No stored aliases (a tunnel saved before aliases existed): still named.
-	legacy := peersJSON([]string{"k1", "k2"}, nil, []string{"k2"}, nil)
+	legacy := peersJSON([]string{"k1", "k2"}, nil, []string{"k2"}, nil, nil)
 	for _, p := range legacy {
 		if len(p.Alias) != len("peer-")+4 {
 			t.Errorf("legacy peer %s alias = %q, want a generated name", p.Key, p.Alias)
@@ -1072,21 +1072,21 @@ func TestPeerAliasesFlow(t *testing.T) {
 	// left without the field rather than given an empty one: absent is what tells a
 	// save "unchanged", and a response that said otherwise would ask the operator's
 	// own client to clear every address the hub holds.
-	withIP := peersJSON([]string{"k1"}, nil, nil, map[string]string{"k1": "10.10.0.2"})
+	withIP := peersJSON([]string{"k1"}, nil, nil, map[string]string{"k1": "10.10.0.2"}, nil)
 	if len(withIP) != 1 || withIP[0].IP == nil || *withIP[0].IP != "10.10.0.2" {
 		t.Errorf("peersJSON with an assignment = %+v, want the row carrying 10.10.0.2", withIP)
 	}
-	if got := peersJSON([]string{"k1"}, nil, nil, map[string]string{"other": "10.10.0.2"})[0].IP; got != nil {
+	if got := peersJSON([]string{"k1"}, nil, nil, map[string]string{"other": "10.10.0.2"}, nil)[0].IP; got != nil {
 		t.Errorf("a row with no assignment carries %q, want the field absent", *got)
 	}
 	// A spoke the operator cleared holds "", and that is not the same thing as a
 	// spoke with nothing: it must not come back looking like a request to clear.
-	if got := peersJSON([]string{"k1"}, nil, nil, map[string]string{"k1": ""})[0].IP; got != nil {
+	if got := peersJSON([]string{"k1"}, nil, nil, map[string]string{"k1": ""}, nil)[0].IP; got != nil {
 		t.Errorf("a row with an empty assignment carries %q, want the field absent", *got)
 	}
-	if peersJSON(nil, nil, nil, nil) != nil {
+	if peersJSON(nil, nil, nil, nil, nil) != nil {
 		// An empty allowlist must stay absent from the JSON, not become [].
-		if got := peersJSON(nil, nil, nil, nil); len(got) != 0 {
+		if got := peersJSON(nil, nil, nil, nil, nil); len(got) != 0 {
 			t.Errorf("peersJSON() = %v, want empty", got)
 		}
 	}
@@ -2762,5 +2762,33 @@ func TestUpdateP2PTunnelPeersIgnoresAddresses(t *testing.T) {
 	}
 	if ips, ok := saved["options"].(map[string]any)["peer_ips"]; ok {
 		t.Errorf("options.peer_ips = %v on a p2p tunnel, want the field absent", ips)
+	}
+}
+
+// TestLanJSONRendersTheDoctorsViews: a hub's LAN routing has two readers — the
+// whole installed table, and one spoke's row of it — and they are built from
+// one LanState, so they cannot disagree. The hub's own injected routes are not
+// a spoke's claim and never appear in a spoke's column.
+func TestLanJSONRendersTheDoctorsViews(t *testing.T) {
+	// A dynamic claim and an injected route, both carried by the same member:
+	// a claim names its claimer, a route names its carrier.
+	state := tunnel.LanState{Routes: []tunnel.LanRoute{
+		{Prefix: "192.168.50.0/24", Origin: "peerB", Peer: "peerB"},
+		{Prefix: "192.168.60.0/24", Origin: "static", Peer: "peerB", Allow: []string{"peerB"}},
+	}}
+
+	resp := lanJSON(state)
+	if len(resp.Routes) != 2 || resp.Routes[0].Origin != "peerB" || resp.Routes[1].Peer != "peerB" {
+		t.Fatalf("routes = %+v, want both with their two owners named", resp.Routes)
+	}
+	claims := resp.Claims["peerB"]
+	if len(claims.Prefixes) != 1 || claims.Prefixes[0] != "192.168.50.0/24" {
+		t.Fatalf("peerB's column = %+v, want only its own claim", claims)
+	}
+	if _, ok := resp.Claims["static"]; ok {
+		t.Fatal("a hub's own route must not show up as a spoke's claim")
+	}
+	if got := lanJSON(tunnel.LanState{}).Claims; len(got) != 0 {
+		t.Fatalf("a hub with no LAN routes still reports claims: %v", got)
 	}
 }
