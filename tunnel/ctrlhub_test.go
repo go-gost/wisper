@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/logger"
 	tunhandler "github.com/go-gost/x/handler/tun"
 	xlogger "github.com/go-gost/x/logger"
@@ -245,6 +246,27 @@ func TestControlRouteRegistersPeerOnAccept(t *testing.T) {
 	waitFor(t, "the registered spoke's claim must reach the hub", func() bool {
 		_, ok := h.installed()[want]
 		return ok
+	})
+}
+
+// TestP2PHandlerTakesPrefixRoutes: the hub installs its LAN routes into the
+// handler it builds by shape, because NewP2PHandler hands back a core
+// handler.Handler. If that assertion were false the hub would start, log that
+// it installs nothing, and route no LAN at all — a failure that looks exactly
+// like a network that has no LANs in it, so it is worth proving against the
+// real handler rather than the fake.
+func TestP2PHandlerTakesPrefixRoutes(t *testing.T) {
+	device, far := net.Pipe()
+	defer device.Close()
+	defer far.Close()
+
+	h := tunhandler.NewP2PHandler(device, nil, handler.LoggerOption(testLogger()))
+	sink, ok := h.(prefixSink)
+	if !ok {
+		t.Fatal("x's p2p handler must take the hub's prefix routes")
+	}
+	sink.SetPrefixRoutes(map[netip.Prefix]tunhandler.PrefixRoute{
+		netip.MustParsePrefix("192.168.50.0/24"): {Peer: "peerB"},
 	})
 }
 
