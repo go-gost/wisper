@@ -125,7 +125,17 @@ type Options struct {
 	ShareLAN string
 	// ShareMode pins the sharing implementation: auto (default), kernel, or
 	// userspace. Auto tries the kernel path and falls back with an event.
-	ShareMode     string
+	ShareMode string
+	// LanAllow is the policy for the LANs the hub's spokes may claim:
+	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
+	// A spoke with no row claims nothing at all — default-deny — so a spoke
+	// that reaches a hub it is not configured for cannot put a route into it
+	// just by saying so. Read by ParseLanAllow at start.
+	LanAllow string
+	// LanRoutes is the hub's own routes, each a "cidr [via addr] [allow=keys]"
+	// spec resolved against the spokes' assigned addresses. They are injected
+	// before any claim, so a hub operator reaches a LAN that no spoke claims.
+	LanRoutes     []string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -354,6 +364,22 @@ func ShareLANOption(spec string) Option {
 func ShareModeOption(mode string) Option {
 	return func(opts *Options) {
 		opts.ShareMode = NormalizeShareMode(mode)
+	}
+}
+
+// LanAllowOption sets the hub-side LAN-routing policy: the supernets each
+// spoke may claim inside ("key=cidr" rows).
+func LanAllowOption(spec string) Option {
+	return func(opts *Options) {
+		opts.LanAllow = spec
+	}
+}
+
+// LanRoutesOption sets the hub's own routes ("cidr [via addr] [allow=keys]"
+// specs, resolved against the spokes' assigned addresses).
+func LanRoutesOption(specs ...string) Option {
+	return func(opts *Options) {
+		opts.LanRoutes = specs
 	}
 }
 
@@ -588,6 +614,8 @@ func RestartRunning() {
 			DNS:          p.opts.DNS,
 			ShareLAN:     p.opts.ShareLAN,
 			ShareMode:    p.opts.ShareMode,
+			LanAllow:     p.opts.LanAllow,
+			LanRoutes:    p.opts.LanRoutes,
 			CreatedAt:    p.opts.CreatedAt,
 		})
 		if newT == nil {
@@ -685,6 +713,8 @@ func LoadConfig() {
 			DNS:           cfg.DNS,
 			ShareLAN:      cfg.ShareLAN,
 			ShareMode:     cfg.ShareMode,
+			LanAllow:      cfg.LanAllow,
+			LanRoutes:     cfg.LanRoutes,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -745,6 +775,8 @@ func SaveConfig() error {
 			DNS:           opts.DNS,
 			ShareLAN:      opts.ShareLAN,
 			ShareMode:     opts.ShareMode,
+			LanAllow:      opts.LanAllow,
+			LanRoutes:     opts.LanRoutes,
 			Favorite:      tun.IsFavorite(),
 			Closed:        tun.IsClosed(),
 			CreatedAt:     opts.CreatedAt,
@@ -798,6 +830,8 @@ func TunnelOptions(opts Options) []Option {
 		DNSOption(opts.DNS),
 		ShareLANOption(opts.ShareLAN),
 		ShareModeOption(opts.ShareMode),
+		LanAllowOption(opts.LanAllow),
+		LanRoutesOption(opts.LanRoutes...),
 	}
 }
 

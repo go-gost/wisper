@@ -132,6 +132,12 @@ type tunnelOptionsResp struct {
 	// implementation: auto (default), kernel, or userspace.
 	ShareLAN  string `json:"share_lan,omitempty"`
 	ShareMode string `json:"share_mode,omitempty"`
+	// LanAllow is the hub-side policy for the LANs a spoke may claim:
+	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
+	// A spoke with no row claims nothing at all. LanRoutes is the hub's own
+	// routes, each a "cidr [via addr] [allow=keys]" spec.
+	LanAllow  string   `json:"lan_allow,omitempty"`
+	LanRoutes []string `json:"lan_routes,omitempty"`
 }
 
 type statsResponse struct {
@@ -247,6 +253,8 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			DNS:         opts.DNS,
 			ShareLAN:    opts.ShareLAN,
 			ShareMode:   tunnel.NormalizeShareMode(opts.ShareMode),
+			LanAllow:    opts.LanAllow,
+			LanRoutes:   opts.LanRoutes,
 		},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
@@ -381,6 +389,12 @@ type tunnelCreateRequest struct {
 	// implementation: auto (default), kernel, or userspace.
 	ShareLAN  string `json:"share_lan,omitempty"`
 	ShareMode string `json:"share_mode,omitempty"`
+	// LanAllow is the hub-side policy for the LANs a spoke may claim:
+	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
+	// A spoke with no row claims nothing at all. LanRoutes is the hub's own
+	// routes, each a "cidr [via addr] [allow=keys]" spec.
+	LanAllow  string   `json:"lan_allow,omitempty"`
+	LanRoutes []string `json:"lan_routes,omitempty"`
 }
 
 // settlePeerIPs applies a tun hub's address policy to the rows of a request, and
@@ -491,6 +505,8 @@ func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string) []tunnel.Opti
 		tunnel.DNSOption(r.DNS),
 		tunnel.ShareLANOption(r.ShareLAN),
 		tunnel.ShareModeOption(r.ShareMode),
+		tunnel.LanAllowOption(r.LanAllow),
+		tunnel.LanRoutesOption(r.LanRoutes...),
 	}
 }
 

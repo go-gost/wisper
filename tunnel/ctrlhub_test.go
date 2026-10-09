@@ -159,3 +159,46 @@ func TestControlHubIgnoresOversizeAndUnknownType(t *testing.T) {
 		return ok
 	})
 }
+
+func TestParseLanAllow(t *testing.T) {
+	// Rows separated by whitespace or commas, one or more per spoke.
+	rows, err := ParseLanAllow("peerA=192.168.0.0/16, peerB=10.0.0.0/8 peerA=fd00::/8")
+	if err != nil {
+		t.Fatalf("ParseLanAllow: %v", err)
+	}
+	if got := rows["peerA"]; len(got) != 2 ||
+		got[0] != netip.MustParsePrefix("192.168.0.0/16") ||
+		got[1] != netip.MustParsePrefix("fd00::/8") {
+		t.Fatalf("peerA rows = %v, want its two supernets", got)
+	}
+	if got := rows["peerB"]; len(got) != 1 || got[0] != netip.MustParsePrefix("10.0.0.0/8") {
+		t.Fatalf("peerB rows = %v, want 10.0.0.0/8", got)
+	}
+
+	// A spoke with an empty row is a spoke that may claim nothing, which is
+	// not the same state as a spoke this hub has not configured.
+	rows, err = ParseLanAllow("peerA=")
+	if err != nil {
+		t.Fatalf("an empty row: %v", err)
+	}
+	if got, ok := rows["peerA"]; !ok || len(got) != 0 {
+		t.Fatalf("peerA = (%v, %v); want an empty row that is present", got, ok)
+	}
+
+	// Nothing configured is not an error: no row, nothing claimed.
+	rows, err = ParseLanAllow("  ")
+	if err != nil {
+		t.Fatalf("an empty policy: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("an empty policy = %v, want no rows", rows)
+	}
+
+	// A row that names no network is refused: the hub would otherwise start
+	// with a policy nobody typed.
+	for _, bad := range []string{"peerA", "peerA=nonsense", "=192.168.0.0/16", "peerA=192.168.0.0/16 peerB"} {
+		if _, err := ParseLanAllow(bad); err == nil {
+			t.Fatalf("ParseLanAllow(%q) = nil error, want a refusal", bad)
+		}
+	}
+}

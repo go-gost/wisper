@@ -357,6 +357,16 @@ type Tunnel struct {
 	// userspace. Auto tries the kernel path and falls back with an event.
 	ShareMode string `yaml:"share_mode,omitempty" json:"share_mode,omitempty"`
 
+	// LanAllow is the hub-side policy for the LANs a spoke may claim:
+	// "key=cidr" rows naming the supernets that spoke may claim inside. A
+	// spoke with no row claims nothing.
+	LanAllow string `yaml:"lan_allow,omitempty" json:"lan_allow,omitempty"`
+
+	// LanRoutes is the hub's own routes, each a
+	// "cidr [via addr] [allow=keys]" spec resolved against the spokes'
+	// assigned addresses.
+	LanRoutes []string `yaml:"lan_routes,omitempty" json:"lan_routes,omitempty"`
+
 	// Events is this object's recent history, oldest first. Runtime state, like
 	// Stats: SaveConfig rewrites it on every stats tick.
 	Events []event.Event `yaml:"events,omitempty"`

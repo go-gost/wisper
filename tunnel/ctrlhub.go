@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/netip"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/go-gost/core/logger"
 	tunhandler "github.com/go-gost/x/handler/tun"
@@ -394,6 +396,46 @@ func parseClaimPrefixes(ch *controlHub, peer string, specs []string) []netip.Pre
 	return out
 }
 
+// ParseLanAllow reads the lan_allow policy from its config form:
+// whitespace- or comma-separated "key=cidr" rows, one or more per spoke.
+//
+// A key with an empty value is a spoke that may claim nothing — default-deny
+// written out, which is a different state from a key that is absent and has to
+// stay in the map, because the RIB's refusal message is what tells the two
+// apart. Nothing at all is not an error: a hub with no policy claims nothing.
+//
+// A row that does not parse is an error rather than a dropped row, because a
+// typo that silently vanished would leave an operator looking at a policy that
+// is not the one they wrote.
+func ParseLanAllow(spec string) (map[string][]netip.Prefix, error) {
+	rows := make(map[string][]netip.Prefix)
+	for _, row := range strings.FieldsFunc(spec, func(r rune) bool {
+		return r == ',' || unicode.IsSpace(r)
+	}) {
+		key, value, ok := strings.Cut(row, "=")
+		if !ok {
+			return nil, fmt.Errorf("lan_allow row %q is not \"key=cidr\"", row)
+		}
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return nil, fmt.Errorf("lan_allow row %q names no spoke", row)
+		}
+		if _, seen := rows[key]; !seen {
+			rows[key] = nil
+		}
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(value)
+		if err != nil {
+			return nil, fmt.Errorf("lan_allow row %q: %v", row, err)
+		}
+		rows[key] = append(rows[key], prefix.Masked())
+	}
+	return rows, nil
+}
+
 // streamDead reports whether a read error means the conn is finished, as
 // opposed to one frame being unreadable.
 //
@@ -412,17 +454,18 @@ func streamDead(err error) bool {
 		errors.Is(err, context.Canceled)
 }
 
-// consumeControlMagic reads the magic off an inbound stream and reports
-// whether it matched. The bytes are consumed either way — a stream that did
-// not announce itself has them replayed to the tun path by its caller.
-func consumeControlMagic(conn net.Conn) bool {
+// consumeControlMagic reads the magic off an inbound stream and reports whether
+// it matched. The bytes it read come back either way: a stream that did not
+// announce itself replays them (see replayConn), so nothing a spoke sent
+// before it was identified is lost.
+func consumeControlMagic(conn net.Conn) (prefix []byte, ok bool) {
 	_ = conn.SetReadDeadline(time.Now().Add(controlPeekTimeout))
 	buf := make([]byte, len(ControlMagic))
 	n, _ := io.ReadFull(conn, buf)
-	// The deadline is cleared before the conn goes anywhere: a tun stream that
-	// was peeked at and found to be one must not inherit it.
+	// The deadline is cleared before the conn goes anywhere: a stream that was
+	// peeked at and found to be a tun link must not inherit it.
 	_ = conn.SetReadDeadline(time.Time{})
-	return n == len(ControlMagic) && bytes.Equal(buf, ControlMagic)
+	return buf[:n], n == len(ControlMagic) && bytes.Equal(buf, ControlMagic)
 }
 
 // writeWithDeadline writes one control message under conn's write deadline, so
@@ -445,7 +488,7 @@ func writeWithDeadline(conn net.Conn, m netviewMessage, timeout time.Duration) e
 func (ch *controlHub) dialControlForTest(peer string) (net.Conn, net.Conn) {
 	hub, spoke := net.Pipe()
 	go func() { _, _ = spoke.Write(ControlMagic) }()
-	if !consumeControlMagic(hub) {
+	if _, ok := consumeControlMagic(hub); !ok {
 		_ = hub.Close()
 		_ = spoke.Close()
 		return hub, spoke

@@ -370,6 +370,8 @@ func TestGetTunTunnelOptions(t *testing.T) {
 		tunnel.DNSOption("10.10.0.1"),
 		tunnel.KeepaliveOption(true),
 		tunnel.TTLOption(15),
+		tunnel.LanAllowOption("peerA=192.168.0.0/16"),
+		tunnel.LanRoutesOption("192.168.50.0/24", "10.20.0.0/16 via 10.10.0.9 allow=peerA"),
 	)
 	tun.Close() // no device is created: this test is about the API shape
 	tunnel.Add(tun)
@@ -388,12 +390,20 @@ func TestGetTunTunnelOptions(t *testing.T) {
 		"device_name": "wisper-hub",
 		"routes":      "192.168.50.0/24",
 		"dns":         "10.10.0.1",
-		"keepalive":   true,
-		"ttl":         float64(15),
+		"keepalive":  true,
+		"ttl":        float64(15),
+		"lan_allow":  "peerA=192.168.0.0/16",
 	} {
 		if got := opts[field]; got != want {
 			t.Errorf("options[%s] = %v, want %v", field, got, want)
 		}
+	}
+	// Compared apart from the scalars: JSON hands a list back as []any, which
+	// is not comparable with !=.
+	routes, _ := opts["lan_routes"].([]any)
+	if len(routes) != 2 || routes[0] != "192.168.50.0/24" ||
+		routes[1] != "10.20.0.0/16 via 10.10.0.9 allow=peerA" {
+		t.Errorf("options[lan_routes] = %v, want the hub's two routes", opts["lan_routes"])
 	}
 }
 
