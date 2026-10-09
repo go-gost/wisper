@@ -3,6 +3,7 @@ package tunnel
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 	"net/netip"
 	"sync"
 	"testing"
@@ -200,5 +201,76 @@ func TestParseLanAllow(t *testing.T) {
 		if _, err := ParseLanAllow(bad); err == nil {
 			t.Fatalf("ParseLanAllow(%q) = nil error, want a refusal", bad)
 		}
+	}
+}
+
+// TestControlRouteRegistersPeerOnAccept: the hub learns a spoke exists from its
+// tun stream, not from its control stream — the two arrive independently — so
+// accepting the tun stream has to open the control channel for that spoke.
+// Driving it through the route's own Accept is what keeps tun.go's wiring
+// honest without a tun device.
+func TestControlRouteRegistersPeerOnAccept(t *testing.T) {
+	h := newFakeP2PHandler()
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+
+	route := &controlRoute{peerListener: newPeerListener([]string{"peerB"}), ch: ch}
+	defer route.Close()
+
+	tun, tunFar := peerPipe("peerB")
+	defer tunFar.Close()
+	tun.Close() // the stream's life does not matter here, only its acceptance
+	route.deliver(tun)
+
+	conn, err := route.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	conn.Close()
+
+	// The spoke's control stream, which a real spoke may send before or after
+	// its tun stream: the slot Register opened is what takes it.
+	hub, spoke := net.Pipe()
+	go func() { _, _ = spoke.Write(ControlMagic) }()
+	if _, ok := consumeControlMagic(hub); !ok {
+		t.Fatal("the control stream's magic must be read")
+	}
+	ch.deliver("peerB", hub)
+	go func() {
+		_, _ = spoke.Write(framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"192.168.50.0/24"}}))
+	}()
+
+	want := netip.MustParsePrefix("192.168.50.0/24")
+	waitFor(t, "the registered spoke's claim must reach the hub", func() bool {
+		_, ok := h.installed()[want]
+		return ok
+	})
+}
+
+func TestSpokeAuthorizerMembers(t *testing.T) {
+	a := newSpokeAuthorizer("hub1", map[string]string{
+		"peerB": "10.10.100.5",
+		"peerA": "10.10.100.2,::ffff:10.10.100.3",
+	}, testLogger())
+
+	members := a.Members()
+	// One canonical order, so a repeated read is not a change: SetMembers
+	// compares by contents to decide what to publish.
+	want := []memberEntry{
+		{IP: "10.10.100.2", Key: "peerA"},
+		{IP: "10.10.100.3", Key: "peerA"},
+		{IP: "10.10.100.5", Key: "peerB"},
+	}
+	if len(members) != len(want) {
+		t.Fatalf("Members = %v, want %v", members, want)
+	}
+	for i := range want {
+		if members[i] != want[i] {
+			t.Fatalf("Members[%d] = %v, want %v (all: %v)", i, members[i], want[i], members)
+		}
+	}
+	if got := a.Members(); len(got) != len(members) {
+		t.Fatalf("a second read changed length: %v vs %v", got, members)
 	}
 }

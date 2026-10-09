@@ -60,7 +60,13 @@ type tunTunnel struct {
 	// place. It is nil until Run builds it — there is no hub to allocate for
 	// before that — and Close clears it with ln and device, because both mean the
 	// same thing here: nothing is running.
-	authz         *spokeAuthorizer
+	authz *spokeAuthorizer
+	// ctrl is the hub side of the LAN-routing control channel: one RIB, one
+	// control stream per spoke, and the prefix table it installs into the
+	// handler. Nil until Run builds it and cleared in Close, and held here
+	// only so a peer's route coming out (SetPeers) or a row changing
+	// (SetPeerIPs) reaches the hub that reasons about them.
+	ctrl          *controlHub
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
@@ -583,13 +589,46 @@ func (s *tunTunnel) Run() (err error) {
 		return
 	}
 
-	s.forward = xservice.NewService(s.opts.Name, peerLn, h,
+	// The hub side of the control channel. It is built here, after the handler
+	// exists, because the handler is what it installs its routes into — and it
+	// installs nothing at all if the handler does not take them, which is why
+	// a hub that cannot receive routes simply runs without LAN routing rather
+	// than failing to start.
+	var ch *controlHub
+	allow, allowErr := ParseLanAllow(s.opts.LanAllow)
+	if allowErr != nil {
+		return allowErr
+	}
+	if sink, ok := h.(prefixSink); ok {
+		ch = newControlHub(s.opts.ID, allow, sink, log.WithFields(map[string]any{"kind": "control"}))
+		// The membership first: it is what a claim may not swallow, and what
+		// an injected route's "via" resolves against.
+		ch.SetMembers(authz.Members())
+		// The hub's own routes land before any claim, and a spec that names no
+		// member is a config error — the same shape as a malformed share_lan,
+		// which is refused at start rather than at the first packet.
+		if staticErr := ch.SetStaticRoutes(s.opts.LanRoutes); staticErr != nil {
+			ch.Close()
+			return staticErr
+		}
+		peerLn.setControl(ch)
+	} else {
+		log.Warn("the tun handler installs no prefix routes: LAN routing is disabled")
+	}
+
+	// The service accepts from the route through this wrapper, so a spoke's
+	// control channel is registered the moment its tun stream is accepted.
+	var svcLn listener.Listener = peerLn
+	if ch != nil {
+		svcLn = &controlRoute{peerListener: peerLn, ch: ch}
+	}
+	s.forward = xservice.NewService(s.opts.Name, svcLn, h,
 		xservice.LoggerOption(log),
 		xservice.StatsOption(pStats),
 	)
 
 	s.mu.Lock()
-	s.ln, s.device, s.authz = peerLn, deviceLn, authz
+	s.ln, s.device, s.authz, s.ctrl = peerLn, deviceLn, authz, ch
 	s.shareEffective, s.shareCleanup = shareEffective, shareCleanup
 	forward := s.forward
 	s.mu.Unlock()
@@ -700,10 +739,33 @@ func (s *tunTunnel) SetPeers(ctx context.Context, peers []string, aliases map[st
 	s.opts.PeerDisabled = off
 	s.mu.Unlock()
 
+	// A spoke removed here loses its control channel too: a dropped peer's
+	// inbound streams are closed by the route's own reconcile, and its slot in
+	// the hub would otherwise outlive the last stream that could reach it.
+	if ch := s.controlHub(); ch != nil {
+		live := make(map[string]struct{}, len(enabled))
+		for _, peer := range enabled {
+			live[peer] = struct{}{}
+		}
+		for _, peer := range peers {
+			if _, ok := live[peer]; !ok {
+				ch.Unregister(peer)
+			}
+		}
+	}
+
 	// A spoke added here must get the same head start a spoke configured at Run
 	// time does, or its row would stay blank until it happens to dial in.
 	p2pHost.warmPeers(ctx, enabled)
 	return nil
+}
+
+// controlHub is the hub's control channel while it is running, and nil before
+// Run built one or after Close cleared it.
+func (s *tunTunnel) controlHub() *controlHub {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ctrl
 }
 
 // SetPeerIPs replaces the hub's address assignment. ctx is accepted for the
@@ -746,6 +808,12 @@ func (s *tunTunnel) SetPeerIPs(ctx context.Context, peerIPs map[string]string) e
 	s.opts.PeerIPs = kept
 	s.mu.Unlock()
 	authz.set(kept)
+	// The RIB reasons about this assignment twice over: a claim may not swallow
+	// a member's tun address, and an injected route's "via" resolves against
+	// it. Both change when a row changes, so the network is republished.
+	if ch := s.controlHub(); ch != nil {
+		ch.SetMembers(authz.Members())
+	}
 	return nil
 }
 
@@ -761,9 +829,17 @@ func (s *tunTunnel) Close() error {
 	s.mu.Lock()
 	forward, ln, device := s.forward, s.ln, s.device
 	shareCleanup := s.shareCleanup
-	s.forward, s.ln, s.device, s.authz = nil, nil, nil, nil
+	ctrl := s.ctrl
+	s.forward, s.ln, s.device, s.authz, s.ctrl = nil, nil, nil, nil, nil
 	s.shareEffective, s.shareCleanup = "", nil
 	s.mu.Unlock()
+
+	// The spokes' control streams go before their tun streams: a spoke whose
+	// control channel outlived the route would keep its LAN claims installed
+	// in a hub that is going away.
+	if ctrl != nil {
+		ctrl.Close()
+	}
 
 	var err error
 	if forward != nil {

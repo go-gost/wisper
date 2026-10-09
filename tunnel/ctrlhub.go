@@ -496,3 +496,35 @@ func (ch *controlHub) dialControlForTest(peer string) (net.Conn, net.Conn) {
 	ch.deliver(peer, hub)
 	return hub, spoke
 }
+
+// controlRoute is the route a hub's service accepts from, wrapped so a spoke's
+// control channel is registered the moment its tun stream is accepted.
+//
+// It is a wrapper and not a per-conn hook because the service owns the accept
+// loop: the hub has no other moment at which it learns a spoke is here. The two
+// streams arrive independently — a spoke opens its control channel and its tun
+// link in whichever order it likes — so the hub does not wait for a control
+// stream to learn a spoke exists. The tun stream says so first, and Register
+// only opens the slot that spoke's control stream will fill.
+type controlRoute struct {
+	*peerListener
+	ch *controlHub
+}
+
+func (l *controlRoute) Accept() (net.Conn, error) {
+	conn, err := l.peerListener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	// A conn with no peer key names no spoke, and the hub has nothing to
+	// register it against. The stream is still delivered: the service closes
+	// it, exactly as it does for any conn it cannot route.
+	if peer := peerOf(conn); peer != "" {
+		if err := l.ch.Register(peer); err != nil {
+			// Not fatal and not logged as one: the spoke gets no control
+			// channel, which means it lives exactly as it does without one.
+			l.ch.warnf("control: spoke %q: %v", peer, err)
+		}
+	}
+	return conn, nil
+}

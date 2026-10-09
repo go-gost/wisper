@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"sort"
 	"strings"
 	"sync/atomic"
 
@@ -78,6 +79,38 @@ func (a *spokeAuthorizer) set(assigned map[string]string) {
 		parsed[peer] = unmapAll(addrs)
 	}
 	a.assigned.Store(&parsed)
+}
+
+// Members is the hub's membership as the control hub reasons about it: every
+// allowlisted spoke's assigned addresses, whether or not that spoke is
+// connected right now. It is what a claim may not swallow (a member's own tun
+// address) and what an injected route's "via" resolves against.
+//
+// It reads the same snapshot Authorize decides against, so what authorizes and
+// what the RIB sees are the same rows — a half-applied save cannot have the
+// two disagree.
+func (a *spokeAuthorizer) Members() []memberEntry {
+	addrs := a.assigned.Load()
+	if addrs == nil {
+		return nil
+	}
+	out := make([]memberEntry, 0, len(*addrs))
+	for peer, ips := range *addrs {
+		for _, ip := range ips {
+			out = append(out, memberEntry{IP: ip.String(), Key: peer})
+		}
+	}
+	// Sorted so the list is one canonical order: rib.SetMembers compares
+	// membership by contents to decide whether anything changed, and an
+	// iteration order that varied per call would publish a netview on every
+	// registration.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Key != out[j].Key {
+			return out[i].Key < out[j].Key
+		}
+		return out[i].IP < out[j].IP
+	})
+	return out
 }
 
 // Authorize reports whether the peer that sent a registration may hold every
