@@ -1,8 +1,11 @@
 package tunnel
 
 import (
+	"errors"
+	"io"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -31,6 +34,51 @@ func mustIPNet(t *testing.T, s string) *net.IPNet {
 		t.Fatalf("ParseCIDR(%q): %v", s, err)
 	}
 	return ipNet
+}
+
+// spokeStack is the spoke shim's fake ShareStackBackend. Unlike the shared
+// fakeShareStack it does not mask double closes: the real shareStack closes
+// ep.done (sharegvisor.go:310), which panics on a second call — so this one
+// panics the same way and records its closes for the assertions.
+type spokeStack struct {
+	mu     sync.Mutex
+	inputs [][]byte
+	closes int
+	out    chan []byte
+}
+
+func newSpokeStack() *spokeStack {
+	return &spokeStack{out: make(chan []byte, 8)}
+}
+
+func (s *spokeStack) write(pkt []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inputs = append(s.inputs, append([]byte(nil), pkt...))
+}
+
+func (s *spokeStack) output() <-chan []byte { return s.out }
+
+func (s *spokeStack) close() {
+	s.mu.Lock()
+	s.closes++
+	n := s.closes
+	s.mu.Unlock()
+	if n > 1 {
+		panic("share stack closed more than once")
+	}
+}
+
+func (s *spokeStack) closeCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closes
+}
+
+func (s *spokeStack) inputCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.inputs)
 }
 
 // The rules a spoke needs are the hub's own with the roles swapped: the
@@ -119,7 +167,7 @@ func TestSpokeShareFallsBackToUserspace(t *testing.T) {
 
 	// Drive the shim: chain carries a LAN TCP (into the stack), an ICMP
 	// (dropped), and a virtual packet (through to the caller's Read).
-	st := &fakeShareStack{out: make(chan []byte, 8)}
+	st := newSpokeStack()
 	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st)
 	local, chain := net.Pipe()
 	conn := shim.Wrap(chain)
@@ -141,6 +189,7 @@ func TestSpokeShareFallsBackToUserspace(t *testing.T) {
 		}
 		wrote <- nil
 	}()
+
 	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
 		t.Fatalf("SetReadDeadline: %v", err)
 	}
@@ -152,12 +201,9 @@ func TestSpokeShareFallsBackToUserspace(t *testing.T) {
 	if string(buf[:n]) != string(virt) {
 		t.Fatalf("Read = %x, want the non-LAN packet %x", buf[:n], virt)
 	}
-	st.mu.Lock()
-	if len(st.inputs) != 1 || string(st.inputs[0]) != string(lanTCP) {
-		st.mu.Unlock()
-		t.Fatalf("stack inputs = %d, want 1 LAN TCP", len(st.inputs))
+	if got := st.inputCount(); got != 1 {
+		t.Fatalf("stack inputs = %d, want 1 LAN TCP", got)
 	}
-	st.mu.Unlock()
 
 	// ICMP to the LAN is dropped and counted, never delivered: the third
 	// write is consumed silently, so this Read ends in the deadline.
@@ -190,14 +236,106 @@ func TestSpokeShareFallsBackToUserspace(t *testing.T) {
 		t.Fatalf("chain got %x, want the stack reply %x", got[:m], reply)
 	}
 
-	// Close tears the stack down with the shim.
+	// Every close path — conn twice, shim twice — tears the stack down
+	// exactly once. The fake panics like the real stack on a second close.
 	if err := conn.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
+		t.Fatalf("conn.Close: %v", err)
 	}
-	st.mu.Lock()
-	closed := st.closed
-	st.mu.Unlock()
-	if !closed {
-		t.Fatal("stack not closed with the shim")
+	if err := conn.Close(); err != nil {
+		t.Fatalf("second conn.Close: %v", err)
+	}
+	if err := shim.Close(); err != nil {
+		t.Fatalf("shim.Close: %v", err)
+	}
+	if err := shim.Close(); err != nil {
+		t.Fatalf("second shim.Close: %v", err)
+	}
+	if got := st.closeCount(); got != 1 {
+		t.Fatalf("stack closes = %d, want exactly 1", got)
+	}
+}
+
+// The stack is closed exactly once no matter which close path runs first
+// or how often: conn.Close, shim.Close, repeated calls. Wrap is guarded —
+// the same conn comes back, so no second pump starts on the chain.
+func TestSpokeShareCloseClosesStackOnce(t *testing.T) {
+	st := newSpokeStack()
+	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+	local, chain := net.Pipe()
+	defer local.Close()
+
+	conn := shim.Wrap(chain)
+	if again := shim.Wrap(chain); again != conn {
+		t.Fatal("Wrap returned a different conn on the second call")
+	}
+
+	// Close the shim first, then the conn: reversed order, same result.
+	if err := shim.Close(); err != nil {
+		t.Fatalf("shim.Close: %v", err)
+	}
+	if err := shim.Close(); err != nil {
+		t.Fatalf("second shim.Close: %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("conn.Close: %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("second conn.Close: %v", err)
+	}
+	if got := st.closeCount(); got != 1 {
+		t.Fatalf("stack closes = %d, want exactly 1", got)
+	}
+}
+
+// A chain write failure kills the reply pump: it must be reported, not
+// swallowed. The first death error surfaces on Read and Write, and the
+// stack is closed exactly once with it.
+func TestSpokeSharePumpDeathSurfaces(t *testing.T) {
+	st := newSpokeStack()
+	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st)
+	local, chain := net.Pipe()
+	conn := shim.Wrap(chain)
+	defer conn.Close()
+
+	// The deadline must be set while the chain is still whole: a closed
+	// pipe refuses SetReadDeadline. Read reports the death: EOF while the
+	// pump is alive, the recorded chain write error once it died. A shim
+	// that swallowed the death would loop on EOF forever — hence the cap.
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("SetReadDeadline: %v", err)
+	}
+
+	// Kill the chain from the far end: the pump's next reply write fails
+	// with io.ErrClosedPipe while reads keep "working" (they see EOF).
+	local.Close()
+	st.out <- v4(6, "10.10.0.5")
+	buf := make([]byte, 1500)
+	deadline := time.Now().Add(2 * time.Second)
+	var readErr error
+	for {
+		if _, readErr = conn.Read(buf); errors.Is(readErr, io.ErrClosedPipe) {
+			break
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if !errors.Is(readErr, io.ErrClosedPipe) {
+		t.Fatalf("Read after pump death = %v, want the chain write error io.ErrClosedPipe", readErr)
+	}
+	// Write reports it too — nothing keeps looking healthy.
+	if _, err := conn.Write(v4(6, "10.10.0.6")); !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatalf("Write after pump death = %v, want the chain write error io.ErrClosedPipe", err)
+	}
+	// The counter ticked, and later close paths change nothing.
+	if shim.PumpDeaths() != 1 {
+		t.Fatalf("PumpDeaths = %d, want 1", shim.PumpDeaths())
+	}
+	if err := shim.Close(); err != nil {
+		t.Fatalf("shim.Close after death: %v", err)
+	}
+	if got := st.closeCount(); got != 1 {
+		t.Fatalf("stack closes = %d, want exactly 1", got)
 	}
 }
