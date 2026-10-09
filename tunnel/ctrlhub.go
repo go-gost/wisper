@@ -121,6 +121,18 @@ type controlPeer struct {
 	inbound chan net.Conn
 	conn    net.Conn
 	sent    uint64
+	// stopped ends the goroutine serving this slot, which is what makes
+	// Unregister release it rather than parking it for the life of the hub.
+	stopped chan struct{}
+	once    sync.Once
+}
+
+// newControlPeer is one spoke's slot: one waiting stream and one live stream.
+func newControlPeer() *controlPeer {
+	return &controlPeer{
+		inbound: make(chan net.Conn, 1),
+		stopped: make(chan struct{}),
+	}
 }
 
 // newControlHub builds the hub side of the control channel. allow is the
@@ -196,7 +208,7 @@ func (ch *controlHub) Register(peer string) error {
 		ch.mu.Unlock()
 		return nil
 	}
-	p := &controlPeer{inbound: make(chan net.Conn, 1)}
+	p := newControlPeer()
 	ch.peers[peer] = p
 	ch.mu.Unlock()
 
@@ -218,6 +230,10 @@ func (ch *controlHub) Unregister(peer string) {
 	conn := p.conn
 	ch.mu.Unlock()
 
+	// Stopping the slot is what releases its goroutine: without it the reader
+	// parks forever on a channel nothing will send to again, one goroutine per
+	// removed spoke for the rest of the hub's life.
+	p.once.Do(func() { close(p.stopped) })
 	if conn != nil {
 		_ = conn.Close()
 	}
@@ -344,7 +360,7 @@ func (ch *controlHub) deliver(peer string, conn net.Conn) {
 	}
 	p := ch.peers[peer]
 	if p == nil {
-		p = &controlPeer{inbound: make(chan net.Conn, 1)}
+		p = newControlPeer()
 		ch.peers[peer] = p
 		ch.mu.Unlock()
 		go ch.serve(peer, p)
@@ -352,9 +368,16 @@ func (ch *controlHub) deliver(peer string, conn net.Conn) {
 		ch.mu.Unlock()
 	}
 
+	// Never wait: this runs on the p2p host's accept loop, which is one
+	// goroutine serving every inbound stream for every tunnel. A send that
+	// waited for a slot would let one peer stall the whole host, so a stream
+	// that finds no room is closed on the spot and its spoke redials — which
+	// is exactly what it does for a stream that was refused anyway.
 	select {
 	case p.inbound <- conn:
 	case <-ch.done:
+		_ = conn.Close()
+	default:
 		_ = conn.Close()
 	}
 }
@@ -368,6 +391,17 @@ func (ch *controlHub) serve(peer string, p *controlPeer) {
 		select {
 		case conn := <-p.inbound:
 			ch.runStream(peer, p, conn)
+		case <-p.stopped:
+			// The slot was dropped (the spoke is no longer in the allowlist),
+			// so whatever streams are still queued for it are nobody's.
+			for {
+				select {
+				case queued := <-p.inbound:
+					_ = queued.Close()
+				default:
+					return
+				}
+			}
 		case <-ch.done:
 			return
 		}
@@ -535,6 +569,9 @@ func (ch *controlHub) Close() {
 		}
 		ch.mu.Unlock()
 
+		for _, p := range ch.peers {
+			p.once.Do(func() { close(p.stopped) })
+		}
 		close(ch.done)
 		for _, conn := range conns {
 			_ = conn.Close()

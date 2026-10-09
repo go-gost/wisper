@@ -396,3 +396,73 @@ func TestControlHubCountsWhatItRouts(t *testing.T) {
 		t.Errorf("lan withdrawn = %d, want the prefix the drop took out", got)
 	}
 }
+
+// TestControlHubDeliverNeverBlocksTheAcceptLoop: dispatch runs on the p2p
+// host's single accept loop, so a hub that blocks in deliver stalls every
+// inbound stream on the host — every tunnel, not just this peer's. A spoke
+// that opens more control streams than it reads (a redial, or a peer that is
+// simply rude) must not be able to do that.
+func TestControlHubDeliverNeverBlocksTheAcceptLoop(t *testing.T) {
+	ch := newControlHub("hub1", nil, newFakeP2PHandler(), testLogger())
+	defer ch.Close()
+
+	// The first stream is served (and holds the reader), which is what fills
+	// the slot: the two that follow have nothing to wait on.
+	first, spoke := ch.dialControlForTest("peerB")
+	defer first.Close()
+	defer spoke.Close()
+
+	extra := make([]net.Conn, 0, 3)
+	for i := 0; i < 3; i++ {
+		hub, far := net.Pipe()
+		defer far.Close()
+		extra = append(extra, hub)
+		// Nothing reads these, so a blocking deliver would never return.
+		done := make(chan struct{})
+		go func() { ch.deliver("peerB", hub); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("deliver %d blocked on an already-served peer: the accept loop would stall", i)
+		}
+	}
+	for _, c := range extra {
+		_ = c.Close()
+	}
+}
+
+// TestControlHubUnregisterStopsItsReader: a spoke dropped from the allowlist
+// has its control stream closed, and the goroutine holding that slot has to go
+// with it — one parked goroutine per removed spoke, for the life of the hub,
+// is a leak that only a reload clears.
+func TestControlHubUnregisterStopsItsReader(t *testing.T) {
+	// A hub whose lan_allow row lets this spoke claim: the refusal path is
+	// covered elsewhere, and here the claim has to land to show the slot works.
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, newFakeP2PHandler(), testLogger())
+	defer ch.Close()
+
+	if err := ch.Register("peerB"); err != nil {
+		t.Fatal(err)
+	}
+	ch.Unregister("peerB")
+
+	// The next stream is served by a fresh slot: a claim lands in the RIB and
+	// the hub answers with a netview on the same stream. If the old goroutine
+	// were still holding the peer, the new stream would never be read at all.
+	hub, spoke := ch.dialControlForTest("peerB")
+	defer hub.Close()
+	defer spoke.Close()
+
+	go func() {
+		_ = writeMessage(spoke, claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Add: []string{"192.168.50.0/24"}})
+	}()
+	got, _, err := readMessage(spoke)
+	if err != nil {
+		t.Fatalf("after unregister: %v", err)
+	}
+	if got.Type != ctrlTypeNetview || len(got.Claims) != 1 {
+		t.Fatalf("after unregister the slot answered %+v, want the new stream's netview", got)
+	}
+}
