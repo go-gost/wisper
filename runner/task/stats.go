@@ -86,6 +86,9 @@ func (t *updateStatsTask) updateTunnel() error {
 			stats.OutputBytes = s.Get(stats_pkg.KindOutputBytes)
 			stats.TotalConns = s.Get(stats_pkg.KindTotalConns)
 			stats.TotalErrs = s.Get(stats_pkg.KindTotalErrs)
+			stats.LanRouted = s.Get(xstats.KindLanRouted)
+			stats.LanDenied = s.Get(xstats.KindLanDenied)
+			stats.LanWithdrawn = s.Get(xstats.KindLanWithdrawn)
 			stats.Time = time.Now()
 		}
 
