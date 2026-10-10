@@ -40,7 +40,7 @@
 ## 4. 决策记录
 
 1. **一次到位**：UI 三处呈现 + refusal journal + 事件时间线 + doctor LAN 段落 + 计数修复（用户确认"UI 为主"，并要求诊断可精准定位；不做半吊子）。
-2. **journal 只驻内存**：环形 16 条、新在前、重启即清；"时间线/回溯"由事件历史（持久、按对象）承担。UI 标注"本次运行"，避免把易失数据当承诺。
+2. **journal 只驻内存（用户确认）**：环形 16 条、新在前、重启即清；"时间线/回溯"由事件历史（持久、按对象）承担。UI 标注"本次运行"，避免把易失数据当承诺。
 3. **refusal 结构化但句子不双写**：RIB 增加带原因码的 typed refusal 钩子，人类可读的 `r.report` 行保持不动——日志与 journal 同源，不会漂移。
 4. **doctor 段落由 wisper 侧追加**：`handleGetP2PDoctor` 在 p2p 文本后附加 LAN 段，**不动 p2p 仓库**（跨仓发布不在本设计范围）。
 5. **计数修复走真源**：`updateTunnel` 补三个 `s.Get`。`updateEntrypoint` 的三个读数保留——spoke entrypoint 不产生 LAN 计数，恒 0 无害；不为它新增逻辑。
@@ -197,7 +197,7 @@ refused (this run):
 - **门禁**：`GOWORK=off go build ./...`；按包 `go test`（`./runner/...`、`./tunnel/...`、`./api/...`；`-race` 需 `CGO_ENABLED=1`）；**推送前本地 `GOWORK=off golangci-lint run --timeout 5m`**（v1.9.0 的 CI 教训：CI 的 lint 即本地 v2.14.0，可完全复现）。
 - **已知先存失败**：（x 仓）`TestRunDeviceProbeReportsSent` 只在 `-race` 下失败、只出现在 x 的 `./handler/tun/`；wisper 门禁不受影响。
 - **触点清单**：改 `runner/task/stats.go`、`tunnel/rib.go`、`tunnel/ctrlhub.go`、`api/tunnel_handler.go`、`api/p2p_handler.go`、`tunnel/netview_router.go`、`tunnel/entrypoint/netview.go`、`config/config.go`、`api/entrypoint_handler.go`、`tunnel/entrypoint/tun.go`（§5.0），新增 `tunnel/shareconnector.go`（§5.0），`web-src/src/{api/types.ts,store/*,pages/tunnel-detail-page.ts,pages/entrypoint-detail-page.ts,components/peer-stats-row.ts,i18n/{en,zh}.ts}`；**不改** x、p2p 两个仓（`tun-share` 经 x 既有 connector registry 注册，无需改 x）。
-- **顺序**：spec 批准 → writing-plans → 四个 commit 序贯实现（§5.0 先行）。
+- **顺序**：spec 批准 → writing-plans → 在 `sdd/wisper-lan-observability` 分支四个 commit 序贯实现（§5.0 先行），跑完合入 main（用户确认）。
 
 ## 8. 风险与已知限制
 
