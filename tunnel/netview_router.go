@@ -261,11 +261,13 @@ func keepClaimFresh(stop <-chan struct{}, conn net.Conn, claims []string, log lo
 	}
 }
 
-// RunControlChannel dials the hub's peer key over a chain of the same shape
-// as the tun link (forward connector, udp dialer, metadata p2p provider, no
-// "p2p.network" so the stream is a byte stream), writes ControlMagic, then
+// RunControlChannel dials the hub's peer key over a chain of the tun link's
+// shape (forward connector, udp dialer, the p2p provider) but marked
+// "p2p.network: tcp" so the seam builds a byte stream, not the datagram conn
+// the tun link wants - the hub's demux hands a datagram conn to the tun
+// handler and the claim would never arrive. It writes ControlMagic, then
 // sends this spoke's share_lan as a claim and reads netviews until the conn
-// dies, redialing every second. Failures are logged at debug and retried.
+// dies, redialing every second. Failures are logged at warn and retried.
 //
 // It never returns an error and never gives up on its own: a spoke whose
 // control channel never opens behaves exactly as it does without one — it
@@ -299,14 +301,20 @@ func RunControlChannel(ctx context.Context, cfg ControlChannelConfig) {
 	}
 }
 
-// controlSession is one connect: dial, magic, claim, then netviews until the
-// conn dies. A reconnect is a fresh session and re-sends the whole claim —
-// that is how the hub learns the spoke survived, and a reconnect that forgot
-// its claim would silently lose the spoke's LAN.
-func controlSession(ctx context.Context, cfg ControlChannelConfig) error {
-	// A chain per dial: a chain holds the node's connector state, so each
-	// session builds its own and gives it back on the way out.
-	chCfg := &xconfig.ChainConfig{
+// controlChainConfig builds the one-hop chain the control channel dials the
+// hub with: the same node shape as the tun link's chain, but the network
+// marker is what makes the two different - see the test that pins it.
+//
+// The marker is not optional. The dialer is udp, and the udp dialer hardwires
+// the base network to "udp"; the p2p seam then builds a datagram session and
+// hands back a net.PacketConn, which the hub's demuxControlStream passes
+// straight to the tun handler as a tun link. The WISP magic would never be
+// consumed and the claim would never reach the controlHub - the hub would sit
+// with an empty RIB and the spoke would show no LAN routes, with nothing in
+// either log naming the cause. "tcp" asks the seam for the opposite shape:
+// the marker, not the dialer, is what says which one.
+func controlChainConfig(cfg ControlChannelConfig) *xconfig.ChainConfig {
+	return &xconfig.ChainConfig{
 		Name: "netview",
 		Hops: []*xconfig.HopConfig{
 			{
@@ -317,15 +325,25 @@ func controlSession(ctx context.Context, cfg ControlChannelConfig) error {
 						Addr:      cfg.HubPeer,
 						Connector: &xconfig.ConnectorConfig{Type: "forward"},
 						Dialer:    &xconfig.DialerConfig{Type: "udp"},
-						// No "p2p.network": that marker makes the tun link a
-						// datagram tunnel session-scoped to the peer session;
-						// the control stream wants a plain byte stream.
-						Metadata: map[string]any{"p2p": cfg.Provider},
+						Metadata: map[string]any{
+							"p2p":         cfg.Provider,
+							"p2p.network": "tcp",
+						},
 					},
 				},
 			},
 		},
 	}
+}
+
+// controlSession is one connect: dial, magic, claim, then netviews until the
+// conn dies. A reconnect is a fresh session and re-sends the whole claim —
+// that is how the hub learns the spoke survived, and a reconnect that forgot
+// its claim would silently lose the spoke's LAN.
+func controlSession(ctx context.Context, cfg ControlChannelConfig) error {
+	// A chain per dial: a chain holds the node's connector state, so each
+	// session builds its own and gives it back on the way out.
+	chCfg := controlChainConfig(cfg)
 	ch, err := chain_parser.ParseChain(chCfg, cfg.Log)
 	if err != nil {
 		return err

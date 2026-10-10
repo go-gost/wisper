@@ -219,3 +219,27 @@ func TestKeepClaimFresh(t *testing.T) {
 		t.Fatal("the refresher outlived its session")
 	}
 }
+
+// The control chain must dial a byte stream, not a datagram conn: the hub's
+// demux (tunnel/p2p_host.go demuxControlStream) hands any net.PacketConn
+// straight to the tun handler, so a udp-shaped control stream is delivered
+// as a tun link, the WISP magic is never consumed, and the claim never
+// reaches the controlHub - a silence with no other symptom. The marker is
+// the only thing that says which one the p2p seam builds.
+func TestControlChainDialAStream(t *testing.T) {
+	cfg := controlChainConfig(ControlChannelConfig{HubPeer: "hubkey", Provider: "prov"})
+	node := cfg.Hops[0].Nodes[0]
+
+	if got := node.Metadata["p2p.network"]; got != "tcp" {
+		t.Fatalf("p2p.network = %v, want \"tcp\": a control stream without the marker is a datagram conn the hub demuxes as a tun link, and the claim never arrives", got)
+	}
+	if got := node.Metadata["p2p"]; got != "prov" {
+		t.Fatalf("p2p = %v, want prov", got)
+	}
+	if node.Dialer == nil || node.Dialer.Type != "udp" {
+		t.Fatalf("dialer type = %v, want udp (the tun link's shape)", node.Dialer)
+	}
+	if node.Connector == nil || node.Connector.Type != "forward" {
+		t.Fatalf("connector type = %v, want forward (the tun link's shape)", node.Connector)
+	}
+}
