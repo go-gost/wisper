@@ -71,8 +71,9 @@ stats.LanWithdrawn = s.Get(xstats.KindLanWithdrawn) // 105
   `hub-own-route` | hub 自己已注入该路由 | "the hub has that route of its own"
   `taken-by-peer` | 别的 spoke 先到先得 | "spoke %q claimed it first and keeps it"
 
-- RIB：`newRIB` 增第二个钩子 `refused func(Origin string, Prefix netip.Prefix, Code string, Detail string)`；六处拒绝点各带码调用。`ApplyClaim` 签名不变。`rib.go:301` 的 TTL 撤销走 `report`（现有 warn 行）即可，不入 journal（它不是"被拒"）。
+- RIB：`newRIB` 增第二个钩子 `refused func(Origin string, Prefix netip.Prefix, Code string, Detail string)`。拒绝点只有四处 `r.report`：`no-allow-row`/`empty-allow`/`outside-allow` 三码由 `approvalRefusal` 改为返回 `(code, detail, ok)` 产生，其余三处（`covers-member`/`hub-own-route`/`taken-by-peer`）在分支内直接带码。`ApplyClaim` 签名不变。`rib.go:301` 的 TTL 撤销走 `report`（现有 warn 行）即可，不入 journal（它不是"被拒"）。
 - `controlHub`：环形缓冲 `refusals []LanRefusal`（cap 16，`append` 后截断，新在前），钩子落地时：入 journal + `count(KindLanDenied, 1)` + `event.Record(hubID, event.LevelWarn, ...)`（与 `report` 的 warn 同行同内容，事件侧供 UI/事件页）。
+- **记账唯一来源**：`applyClaim`（`ctrlhub.go:458-462`）里 `before - len(accepted)` 的 `KindLanDenied` 计数**删除**——与 refusal 钩子并存会双计，`ctrlhub_test.go:407` 的 `denied == 1` 也会破。
 - 数据结构：`type LanRefusal struct { Prefix, Peer, Reason, Detail string; At time.Time }`，与 `LanRoute`/`LanState` 同放 `ctrlhub.go`。
 - 访问：`LanState` 增字段 `Refused []LanRefusal`（tunnel 包内一个读，医生和 API 不会互不同意，与 Routes/PeerClaims 同源的原则一致）。
 
@@ -81,15 +82,15 @@ stats.LanWithdrawn = s.Get(xstats.KindLanWithdrawn) // 105
 `installRoutes` 已有 diff（`routed`/`withdrawn`），把两边各补一条事件，**只在 diff 非空时记**（刷新不记，保证有界）：
 
 - 新 prefix：`event.Record(hubID, LevelInfo, "LAN route %s installed (spoke %q)", prefix, peer)`
-- 消失的 prefix：`event.Record(hubID, LevelInfo, "LAN route %s withdrawn", prefix)`——peer 来自旧 `ch.installed` 表项（`Peer` 字段即声称者）；**原因**（TTL/掉线）由 `rib.go:301` 的既有 warn 行承担，两行相邻可对照，不重新发明原因枚举。
+- 消失的 prefix：`event.Record(hubID, LevelInfo, "LAN route %s withdrawn (spoke %q)", prefix, peer)`。`ch.installed` 现为 `map[netip.Prefix]struct{}`（`ctrlhub.go:78`，无 peer），改为 `map[netip.Prefix]string`（prefix→声称者），同步改 `installed()` 辅助函数（`ctrlhub.go:501`）与相关测试；**原因**（TTL/掉线）由 `rib.go:301` 的既有 warn 行承担——事件给「谁/哪条」，日志给「为什么」，两行相邻可对照，不重新发明原因枚举。
 
 hubID 即 tunnel ID（`s.opts.ID`，与 `tun.go:551` 的既有用法一致）。
 
 ### 5.4 Go · API（`api/tunnel_handler.go`）
 
-- `lanResponse` 增 `Rejected []lanRejectedJSON `json:"rejected"``，元素 `{prefix, peer, reason, at}`，`at` 为 RFC3339 UTC。
-- `lanJSON` 从 `lan.Refused` 填充；claims/routes 不变。**只增不改**，旧消费者不受影响。
-- 其他出口不变（`/api/tunnels`、`/api/stats` 自动带上）。
+- `lanResponse` 增 `Rejected []lanRejectedJSON `json:"rejected"``，元素 `{prefix, peer, reason, at}`，`at` 为 RFC3339 UTC；`lanJSON` 从 `lan.Refused` 填充，claims/routes 不变。
+- **per-peer LAN 走轮询路径**：`peerStatsJSON` 增 `LAN []string `json:"lan,omitempty"``（数据源 `LanState.PeerClaims()[key]`），`toTunnelResponse` 的 peer_stats 映射同步填充。不依赖 allowlist 的 `options.peers[].lan`——那是静态配置面，`applyStats` 不拷 `options`，轮询不会刷新它。
+- **只增不改**，旧消费者不受影响；其他出口不变（`/api/tunnels`、`/api/stats` 自动带上）。
 
 ### 5.5 Go · doctor LAN 段（`api/p2p_handler.go`）
 
@@ -109,13 +110,13 @@ refused (this run):
 
 ### 5.6 Go · 日志纪律（spoke 侧升格）
 
-`tunnel/entrypoint/netview_router.go:225` 与 `netview.go:37/62` 由 debug 提 warn，信息带 prefix：claim 发送/接收侧的失败是"LAN 不通"的 A 类直接证据，默认级别必须看得见。
+`tunnel/netview_router.go:225`（刷新失败）与 `tunnel/entrypoint/netview.go:37/62`（注册失败、share_lan 解析失败）由 debug 提 warn，信息带 prefix：claim 发送/接收侧的失败是"LAN 不通"的 A 类直接证据，默认级别必须看得见。
 
 ### 5.7 Web（`web-src/src`）
 
 - **`api/types.ts`**：
   - `ServiceStats`/`ItemStats` 增 `lan_routed?: number; lan_denied?: number; lan_withdrawn?: number`。
-  - `PeerStats` 增 `lan?: string[]`（对应 peerJSON 的 `lan`）。
+  - `PeerStats` 增 `lan?: string[]`（对应 `peerStatsJSON.lan`，轮询路径，随 `peer_stats` 每次刷新）。
   - `Tunnel` 增 `lan?: TunnelLAN`：
 
     ```ts
@@ -144,9 +145,9 @@ refused (this run):
 {
   "lan": {
     "routes": [
-      { "prefix": "192.168.50.0/24", "origin": "yWeo…nMTQ", "peer": "yWeo…nMTQ", "allow": [] }
+      { "prefix": "192.168.50.0/24", "origin": "yWeo…nMTQ", "peer": "yWeo…nMTQ" }
     ],
-    "claims": { "yWeo…nMTQ": { "prefixes": ["192.168.50.0/24"], "allow": [] } },
+    "claims": { "yWeo…nMTQ": { "prefixes": ["192.168.50.0/24"] } },
     "rejected": [
       { "prefix": "10.0.0.0/8", "peer": "AbCd…1234", "reason": "outside-allow",
         "at": "2026-10-10T03:14:22Z" }
@@ -166,8 +167,8 @@ refused (this run):
   - `api/` 渲染测试：`lan.rejected` 字段形状；doctor 文本含 LAN 段且有封顶。
 - **Web**：无单测传统，门禁 = `npx tsc --noEmit` + `npx vite build`（CI 同款）。
 - **门禁**：`GOWORK=off go build ./...`；按包 `go test`（`./runner/...`、`./tunnel/...`、`./api/...`；`-race` 需 `CGO_ENABLED=1`）；**推送前本地 `GOWORK=off golangci-lint run --timeout 5m`**（v1.9.0 的 CI 教训：CI 的 lint 即本地 v2.14.0，可完全复现）。
-- **已知先存失败**：`TestRunDeviceProbeReportsSent`（unrelated，允许）。
-- **触点清单**：改 `runner/task/stats.go`、`tunnel/rib.go`、`tunnel/ctrlhub.go`、`api/tunnel_handler.go`、`api/p2p_handler.go`、`tunnel/entrypoint/netview*.go`、`web-src/src/{api/types.ts,store/*,pages/tunnel-detail-page.ts,pages/entrypoint-detail-page.ts,components/peer-stats-row.ts,i18n/{en,zh}.ts}`；**不改** x、p2p 两个仓。
+- **已知先存失败**：（x 仓）`TestRunDeviceProbeReportsSent` 只在 `-race` 下失败、只出现在 x 的 `./handler/tun/`；wisper 门禁不受影响。
+- **触点清单**：改 `runner/task/stats.go`、`tunnel/rib.go`、`tunnel/ctrlhub.go`、`api/tunnel_handler.go`、`api/p2p_handler.go`、`tunnel/netview_router.go`、`tunnel/entrypoint/netview.go`、`web-src/src/{api/types.ts,store/*,pages/tunnel-detail-page.ts,pages/entrypoint-detail-page.ts,components/peer-stats-row.ts,i18n/{en,zh}.ts}`；**不改** x、p2p 两个仓。
 - **顺序**：spec 批准 → writing-plans → 三个 commit 序贯实现。
 
 ## 8. 风险与已知限制
@@ -184,3 +185,4 @@ refused (this run):
 - 与既有事实对齐：§5.1 的 kind 编号、§5.2 的六条原因串、§5.4 的既有字段名均逐条核对过代码；§3 的"三处既有信号"分别指向 peer 行徽标、`tun.go:551-554` 事件、doctor punch，无一新增。
 - 歧义已收敛：journal 内存态且标注易失；refusal 码集封闭为六；doctor 段封顶；事件只在 diff 非空时记。
 - 规模可单 plan 交付：三个 commit 可分别独立测试，无循环依赖。
+- review 轮修正（fresh-eyes 对照代码）：per-peer LAN 定在 `peerStatsJSON` 轮询路径；`KindLanDenied` 记账单源；`ch.installed` 改 prefix→peer；`approvalRefusal` 返回码；spoke 侧文件名与门禁归属修正。
