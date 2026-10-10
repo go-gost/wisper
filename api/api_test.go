@@ -390,9 +390,9 @@ func TestGetTunTunnelOptions(t *testing.T) {
 		"device_name": "wisper-hub",
 		"routes":      "192.168.50.0/24",
 		"dns":         "10.10.0.1",
-		"keepalive":  true,
-		"ttl":        float64(15),
-		"lan_allow":  "peerA=192.168.0.0/16",
+		"keepalive":   true,
+		"ttl":         float64(15),
+		"lan_allow":   "peerA=192.168.0.0/16",
 	} {
 		if got := opts[field]; got != want {
 			t.Errorf("options[%s] = %v, want %v", field, got, want)
@@ -823,6 +823,73 @@ func TestCreateTunEntryPointValidation(t *testing.T) {
 				t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
 			}
 		})
+	}
+}
+
+// TestCreateTunEntrypointShareFields: a spoke is the only entrypoint that
+// shares a LAN, so its share_lan/share_mode have to reach the create request
+// and come back out through the API — the same fields the entrypoint form reads
+// into. A create that drops them stores a spoke sharing nothing.
+// kernel rather than the default auto is asked for on purpose: the response
+// maps an unset mode back to auto, so auto would read as correct even with the
+// field dropped on the way out.
+func TestCreateTunEntrypointShareFields(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	// A create starts the entrypoint, and Run's tun listener builds its router
+	// through the gost default logger, which is nil here (wisper sets it at
+	// startup) — without a real one the start panics before the answer.
+	if oldLog := clogger.Default(); oldLog != nil {
+		t.Cleanup(func() { clogger.SetDefault(oldLog) })
+	}
+	clogger.SetDefault(xlogger.NewLogger(xlogger.LevelOption(clogger.ErrorLevel)))
+
+	resp, created := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+		"type": "tun", "name": "ep1", "net": "10.20.0.2/24",
+		"peer": "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA", "share_lan": "192.168.50.0/24", "share_mode": "kernel",
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create tun entrypoint = %d: %v, want 201", resp.StatusCode, created)
+	}
+	id, _ := created["id"].(string)
+	defer entrypoint.Delete(id)
+
+	resp, got := getJSON(t, srv.URL+"/api/entrypoints/"+id)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get entrypoint = %d: %v", resp.StatusCode, got)
+	}
+	opts, ok := got["options"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected options object, got %v", got["options"])
+	}
+	if opts["share_lan"] != "192.168.50.0/24" {
+		t.Errorf("options.share_lan = %v, want 192.168.50.0/24", opts["share_lan"])
+	}
+	if opts["share_mode"] != "kernel" {
+		t.Errorf("options.share_mode = %v, want kernel", opts["share_mode"])
+	}
+}
+
+// TestCreateTunEntrypointRejectsBadShareLAN: a malformed CIDR list is refused
+// here rather than at Run, as for a tun hub (see validateTunTunnel) — the create
+// would otherwise answer 201 and leave a stored spoke that never starts.
+func TestCreateTunEntrypointRejectsBadShareLAN(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+		"type": "tun", "name": "ep1", "net": "10.20.0.2/24",
+		"peer": "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA", "share_lan": "banana",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("create tun entrypoint with share_lan=banana = %d: %v, want 400", resp.StatusCode, body)
+	}
+	if msg, _ := body["error"].(string); !strings.Contains(msg, "share_lan") {
+		t.Errorf("error = %q, want it to name share_lan", msg)
+	}
+	if n := entrypoint.Count(); n != 0 {
+		t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
 	}
 }
 

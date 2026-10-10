@@ -37,6 +37,12 @@ type entrypointCreateRequest struct {
 	Routes string `json:"routes,omitempty"`
 	// DNS is the device's DNS servers, comma-separated.
 	DNS string `json:"dns,omitempty"`
+	// ShareLAN lists the LAN subnets this spoke shares with the hub,
+	// comma-separated CIDRs. Empty disables sharing.
+	ShareLAN string `json:"share_lan,omitempty"`
+	// ShareMode pins the sharing implementation (auto/kernel/userspace).
+	// Empty leaves the default (auto).
+	ShareMode string `json:"share_mode,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
@@ -54,6 +60,8 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.DeviceNameOption(r.DeviceName),
 		tunnel.RoutesOption(r.Routes),
 		tunnel.DNSOption(r.DNS),
+		tunnel.ShareLANOption(r.ShareLAN),
+		tunnel.ShareModeOption(r.ShareMode),
 	}
 }
 
@@ -135,6 +143,13 @@ func validateTunEntryPoint(r *entrypointCreateRequest) error {
 	}
 	if !tunnel.ValidPeerKey(r.Peer) {
 		return fmt.Errorf("peer must be the hub's base64 public key")
+	}
+	// A malformed share_lan is refused here rather than at Run, as for a tun
+	// hub (see validateTunTunnel): the create would otherwise answer 201 and
+	// the spoke would fail to start, leaving a stored entrypoint that never
+	// runs.
+	if _, err := tunnel.ParseShareLANNets(r.ShareLAN); err != nil {
+		return fmt.Errorf("share_lan %q is not a comma-separated list of CIDRs: %v", r.ShareLAN, err)
 	}
 	return nil
 }
