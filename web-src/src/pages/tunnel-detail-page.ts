@@ -6,7 +6,7 @@ import { getTunnels, refresh, remove, start, stop, subscribe, resetStats } from 
 import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber, formatTimestamp } from '../utils/format';
+import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import { saveErrorText } from '../utils/save-error';
 import { GoBackend } from '../api/backend';
 import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent } from '../api/types';
@@ -200,6 +200,29 @@ export class TunnelDetailPage extends LitElement {
    *  and nothing else, since a hub's peers are pasted off their peers. */
   private _peerKeys(): string {
     return (this._tunnel?.options.peers ?? []).map(p => p.key).join('\n');
+  }
+
+  /** _peerName is how this page names a peer key: its alias when the allowlist
+   *  carries one, the masked key otherwise — the masking the peers page applies
+   *  to the same key, because the key is a credential. The LAN table, the
+   *  claims and the refusals all arrive as bare keys and none of them is a
+   *  place to reveal one. */
+  private _peerName(key: string): string {
+    const alias = (this._tunnel?.options.peers ?? []).find(p => p.key === key)?.alias;
+    return alias || maskKey(key);
+  }
+
+  /** _lanOrigin is who put a route in the table: 'static' is the hub's own
+   *  config, anything else is the spoke that claimed it. */
+  private _lanOrigin(origin: string): string {
+    return origin === 'static' ? t('lanOriginHub') : this._peerName(origin);
+  }
+
+  /** _lanAllow is who may use a route: everyone, when the hub set no allow
+   *  list (the empty list the RIB stores for one), or the named members. */
+  private _lanAllow(allow?: string[]): string {
+    if (!allow || allow.length === 0) return t('lanAllowAll');
+    return allow.map(k => this._peerName(k)).join(', ');
   }
 
   /** _isP2P is what both p2p types have in common on this page: an allowlist
@@ -653,6 +676,93 @@ export class TunnelDetailPage extends LitElement {
       margin-bottom: 4px;
     }
 
+    /* ── LAN routing ── */
+    .lan-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    /* A refusal and a withdrawal are not the same kind of number as a route,
+       so they are not the traffic grid's one healthy colour either: amber for
+       a spoke that asked and was told nothing, grey for a route that left. */
+    .stat-box.denied .stat-value {
+      color: var(--amber);
+    }
+    .stat-box.withdrawn .stat-value {
+      color: var(--text-muted);
+    }
+    .lan-table {
+      margin-top: 8px;
+    }
+    .lan-head {
+      padding: 10px 12px 2px;
+      font-size: var(--font-sm);
+      font-weight: 600;
+    }
+    .lan-scope {
+      font-weight: 400;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+    }
+    .lan-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: var(--font-sm);
+    }
+    .lan-row:last-child {
+      border-bottom: none;
+    }
+    .lan-row.head {
+      padding-bottom: 4px;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .lan-prefix {
+      flex: 1;
+      min-width: 0;
+      font-family: var(--font-mono, monospace);
+      overflow-wrap: anywhere;
+    }
+    .lan-origin,
+    .lan-allow {
+      flex: none;
+      max-width: 42%;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+    /* The refusal's own line under its row: the reason code an operator
+       searches for, then the sentence the RIB wrote for it. */
+    .lan-detail {
+      flex-basis: 100%;
+      padding-top: 2px;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .lan-reason {
+      font-family: var(--font-mono, monospace);
+      color: var(--amber);
+    }
+    .lan-empty {
+      padding: 14px 12px;
+      text-align: center;
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+    }
+    .lan-guidance {
+      padding: 10px 2px 0;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
     /* ── Form ── */
     .form-group {
       margin-bottom: 14px;
@@ -909,6 +1019,10 @@ export class TunnelDetailPage extends LitElement {
     const t2 = this._tunnel;
     const stats = t2 ? t2.stats : null;
     const typeLabel = this._typeLabel();
+    // The LAN table arrives as one read of the hub's RIB, so its three lists
+    // are read once here and drawn from the same snapshot.
+    const lan = t2?.lan ?? null;
+    const lanClaims = lan ? Object.entries(lan.claims) : [];
 
     return html`
       <app-scaffold>
@@ -1146,6 +1260,102 @@ export class TunnelDetailPage extends LitElement {
                 `
                 : ''}
             </div>
+
+            <!-- LAN routing: the routes the hub installed, what each spoke
+                 claimed, and what the hub turned down. Only a hub that reports
+                 LAN state draws this — every other tunnel type, and a hub whose
+                 control channel never opened, has no section to show. -->
+            ${lan
+              ? html`
+                <div class="section">
+                  <div class="section-title">${t('lanTitle')}</div>
+                  <!-- The run's three counts, in the traffic grid's own boxes:
+                       routed is the healthy one, a refusal amber (a spoke asked
+                       and was told nothing), a withdrawal grey (a route left,
+                       which is not a fault). -->
+                  <div class="lan-summary">
+                    <div class="stat-box">
+                      <div class="stat-label">${t('lanRouted')}</div>
+                      <div class="stat-value">${formatNumber(stats?.lan_routed ?? 0)}</div>
+                    </div>
+                    <div class="stat-box denied">
+                      <div class="stat-label">${t('lanDenied')}</div>
+                      <div class="stat-value">${formatNumber(stats?.lan_denied ?? 0)}</div>
+                    </div>
+                    <div class="stat-box withdrawn">
+                      <div class="stat-label">${t('lanWithdrawn')}</div>
+                      <div class="stat-value">${formatNumber(stats?.lan_withdrawn ?? 0)}</div>
+                    </div>
+                  </div>
+
+                  <div class="lan-table card">
+                    <div class="lan-head">${t('lanRoutesTitle')} (${lan.routes.length})</div>
+                    <div class="lan-row head">
+                      <span class="lan-prefix">${t('lanColPrefix')}</span>
+                      <span class="lan-origin">${t('lanColOrigin')}</span>
+                      <span class="lan-allow">${t('lanColAllow')}</span>
+                    </div>
+                    ${lan.routes.length === 0
+                      ? html`<div class="lan-empty">${t('lanNoRoutes')}</div>`
+                      : lan.routes.map(r => html`
+                        <div class="lan-row">
+                          <span class="lan-prefix">${r.prefix}</span>
+                          <span class="lan-origin">${this._lanOrigin(r.origin)}</span>
+                          <span class="lan-allow">${this._lanAllow(r.allow)}</span>
+                        </div>`)}
+                  </div>
+
+                  ${lanClaims.length > 0
+                    ? html`
+                      <div class="lan-table card">
+                        <div class="lan-head">${t('lanClaimsTitle')} (${lanClaims.length})</div>
+                        <div class="lan-row head">
+                          <span class="lan-prefix">${t('lanColPeer')}</span>
+                          <span class="lan-origin">${t('lanColClaimed')}</span>
+                          <span class="lan-allow">${t('lanColAllow')}</span>
+                        </div>
+                        ${lanClaims.map(([key, c]) => html`
+                          <div class="lan-row">
+                            <span class="lan-prefix">${this._peerName(key)}</span>
+                            <span class="lan-origin">${c.prefixes.join(', ')}</span>
+                            <span class="lan-allow">${this._lanAllow(c.allow)}</span>
+                          </div>`)}
+                      </div>
+                    `
+                    : nothing}
+
+                  ${lan.rejected.length > 0
+                    ? html`
+                      <div class="lan-table card">
+                        <!-- A refusal is never revoked and its prefix never
+                             reaches the table above, so the two read together —
+                             and the refusals are the run's, which is what the
+                             scope note says: restart the hub and they are gone. -->
+                        <div class="lan-head">
+                          ${t('lanRejectedTitle')} <span class="lan-scope">${t('lanRejectedThisRun')}</span>
+                        </div>
+                        <div class="lan-row head">
+                          <span class="lan-prefix">${t('lanColPrefix')}</span>
+                          <span class="lan-origin">${t('lanColPeer')}</span>
+                          <span class="lan-allow">${t('lanColTime')}</span>
+                        </div>
+                        ${lan.rejected.map(r => html`
+                          <div class="lan-row">
+                            <span class="lan-prefix">${r.prefix}</span>
+                            <span class="lan-origin">${this._peerName(r.peer)}</span>
+                            <span class="lan-allow">${formatTimestamp(r.at)}</span>
+                            <span class="lan-detail">
+                              <span class="lan-reason">${r.reason}</span>${r.detail ? ` — ${r.detail}` : ''}
+                            </span>
+                          </div>`)}
+                      </div>
+                    `
+                    : nothing}
+
+                  <div class="lan-guidance">${t('lanGuidance')}</div>
+                </div>
+              `
+              : nothing}
 
             <!-- Allowed peers: the allowlist lives on its own page (long lists,
                  per-peer live traffic), where saving it applies in place. A
