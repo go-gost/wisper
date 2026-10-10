@@ -12,7 +12,7 @@ func TestRIBApprovalGatesDynamicClaims(t *testing.T) {
 	var events []string
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, time.Now)
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, nil, time.Now)
 
 	// Inside the approved supernet: accepted.
 	got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil)
@@ -35,7 +35,7 @@ func TestRIBApprovalGatesDynamicClaims(t *testing.T) {
 }
 
 func TestRIBConflictStaticWinsAndLPM(t *testing.T) {
-	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, time.Now)
+	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, nil, time.Now)
 	// A "via" resolves against the members the hub knows.
 	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerB"}})
 
@@ -64,7 +64,7 @@ func TestRIBEqualLengthFirstWinsWithEvent(t *testing.T) {
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
 		"peerC": {netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, time.Now)
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, nil, time.Now)
 
 	r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil)
 	if got := r.ApplyClaim("peerC", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 0 {
@@ -83,7 +83,7 @@ func TestRIBEqualLengthFirstWinsWithEvent(t *testing.T) {
 }
 
 func TestRIBSnapshotRevOnlyOnChange(t *testing.T) {
-	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, time.Now)
+	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, nil, time.Now)
 	if s := r.Snapshot(); s.Rev != 1 {
 		t.Fatalf("first rev = %d, want 1", s.Rev)
 	}
@@ -109,7 +109,7 @@ func TestRIBRefusesAClaimOverAMemberTunAddress(t *testing.T) {
 	var events []string
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, time.Now)
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, nil, time.Now)
 	r.SetMembers([]memberEntry{{IP: "10.10.100.5", Key: "peerA"}})
 
 	// The member's address exactly: the hub's own route to a spoke is the one
@@ -145,7 +145,7 @@ func TestRIBDropTakesOnlyItsOwnClaim(t *testing.T) {
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
 		"peerC": {netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(string, ...any) {}, time.Now)
+	}, func(string, ...any) {}, nil, time.Now)
 	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerB"}})
 	if got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 1 {
 		t.Fatal("setup claim refused")
@@ -188,7 +188,7 @@ func TestRIBDropTakesOnlyItsOwnClaim(t *testing.T) {
 }
 
 func TestRIBRoutesCarryThePeerThatReachesThem(t *testing.T) {
-	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, time.Now)
+	r := newRIB("hub1", map[string][]netip.Prefix{"peerB": {netip.MustParsePrefix("192.168.0.0/16")}}, func(string, ...any) {}, nil, time.Now)
 	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerB"}, {IP: "10.10.100.10", Key: "peerC"}})
 	if got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 1 {
 		t.Fatal("setup claim refused")
@@ -233,7 +233,7 @@ func TestRIBWithdrawsAStaleClaim(t *testing.T) {
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	r := newRIB("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
-	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, func() time.Time { return now })
+	}, func(format string, args ...any) { events = append(events, fmt.Sprintf(format, args...)) }, nil, func() time.Time { return now })
 
 	r.SetMembers([]memberEntry{{IP: "10.10.100.5", Key: "peerB"}})
 	if got := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(got) != 1 {
@@ -290,5 +290,91 @@ func TestRIBWithdrawsAStaleClaim(t *testing.T) {
 	}
 	if _, ok := r.Routes()[netip.MustParsePrefix("192.168.77.0/24")]; !ok {
 		t.Fatal("the refreshed claim is not routed")
+	}
+}
+
+// TestRIBRefusalCodes: a refusal is a decision, and a decision an operator can
+// act on has to say which of the six reasons it was. The codes are the closed
+// set the hub's journal and the API publish — a seventh spelling of "no" would
+// be a refusal nothing downstream could classify — and each carries the human
+// sentence it has always carried, so the log line and the journal entry are one
+// fact in two shapes rather than two facts that can drift apart.
+//
+// The order below is the order ApplyClaim checks in, which is also the order an
+// operator fixes them in: not permitted to claim at all, then permitted but not
+// of anything this network is made of, then permitted and taken.
+func TestRIBRefusalCodes(t *testing.T) {
+	type refusal struct {
+		origin string
+		prefix netip.Prefix
+		code   string
+		detail string
+	}
+	var got []refusal
+	var lines []string
+	r := newRIB("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16"), netip.MustParsePrefix("10.0.0.0/8")},
+		"peerC": {netip.MustParsePrefix("192.168.0.0/16"), netip.MustParsePrefix("10.0.0.0/8")},
+		// A row that exists and names nothing: this spoke is configured, and
+		// configured to claim nothing — a different failure from "rogue", which
+		// has no row at all.
+		"peerD": {},
+	}, func(format string, args ...any) { lines = append(lines, fmt.Sprintf(format, args...)) },
+		func(origin string, prefix netip.Prefix, code, detail string) {
+			got = append(got, refusal{origin: origin, prefix: prefix, code: code, detail: detail})
+		},
+		time.Now)
+
+	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerA"}})
+	if err := r.AddStatic("10.20.0.0/16 via 10.10.100.9"); err != nil {
+		t.Fatal(err)
+	}
+	// The claim the last refusal is measured against: a taken prefix is one a
+	// peer already holds.
+	if accepted := r.ApplyClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, nil); len(accepted) != 1 {
+		t.Fatal("setup claim refused")
+	}
+
+	// The expected codes are spelled here as literals, not as the rib package's
+	// constants: from the next commit on these strings leave the process — the
+	// journal, the API, the UI — so a renamed constant must break this test,
+	// not silently move the contract with it.
+	cases := []struct {
+		origin string
+		prefix netip.Prefix
+		code   string
+	}{
+		{"rogue", netip.MustParsePrefix("10.0.0.0/8"), "no-allow-row"},
+		{"peerD", netip.MustParsePrefix("10.0.0.0/8"), "empty-allow"},
+		{"peerB", netip.MustParsePrefix("0.0.0.0/0"), "outside-allow"},
+		{"peerB", netip.MustParsePrefix("10.10.100.0/24"), "covers-member"},
+		{"peerC", netip.MustParsePrefix("10.20.0.0/16"), "hub-own-route"},
+		{"peerC", netip.MustParsePrefix("192.168.50.0/24"), "taken-by-peer"},
+	}
+	for _, c := range cases {
+		if accepted := r.ApplyClaim(c.origin, []netip.Prefix{c.prefix}, nil); len(accepted) != 0 {
+			t.Fatalf("%s claiming %s must be refused with %s: %v", c.origin, c.prefix, c.code, accepted)
+		}
+	}
+
+	if len(got) != len(cases) {
+		t.Fatalf("the hook saw %d refusals, want %d: %+v", len(got), len(cases), got)
+	}
+	if len(lines) != len(got) {
+		t.Fatalf("the log saw %d lines for %d refusals: %v", len(lines), len(got), lines)
+	}
+	for i, c := range cases {
+		if got[i].origin != c.origin || got[i].prefix != c.prefix || got[i].code != c.code {
+			t.Fatalf("refusal %d = %+v, want %s of %s as %s", i, got[i], c.origin, c.prefix, c.code)
+		}
+		if got[i].detail == "" {
+			t.Fatalf("%s carries no explanation for the operator", c.code)
+		}
+		// One sentence, two sinks: the journal's detail and the log line's are
+		// the same one, or the operator reading both is reading two accounts of
+		// one decision that can drift apart.
+		if !strings.Contains(lines[i], got[i].detail) {
+			t.Fatalf("refusal %d logs %q without its detail %q", i, lines[i], got[i].detail)
+		}
 	}
 }

@@ -144,6 +144,7 @@ func newControlPeer() *controlPeer {
 // The RIB's event sink is the hub's log: every refusal and every conflict is a
 // line naming the prefix and the spokes involved, because the operator reading
 // the hub's history is the only one who can act on a claim that did not take.
+// The typed side of a refusal goes nowhere for now — nothing journals it yet.
 func newControlHub(hubID string, allow map[string][]netip.Prefix, sink prefixSink, log logger.Logger) *controlHub {
 	ch := &controlHub{
 		hubID: hubID,
@@ -151,7 +152,7 @@ func newControlHub(hubID string, allow map[string][]netip.Prefix, sink prefixSin
 			if log != nil {
 				log.Warnf(format, args...)
 			}
-		}, time.Now),
+		}, nil, time.Now),
 		sink:      sink,
 		log:       log,
 		peers:     make(map[string]*controlPeer),

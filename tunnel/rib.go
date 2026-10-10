@@ -14,6 +14,32 @@ import (
 // a snapshot can tell an operator's route from a peer's own.
 const staticOrigin = "static"
 
+// The hub's reasons for turning a claim down. They are a closed set of six, in
+// the order ApplyClaim checks them — which is also the order an operator fixes
+// them in — because a code an operator has to guess at is worse than no code:
+// the journal and the API publish exactly these, and a seventh spelling of "no"
+// would be a refusal nothing downstream could classify.
+const (
+	// refusalNoAllowRow: the hub has no lan_allow row for this peer at all,
+	// which is default-deny for a spoke nobody configured.
+	refusalNoAllowRow = "no-allow-row"
+	// refusalEmptyAllow: the peer has a row and the row is empty — configured,
+	// and configured to claim nothing.
+	refusalEmptyAllow = "empty-allow"
+	// refusalOutsideAllow: the prefix is not inside any supernet the row
+	// allows, or is wider than all of them.
+	refusalOutsideAllow = "outside-allow"
+	// refusalCoversMember: the prefix swallows a member's own tun address, and
+	// routing that address to a LAN would blackhole the member's own traffic.
+	refusalCoversMember = "covers-member"
+	// refusalHubOwnRoute: the hub's own configuration already holds the route
+	// an operator asked for.
+	refusalHubOwnRoute = "hub-own-route"
+	// refusalTakenByPeer: another spoke claimed the prefix first and keeps it;
+	// equal length is a conflict, and first wins.
+	refusalTakenByPeer = "taken-by-peer"
+)
+
 // lanClaim is one route the hub has approved: the CIDR, who holds it, and —
 // the second of the two layers, and the one that has nothing to do with
 // approval — who may use it.
@@ -88,6 +114,11 @@ type rib struct {
 	allow   map[string][]netip.Prefix
 	members []memberEntry
 	events  func(string, ...any)
+	// refused is the typed half of a refusal: the peer, the prefix, the reason
+	// code and the human sentence. It is the journal's door — a refusal the hub
+	// records, counts and shows an operator — and it is called under the lock,
+	// like report, because it describes the decision being made right now.
+	refused func(origin string, prefix netip.Prefix, code, detail string)
 	// now is where the clock comes from. It is injected because the whole
 	// point of a TTL is the comparison it makes, and a RIB that read the
 	// clock itself could not be tested without a minute of sleeping — the
@@ -99,7 +130,9 @@ type rib struct {
 // supernets it may claim inside. A peer with no row claims nothing at all —
 // default-deny — so a spoke that reaches a hub it is not configured for cannot
 // put a route into it just by saying so. events receives one line per refusal
-// and per conflict, which is how the operator learns a claim did not take.
+// and per conflict, which is how the operator learns a claim did not take;
+// refused receives the same decisions typed, with a reason code and the
+// sentence, which is how they reach a journal an operator can read back.
 //
 // The rows are copied and masked rather than held: allow is the caller's map,
 // read from the hub's config, and a RIB that read it in place would see a later
@@ -108,7 +141,10 @@ type rib struct {
 // its key, because "this spoke may claim nothing" and "this spoke is not
 // configured here" are different states and only the refusal message tells them
 // apart.
-func newRIB(hubID string, allow map[string][]netip.Prefix, events func(string, ...any), now func() time.Time) *rib {
+//
+// Either sink may be nil: a RIB is a routing table, and one with no listener
+// refuses exactly the same claims without telling anyone.
+func newRIB(hubID string, allow map[string][]netip.Prefix, events func(string, ...any), refused func(origin string, prefix netip.Prefix, code, detail string), now func() time.Time) *rib {
 	rows := make(map[string][]netip.Prefix, len(allow))
 	for peer, supers := range allow {
 		row := make([]netip.Prefix, 0, len(supers))
@@ -118,12 +154,13 @@ func newRIB(hubID string, allow map[string][]netip.Prefix, events func(string, .
 		rows[peer] = row
 	}
 	return &rib{
-		hubID:  hubID,
-		rev:    1,
-		claims: make(map[netip.Prefix]*lanClaim),
-		allow:  rows,
-		events: events,
-		now:    now,
+		hubID:   hubID,
+		rev:     1,
+		claims:  make(map[netip.Prefix]*lanClaim),
+		allow:   rows,
+		events:  events,
+		refused: refused,
+		now:     now,
 	}
 }
 
@@ -191,21 +228,26 @@ func (r *rib) ApplyClaim(origin string, add, drop []netip.Prefix) []netip.Prefix
 		// The three refusals, in the order an operator would fix them: not
 		// permitted to claim it at all, then permitted but not of anything this
 		// network is made of, then permitted and taken by a peer.
-		if why, ok := r.approvalRefusal(origin, prefix); !ok {
+		if code, why, ok := r.approvalRefusal(origin, prefix); !ok {
+			r.refuse(origin, prefix, code, why)
 			r.report("spoke %q may not claim %s: %s", origin, prefix, why)
 			continue
 		}
 		if addr, key, ok := r.memberIn(prefix); ok {
-			r.report("spoke %q may not claim %s: it covers %s, the tun address of spoke %q, and routing it there would blackhole that spoke's own traffic",
-				origin, prefix, addr, key)
+			why := fmt.Sprintf("it covers %s, the tun address of spoke %q, and routing it there would blackhole that spoke's own traffic", addr, key)
+			r.refuse(origin, prefix, refusalCoversMember, why)
+			r.report("spoke %q may not claim %s: %s", origin, prefix, why)
 			continue
 		}
 		if taken && held.Static {
+			r.refuse(origin, prefix, refusalHubOwnRoute, "the hub has that route of its own")
 			r.report("spoke %q may not claim %s: the hub has that route of its own", origin, prefix)
 			continue
 		}
 		if taken {
-			r.report("spoke %q may not claim %s: spoke %q claimed it first and keeps it", origin, prefix, held.Origin)
+			why := fmt.Sprintf("spoke %q claimed it first and keeps it", held.Origin)
+			r.refuse(origin, prefix, refusalTakenByPeer, why)
+			r.report("spoke %q may not claim %s: %s", origin, prefix, why)
 			continue
 		}
 
@@ -217,15 +259,17 @@ func (r *rib) ApplyClaim(origin string, add, drop []netip.Prefix) []netip.Prefix
 }
 
 // approvalRefusal is the first gate: may this origin have this route in the
-// table at all. It reports why, because "refused" without a reason is the one
-// answer that leaves an operator nothing to do.
-func (r *rib) approvalRefusal(origin string, prefix netip.Prefix) (string, bool) {
-	supers, ok := r.allow[origin]
-	if !ok {
-		return "the hub has no lan_allow row for it, and an unconfigured peer may claim nothing", false
+// table at all. It reports both a reason code and the sentence explaining it,
+// because "refused" without a reason is the one answer that leaves an operator
+// nothing to do — and a code with no sentence leaves them nothing to explain
+// the code with.
+func (r *rib) approvalRefusal(origin string, prefix netip.Prefix) (code, detail string, ok bool) {
+	supers, exists := r.allow[origin]
+	if !exists {
+		return refusalNoAllowRow, "the hub has no lan_allow row for it, and an unconfigured peer may claim nothing", false
 	}
 	if len(supers) == 0 {
-		return "its lan_allow row is empty", false
+		return refusalEmptyAllow, "its lan_allow row is empty", false
 	}
 	for _, super := range supers {
 		// Both halves: the network address has to be inside the supernet, and
@@ -233,10 +277,10 @@ func (r *rib) approvalRefusal(origin string, prefix netip.Prefix) (string, bool)
 		// by address and inside none of them by length, and approving it on the
 		// address alone is how a claim of the whole internet gets through.
 		if super.Contains(prefix.Addr()) && super.Bits() <= prefix.Bits() {
-			return "", true
+			return "", "", true
 		}
 	}
-	return "lan_allow lets it claim only inside " + joinPrefixes(supers), false
+	return refusalOutsideAllow, "lan_allow lets it claim only inside " + joinPrefixes(supers), false
 }
 
 // memberIn reports a member whose own tun address falls inside prefix. Such a
@@ -501,6 +545,19 @@ func (r *rib) report(format string, args ...any) {
 		return
 	}
 	r.events(format, args...)
+}
+
+// refuse is the typed half of a refusal: the peer that claimed, the prefix it
+// asked for, which of the six reasons turned it down, and the sentence the
+// operator reads. It is the journal's door, and it is nil-safe for the same
+// reason report is — a RIB with no listener refuses the same claims without
+// recording them anywhere, and a hub that never asked for a journal should not
+// have one appear.
+func (r *rib) refuse(origin string, prefix netip.Prefix, code, detail string) {
+	if r.refused == nil {
+		return
+	}
+	r.refused(origin, prefix, code, detail)
 }
 
 // splitKeys reads an allow list: comma-separated peer keys, empties dropped so
