@@ -114,7 +114,8 @@ hubID 即 tunnel ID（`s.opts.ID`，与 `tun.go:551` 的既有用法一致）。
 
 ### 5.4 Go · API（`api/tunnel_handler.go`）
 
-- `lanResponse` 增 `Rejected []lanRejectedJSON `json:"rejected"``，元素 `{prefix, peer, reason, at}`，`at` 为 RFC3339 UTC；`lanJSON` 从 `lan.Refused` 填充，claims/routes 不变。
+- `lanResponse` 增 `Rejected []lanRejectedJSON `json:"rejected"``，元素 `{prefix, peer, reason, detail, at}`（`reason` = 原因码，`detail` = 人类句子，`at` RFC3339 UTC）；`lanJSON` 从 `lan.Refused` 填充，claims/routes 不变。
+- `tunnelResponse` 增 `LANRoutes []string `json:"lan_routes,omitempty"``，仅 tun entrypoint 填充：`entrypoint.InstalledLANRoutes()`（新导出；`NetviewRouter` 增 `Prefixes() []string`，排序 CIDR）。
 - **per-peer LAN 走轮询路径**：`peerStatsJSON` 增 `LAN []string `json:"lan,omitempty"``（数据源 `LanState.PeerClaims()[key]`），`toTunnelResponse` 的 peer_stats 映射同步填充。不依赖 allowlist 的 `options.peers[].lan`——那是静态配置面，`applyStats` 不拷 `options`，轮询不会刷新它。
 - **只增不改**，旧消费者不受影响；其他出口不变（`/api/tunnels`、`/api/stats` 自动带上）。
 
@@ -147,7 +148,7 @@ refused (this run):
 
     ```ts
     interface LANRoute { prefix: string; origin: string; peer: string; allow?: string[] }
-    interface LANRefusal { prefix: string; peer: string; reason: string; at: string }
+    interface LANRefusal { prefix: string; peer: string; reason: string; detail?: string; at: string }
     interface TunnelLAN { routes: LANRoute[]; claims: Record<string, { prefixes: string[]; allow?: string[] }>; rejected: LANRefusal[] }
     ```
 
@@ -161,7 +162,7 @@ refused (this run):
   5. 指引行（固定一行）："路由已装但仍不通？看 peer 的传输徽标、共享后端事件（kernel/userspace）、诊断面板的 punch 状态。"
   - routes 为空时显示"暂无 LAN 路由"而非空白段。
 - **`components/peer-stats-row.ts`**：`peer-ip` 行旁（同款 `.peer-ip` 样式）加 `LAN: cidr, …`，`lan` 非空才出现。
-- **`pages/entrypoint-detail-page.ts`**：spoke 侧加一条 info-row：`LAN 路由（hub 批准）: 192.168.50.0/24, …`（`lan_routes` 非空时）。
+- **`pages/entrypoint-detail-page.ts`**：spoke 侧加一条 info-row：`LAN 路由（hub 批准）: 192.168.50.0/24, …`（顶置 `lan_routes` 非空时）。**生产者**：`tunnel/netview_router.go` 增 `(*NetviewRouter).Prefixes() []string`；`tunnel/entrypoint/netview.go` 增 `InstalledLANRoutes() []string`（经 `netviewRouter()` 读，未初始化进程返回空）；`toTunnelResponse` 对 tun entrypoint 填充。
 - **`i18n/en.ts` + `zh.ts`**：新键齐套（段标题、表头、汇总标签、指引行、空态）。
 
 ## 6. 数据契约
