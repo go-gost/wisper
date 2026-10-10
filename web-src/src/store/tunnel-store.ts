@@ -125,6 +125,10 @@ export function applyStats(statsList: Tunnel[]): void {
             status: s.status,
             error: s.error,
             peer_stats: s.peer_stats,
+            // The LAN table travels with the list (a hub's RIB read is not a
+            // per-second counter), so a poll must not drop it: the section it
+            // draws would vanish between refreshes.
+            lan: s.lan,
           }
         : t,
     );

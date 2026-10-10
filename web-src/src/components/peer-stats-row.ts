@@ -133,6 +133,13 @@ export class PeerStatsRow extends LitElement {
              hub's rows hold one (a p2p tunnel has no device network), so it is
              absent — and this line with it — everywhere else. -->
         ${p?.ip ? html`<div class="peer-ip">${t('peersIP')}: ${p.ip}</div>` : nothing}
+        <!-- The LANs this peer holds on the hub's network: the CIDRs it claimed
+             and the hub installed. Read the same way the address above it is
+             (same class, so the two stack as one block of row facts), and
+             absent — with this line — for a peer that claimed none. -->
+        ${s?.lan && s.lan.length > 0
+          ? html`<div class="peer-ip">${t('peersLAN')}: ${s.lan.join(', ')}</div>`
+          : nothing}
         ${s
           ? html`<div class="peer-stats">
               <span>${formatNumber(s.current_conns)} ${t('p2pColConns')}</span>

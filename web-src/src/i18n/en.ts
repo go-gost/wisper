@@ -205,6 +205,8 @@ const en: Record<string, string> = {
   peersIP: 'IP',
   peersIPHint:
     'The address this spoke may use on the hub\'s network. Leave empty and the hub assigns one from its own subnet; a spoke must be configured with the same address.',
+  /** The peer row's LAN line: the CIDRs this peer claimed and the hub installed. */
+  peersLAN: 'LAN',
   peersKeyRequired: 'A key is required.',
   peersKeyInvalid: 'Not a base64 32-byte public key.',
   peersKeyDuplicate: 'Listed twice.',

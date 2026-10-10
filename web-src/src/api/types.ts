@@ -33,6 +33,12 @@ export interface ServiceStats {
   output_bytes: number;
   input_rate_bytes: number;
   output_rate_bytes: number;
+  /** LAN routes a tun hub installed (absent everywhere else). */
+  lan_routed?: number;
+  /** LAN claims a tun hub refused. */
+  lan_denied?: number;
+  /** LAN routes a tun hub withdrew. */
+  lan_withdrawn?: number;
 }
 
 export interface ItemStats {
@@ -44,6 +50,9 @@ export interface ItemStats {
   output_bytes: number;
   input_rate_bytes: number;
   output_rate_bytes: number;
+  lan_routed?: number;
+  lan_denied?: number;
+  lan_withdrawn?: number;
 }
 
 // ─── Tunnel ──────────────────────────────────────────────────────────────────
@@ -128,6 +137,9 @@ export interface PeerStats {
   /** The peer's recent punch history: short lines, oldest first (newest kept),
    *  capped by the p2p host's ring. */
   trace?: string[];
+  /** The LANs this peer holds on the hub's network — the CIDRs it claimed.
+   *  Absent when it holds none (and on an object that has no device network). */
+  lan?: string[];
   current_conns: number;
   total_conns: number;
   input_bytes: number;
@@ -148,6 +160,38 @@ export interface WisperEvent {
   count?: number;
 }
 
+/** One LAN route a tun hub installed: the CIDR, who put it there (a spoke's
+ *  key, or 'static' for the hub's own config), the member that carries it, and
+ *  the members allowed to use it (absent = all of them). */
+export interface LANRoute {
+  prefix: string;
+  origin: string;
+  peer: string;
+  allow?: string[];
+}
+
+/** One claim a tun hub turned down: the CIDR, the spoke that asked, the RIB's
+ *  reason code, the sentence an operator reads, and when. A refusal is never
+ *  revoked and its prefix never reaches the routes table, which is why the two
+ *  lists are read together. */
+export interface LANRefusal {
+  prefix: string;
+  peer: string;
+  reason: string;
+  detail?: string;
+  at: string;
+}
+
+/** A tun hub's LAN routing, as one read of its RIB: the installed table, each
+ *  spoke's claim of it, and what was refused. Only a running hub reports one,
+ *  so every other object — and a hub whose control channel never opened —
+ *  leaves the field absent. */
+export interface TunnelLAN {
+  routes: LANRoute[];
+  claims: Record<string, { prefixes: string[]; allow?: string[] }>;
+  rejected: LANRefusal[];
+}
+
 export interface Tunnel {
   id: string;
   name: string;
@@ -162,6 +206,8 @@ export interface Tunnel {
   stats: ServiceStats;
   /** p2p tunnels: per-peer traffic, allowlist order. */
   peer_stats?: PeerStats[];
+  /** tun hubs: the LAN routing state (absent on everything else). */
+  lan?: TunnelLAN;
   /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
   peer_transport?: string;
   /** tun hubs: the sharing backend actually settled on ('kernel'/'userspace', absent when disabled). */
@@ -221,6 +267,10 @@ export interface EntrypointOptions {
   /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
   routes?: string;
   dns?: string;
+  /** Hub-side LAN subnets shared with peers (comma-separated CIDRs, empty disables). */
+  share_lan?: string;
+  /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
+  share_mode?: string;
 }
 
 export interface Entrypoint {
@@ -237,6 +287,10 @@ export interface Entrypoint {
   stats: ServiceStats;
   /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
   peer_transport?: string;
+  /** tun entrypoints: the LANs this spoke's hub approved and installed, which
+   *  is what became of its share_lan rather than what it asked for. Absent
+   *  when the hub approved nothing. */
+  lan_routes?: string[];
   /** This object's recent history, newest first. */
   events?: WisperEvent[];
 }
@@ -265,6 +319,10 @@ export interface EntrypointCreateRequest {
   /** Subnets routed through the device, comma-separated "cidr [gw]" pairs. */
   routes?: string;
   dns?: string;
+  /** Hub-side LAN subnets shared with peers (comma-separated CIDRs, empty disables). */
+  share_lan?: string;
+  /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
+  share_mode?: string;
 }
 
 // ─── Stats Snapshot ──────────────────────────────────────────────────────────
