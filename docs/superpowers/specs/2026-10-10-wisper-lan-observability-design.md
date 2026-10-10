@@ -1,12 +1,13 @@
 # wisper LAN 可观测性与诊断：让路由状态可见、故障可定位设计
 
-日期：2026-10-10 | 状态：draft 待 review | 路径：architectural（brainstorming 已确认：UI 为主 + 诊断可精准快速定位，用户指示"走spec"）
+日期：2026-10-10（审查后修订 v2） | 状态：draft 待 review | 路径：architectural（brainstorming 已确认：UI 为主 + 诊断可精准快速定位，用户指示"走spec"；审查发现 spoke 侧未接线，用户确认修复纳入本 plan）
 
 ## 1. 理解与目标（用户所说 vs 假设）
 
 - 用户所说：v1.9.0 已发布 LAN routing，但"新版本完全看不到新功能变化"；且可观测性与诊断要同时考虑**以后 debug 是否方便、能否精准快速定位问题**。
 - 假设（待纠正）：主要消费者是 app 内的 Web UI（原生壳 / Tauri / Android 都嵌 `web-src`）；排查入口同时存在服务器侧（日志文件、`GET /api/logs`）与设备侧（设置页诊断面板）；hub 与 spoke 通常是两台主机，调试依赖各自状态而非同机观察（e2e 探针尚未建成，不在本设计内兑现）。
 - 成功标准：
+  - **S0 功能可达（修复前置，审查后增补）**：spoke 的 `share_lan` 配置真正生效——claim 到达 hub、路由装上、A 能经 hub 到达 B 的 LAN。不满足 S0，S1–S5 都是给空表做 UI。
   - S1 可见：hub 的 tunnel 详情页能看到已装路由表、各 spoke 的 claim、三个 LAN 计数；peer 行能看到各自 LAN 网段；spoke 的 entrypoint 页能看到本机已装路由。
   - S2 可定位："ping 不通"能在半分钟内归到三类之一——claim 没到 / 被拒（**带原因**）/ 装上但传输层不通——每类指出具体 peer 与 prefix，并给出下一步看哪里。
   - S3 可回溯：装路由 / 撤路由 / 拒绝都有时间线，"什么时候变的、为什么变"可答。
@@ -15,6 +16,7 @@
 
 ## 2. 现状与根因
 
+- **断点零（最致命，2026-10-10 审查发现）：spoke 侧从未接线。** `StartNetview`（`tunnel/entrypoint/netview.go:53`）、`SetupSpokeShare`/`NewChainShareShim`（`tunnel/share_spoke.go`）零非测试调用方；`tunEntryPoint.RunContext` 不启动控制通道也不应用分享；entrypoint 的配置面（config/API/UI）没有 `share_lan`。真实部署中没有任何 claim 到达 hub——claims 恒空、路由恒无，不只是显示问题。修复见 §5.0，为本 plan 第一优先级。
 - 数据本来就在，且 API 契约是对的：`api/tunnel_handler.go:44` `Lan *lanResponse`（routes + claims，`:156-199`）、peer 的 `LAN []string`（`:87`）、`statsResponse.LanRouted/LanDenied/LanWithdrawn`（`:212-216`），`/api/stats`、`/api/tunnels`、`/api/entrypoints` 都在吐。
 - **断点一（最致命）：hub 的计数恒 0。** `runner/task/stats.go` 的 `updateTunnel`（`:85-90`）只读 5 个通用 kind；三个 LAN kind 只有 `updateEntrypoint` 读（`:145-147`）。hub 是 tunnel 不是 entrypoint，而 LAN 计数只由 hub 产生（`tunnel/ctrlhub.go` 的 `installRoutes`/`applyClaim`），于是 API 对 hub 永远吐 0。唯一有数据的那个面是假的。
 - **断点二：前端不消费。** `web-src/src/api/types.ts` 无 `lan` 字段；`store/tunnel-store.ts` 的 `applyStats`（`:118-131`）只拷 `entrypoint/stats/status/error/peer_stats`，`lan` 被直接丢弃。
@@ -31,6 +33,8 @@
 | B claim 被拒 | RIB 拒绝，spoke 不知情 | `rib.go:195-208` 六种原因的 warn 行 | **refusal journal**：peer/prefix/原因码/时间，API + UI 可读（§5.2） |
 | C 装上但不通 | 路由在表里但流量不过 | peer 行 transport 徽标；`share_effective`/`share_downgraded` 事件（`tunnel/tun.go:551-554`）；doctor 的 punch 状态 | UI 在 LAN 段给一行"仍不通看这三处"的指引，不新增机制 |
 
+接线修复（§5.0）是这一切的前置：在它落地前，A/B/C 三类都只是"没有数据"。
+
 撤销是第四种状态变化而非故障：TTL 到期（spoke 停止重述）与显式 drop 都要带原因进时间线（§5.3）。
 
 ## 4. 决策记录
@@ -40,10 +44,32 @@
 3. **refusal 结构化但句子不双写**：RIB 增加带原因码的 typed refusal 钩子，人类可读的 `r.report` 行保持不动——日志与 journal 同源，不会漂移。
 4. **doctor 段落由 wisper 侧追加**：`handleGetP2PDoctor` 在 p2p 文本后附加 LAN 段，**不动 p2p 仓库**（跨仓发布不在本设计范围）。
 5. **计数修复走真源**：`updateTunnel` 补三个 `s.Get`。`updateEntrypoint` 的三个读数保留——spoke entrypoint 不产生 LAN 计数，恒 0 无害；不为它新增逻辑。
-6. **不动的东西**：API 既有形状只增不改；首页状态条不做；不上 prometheus；不碰 Android 原生壳；不建 e2e（探针未完成，另行排期）。
-7. **提交三分**：数据真值（计数修复）→ 内核（RIB/journal/事件/API/doctor/日志）→ 前端（UI）。每个 commit 可独立验证。
+6. **不动的东西**：API 既有形状只增不改；首页状态条不做；不上 prometheus；不碰 Android 原生壳；**不建 CI e2e**（功能验收用 2026-10-09 的本地探针，§5.0；CI 化另行排期）。
+7. **接线纳入（用户确认）**：spoke 接线修复是本 plan 的 commit 1（§5.0）——观察性以功能存在为前提。
+8. **提交四分**：接线修复（§5.0）→ 数据真值（计数修复）→ 内核（RIB/journal/事件/API/doctor/日志）→ 前端（UI）。每个 commit 可独立验证。
 
 ## 5. 详细设计
+
+### 5.0 Go · spoke 接线：让数据流真的存在（修复，commit 1）
+
+**现状证据**（审查）：`StartNetview`（`tunnel/entrypoint/netview.go:53`）、`SetupSpokeShare`/`NewChainShareShim`（`tunnel/share_spoke.go`）零非测试调用方；`tunEntryPoint.RunContext` 从不启动它们；entrypoint 无 `share_lan` 配置。
+
+**配置面（`share_lan` + `share_mode`，与 tunnel 同名同义）**：
+- `config/config.go`：entrypoint 配置结构体加 `ShareLAN`/`ShareMode` 两字段（tag 同 tunnel，`config.go:352-354` 的孪生）；config→options 映射同步带上。`createEntryPoint` 已走 `tunnel.TunnelOptions(opts)`（`entrypoint.go:422`），上游填上即通。
+- `api/entrypoint_handler.go`：`entrypointCreateRequest` 加两字段 + `toOptions()` 映射 + 创建/更新校验（`ParseShareLANNets`/`NormalizeShareMode`，照 `api/tunnel_handler.go:651`）。
+- Web：`entrypoint-detail-page.ts` 表单状态/输入/请求体/回填（照 `tunnel-detail-page.ts:195/291` 的 `_shareLAN`），tun 类型才显示；`share_mode` 缺省 auto。
+
+**启动接线（`tunnel/entrypoint/tun.go`）**：
+1. **控制通道永远启动**：`StartNetview(ctx, host, s.peer, s.opts.ShareLAN, s.provider, log)`——不分享 LAN 的 spoke 也要靠它装 hub 批准的去程路由；ctx 用 RunContext 的 ctx；放在 host 注册与 punch 之后。空 `share_lan` 族 claim 为空（组件已处理），不影响控制通道与 netview 安装。
+2. **分享条件应用**：`share_lan` 非空时 `SetupSpokeShare(s.opts.Net, lans, shareMode, probeShareKernel())`；语义与 hub 对齐（`kernel` 钉死失败即启动失败；`auto` 降级 userspace + warn 事件）。cleanup 挂 entrypoint 关闭路径（与 hub 的 `shareCleanup` 同款），启动中途失败即回滚。
+3. **userspace 降级的数据路径**：`init()` 里先 probe+SetupSpokeShare 再定 connector——kernel 时节点保持 `forward`（`tun.go:173`）；userspace 时 `node.Connector.Type = "tun-share"`。新文件 `tunnel/shareconnector.go`：`init()` 向 x 的 connector registry 注册 `tun-share`；`Connect(ctx, conn, …)` 对拿到的链 conn 建一颗**新的** `ChainShareShim` + `newShareStack(mtu)`（每次 Connect 一颗，重拨不复用旧栈）并 `Wrap` 返回；metadata 传 `lans`/`mtu`。组件语义（分类/回复泵/关闭行为）Task 5 测试已覆盖，接线只管"何时建、挂在哪、谁关"。
+4. **失败永远不致命**：控制通道连不上、auto 分享降级失败 → 记日志/事件，entrypoint 照常提供普通隧道能力（`StartNetview` 的既有承诺）。
+
+**测试**：
+- `tunnel/`：`tun-share` connector 注册可查；`Connect` 返回的 conn 对 fake 链分类走 stack、直通包原样；每次 Connect 独立栈。
+- config/API：`share_lan`/`share_mode` round-trip；创建校验拒绝坏 CIDR。
+- 接线级：断言 RunContext 在分享时选定 `tun-share`（probe/SetupSpokeShare 走可注入 fake；具体 seam 实现计划定）。
+- **功能验收（本地探针，非 CI）**：复用 2026-10-09 探针（relay+hub+spoke 容器），spoke B 配 `share_lan` 后：hub 的 `lan.claims` 出现 B、A ping 通 B 的 LAN 主机（kernel 路径）——这正是 Task 7 缺掉的第一手检查。
 
 ### 5.1 Go · 计数修复（`runner/task/stats.go` + `stats_test.go`）
 
@@ -165,11 +191,13 @@ refused (this run):
   - `tunnel/rib_test.go`（现成）：六个原因码各一例；`outside-allow` 的位数规则不回归。
   - `tunnel/ctrlhub_test.go`（现成）：refusal 同时进 journal/count/event；journal 满 16 截断且新在前；installRoutes 只对 diff 记事件（刷新不记）；`LanState.Refused` 与 Routes 同源。
   - `api/` 渲染测试：`lan.rejected` 字段形状；doctor 文本含 LAN 段且有封顶。
+  - `tunnel/` connector（§5.0）：`tun-share` 注册可查；Connect 返回的 conn 分类走 stack、直通包原样；每次 Connect 独立栈（重拨不复用）。
+  - config/API（§5.0）：`share_lan`/`share_mode` round-trip；创建校验拒绝坏 CIDR。
 - **Web**：无单测传统，门禁 = `npx tsc --noEmit` + `npx vite build`（CI 同款）。
 - **门禁**：`GOWORK=off go build ./...`；按包 `go test`（`./runner/...`、`./tunnel/...`、`./api/...`；`-race` 需 `CGO_ENABLED=1`）；**推送前本地 `GOWORK=off golangci-lint run --timeout 5m`**（v1.9.0 的 CI 教训：CI 的 lint 即本地 v2.14.0，可完全复现）。
 - **已知先存失败**：（x 仓）`TestRunDeviceProbeReportsSent` 只在 `-race` 下失败、只出现在 x 的 `./handler/tun/`；wisper 门禁不受影响。
-- **触点清单**：改 `runner/task/stats.go`、`tunnel/rib.go`、`tunnel/ctrlhub.go`、`api/tunnel_handler.go`、`api/p2p_handler.go`、`tunnel/netview_router.go`、`tunnel/entrypoint/netview.go`、`web-src/src/{api/types.ts,store/*,pages/tunnel-detail-page.ts,pages/entrypoint-detail-page.ts,components/peer-stats-row.ts,i18n/{en,zh}.ts}`；**不改** x、p2p 两个仓。
-- **顺序**：spec 批准 → writing-plans → 三个 commit 序贯实现。
+- **触点清单**：改 `runner/task/stats.go`、`tunnel/rib.go`、`tunnel/ctrlhub.go`、`api/tunnel_handler.go`、`api/p2p_handler.go`、`tunnel/netview_router.go`、`tunnel/entrypoint/netview.go`、`config/config.go`、`api/entrypoint_handler.go`、`tunnel/entrypoint/tun.go`（§5.0），新增 `tunnel/shareconnector.go`（§5.0），`web-src/src/{api/types.ts,store/*,pages/tunnel-detail-page.ts,pages/entrypoint-detail-page.ts,components/peer-stats-row.ts,i18n/{en,zh}.ts}`；**不改** x、p2p 两个仓（`tun-share` 经 x 既有 connector registry 注册，无需改 x）。
+- **顺序**：spec 批准 → writing-plans → 四个 commit 序贯实现（§5.0 先行）。
 
 ## 8. 风险与已知限制
 
@@ -177,7 +205,8 @@ refused (this run):
 - **事件体积有界但非零**：只记状态迁移，长期运行的 hub 事件量取决于 LAN 变动频率（每 spoke 每 20s 重述不触发）。
 - **doctor 文本增长**：LAN 段封顶（routes 全量、claims 全量、refused 5 条）；多 hub 各一段。
 - **alias 解析在 UI 侧**：claims/rejected 以 peer key 为键，UI 用 `options.peers`/`peer_stats` 的 alias 渲染，退化显示掩码 key。
-- **不在本设计兑现**：e2e 覆盖（探针未完成，另行排期）；Android 原生壳无变化；prometheus 导出；doctor 的 p2p 段本身不动。
+- **userspace shim 的接线风险（§5.0）**：`tun-share` 每次 Connect 建新 shim/栈、关闭随 conn；重拨时旧 conn 由引擎关闭——实现计划需用测试钉住"重拨不漏栈、不双泵"（组件级 Task 5 已测，接线级是新增面）。
+- **不在本设计兑现**：CI e2e（本地探针做功能验收，§5.0；CI 化另行排期）；Android 原生壳无变化；prometheus 导出；doctor 的 p2p 段本身不动。
 
 ## 9. 自查（spec self-review）
 
@@ -185,4 +214,5 @@ refused (this run):
 - 与既有事实对齐：§5.1 的 kind 编号、§5.2 的六条原因串、§5.4 的既有字段名均逐条核对过代码；§3 的"三处既有信号"分别指向 peer 行徽标、`tun.go:551-554` 事件、doctor punch，无一新增。
 - 歧义已收敛：journal 内存态且标注易失；refusal 码集封闭为六；doctor 段封顶；事件只在 diff 非空时记。
 - 规模可单 plan 交付：三个 commit 可分别独立测试，无循环依赖。
+- 审查后增补：spoke 接线缺口（§2 断点零；证据=三个导出符号零非测试调用方 + entrypoint 无配置字段）经用户确认纳入 §5.0；S0、提交四分、触点与测试同步增补。
 - review 轮修正（fresh-eyes 对照代码）：per-peer LAN 定在 `peerStatsJSON` 轮询路径；`KindLanDenied` 记账单源；`ch.installed` 改 prefix→peer；`approvalRefusal` 返回码；spoke 侧文件名与门禁归属修正。
