@@ -3,8 +3,10 @@ package tunnel
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +17,8 @@ import (
 	tunhandler "github.com/go-gost/x/handler/tun"
 	xlogger "github.com/go-gost/x/logger"
 	xstats "github.com/go-gost/x/observer/stats"
+
+	"github.com/go-gost/wisper/event"
 )
 
 // fakeCounters is the stats object the hub counts into: one map, one method.
@@ -409,6 +413,128 @@ func TestControlHubCountsWhatItRouts(t *testing.T) {
 	}
 	if got := counts.total[xstats.KindLanWithdrawn]; got != 1 {
 		t.Errorf("lan withdrawn = %d, want the prefix the drop took out", got)
+	}
+}
+
+// TestControlHubJournalsRefusals: a refusal is the one state a spoke is never
+// told about, so it is the one an operator can only see if the hub writes it
+// down. The journal holds it newest first with the peer, the reason code and
+// the sentence; the counter counts it exactly once; and the hub's event history
+// gets a line, which is what outlives the run's window. Two claims peerB is not
+// allowed to make arrive the way a real spoke's do: down one control stream,
+// through deliver.
+func TestControlHubJournalsRefusals(t *testing.T) {
+	const hubID = "hub-journal"
+	h := newFakeP2PHandler()
+	ch := newControlHub(hubID, map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+	defer ch.Close()
+
+	counts := newFakeCounters()
+	ch.SetCounter(counts)
+	// Isolate: the event store is process-wide, so a run of this test must not
+	// read another's history.
+	event.Seed(hubID, nil)
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	hub, ctrl := ch.dialControlForTest("peerB")
+	defer hub.Close()
+	defer ctrl.Close()
+
+	// Both are outside peerB's allow row, so both are refused.
+	go func() {
+		_, _ = ctrl.Write(framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"10.0.0.0/8"}}))
+		_, _ = ctrl.Write(framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"172.16.0.0/12"}}))
+	}()
+	// The hub answers the claim with a netview even though the refusal left the
+	// rev alone; read it, because that write is made from the reader goroutine
+	// and a write nobody reads would hold it for the whole write timeout.
+	_ = ctrl.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, _, err := readMessage(ctrl); err != nil {
+		t.Fatalf("read the netview the hub pushed: %v", err)
+	}
+
+	waitFor(t, "both refused claims must be journaled", func() bool {
+		return len(ch.LanState().Refused) == 2
+	})
+
+	// Newest first: the claim that just arrived is the one an operator is
+	// looking for.
+	want := []LanRefusal{
+		{Prefix: "172.16.0.0/12", Peer: "peerB", Reason: refusalOutsideAllow},
+		{Prefix: "10.0.0.0/8", Peer: "peerB", Reason: refusalOutsideAllow},
+	}
+	refused := ch.LanState().Refused
+	for i, w := range want {
+		got := refused[i]
+		if got.Prefix != w.Prefix || got.Peer != w.Peer {
+			t.Fatalf("refused[%d] = %+v, want %s from %s (all: %+v)", i, got, w.Prefix, w.Peer, refused)
+		}
+		if got.Reason != w.Reason {
+			t.Fatalf("refused[%d] reason = %q, want %q", i, got.Reason, w.Reason)
+		}
+		if got.Detail == "" {
+			t.Fatalf("refused[%d] = %+v, want the sentence beside the code", i, got)
+		}
+		if got.At.IsZero() {
+			t.Fatalf("refused[%d] = %+v, want when it happened", i, got)
+		}
+	}
+
+	// One refusal, one count. The other place this was measured — the
+	// difference between what a spoke asked for and what it got, in applyClaim —
+	// would count each of these a second time now that the refusal itself is
+	// counted, so it is gone and this is the only place.
+	if got := counts.total[xstats.KindLanDenied]; got != 2 {
+		t.Errorf("lan denied = %d, want the two claims the hub refused", got)
+	}
+	if got := counts.total[xstats.KindLanRouted]; got != 0 {
+		t.Errorf("lan routed = %d, want nothing: both claims were refused", got)
+	}
+
+	history := strings.Join(warnMessages(hubID), "\n")
+	for _, prefix := range []string{"10.0.0.0/8", "172.16.0.0/12"} {
+		if !strings.Contains(history, "may not claim") || !strings.Contains(history, prefix) {
+			t.Errorf("the hub's history does not name the refusal of %s: %q", prefix, history)
+		}
+	}
+}
+
+// TestControlHubJournalCapsAt16: the journal is a window on this run, not a
+// log. Seventeen refusals hold the newest sixteen and drop the oldest, so a hub
+// that has been misconfigured for an hour does not grow without bound — and the
+// counting is unaffected by the cap, because the count is the operator's total
+// and the journal is only the recent view.
+func TestControlHubJournalCapsAt16(t *testing.T) {
+	const hubID = "hub-cap"
+	h := newFakeP2PHandler()
+	ch := newControlHub(hubID, map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+	defer ch.Close()
+
+	counts := newFakeCounters()
+	ch.SetCounter(counts)
+
+	// applyClaim rather than the control stream: the order is the assertion
+	// here, and the reader goroutine would make it a race against them.
+	for i := 0; i <= refusalJournalCap; i++ {
+		ch.applyClaim("peerB", claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Add: []string{fmt.Sprintf("10.0.%d.0/24", i)}})
+	}
+
+	refused := ch.LanState().Refused
+	if len(refused) != refusalJournalCap {
+		t.Fatalf("the journal holds %d refusals, want the cap of %d", len(refused), refusalJournalCap)
+	}
+	if got := refused[0].Prefix; got != fmt.Sprintf("10.0.%d.0/24", refusalJournalCap) {
+		t.Errorf("the newest refusal is %s, want the last one sent", got)
+	}
+	if got := refused[len(refused)-1].Prefix; got != "10.0.1.0/24" {
+		t.Errorf("the oldest refusal kept is %s, want 10.0.1.0/24: the first must be the one dropped", got)
+	}
+	if got := counts.total[xstats.KindLanDenied]; got != int64(refusalJournalCap+1) {
+		t.Errorf("lan denied = %d, want the %d refusals that happened, capped journal or not", got, refusalJournalCap+1)
 	}
 }
 

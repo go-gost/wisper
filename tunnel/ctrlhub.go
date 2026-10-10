@@ -19,6 +19,8 @@ import (
 	"github.com/go-gost/core/observer/stats"
 	tunhandler "github.com/go-gost/x/handler/tun"
 	xstats "github.com/go-gost/x/observer/stats"
+
+	"github.com/go-gost/wisper/event"
 )
 
 const (
@@ -85,6 +87,21 @@ type controlHub struct {
 	// than panicking — and it is set from Run, which holds the shared stats
 	// the API reads.
 	counter statsCounter
+
+	// refMu guards refusals, the run's window on the claims the hub turned
+	// down. It is a separate lock from mu, and deliberately the innermost one:
+	// the RIB calls the refusal hook while holding its own lock, so anything
+	// taken here must never take the RIB's (or the hub's) back. LanState copies
+	// the journal out under it and lets it go, so a reader never holds a lock
+	// the RIB is waiting on.
+	refMu    sync.Mutex
+	refusals []LanRefusal
+
+	// now is where the clock comes from, the same one the RIB was built with:
+	// a refusal recorded and the claim it lost to have to agree about when.
+	// It is injected rather than read here so that wiring stays in one place,
+	// and a test that ever needs a fixed time has somewhere to put it.
+	now func() time.Time
 }
 
 // statsKind is the kind of LAN event being counted: x's kinds (KindLanRouted
@@ -144,21 +161,26 @@ func newControlPeer() *controlPeer {
 // The RIB's event sink is the hub's log: every refusal and every conflict is a
 // line naming the prefix and the spokes involved, because the operator reading
 // the hub's history is the only one who can act on a claim that did not take.
-// The typed side of a refusal goes nowhere for now — nothing journals it yet.
+// The typed half of a refusal goes to the journal, which is also the hub's one
+// place for counting it.
 func newControlHub(hubID string, allow map[string][]netip.Prefix, sink prefixSink, log logger.Logger) *controlHub {
+	// One clock for the RIB's TTL and the journal's timestamps, so a refusal
+	// recorded and the claim it lost to carry the same notion of now.
+	now := time.Now
 	ch := &controlHub{
-		hubID: hubID,
-		rib: newRIB(hubID, allow, func(format string, args ...any) {
-			if log != nil {
-				log.Warnf(format, args...)
-			}
-		}, nil, time.Now),
+		hubID:     hubID,
 		sink:      sink,
 		log:       log,
 		peers:     make(map[string]*controlPeer),
 		installed: make(map[netip.Prefix]struct{}),
 		done:      make(chan struct{}),
+		now:       now,
 	}
+	ch.rib = newRIB(hubID, allow, func(format string, args ...any) {
+		if log != nil {
+			log.Warnf(format, args...)
+		}
+	}, ch.refuse, now)
 
 	// The withdrawal sweep runs for the life of the hub. It is the one
 	// operation that removes a route nobody withdrew: a claim is live only
@@ -273,6 +295,23 @@ func (ch *controlHub) SetStaticRoutes(specs []string) error {
 // carries.
 func (ch *controlHub) Snapshot() claimSet { return ch.rib.Snapshot() }
 
+// LanRefusal is one claim the hub turned down: the CIDR the spoke asked for,
+// the spoke that asked, which of the RIB's reasons said no, the sentence the
+// operator reads, and when. It is a record of a decision, not of a state — a
+// refusal is never revoked, and its prefix is never in the route table.
+type LanRefusal struct {
+	Prefix string
+	Peer   string
+	Reason string
+	Detail string
+	At     time.Time
+}
+
+// refusalJournalCap is how many refusals a run remembers. A bound and not a
+// setting: the journal is a window on what just went wrong, and a hub that has
+// been misconfigured for an hour should not grow for as long as it lived.
+const refusalJournalCap = 16
+
 // LanState is the hub's LAN routing the way an operator reads it: both owners
 // of every route, because a route's claimer and its carrier are different
 // things. A claim names the spoke that asked for the prefix; a route names the
@@ -283,6 +322,10 @@ type LanState struct {
 	// Routes is what the hub installed: every route in force, with both of
 	// its owners.
 	Routes []LanRoute
+	// Refused is what the hub turned down, newest first: the claims a spoke
+	// was never told about, which is the one half of this state an operator
+	// can get nowhere else.
+	Refused []LanRefusal
 }
 
 // LanRoute is one installed route: the CIDR, the spoke that claimed it (or
@@ -341,7 +384,54 @@ func (ch *controlHub) LanState() LanState {
 	// One order, so the list a reader sees is the list the next reader sees and
 	// a UI can render without re-sorting.
 	slices.SortFunc(out, func(a, b LanRoute) int { return strings.Compare(a.Prefix, b.Prefix) })
-	return LanState{Routes: out}
+	return LanState{Routes: out, Refused: ch.refusedSnapshot()}
+}
+
+// refusedSnapshot is the journal as a copy, newest first. It is read under the
+// journal's own lock and that lock is released before the caller has anything
+// — which is the point of it being a leaf: the RIB refuses claims under its
+// lock, and a reader holding the journal's lock across a render would be a
+// second path into the same mutex.
+func (ch *controlHub) refusedSnapshot() []LanRefusal {
+	ch.refMu.Lock()
+	defer ch.refMu.Unlock()
+	return slices.Clone(ch.refusals)
+}
+
+// refuse is the RIB's typed hook and the hub's one place for counting a
+// refusal. It runs under the RIB's lock, so it does three things that cannot
+// block and takes no lock the RIB holds: the journal (a copy of 16 structs),
+// the counter, and the hub's event history.
+//
+// The counting lives here rather than beside ApplyClaim because this is the
+// decision: applyClaim's other way of counting them — the difference between
+// what a spoke asked for and what it got — counted each refusal a second time,
+// and could only ever see the ones it happened to measure against.
+func (ch *controlHub) refuse(origin string, prefix netip.Prefix, code, detail string) {
+	ch.journal(LanRefusal{
+		Prefix: prefix.String(),
+		Peer:   origin,
+		Reason: code,
+		Detail: detail,
+		At:     ch.now(),
+	})
+	ch.count(xstats.KindLanDenied, 1)
+	// Same line the hub's log gets, filed under the tunnel: the log is what
+	// scrolls past, the event page is what an operator reads back later.
+	event.Record(ch.hubID, event.LevelWarn, "spoke %q may not claim %s: %s", origin, prefix, detail)
+}
+
+// journal puts one refusal at the front of the window and drops whatever fell
+// off the back. Newest first, so a reader gets the order an operator wants
+// without a sort, and the drop is the tail rather than a shift.
+func (ch *controlHub) journal(r LanRefusal) {
+	ch.refMu.Lock()
+	defer ch.refMu.Unlock()
+
+	ch.refusals = append([]LanRefusal{r}, ch.refusals...)
+	if len(ch.refusals) > refusalJournalCap {
+		ch.refusals = ch.refusals[:refusalJournalCap]
+	}
 }
 
 // deliver hands the hub the spoke end of one accepted control stream, with
@@ -446,21 +536,17 @@ func (ch *controlHub) runStream(peer string, p *controlPeer, conn net.Conn) {
 // applyClaim hands one spoke's add/drop to the RIB. A prefix that does not
 // parse is an event, not a silence: the spoke was configured with something
 // that names no network, and the operator gets to see which.
+//
+// The RIB's answer is not read: a refused claim is counted and journaled where
+// the refusal is decided (see refuse), not measured here against what the spoke
+// asked for. Counting it both ways counted every refusal twice.
 func (ch *controlHub) applyClaim(peer string, m claimMessage) {
 	add := parseClaimPrefixes(ch, peer, m.Add)
 	drop := parseClaimPrefixes(ch, peer, m.Drop)
 	if len(add) == 0 && len(drop) == 0 {
 		return
 	}
-	// The difference between what the spoke asked for and what it got is what
-	// the hub refused: a claim the RIB turned down is invisible on the wire —
-	// the spoke is told nothing — so the counter is the only place an operator
-	// can see a claim being dropped.
-	before := len(add)
-	accepted := ch.rib.ApplyClaim(peer, add, drop)
-	if denied := before - len(accepted); denied > 0 {
-		ch.count(xstats.KindLanDenied, int64(denied))
-	}
+	ch.rib.ApplyClaim(peer, add, drop)
 }
 
 // publish pushes the RIB's winners out: the prefix table into the handler, and
