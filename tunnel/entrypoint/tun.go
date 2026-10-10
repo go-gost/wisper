@@ -51,6 +51,12 @@ type tunEntryPoint struct {
 	forward  service.Service
 	acquired bool // holds one reference on the shared p2p host
 
+	// shareCleanup removes the NAT rules init applied for a shared LAN. Nil
+	// unless the kernel path was used (the userspace fallback has no rules),
+	// and cleared by teardownShare as it runs, so it runs exactly once —
+	// the same shape as the hub's shareCleanup.
+	shareCleanup func()
+
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
@@ -60,6 +66,14 @@ type tunEntryPoint struct {
 	err       error
 	mu        sync.RWMutex
 }
+
+// The spoke's two host-touching share steps are package vars so a test can
+// reason about the wiring without a host: probing the kernel reads and writes
+// /proc and the PATH, and applying the rules shells out to iptables.
+var (
+	probeKernel     = tunnel.ProbeShareKernel
+	applySpokeShare = tunnel.SetupSpokeShare
+)
 
 // NewTunEntryPoint creates a tun entrypoint: a device whose traffic exits
 // through the shared p2p host to the peer's public key.
@@ -179,11 +193,84 @@ func (s *tunEntryPoint) init() error {
 	// "udp" link stays transparent; only this tun link is session-scoped.
 	node.Metadata = map[string]any{"p2p": s.provider, "p2p.network": "ip"}
 
+	// Sharing a LAN is host-level NAT: the same rules a hub applies, with the
+	// roles swapped (masquerade from the virtual subnet into the LAN, and no
+	// route — the LAN is directly connected). A malformed share_lan fails the
+	// start here, exactly as a hub's does, rather than at the first packet:
+	// a typo would otherwise silently share nothing. Both steps below touch
+	// the host, so both are package seams.
+	if lans, err := tunnel.ParseShareLANNets(s.opts.ShareLAN); err != nil {
+		return fmt.Errorf("tun entrypoint share_lan %q is not a comma-separated list of CIDRs: %v", s.opts.ShareLAN, err)
+	} else if len(lans) > 0 {
+		// A pinned kernel mode that cannot run is a start failure, never a
+		// silent downgrade: the operator asked for the kernel and must be
+		// told it is unavailable. Auto degrades to userspace and says so.
+		effective, cleanup, err := applySpokeShare(s.opts.Net, lans, s.opts.ShareMode, probeKernel())
+		if err != nil {
+			return err
+		}
+		s.mu.Lock()
+		s.shareCleanup = cleanup
+		s.mu.Unlock()
+
+		// Auto's downgrade is the one case that must never be silent: ping
+		// works through the kernel and dies in userspace, and without this a
+		// LAN that stops pinging reads as the network breaking for no
+		// reason. It is read the way the hub reads it (setupShareLAN's
+		// downgraded flag): auto, resolved to userspace.
+		userspace := effective == tunnel.ShareUserspace
+		downgraded := userspace && tunnel.NormalizeShareMode(s.opts.ShareMode) == tunnel.ShareAuto
+		switch {
+		case effective == tunnel.ShareKernel:
+			slog.Info("tun entrypoint: sharing LAN via kernel NAT",
+				"entrypoint", s.opts.Name, "lan", s.opts.ShareLAN)
+			event.Record(s.ID(), event.LevelInfo, "sharing LAN %s via kernel NAT", s.opts.ShareLAN)
+		case downgraded:
+			slog.Warn("tun entrypoint: kernel NAT unavailable, sharing LAN via userspace TCP/UDP: ping will not reach the LAN",
+				"entrypoint", s.opts.Name, "lan", s.opts.ShareLAN)
+			event.Record(s.ID(), event.LevelWarn,
+				"kernel NAT unavailable, sharing LAN %s via userspace TCP/UDP: ping will not reach the LAN", s.opts.ShareLAN)
+		case userspace:
+			slog.Info("tun entrypoint: sharing LAN via userspace TCP/UDP: ping will not reach the LAN",
+				"entrypoint", s.opts.Name, "lan", s.opts.ShareLAN)
+			event.Record(s.ID(), event.LevelInfo,
+				"sharing LAN %s via userspace TCP/UDP: ping will not reach the LAN", s.opts.ShareLAN)
+		}
+
+		if userspace {
+			// The engine must run the chain through the userspace shim: a
+			// plain "forward" connector hands LAN packets to a kernel that
+			// drops them, with nothing anywhere saying why.
+			node.Connector = &xconfig.ConnectorConfig{
+				Type: "tun-share",
+				Metadata: map[string]any{
+					"lans": tunnel.ShareLANSpec(lans),
+					"mtu":  s.opts.MTU,
+				},
+			}
+		}
+	}
+
 	s.config = &xconfig.Config{
 		Services: []*xconfig.ServiceConfig{svc},
 		Chains:   []*xconfig.ChainConfig{chCfg},
 	}
 	return nil
+}
+
+// teardownShare removes whatever the share setup applied, exactly once. The
+// field is cleared before the teardown runs, so a stop that races a second
+// stop — or a start that failed halfway — cannot remove a rule twice, and a
+// Close that never started anything does nothing.
+func (s *tunEntryPoint) teardownShare() {
+	s.mu.Lock()
+	cleanup := s.shareCleanup
+	s.shareCleanup = nil
+	s.mu.Unlock()
+
+	if cleanup != nil {
+		cleanup()
+	}
 }
 
 func (s *tunEntryPoint) Run() error { return s.RunContext(context.Background()) }
@@ -218,6 +305,9 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	// background and the entrypoint keeps running, so it is logged.
 	host, err := tunnel.AcquireP2PHost(ctx)
 	if err != nil {
+		// init already applied the share rules and nothing below has been
+		// set up to unwind them, so this is where they come off.
+		s.teardownShare()
 		return
 	}
 	// Until the service is wired, Run owns the reference and the provider
@@ -229,6 +319,9 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 			registry.P2PRegistry().Unregister(s.provider)
 			tunnel.ReleaseP2PHost()
 			tunnel.ReleaseTunDevice(s.opts.ID)
+			// The share setup ran in init, before the host was taken, so the
+			// same rollback has to reach it.
+			s.teardownShare()
 		}
 	}()
 
@@ -263,6 +356,15 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 		slog.Warn("tun entrypoint: punch peer", "peer", s.peer, "err", err)
 		event.Record(s.ID(), event.LevelWarn, "punch %s failed: %v", s.peer, err)
 	}
+
+	// The control channel is the spoke's half of LAN routing: it claims this
+	// spoke's share_lan at the hub and installs every netview the hub
+	// approves into the router the tun listener resolves by name. It runs for
+	// every spoke, sharing a LAN or not — a spoke with no share_lan still
+	// needs the hub-approved routes back. Never fatal by construction: a
+	// channel that cannot open is a spoke that tunnels exactly as it did
+	// before LAN routing existed.
+	StartNetview(ctx, host, s.peer, s.opts.ShareLAN, s.provider, log)
 
 	var forward service.Service
 	{
@@ -410,6 +512,10 @@ func (s *tunEntryPoint) Close() error {
 		if forward != nil {
 			err = forward.Close()
 		}
+		// The NAT rules go here: the service is stopped, so nothing still
+		// needs them, and the field is cleared as it runs so a repeat cannot
+		// delete a rule twice. A start that never applied any holds nil.
+		s.teardownShare()
 		// Only the first Close may touch the shared registry: a replacement
 		// reuses the name (the ID survives an update), and Unregister closes
 		// the value it finds, so a repeat call would take the successor's p2p

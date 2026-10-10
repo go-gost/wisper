@@ -18,6 +18,14 @@ type ShareStackBackend = shareStackBackend
 // Production points at shareExec; tests swap in a recorder.
 var spokeShareRun shareRunner = shareExec
 
+// ProbeShareKernel reports whether the host can run the kernel NAT path for
+// LAN sharing. It is the exported wrapper over the platform probe
+// (probeShareKernel): the probe itself reads and writes host state
+// (/proc/sys/net/ipv4/ip_forward, PATH lookups) and is therefore taken as a
+// seam by whoever wires a spoke, so the entrypoint can be reasoned about —
+// and tested — without a host to probe.
+func ProbeShareKernel() bool { return probeShareKernel() }
+
 // SetupSpokeShare applies the sharer side: masquerade from the hub's subnet
 // into the claimed LAN, and the forwarding rules that let B's kernel pass
 // it out eth0. B's LAN is directly connected, so no route is added — the
@@ -27,12 +35,14 @@ var spokeShareRun shareRunner = shareExec
 // degrades to userspace and reports it as the effective mode.
 func SetupSpokeShare(hubNet string, lans []*net.IPNet, mode string, kernelOK bool) (string, func(), error) {
 	effective, _, cleanup, err := setupShareLAN(
-		hubNet, shareLanSpec(lans), mode, kernelOK, spokeShareRun)
+		hubNet, ShareLANSpec(lans), mode, kernelOK, spokeShareRun)
 	return effective, cleanup, err
 }
 
-// shareLanSpec joins nets in the form ParseShareLANNets reads back.
-func shareLanSpec(lans []*net.IPNet) string {
+// ShareLANSpec joins nets in the form ParseShareLANNets reads back. It is
+// exported because the spoke's chain carries the shared LANs to its
+// connector as metadata, in exactly this form.
+func ShareLANSpec(lans []*net.IPNet) string {
 	specs := make([]string, len(lans))
 	for i, lan := range lans {
 		specs[i] = lan.String()
