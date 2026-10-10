@@ -706,6 +706,7 @@ export class TunnelDetailPage extends LitElement {
     }
     .lan-row {
       display: flex;
+      flex-wrap: wrap;
       align-items: baseline;
       gap: 8px;
       padding: 7px 12px;
@@ -1022,7 +1023,7 @@ export class TunnelDetailPage extends LitElement {
     // The LAN table arrives as one read of the hub's RIB, so its three lists
     // are read once here and drawn from the same snapshot.
     const lan = t2?.lan ?? null;
-    const lanClaims = lan ? Object.entries(lan.claims) : [];
+    const lanClaims = lan ? Object.entries(lan.claims).sort(([a], [b]) => (a < b ? -1 : 1)) : [];
 
     return html`
       <app-scaffold>
@@ -1312,19 +1313,17 @@ export class TunnelDetailPage extends LitElement {
                         <div class="lan-row head">
                           <span class="lan-prefix">${t('lanColPeer')}</span>
                           <span class="lan-origin">${t('lanColClaimed')}</span>
-                          <span class="lan-allow">${t('lanColAllow')}</span>
                         </div>
                         ${lanClaims.map(([key, c]) => html`
                           <div class="lan-row">
                             <span class="lan-prefix">${this._peerName(key)}</span>
                             <span class="lan-origin">${c.prefixes.join(', ')}</span>
-                            <span class="lan-allow">${this._lanAllow(c.allow)}</span>
                           </div>`)}
                       </div>
                     `
                     : nothing}
 
-                  ${lan.rejected.length > 0
+                  ${(lan.rejected?.length ?? 0) > 0
                     ? html`
                       <div class="lan-table card">
                         <!-- A refusal is never revoked and its prefix never
@@ -1339,7 +1338,7 @@ export class TunnelDetailPage extends LitElement {
                           <span class="lan-origin">${t('lanColPeer')}</span>
                           <span class="lan-allow">${t('lanColTime')}</span>
                         </div>
-                        ${lan.rejected.map(r => html`
+                        ${(lan.rejected ?? []).map(r => html`
                           <div class="lan-row">
                             <span class="lan-prefix">${r.prefix}</span>
                             <span class="lan-origin">${this._peerName(r.peer)}</span>

@@ -189,7 +189,7 @@ export interface LANRefusal {
 export interface TunnelLAN {
   routes: LANRoute[];
   claims: Record<string, { prefixes: string[]; allow?: string[] }>;
-  rejected: LANRefusal[];
+  rejected?: LANRefusal[];
 }
 
 export interface Tunnel {
