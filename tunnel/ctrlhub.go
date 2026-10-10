@@ -75,9 +75,10 @@ type controlHub struct {
 	// publishedRev is the rev last installed into the sink, so a settle that
 	// changed nothing does not reinstall the same table.
 	publishedRev uint64
-	// installed is what is in the sink's table right now, so the counters can
-	// say what changed: a prefix that appeared and one that left.
-	installed map[netip.Prefix]struct{}
+	// installed is what is in the sink's table right now — every prefix mapped
+	// to the spoke that claimed it — so the counters can say what changed and
+	// the events page can still name who a route belonged to once it is gone.
+	installed map[netip.Prefix]string
 	closed    bool
 	done      chan struct{}
 	closeOnce sync.Once
@@ -172,7 +173,7 @@ func newControlHub(hubID string, allow map[string][]netip.Prefix, sink prefixSin
 		sink:      sink,
 		log:       log,
 		peers:     make(map[string]*controlPeer),
-		installed: make(map[netip.Prefix]struct{}),
+		installed: make(map[netip.Prefix]string),
 		done:      make(chan struct{}),
 		now:       now,
 	}
@@ -583,12 +584,13 @@ func (ch *controlHub) publish() {
 	}
 }
 
-// installed is the set of prefixes a route map carries, so the counters can
-// compare what the table is becoming against what it was.
-func installed(routes map[netip.Prefix]tunhandler.PrefixRoute) map[netip.Prefix]struct{} {
-	out := make(map[netip.Prefix]struct{}, len(routes))
-	for prefix := range routes {
-		out[prefix] = struct{}{}
+// installed is the set of prefixes a route map carries, mapped to the spoke each
+// one is claimed by, so what changed can be counted and what left can be
+// attributed to the spoke that held it.
+func installed(routes map[netip.Prefix]tunhandler.PrefixRoute) map[netip.Prefix]string {
+	out := make(map[netip.Prefix]string, len(routes))
+	for prefix, route := range routes {
+		out[prefix] = route.Peer
 	}
 	return out
 }
@@ -613,14 +615,24 @@ func (ch *controlHub) installRoutes() {
 	// two numbers describe the table an operator can see: a prefix that
 	// appeared is a LAN routed for, one that left is a LAN withdrawn.
 	var routed, withdrawn int
-	for prefix := range out {
+	for prefix, route := range out {
 		if _, ok := ch.installed[prefix]; !ok {
 			routed++
+			// A spoke is told its own claims and nothing else, so the hub is
+			// the only thing on the network that knows which spoke holds a
+			// route. A line saying a LAN appeared therefore has to name that
+			// spoke here or go nameless forever.
+			event.Record(ch.hubID, event.LevelInfo, "LAN route %s installed (spoke %q)", prefix, route.Peer)
 		}
 	}
-	for prefix := range ch.installed {
+	for prefix, oldPeer := range ch.installed {
 		if _, ok := out[prefix]; !ok {
 			withdrawn++
+			// The spoke that was holding it, read off the table being replaced:
+			// why a route went (its claim expired, its spoke went quiet) is a
+			// warn line the RIB already wrote, and all the operator has left to
+			// match it against is who had lost the route.
+			event.Record(ch.hubID, event.LevelInfo, "LAN route %s withdrawn (spoke %q)", prefix, oldPeer)
 		}
 	}
 	ch.installed = installed(out)

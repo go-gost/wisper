@@ -538,6 +538,75 @@ func TestControlHubJournalCapsAt16(t *testing.T) {
 	}
 }
 
+// routeMessages is everything the hub filed under id as one string, oldest
+// first, so a test can look for the single line it means rather than trust an
+// index. warnMessages is the warn-only half of this; these lines are the
+// information ones, and they belong to a hub that is doing its job.
+func routeMessages(id string) string {
+	events := event.List(id)
+	msgs := make([]string, 0, len(events))
+	for _, ev := range events {
+		msgs = append(msgs, ev.Message)
+	}
+	return strings.Join(msgs, "\n")
+}
+
+// TestControlHubRecordsRouteChanges: the hub's events page is where an operator
+// learns what its LAN routing did, because a route appearing or vanishing is the
+// one change a spoke is never told about. So each half of the diff writes one
+// line naming the CIDR and the spoke behind it — the hub is the only one who
+// knows the spoke — and a publish that changed nothing (a member arriving, a
+// claim re-asserted) writes nothing at all, or a quiet network would fill the
+// page with refreshes.
+func TestControlHubRecordsRouteChanges(t *testing.T) {
+	const hubID = "hub-routes"
+	h := newFakeP2PHandler()
+	ch := newControlHub(hubID, map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+	defer ch.Close()
+
+	// Isolate: the event store is process-wide, so a run of this test must not
+	// read another's history.
+	event.Seed(hubID, nil)
+	t.Cleanup(func() { event.Seed(hubID, nil) })
+
+	// A claim that lands is a route that appeared.
+	ch.applyClaim("peerB", claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Add: []string{"192.168.50.0/24"}})
+	ch.publish()
+	if _, ok := h.installed()[netip.MustParsePrefix("192.168.50.0/24")]; !ok {
+		t.Fatal("the claim must be installed before its event means anything")
+	}
+	// publish runs the install itself, so the line is written by the time it
+	// returns — no polling, and no race with a reader goroutine.
+	installed := `LAN route 192.168.50.0/24 installed (spoke "peerB")`
+	if history := routeMessages(hubID); !strings.Contains(history, installed) {
+		t.Fatalf("the hub's history is %q, want %q", history, installed)
+	}
+
+	// The spoke withdraws it, and the route leaves naming the same spoke: an
+	// operator reading the pair has to be able to tell the two lines apart.
+	ch.applyClaim("peerB", claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Drop: []string{"192.168.50.0/24"}})
+	ch.publish()
+	if _, ok := h.installed()[netip.MustParsePrefix("192.168.50.0/24")]; ok {
+		t.Fatal("the drop must take the route out before its event means anything")
+	}
+	withdrawn := `LAN route 192.168.50.0/24 withdrawn (spoke "peerB")`
+	if history := routeMessages(hubID); !strings.Contains(history, withdrawn) {
+		t.Fatalf("the hub's history is %q, want %q", history, withdrawn)
+	}
+
+	// A publish that moved no route writes nothing: a member arriving advances
+	// the rev and reinstalls the same table, which is a refresh rather than a
+	// change, and the history has to say so by staying exactly as it was.
+	before := routeMessages(hubID)
+	ch.SetMembers([]memberEntry{{IP: "10.10.100.5", Key: "peerB"}})
+	ch.publish()
+	if after := routeMessages(hubID); after != before {
+		t.Fatalf("a publish that changed no route wrote history: before %q, after %q", before, after)
+	}
+}
+
 // TestControlHubDeliverNeverBlocksTheAcceptLoop: dispatch runs on the p2p
 // host's single accept loop, so a hub that blocks in deliver stalls every
 // inbound stream on the host — every tunnel, not just this peer's. A spoke
