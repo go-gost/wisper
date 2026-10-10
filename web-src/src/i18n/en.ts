@@ -65,6 +65,7 @@ const en: Record<string, string> = {
   fieldMTU: 'MTU',
   fieldDeviceName: 'Device Name',
   fieldDeviceNameHint: 'Leave empty to let the kernel name it.',
+  fieldLANRoutes: 'LAN routes (hub-approved)',
   fieldShareLAN: 'Shared LAN',
   fieldShareLANHint: 'Hub-side subnets peers may reach, comma-separated CIDRs — e.g. 192.168.1.0/24. Empty disables sharing.',
   fieldShareMode: 'Sharing Backend',

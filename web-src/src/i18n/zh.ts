@@ -65,6 +65,7 @@ const zh: Record<string, string> = {
   fieldMTU: 'MTU',
   fieldDeviceName: '设备名',
   fieldDeviceNameHint: '留空则由内核命名。',
+  fieldLANRoutes: 'LAN 路由（hub 批准）',
   fieldShareLAN: '共享局域网',
   fieldShareLANHint: '允许对端访问的 hub 侧网段，逗号分隔的 CIDR，例如 192.168.1.0/24。留空则不共享。',
   fieldShareMode: '共享后端',

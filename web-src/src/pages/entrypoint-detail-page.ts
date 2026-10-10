@@ -54,6 +54,11 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _deviceName = '';
   @state() private _routes = '';
   @state() private _dns = '';
+  // LAN sharing: the subnets of this node's own LAN that the hub may approve
+  // for its peers (empty disables), and the backend that runs them — the
+  // spoke's half of the hub's share_lan. Same fields, same defaults.
+  @state() private _shareLAN = '';
+  @state() private _shareMode = 'auto';
 
   private _unsubs: (() => void)[] = [];
 
@@ -125,6 +130,8 @@ export class EntrypointDetailPage extends LitElement {
     this._deviceName = '';
     this._routes = '';
     this._dns = '';
+    this._shareLAN = '';
+    this._shareMode = 'auto';
   }
 
   private _populateForm(ep: Entrypoint) {
@@ -147,6 +154,8 @@ export class EntrypointDetailPage extends LitElement {
     this._deviceName = ep.options?.device_name ?? '';
     this._routes = ep.options?.routes ?? '';
     this._dns = ep.options?.dns ?? '';
+    this._shareLAN = ep.options?.share_lan ?? '';
+    this._shareMode = ep.options?.share_mode || 'auto';
   }
 
   /** _renderTransport is the peer's path: one word, plus a tappable ⓘ whose
@@ -287,6 +296,10 @@ export class EntrypointDetailPage extends LitElement {
         device_name: this.entrypointType === 'tun' ? this._deviceName.trim() || undefined : undefined,
         routes: this.entrypointType === 'tun' ? this._routes.trim() || undefined : undefined,
         dns: this.entrypointType === 'tun' ? this._dns.trim() || undefined : undefined,
+        // Only a spoke shares a LAN: the hub's own share fields live on the tun
+        // tunnel, and nothing else reads these two.
+        share_lan: this.entrypointType === 'tun' ? this._shareLAN.trim() || undefined : undefined,
+        share_mode: this.entrypointType === 'tun' ? this._shareMode || undefined : undefined,
       };
 
       if (this.mode === 'create') {
@@ -378,6 +391,24 @@ export class EntrypointDetailPage extends LitElement {
 
   private _typeLabel(): string {
     return this.entrypointType.toUpperCase();
+  }
+
+  private _cycleOption<T>(current: T, options: T[]): T {
+    const idx = options.indexOf(current);
+    return options[(idx + 1) % options.length];
+  }
+
+  /** The sharing backends a spoke may pick, in cycle order. The same three the
+   *  hub's form offers, so the two pages read alike. */
+  private static readonly SHARE_MODES = ['auto', 'kernel', 'userspace'] as const;
+
+  /** The backend word for the mode cycle: auto/kernel/userspace. */
+  private _shareModeLabel(mode: string): string {
+    switch (mode) {
+      case 'kernel': return t('shareModeKernel');
+      case 'userspace': return t('shareModeUserspace');
+      default: return t('shareModeAuto');
+    }
   }
 
   // ── Styles ───────────────────────────────────────────────────────────
@@ -854,6 +885,16 @@ export class EntrypointDetailPage extends LitElement {
                     ${ep.options?.device_name
                       ? html`<div class="info-row"><span class="info-label">${t('fieldDeviceName')}</span><span class="info-value text">${ep.options.device_name}</span></div>`
                       : ''}
+                    <!-- What this spoke asked to share, and what its hub
+                         actually approved: the two are not the same value, and
+                         only the second reaches the hub's peers. A hub that
+                         approved nothing has no routes row at all. -->
+                    ${ep.options?.share_lan
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldShareLAN')}</span><span class="info-value text">${ep.options.share_lan}</span></div>`
+                      : ''}
+                    ${ep.lan_routes?.length
+                      ? html`<div class="info-row"><span class="info-label">${t('fieldLANRoutes')}</span><span class="info-value text">${ep.lan_routes.join(', ')}</span></div>`
+                      : ''}
                     ${ep.options?.routes
                       ? html`<div class="info-row"><span class="info-label">${t('fieldRoutes')}</span><span class="info-value text">${ep.options.routes}</span></div>`
                       : ''}
@@ -1022,6 +1063,27 @@ export class EntrypointDetailPage extends LitElement {
                         @input=${(e: Event) => { this._deviceName = (e.target as HTMLInputElement).value; }}>
                       <div class="p2p-hint">${t('fieldDeviceNameHint')}</div>
                     </div>
+                    <!-- LAN sharing: the subnets of this node's own LAN that the
+                         hub may let its peers reach, and the backend that would
+                         run them. What actually reaches the peers is the hub's
+                         decision, shown below the form on the routes row. -->
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldShareLAN')}</label>
+                      <input class="form-input" .value=${this._shareLAN} placeholder="192.168.1.0/24"
+                        @input=${(e: Event) => { this._shareLAN = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldShareLANHint')}</div>
+                    </div>
+                    <div class="switch-row" @click=${() => {
+                      this._shareMode = this._cycleOption(this._shareMode, [...EntrypointDetailPage.SHARE_MODES]);
+                      this.requestUpdate();
+                    }}>
+                      <span class="switch-label">${t('fieldShareMode')}</span>
+                      <span class="protocol-value">
+                        ${this._shareModeLabel(this._shareMode)}
+                        ${icon('chevron-right')}
+                      </span>
+                    </div>
+                    <div class="p2p-hint">${t('fieldShareModeHint')}</div>
                     <div class="form-group">
                       <label class="form-label">${t('fieldRoutes')}</label>
                       <input class="form-input" .value=${this._routes} placeholder="0.0.0.0/0"
