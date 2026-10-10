@@ -202,7 +202,6 @@ type lanRejectedJSON struct {
 // lanClaimJSON is one spoke's LAN: the CIDRs it holds and who may use them.
 type lanClaimJSON struct {
 	Prefixes []string `json:"prefixes"`
-	Allow    []string `json:"allow,omitempty"`
 }
 
 // lanJSON renders the hub's installed routes as the doctor's table, and
@@ -451,7 +450,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	// A spoke's exit: the LANs its hub approved, which is not the share_lan it
 	// was configured with but what became of it. Only a tun entrypoint fills
 	// it, and a spoke whose hub approved nothing has none.
-	if t.Type() == entrypoint.TunEntryPoint {
+	if !isHub && t.Type() == entrypoint.TunEntryPoint {
 		if routes := entrypoint.InstalledLANRoutes(); len(routes) > 0 {
 			resp.LANRoutes = routes
 		}

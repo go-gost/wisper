@@ -205,7 +205,7 @@ func (s *tunEntryPoint) init() error {
 		// A pinned kernel mode that cannot run is a start failure, never a
 		// silent downgrade: the operator asked for the kernel and must be
 		// told it is unavailable. Auto degrades to userspace and says so.
-		effective, cleanup, err := applySpokeShare(s.opts.Net, lans, s.opts.ShareMode, probeKernel())
+		effective, cleanup, err := applySpokeShare(s.opts.Net, lans, tunnel.NormalizeShareMode(s.opts.ShareMode), probeKernel())
 		if err != nil {
 			return err
 		}

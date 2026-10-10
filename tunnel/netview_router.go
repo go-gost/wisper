@@ -290,7 +290,7 @@ func RunControlChannel(ctx context.Context, cfg ControlChannelConfig) {
 
 	for ctx.Err() == nil {
 		if err := controlSession(ctx, cfg); err != nil {
-			cfg.Log.Debugf("control channel: %v", err)
+			cfg.Log.Warnf("control channel: %v", err)
 		}
 		select {
 		case <-ctx.Done():

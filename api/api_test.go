@@ -3017,6 +3017,10 @@ func TestDoctorShowsLanSection(t *testing.T) {
 	// A hub with no LAN state of its own says nothing: an empty section on
 	// every hub in the registry is noise in a report meant to be read.
 	plain := preRegisterTunnel(t, tunnel.TCPTunnel, "Plain", "127.0.0.1:9")
+	// The same stub with nothing installed is the guard for that branch: the
+	// zero LanState is the state of every hub whose tun handler has seen no
+	// claim, and it must print no section at all — not an empty one.
+	stubLanHub(t, "EmptyHub", "10.10.0.9/24", strings.Repeat("B", 43))
 
 	resp, err := http.Get(srv.URL + "/api/p2p/doctor")
 	if err != nil {
@@ -3028,6 +3032,12 @@ func TestDoctorShowsLanSection(t *testing.T) {
 		t.Fatalf("read body: %v", err)
 	}
 	body := string(raw)
+	if n := strings.Count(body, "=== LAN routing"); n != 1 {
+		t.Fatalf("LAN routing sections = %d, want only LanHub's: EmptyHub's zero state must print nothing", n)
+	}
+	if strings.Contains(body, "EmptyHub") {
+		t.Fatal("a hub with no LAN state still got a doctor section")
+	}
 
 	// The p2p report itself, unchanged: the LAN section is appended after it.
 	for _, want := range []string{"p2p doctor", "summary:", "peers:", "verdicts:"} {

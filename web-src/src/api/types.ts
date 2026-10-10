@@ -188,7 +188,7 @@ export interface LANRefusal {
  *  leaves the field absent. */
 export interface TunnelLAN {
   routes: LANRoute[];
-  claims: Record<string, { prefixes: string[]; allow?: string[] }>;
+  claims: Record<string, { prefixes: string[] }>;
   rejected?: LANRefusal[];
 }
 

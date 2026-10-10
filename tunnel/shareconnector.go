@@ -17,7 +17,7 @@ import (
 // the chain — and the chain is the engine's, which is why it is an x
 // connector, resolved by name from the parsed config.
 func init() {
-	registry.ConnectorRegistry().Register("tun-share", NewShareConnector)
+	_ = registry.ConnectorRegistry().Register("tun-share", NewShareConnector)
 }
 
 // NewShareConnector creates the spoke's userspace share connector.
