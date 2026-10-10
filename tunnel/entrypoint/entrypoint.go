@@ -8,6 +8,9 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/go-gost/core/logger"
+	xlogger "github.com/go-gost/x/logger"
+
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
@@ -42,6 +45,23 @@ type EntryPoint = tunnel.Tunnel
 // marks the entrypoint failed on every cold start. Starting it in the
 // background lets the API answer, the VPN come up and the device arrive while
 // the entrypoint is still waiting for it.
+// serviceLog is the logger an entrypoint's service runs under. A restored
+// entrypoint can start before any logger is configured -- in a test binary,
+// or in a process whose config.Init has not run yet -- and core/logger's
+// Default() is nil until logger.SetDefault is called. Falling back to a plain
+// logger keeps the entrypoint running instead of panicking; config.Init sets
+// the real default afterwards.
+func serviceLog(name string) logger.Logger {
+	l := logger.Default()
+	if l == nil {
+		l = xlogger.NewLogger()
+	}
+	return l.WithFields(map[string]any{
+		"kind":    "service",
+		"service": name,
+	})
+}
+
 func restore(ctx context.Context, goos string, ep EntryPoint) {
 	fail := func(err error) {
 		if err != nil {

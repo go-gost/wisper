@@ -11,7 +11,6 @@ import (
 	"github.com/go-gost/core/chain"
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/listener"
-	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
@@ -131,10 +130,7 @@ func (s *udpEntryPoint) Run() (err error) {
 		return
 	}
 
-	log := logger.Default().WithFields(map[string]any{
-		"kind":    "service",
-		"service": s.opts.Name,
-	})
+	log := serviceLog(s.opts.Name)
 
 	{
 		var ch chain.Chainer
