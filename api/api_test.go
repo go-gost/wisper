@@ -2859,3 +2859,207 @@ func TestLanJSONRendersTheDoctorsViews(t *testing.T) {
 		t.Fatalf("a hub with no LAN routes still reports claims: %v", got)
 	}
 }
+
+// lanHubStub is a hub's reporting interfaces without the device: a real tun hub
+// wrapped so it also answers with per-peer traffic and a LAN table. Both of
+// those come off a hub that is actually running — PeerStats off the peer route,
+// LANState off the control hub — and neither a device nor a control channel is
+// what is under test here, only the API's join of the two. Every other method is
+// the wrapped hub's.
+type lanHubStub struct {
+	tunnel.Tunnel
+	lan   tunnel.LanState
+	stats []tunnel.PeerStat
+}
+
+func (s *lanHubStub) LANState() tunnel.LanState    { return s.lan }
+func (s *lanHubStub) PeerStats() []tunnel.PeerStat { return s.stats }
+
+// stubLanHub registers a hub stub as id and returns it. It is added to the
+// registry rather than handed to the builder directly, so the case reads the
+// same response the UI does.
+func stubLanHub(t *testing.T, name, net string, peers ...string) *lanHubStub {
+	t.Helper()
+
+	base := tunnel.NewTunTunnel(tunnel.NameOption(name), tunnel.NetOption(net), tunnel.PeersOption(peers...))
+	base.Close() // no device is created: the stub answers for the two interfaces
+	stub := &lanHubStub{Tunnel: base}
+	tunnel.Add(stub)
+	t.Cleanup(func() { tunnel.Delete(stub.ID()) })
+	return stub
+}
+
+// TestLanJSONRendersRejected: a refusal is a decision the spoke was never told
+// about, so it is the one half of a hub's LAN state an operator can get nowhere
+// else. It is rendered with the reason code, the human sentence and the time,
+// in the journal's order (newest first) — reordering it here would put the
+// decision that just happened below one from ten minutes ago.
+func TestLanJSONRendersRejected(t *testing.T) {
+	newest := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	// A west-of-UTC clock on purpose: the field is rendered in UTC whatever the
+	// host's zone is, or two hubs in two zones report the same minute
+	// differently.
+	older := newest.Add(-time.Minute).In(time.FixedZone("UTC-2", -2*60*60))
+
+	state := tunnel.LanState{Refused: []tunnel.LanRefusal{
+		{
+			Prefix: "10.0.0.0/8", Peer: "peerB", Reason: "outside-allow",
+			Detail: "lan_allow lets it claim only inside 192.168.50.0/24", At: newest,
+		},
+		{
+			Prefix: "192.168.60.0/24", Peer: "peerA", Reason: "taken-by-peer",
+			Detail: `spoke "peerB" claimed it first and keeps it`, At: older,
+		},
+	}}
+
+	resp := lanJSON(state)
+	if len(resp.Rejected) != 2 {
+		t.Fatalf("rejected = %+v, want the two refusals", resp.Rejected)
+	}
+	first := resp.Rejected[0]
+	if first.Prefix != "10.0.0.0/8" || first.Peer != "peerB" || first.Reason != "outside-allow" {
+		t.Errorf("the newest refusal = %+v, want the one the journal holds first", first)
+	}
+	if first.Detail != "lan_allow lets it claim only inside 192.168.50.0/24" {
+		t.Errorf("detail = %q, want the sentence the operator reads", first.Detail)
+	}
+	if want := newest.Format(time.RFC3339); first.At != want {
+		t.Errorf("at = %q, want %q (RFC3339 UTC)", first.At, want)
+	}
+	// The older one keeps its place and its own spelling of the same instant.
+	if second := resp.Rejected[1]; second.Peer != "peerA" || second.At != older.UTC().Format(time.RFC3339) {
+		t.Errorf("the second refusal = %+v, want peerA at %s", second, older.UTC().Format(time.RFC3339))
+	}
+
+	// A hub with nothing refused is empty rather than absent-shaped: the field
+	// is omitted, so a UI rendering "nothing was refused" and one rendering an
+	// empty list read the same state.
+	if got := lanJSON(tunnel.LanState{}).Rejected; len(got) != 0 {
+		t.Fatalf("a hub with no refusals reports %v, want none", got)
+	}
+}
+
+// TestTunResponsePeerStatsCarryLAN: the per-peer LAN column travels on the
+// polling path — peer_stats — because that is the shape the UI refreshes. It is
+// joined from one LAN state read, so a spoke's traffic row and the routes table
+// beside it cannot disagree about what that spoke holds, and a spoke holding
+// nothing comes back with the column absent rather than empty.
+func TestTunResponsePeerStatsCarryLAN(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	offlineP2P()
+
+	keyA, keyB, keyC := strings.Repeat("A", 43), strings.Repeat("B", 43), strings.Repeat("C", 43)
+	stub := stubLanHub(t, "Hub", "10.10.0.1/24", keyA, keyB, keyC)
+	// Two spokes holding one LAN each, and one holding none: "holds no LAN" is a
+	// state worth showing next to one that holds two.
+	stub.lan = tunnel.LanState{Routes: []tunnel.LanRoute{
+		{Prefix: "192.168.50.0/24", Origin: keyA, Peer: keyA},
+		{Prefix: "192.168.60.0/24", Origin: keyB, Peer: keyB},
+	}}
+	stub.stats = []tunnel.PeerStat{
+		{Key: keyA, CurrentConns: 1},
+		{Key: keyB, CurrentConns: 2},
+		{Key: keyC},
+	}
+
+	rows := peerStatsRows(t, srv, stub.ID())
+	if len(rows) != 3 {
+		t.Fatalf("peer_stats = %v, want one row per spoke", rows)
+	}
+	for _, row := range rows {
+		key, _ := row["key"].(string)
+		lan, _ := row["lan"].([]any)
+		switch key {
+		case keyA:
+			if len(lan) != 1 || lan[0] != "192.168.50.0/24" {
+				t.Errorf("spoke A's lan = %v, want 192.168.50.0/24", lan)
+			}
+		case keyB:
+			if len(lan) != 1 || lan[0] != "192.168.60.0/24" {
+				t.Errorf("spoke B's lan = %v, want 192.168.60.0/24", lan)
+			}
+		case keyC:
+			if _, ok := row["lan"]; ok {
+				t.Errorf("a spoke holding no LAN carries lan = %v, want the field absent", row["lan"])
+			}
+		default:
+			t.Errorf("unexpected peer row %v", row)
+		}
+	}
+}
+
+// TestDoctorShowsLanSection: the doctor's report is the pasteable answer to
+// "why does this LAN not work", and a hub's routing half of it lives outside
+// the p2p host: what it installed, what each spoke holds, and what it refused.
+// The section is appended to the report, so the settings panel reads it with no
+// change at all — and a hub with nothing to say is not a section of noise.
+func TestDoctorShowsLanSection(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	offlineP2P()
+
+	keyA := strings.Repeat("A", 43)
+	stub := stubLanHub(t, "LanHub", "10.10.0.1/24", keyA)
+	stub.lan = tunnel.LanState{
+		Routes: []tunnel.LanRoute{
+			{Prefix: "192.168.50.0/24", Origin: keyA, Peer: keyA},
+			{Prefix: "192.168.60.0/24", Origin: "static", Peer: keyA, Allow: []string{keyA}},
+		},
+		Refused: []tunnel.LanRefusal{{
+			Prefix: "10.0.0.0/8", Peer: keyA, Reason: "outside-allow",
+			Detail: "lan_allow lets it claim only inside 192.168.50.0/24",
+			At:     time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC),
+		}},
+	}
+	// A hub with no LAN state of its own says nothing: an empty section on
+	// every hub in the registry is noise in a report meant to be read.
+	plain := preRegisterTunnel(t, tunnel.TCPTunnel, "Plain", "127.0.0.1:9")
+
+	resp, err := http.Get(srv.URL + "/api/p2p/doctor")
+	if err != nil {
+		t.Fatalf("GET /api/p2p/doctor: %v", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	body := string(raw)
+
+	// The p2p report itself, unchanged: the LAN section is appended after it.
+	for _, want := range []string{"p2p doctor", "summary:", "peers:", "verdicts:"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("report missing %q\n---\n%s", want, body)
+		}
+	}
+	for _, want := range []string{
+		"=== LAN routing (hub LanHub) ===",
+		"installed: 2 routes",
+		"192.168.50.0/24  via spoke ",
+		"192.168.60.0/24  via spoke ",
+		"allow: " + keyA,
+		"claims:",
+		keyA + ": 192.168.50.0/24",
+		"refused (this run):",
+		"outside-allow",
+		"lan_allow lets it claim only inside 192.168.50.0/24",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("LAN section missing %q\n---\n%s", want, body)
+		}
+	}
+	// The hub's own injected route is not a spoke's claim, so it is not in the
+	// claims list — the same ruling the API's routes view makes.
+	if strings.Count(body, "claims:") != 1 {
+		t.Errorf("one claims list, want exactly one:\n---\n%s", body)
+	}
+	if !strings.Contains(body, keyA+": 192.168.50.0/24\n") || strings.Contains(body, keyA+": 192.168.50.0/24, 192.168.60.0/24") {
+		t.Errorf("claims list names the spoke's own claim only:\n---\n%s", body)
+	}
+	if plain != nil && strings.Contains(body, "LAN routing (hub Plain)") {
+		t.Errorf("a hub with no LAN state must not produce a section:\n---\n%s", body)
+	}
+}

@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"net"
+	"slices"
 	"testing"
 	"time"
 
@@ -136,6 +137,43 @@ func TestNetviewRouterGatewayDegradesToEmptyWithoutHubMember(t *testing.T) {
 	}
 	if rt.Gateway != "" {
 		t.Fatalf("no hub member yet: gateway must stay empty rather than guess: got %+v", rt)
+	}
+}
+
+// TestNetviewRouterPrefixes: the spoke's installed routes are an observability
+// surface as much as a routing table — the API answers "what did the hub
+// approve" from them — and a reader must not have to walk the table or read the
+// claims out from under the router to answer. Sorted, because the answer is read
+// by a human and by a diff, and the router's internal order is
+// longest-prefix-first, which is a routing order and not a reading one.
+func TestNetviewRouterPrefixes(t *testing.T) {
+	// A router that never saw a netview reports nothing rather than an empty
+	// slice of nothing: a spoke whose control channel has not opened has no
+	// LAN routing, and the API must be able to say so.
+	if got := NewNetviewRouter().Prefixes(); len(got) != 0 {
+		t.Fatalf("an empty router reports %v, want no routes at all", got)
+	}
+
+	r := NewNetviewRouter()
+	r.Apply(netviewMessage{V: 1, Hub: "hub1", Rev: 1, Claims: []claimEntry{
+		{Prefix: "192.168.50.0/24", Origin: "peerB"},
+		{Prefix: "192.168.0.0/16", Origin: "peerW"},
+		{Prefix: "10.0.0.0/8", Origin: "peerX"},
+	}})
+
+	want := []string{"10.0.0.0/8", "192.168.0.0/16", "192.168.50.0/24"}
+	if got := r.Prefixes(); !slices.Equal(got, want) {
+		t.Fatalf("Prefixes() = %v, want the approved claims sorted: %v", got, want)
+	}
+
+	// The table is a whole-table write, so a netview that withdraws a claim
+	// withdraws it here too: the answer is the live table, not an
+	// accumulation of everything ever seen.
+	r.Apply(netviewMessage{V: 1, Hub: "hub1", Rev: 2, Claims: []claimEntry{
+		{Prefix: "192.168.50.0/24", Origin: "peerB"},
+	}})
+	if got := r.Prefixes(); !slices.Equal(got, []string{"192.168.50.0/24"}) {
+		t.Fatalf("Prefixes() after a smaller netview = %v, want only the claim still installed", got)
 	}
 }
 

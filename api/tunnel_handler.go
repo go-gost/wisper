@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-gost/p2p"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
+	"github.com/go-gost/wisper/tunnel/entrypoint"
 )
 
 // tunnelResponse is the JSON representation of a tunnel returned by the API.
@@ -42,6 +44,11 @@ type tunnelResponse struct {
 	// Absent for every other type, which is what keeps a p2p tunnel's response
 	// free of a section nothing fills.
 	Lan *lanResponse `json:"lan,omitempty"`
+	// LANRoutes is a spoke's exit: the LANs its hub has approved and the router
+	// is carrying, which is not the share_lan it was configured with but what
+	// became of it. Only a tun entrypoint carries any — a hub routes rather
+	// than following, and every other type has no such table.
+	LANRoutes []string `json:"lan_routes,omitempty"`
 	// Events is this object's recent history, newest first.
 	Events []eventResponse `json:"events"`
 }
@@ -64,7 +71,13 @@ type peerStatsJSON struct {
 	LastRecvAgeMs int64    `json:"last_recv_age_ms,omitempty"`
 	// Trace is the peer's recent punch history: short lines, oldest first
 	// (newest kept), capped by the p2p host's ring.
-	Trace           []string `json:"trace,omitempty"`
+	Trace []string `json:"trace,omitempty"`
+	// LAN is the LAN routing this peer holds, as a hub's routes name it: what
+	// the peer claimed over the control channel and the hub approved. It rides
+	// on peer_stats rather than on the allowlist row, because the allowlist is
+	// the static configuration face and this is the live table — a hub that
+	// refused a claim leaves the row's own lan alone and this empty.
+	LAN             []string `json:"lan,omitempty"`
 	CurrentConns    uint64   `json:"current_conns"`
 	TotalConns      uint64   `json:"total_conns"`
 	InputBytes      uint64   `json:"input_bytes"`
@@ -160,15 +173,30 @@ type lanRouteJSON struct {
 	Allow  []string `json:"allow,omitempty"`
 }
 
-// lanResponse is a tun hub's LAN routing for the doctor: the installed table
-// and each spoke's claim. A hub that is not running, or whose handler installs
-// no prefix routes, carries an empty list — a hub with no LAN routes is a hub
-// working as it did before the feature existed.
+// lanResponse is a tun hub's LAN routing for the doctor: the installed table,
+// each spoke's claim, and what the hub turned down. A hub that is not running, or
+// whose handler installs no prefix routes, carries an empty list — a hub with no
+// LAN routes is a hub working as it did before the feature existed.
 type lanResponse struct {
 	Routes []lanRouteJSON `json:"routes"`
 	// Claims is the same table per claimer, so a UI can show either the whole
 	// net or one spoke's row of it without asking twice.
 	Claims map[string]lanClaimJSON `json:"claims"`
+	// Rejected is what the hub refused, newest first: the claims a spoke was
+	// never told about. A refusal is never revoked and its prefix is never in
+	// the table above, which is why the two lists have to be read together.
+	Rejected []lanRejectedJSON `json:"rejected,omitempty"`
+}
+
+// lanRejectedJSON is one claim the hub turned down: the CIDR, the spoke that
+// asked, which of the RIB's reasons said no (the reason code a search finds),
+// the sentence the operator reads, and when.
+type lanRejectedJSON struct {
+	Prefix string `json:"prefix"`
+	Peer   string `json:"peer"`
+	Reason string `json:"reason"`
+	Detail string `json:"detail"`
+	At     string `json:"at"`
 }
 
 // lanClaimJSON is one spoke's LAN: the CIDRs it holds and who may use them.
@@ -194,6 +222,17 @@ func lanJSON(lan tunnel.LanState) *lanResponse {
 	}
 	for peer, claims := range lan.PeerClaims() {
 		resp.Claims[peer] = lanClaimJSON{Prefixes: claims}
+	}
+	// In the journal's order, newest first, which is the order the hub keeps
+	// them in: the decision that just happened is the one being looked for.
+	for _, ref := range lan.Refused {
+		resp.Rejected = append(resp.Rejected, lanRejectedJSON{
+			Prefix: ref.Prefix,
+			Peer:   ref.Peer,
+			Reason: ref.Reason,
+			Detail: ref.Detail,
+			At:     ref.At.UTC().Format(time.RFC3339),
+		})
 	}
 	return resp
 }
@@ -355,10 +394,22 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		transports = st.PeerTransports
 		diagnostics = st.PeerDiagnostics
 	}
+	// The hub's LAN routing, read once and used twice: the peer rows' LAN
+	// column below and the routes list at the end are two views of one RIB
+	// snapshot, and a second read could disagree with the first about what is
+	// in force. Only a tun hub reports it, so every other type leaves both
+	// views absent.
+	var lan tunnel.LanState
+	var peerLAN map[string][]string
+	isHub := false
+	if ls, ok := t.(tunnel.LanStateReporter); ok {
+		lan, isHub = ls.LANState(), true
+		peerLAN = lan.PeerClaims()
+	}
 	if ps, ok := t.(tunnel.PeerStatsReporter); ok {
 		for _, p := range ps.PeerStats() {
 			d := diagnostics[p.Key]
-			resp.PeerStats = append(resp.PeerStats, peerStatsJSON{
+			row := peerStatsJSON{
 				Key:             p.Key,
 				Alias:           opts.PeerAliases[p.Key],
 				Transport:       transports[p.Key],
@@ -372,29 +423,38 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 				SessionAgeMs:    d.SessionAge.Milliseconds(),
 				LastRecvAgeMs:   d.LastRecvAge.Milliseconds(),
 				Trace:           d.Trace,
+				LAN:             peerLAN[p.Key],
 				CurrentConns:    p.CurrentConns,
 				TotalConns:      p.TotalConns,
 				InputBytes:      p.InputBytes,
 				OutputBytes:     p.OutputBytes,
 				InputRateBytes:  p.InputRateBytes,
 				OutputRateBytes: p.OutputRateBytes,
-			})
+			}
+			resp.PeerStats = append(resp.PeerStats, row)
 		}
 	}
 	if opts.Peer != "" {
 		resp.PeerTransport = transports[opts.Peer]
 	}
-	// The hub's LAN routing: only a tun hub reports it, and it fills both the
-	// per-spoke column above and the routes list below. Read once, because the
-	// two views are one RIB snapshot and a second read could disagree with
-	// the first about what is in force.
-	if ls, ok := t.(tunnel.LanStateReporter); ok {
-		lan := ls.LANState()
+	// The routes table and the per-spoke column on the allowlist above are the
+	// same snapshot the peer rows were filled from: a hub cannot report one
+	// table to one view and another to the other.
+	if isHub {
 		resp.Lan = lanJSON(lan)
 		for i := range resp.Options.Peers {
-			if claims := lan.PeerClaims()[resp.Options.Peers[i].Key]; len(claims) > 0 {
+			if claims := peerLAN[resp.Options.Peers[i].Key]; len(claims) > 0 {
 				resp.Options.Peers[i].LAN = claims
 			}
+		}
+	}
+	// A spoke's exit: the LANs its hub approved, which is not the share_lan it
+	// was configured with but what became of it. Absent for a hub (it routes
+	// rather than follows) and for every other type, and absent for a spoke
+	// whose hub approved nothing.
+	if t.Type() == entrypoint.TunEntryPoint {
+		if routes := entrypoint.InstalledLANRoutes(); len(routes) > 0 {
+			resp.LANRoutes = routes
 		}
 	}
 	// The badge reads what is actually running, not what was configured:

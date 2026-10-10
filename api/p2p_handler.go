@@ -1,7 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/go-gost/p2p"
 	"github.com/go-gost/p2p/doctor"
@@ -96,6 +100,12 @@ func handleGetP2PIdentity(w http.ResponseWriter, r *http.Request) {
 // so it is complete where the CLI's is not: the relay's liveness (RelayConnected)
 // and the full per-peer snapshot are real here, not inferred from a frozen proto.
 // An optional ?peer=<base64-key> narrows it to one peer.
+//
+// The p2p report is followed by the LAN routing of every hub in this process,
+// which lives outside the p2p host entirely: what each hub installed, what each
+// spoke holds and what it refused. A hub with neither says nothing — the section
+// is a per-hub thing, and an empty one on every hub is noise in a report meant
+// to be pasted into a bug.
 func handleGetP2PDoctor(w http.ResponseWriter, r *http.Request) {
 	opts := doctor.Options{
 		Version:  version.Version,
@@ -110,7 +120,93 @@ func handleGetP2PDoctor(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(doctor.Report(tunnel.P2PHostStatus(), opts)))
+	_, _ = w.Write([]byte(doctor.Report(tunnel.P2PHostStatus(), opts) + lanDoctorSection()))
+}
+
+// lanDoctorRefusalsShown caps how many refusals one hub's section lists. The
+// journal holds 16, and the section is read by someone hunting the reason a
+// LAN is not working — the newest refusals are the live ones, and a wall of a
+// hour's worth of a misconfigured spoke's retries is the same sentence
+// repeated. The count that is left out is stated, so nothing is silently
+// dropped.
+const lanDoctorRefusalsShown = 5
+
+// lanDoctorSection renders the LAN routing of every registered hub, one section
+// per hub, in registry order. Empty when no hub has any: a hub that refused
+// nothing and installed nothing is a hub whose LANs all work, which the p2p
+// report above already says well enough.
+func lanDoctorSection() string {
+	var b strings.Builder
+	for i := 0; i < tunnel.Count(); i++ {
+		t := tunnel.GetIndex(i)
+		if t == nil {
+			continue
+		}
+		hub, ok := t.(tunnel.LanStateReporter)
+		if !ok {
+			continue
+		}
+		lan := hub.LANState()
+		if len(lan.Routes) == 0 && len(lan.Refused) == 0 {
+			continue
+		}
+		aliases := t.Options().PeerAliases
+
+		fmt.Fprintf(&b, "\n=== LAN routing (hub %s) ===\n", t.Name())
+		fmt.Fprintf(&b, "installed: %d routes\n", len(lan.Routes))
+		for _, r := range lan.Routes {
+			allow := "(all)"
+			if len(r.Allow) > 0 {
+				allow = strings.Join(r.Allow, ", ")
+			}
+			fmt.Fprintf(&b, "  %s  via spoke %s  allow: %s\n",
+				r.Prefix, lanDoctorPeer(r.Peer, aliases), allow)
+		}
+
+		// Per claimer, sorted: a map walked in Go's order would render the
+		// same hub differently on two reads, and this report is compared
+		// between runs.
+		if claims := lan.PeerClaims(); len(claims) > 0 {
+			b.WriteString("claims:\n")
+			peers := make([]string, 0, len(claims))
+			for peer := range claims {
+				peers = append(peers, peer)
+			}
+			sort.Strings(peers)
+			for _, peer := range peers {
+				fmt.Fprintf(&b, "  %s: %s\n",
+					lanDoctorPeer(peer, aliases), strings.Join(claims[peer], ", "))
+			}
+		}
+
+		if len(lan.Refused) > 0 {
+			b.WriteString("refused (this run):\n")
+			shown := lan.Refused
+			if len(shown) > lanDoctorRefusalsShown {
+				shown = shown[:lanDoctorRefusalsShown]
+			}
+			for _, ref := range shown {
+				fmt.Fprintf(&b, "  [%s] spoke %s: %s — %s (%s)\n",
+					ref.At.UTC().Format(time.RFC3339), lanDoctorPeer(ref.Peer, aliases),
+					ref.Prefix, ref.Reason, ref.Detail)
+			}
+			if left := len(lan.Refused) - len(shown); left > 0 {
+				fmt.Fprintf(&b, "  ... and %d more refusals\n", left)
+			}
+		}
+	}
+	return b.String()
+}
+
+// lanDoctorPeer names one peer the way the p2p report above names its peers: the
+// alias when the hub has one, the key itself otherwise. Unlike the web UI, this
+// report does not mask the key — it is a diagnostic read by whoever is fixing
+// the LAN, and a masked key is a key they cannot act on.
+func lanDoctorPeer(key string, aliases map[string]string) string {
+	if alias := aliases[key]; alias != "" {
+		return alias
+	}
+	return key
 }
 
 // p2pRelayTestRequest is the body of POST /api/p2p/test: the relay values as

@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -118,6 +119,30 @@ func (r *NetviewRouter) Apply(n netviewMessage) {
 	r.hub, r.rev, r.gateway, r.routes = n.Hub, n.Rev, gateway, routes
 }
 
+// Prefixes lists the installed claims as sorted CIDRs, for the readers that
+// want to say what a spoke is routing rather than resolve a single destination:
+// the API's entrypoints page (what the hub approved for this spoke) and the
+// doctor. Sorted rather than in the router's own longest-prefix-first order,
+// which is a routing order — the reader is a human or a diff, and a list they
+// can scan is what they want.
+//
+// The copy matters as much as the order: netviewRoute carries a *net.IPNet the
+// packet path hands out, and a caller must not be able to reach it.
+func (r *NetviewRouter) Prefixes() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.routes) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(r.routes))
+	for _, rt := range r.routes {
+		out = append(out, rt.prefix.String())
+	}
+	sort.Strings(out)
+	return out
+}
+
 // GetRoute returns the route for dst by longest-prefix match over the
 // installed claims, or nil when no claim covers it — nil is what keeps an
 // unclaimed destination on its existing fate. It satisfies core/router.Router.
@@ -222,7 +247,11 @@ func keepClaimFresh(stop <-chan struct{}, conn net.Conn, claims []string, log lo
 				V:    ctrlVersion,
 				Add:  claims,
 			}); err != nil {
-				log.Debugf("control channel: refreshing the claim failed: %v", err)
+				// Warn, not debug: a refresh that cannot be written means the
+				// hub is about to withdraw every LAN this spoke holds, which
+				// is the first symptom of "the LAN stopped working" and has to
+				// be visible at the default level.
+				log.Warnf("control channel: refreshing the claim failed: %v", err)
 				_ = conn.Close()
 				return
 			}

@@ -31,10 +31,14 @@ func netviewRouter() *tunnel.NetviewRouter {
 		netviewRtr = tunnel.NewNetviewRouter()
 		// ErrDup means an operator's config router already holds the name;
 		// the explicit config wins and the netviews simply have nowhere to
-		// install. Not an error, just a debug line.
+		// install. Not fatal, but it means this spoke routes no LAN at all, so
+		// it is a warn and not a debug line.
 		if err := registry.RouterRegistry().Register(tunRouterName, netviewRtr); err != nil && !errors.Is(err, registry.ErrDup) {
 			if log := logger.Default(); log != nil {
-				log.Debugf("netview: register %s: %v", tunRouterName, err)
+				// Warn: the netviews then have nowhere to install, so this
+				// spoke routes no LAN at all and the operator's own router is
+				// the reason. Visible at the default level for that reason.
+				log.Warnf("netview: register %s: %v", tunRouterName, err)
 			}
 		}
 	})
@@ -59,7 +63,9 @@ func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLA
 	var claims []string
 	if lans, err := tunnel.ParseShareLANNets(shareLAN); err != nil {
 		if log != nil {
-			log.Debugf("netview: share_lan %q claims nothing: %v", shareLAN, err)
+			// Warn: the spoke will run and route no LAN, and this line is the
+			// only place the typo in share_lan is named.
+			log.Warnf("netview: share_lan %q claims nothing: %v", shareLAN, err)
 		}
 	} else {
 		for _, lan := range lans {
@@ -75,4 +81,21 @@ func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLA
 		Router:   router,
 		Log:      log,
 	})
+}
+
+// InstalledLANRoutes lists the CIDRs the hub has approved for this spoke, exactly
+// as the router the tun listener resolves by name holds them — the spoke's exit
+// for the LANs it shares, and what the entrypoints page shows next to the
+// share_lan it was configured with.
+//
+// It is a process-wide read rather than a per-entrypoint one, because the router
+// is: one spoke process installs one netview, whichever entrypoint's control
+// channel received it. A read in a process where no channel has ever opened
+// materializes the same empty router, so the answer is an empty list rather than
+// an error — a spoke whose hub approved nothing and a spoke that never asked are
+// both "no routes", and asking starts nothing.
+//
+// Sorted, because the router sorts: the list is read by a human and by a diff.
+func InstalledLANRoutes() []string {
+	return netviewRouter().Prefixes()
 }
