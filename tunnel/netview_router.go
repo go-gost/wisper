@@ -205,7 +205,15 @@ type ControlChannelConfig struct {
 	ShareLAN []string           // this spoke's claimed CIDRs, from share_lan
 	Provider any                // the entrypoint's p2p provider, for the chain metadata
 	Router   *NetviewRouter
-	Log      logger.Logger
+	// RouteSync runs after every netview the router accepts, with the CIDRs
+	// the hub now routes through this spoke. It is where a platform that
+	// can reaches the kernel and installs the matching routes, because the
+	// router alone is a lookup table: a prefix it knows is still not a
+	// prefix this device captures. Best-effort by contract — an error is
+	// logged by the sync itself, never returned here, because a route that
+	// could not be installed must not cost the spoke its tunnel.
+	RouteSync func(prefixes []string)
+	Log       logger.Logger
 }
 
 // controlLogger fills in a missing log with the process default, or a
@@ -340,6 +348,23 @@ func controlChainConfig(cfg ControlChannelConfig) *xconfig.ChainConfig {
 // conn dies. A reconnect is a fresh session and re-sends the whole claim —
 // that is how the hub learns the spoke survived, and a reconnect that forgot
 // its claim would silently lose the spoke's LAN.
+// deliverNetview installs one netview and tells the kernel what it now owns.
+//
+// The router answers lookups; only a route tells this device's kernel to hand
+// the packet to the device in the first place, which is why the two are not
+// the same job and both need doing. A sync that cannot install logs its own
+// failure — the netview still stands, the spoke still tunnels, and the LAN it
+// could not capture is the only casualty.
+func deliverNetview(cfg ControlChannelConfig, n netviewMessage) {
+	if cfg.Router == nil {
+		return
+	}
+	cfg.Router.Apply(n)
+	if cfg.RouteSync != nil {
+		cfg.RouteSync(cfg.Router.Prefixes())
+	}
+}
+
 func controlSession(ctx context.Context, cfg ControlChannelConfig) error {
 	// A chain per dial: a chain holds the node's connector state, so each
 	// session builds its own and gives it back on the way out.
@@ -400,8 +425,8 @@ func controlSession(ctx context.Context, cfg ControlChannelConfig) error {
 		if err != nil {
 			return err
 		}
-		if n.Type == ctrlTypeNetview && cfg.Router != nil {
-			cfg.Router.Apply(n)
+		if n.Type == ctrlTypeNetview {
+			deliverNetview(cfg, n)
 		}
 	}
 }

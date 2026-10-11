@@ -7,6 +7,7 @@ require (
 	github.com/go-gost/p2p v0.14.3
 	github.com/go-gost/x v0.26.1
 	github.com/google/uuid v1.6.0
+	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54
 	github.com/xjasonlyu/tun2socks/v2 v2.6.0
 	gopkg.in/yaml.v3 v3.0.1
 	gvisor.dev/gvisor v0.0.0-20250523182742-eede7a881b20
@@ -69,7 +70,6 @@ require (
 	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
-	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/xtaci/kcp-go/v5 v5.6.72 // indirect
 	github.com/xtaci/smux v1.5.57 // indirect

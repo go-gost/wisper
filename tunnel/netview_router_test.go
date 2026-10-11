@@ -243,3 +243,43 @@ func TestControlChainDialAStream(t *testing.T) {
 		t.Fatalf("connector type = %v, want forward (the tun link's shape)", node.Connector)
 	}
 }
+
+// The kernel, told what the hub approved: a netview the router accepts reaches
+// the RouteSync with the router's prefixes, and a config without a sync (or a
+// router) is simply told nothing. The sync is what installs the device's
+// kernel routes, so a wiring silent here is a spoke that captures nothing the
+// hub approved — the gap this whole change closes.
+func TestDeliverNetviewSyncsTheKernel(t *testing.T) {
+	r := NewNetviewRouter()
+	var got []string
+	cfg := ControlChannelConfig{Router: r, RouteSync: func(prefixes []string) { got = prefixes }}
+
+	deliverNetview(cfg, netviewMessage{Type: ctrlTypeNetview, Hub: "hub", Rev: 1,
+		Claims: []claimEntry{{Prefix: "192.168.50.0/24", Origin: "peerB"}}})
+
+	want := []string{"192.168.50.0/24"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("RouteSync prefixes = %v, want %v", got, want)
+	}
+
+	// A second netview that withdraws the prefix must reach the sync with the
+	// empty set, so the kernel's routes are removed too.
+	deliverNetview(cfg, netviewMessage{Type: ctrlTypeNetview, Hub: "hub", Rev: 2})
+	if len(got) != 0 {
+		t.Fatalf("RouteSync prefixes after the withdrawal = %v, want empty", got)
+	}
+}
+
+func TestDeliverNetviewWithoutASyncOrRouter(t *testing.T) {
+	// No panic and nothing to do for either of the two configurations a
+	// process that never asked for LAN routing can be in.
+	deliverNetview(ControlChannelConfig{}, netviewMessage{Type: ctrlTypeNetview, Hub: "hub", Rev: 1,
+		Claims: []claimEntry{{Prefix: "192.168.50.0/24"}}})
+
+	r := NewNetviewRouter()
+	deliverNetview(ControlChannelConfig{Router: r}, netviewMessage{Type: ctrlTypeNetview, Hub: "hub", Rev: 1,
+		Claims: []claimEntry{{Prefix: "192.168.50.0/24"}}})
+	if got := r.Prefixes(); !slices.Equal(got, []string{"192.168.50.0/24"}) {
+		t.Fatalf("router prefixes = %v, want the claim installed even without a sync", got)
+	}
+}

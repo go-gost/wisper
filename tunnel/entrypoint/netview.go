@@ -3,6 +3,8 @@ package entrypoint
 import (
 	"context"
 	"errors"
+	"net"
+	"strings"
 	"sync"
 
 	"github.com/go-gost/core/logger"
@@ -51,10 +53,14 @@ func netviewRouter() *tunnel.NetviewRouter {
 // by name. It returns immediately; the channel runs until ctx is done,
 // reconnecting every second.
 //
+// deviceNet is this device's own address (the entrypoint's net), the handle
+// by which the kernel-route sync finds the link the routes belong on. Empty
+// is fine: the sync then installs nothing and logs why.
+//
 // Never fatal, by construction: a channel that cannot open (or a share_lan
 // that does not parse, which claims nothing) is a spoke that behaves exactly
 // as it does today — it reaches every member and has no LAN routing.
-func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLAN string, provider any, log logger.Logger) {
+func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLAN, deviceNet string, provider any, log logger.Logger) {
 	// Registered before the channel runs, but the listener's lookup is by
 	// name at query time, so there is no ordering constraint against the
 	// listener's Init.
@@ -73,14 +79,55 @@ func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLA
 		}
 	}
 
+	// The kernel, told what the hub approved. The router is a lookup table;
+	// only a route makes this device's kernel hand the packet over in the
+	// first place. Best-effort by construction — a sync that cannot install
+	// logs its own failure and the spoke tunnels on.
+	sync := newNetviewSync(parseDeviceNets(deviceNet), nil, log)
+
 	go tunnel.RunControlChannel(ctx, tunnel.ControlChannelConfig{
-		Host:     host,
-		HubPeer:  hubPeer,
-		ShareLAN: claims,
-		Provider: provider,
-		Router:   router,
-		Log:      log,
+		Host:      host,
+		HubPeer:   hubPeer,
+		ShareLAN:  claims,
+		Provider:  provider,
+		Router:    router,
+		RouteSync: sync.Reflect,
+		Log:       log,
 	})
+}
+
+// parseDeviceNets turns the entrypoint's net setting into the addresses the
+// sync matches a link on. The setting is a comma-separated list of CIDRs (or
+// bare addresses); a value that parses to no address at all yields an empty
+// list, which the sync reports honestly rather than guessing a link.
+//
+// The address, not the network: ParseCIDR's second return is the masked
+// network (10.20.0.2/24 gives the 10.20.0.0/24 network), and a link holds the
+// address it was configured with, so matching on the network would look for a
+// link that has 10.20.0.0 and never find the one that has 10.20.0.2.
+func parseDeviceNets(spec string) []net.IPNet {
+	var out []net.IPNet
+	for _, v := range strings.Split(spec, ",") {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		ip := net.ParseIP(v)
+		if ip == nil {
+			if parsed, _, err := net.ParseCIDR(v); err == nil {
+				ip = parsed
+			}
+		}
+		if ip == nil {
+			continue
+		}
+		bits := 32
+		if ip.To4() == nil {
+			bits = 128
+		}
+		out = append(out, net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+	}
+	return out
 }
 
 // InstalledLANRoutes lists the CIDRs the hub has approved for this spoke, exactly
