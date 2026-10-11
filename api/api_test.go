@@ -3099,3 +3099,67 @@ func TestPeerRTTFieldsMapping(t *testing.T) {
 		}
 	}
 }
+
+// TestPeerRTTWireShape pins the JSON spellings of the four RTT fields on the
+// three faces that carry them. tsc checks the web client against these tag
+// names and nothing checks either side against the other, so a renamed tag or
+// a mistyped field would otherwise be silent wire rot; the assertions below
+// are the only thing that keeps the two ends agreeing.
+func TestPeerRTTWireShape(t *testing.T) {
+	diags := map[string]p2p.PeerDiagnostic{
+		"k": {RelayKCP: p2p.RelayKCPStats{SRTT: 23, RTO: 200, RTTVar: 5, Live: true}},
+	}
+
+	// The peer_stats row and the single-peer face spell the same three numbers
+	// differently — srtt_ms on the row, peer_rtt_ms on the tunnel — which is
+	// exactly where a typo hides.
+	row, err := json.Marshal(peerStatsJSON{SrttMs: 23, RtoMs: 200, RttVarMs: 5, KcpLive: true})
+	if err != nil {
+		t.Fatalf("marshal peerStatsJSON: %v", err)
+	}
+	for _, want := range []string{`"srtt_ms":23`, `"rto_ms":200`, `"rttvar_ms":5`, `"kcp_live":true`} {
+		if !strings.Contains(string(row), want) {
+			t.Errorf("peer_stats row missing %s: %s", want, row)
+		}
+	}
+	single, err := json.Marshal(tunnelResponse{PeerRTTMs: 23, PeerRtoMs: 200, PeerRttVarMs: 5, PeerKcpLive: true})
+	if err != nil {
+		t.Fatalf("marshal tunnelResponse: %v", err)
+	}
+	for _, want := range []string{`"peer_rtt_ms":23`, `"peer_rto_ms":200`, `"peer_rttvar_ms":5`, `"peer_kcp_live":true`} {
+		if !strings.Contains(string(single), want) {
+			t.Errorf("tunnel response missing %s: %s", want, single)
+		}
+	}
+
+	// The identity's peer_diagnostics goes through peerDiagnosticsJSON, so this
+	// row pins the tags and the mapper wiring together: a peerRTTFields that
+	// stops reading RelayKCP shows up as zeros, which the omitempty tags then
+	// hide — the shape assertion is what catches it.
+	diagOut := peerDiagnosticsJSON(diags)
+	if len(diagOut) != 1 {
+		t.Fatalf("peerDiagnosticsJSON = %d rows, want 1", len(diagOut))
+	}
+	diag, err := json.Marshal(diagOut["k"])
+	if err != nil {
+		t.Fatalf("marshal peerDiagnosticJSON: %v", err)
+	}
+	for _, want := range []string{`"srtt_ms":23`, `"rto_ms":200`, `"rttvar_ms":5`, `"kcp_live":true`} {
+		if !strings.Contains(string(diag), want) {
+			t.Errorf("peer_diagnostics row missing %s: %s", want, diag)
+		}
+	}
+
+	// The absent-field half of the contract: an unmeasured round trip carries
+	// no field at all, because a zero would read as "instant". The UI's display
+	// gate is these tags, so their absence is part of the shape.
+	zero, err := json.Marshal(peerStatsJSON{})
+	if err != nil {
+		t.Fatalf("marshal zero peerStatsJSON: %v", err)
+	}
+	for _, unwanted := range []string{"srtt_ms", "rto_ms", "rttvar_ms", "kcp_live"} {
+		if strings.Contains(string(zero), unwanted) {
+			t.Errorf("unmeasured peer_stats row carries %s: %s", unwanted, zero)
+		}
+	}
+}
