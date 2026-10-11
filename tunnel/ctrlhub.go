@@ -509,7 +509,31 @@ func (ch *controlHub) runStream(peer string, p *controlPeer, conn net.Conn) {
 
 	ch.mu.Lock()
 	p.conn = conn
+	// A fresh stream has seen nothing, so its per-rev marker starts over.
+	// Without this, a spoke that reconnects to a hub whose table has not
+	// moved since its last session inherits that session's sent marker: the
+	// push below (and every later publish) decides the new stream is
+	// already up to date and skips it, and the spoke waits for a rev that
+	// never comes. A claim re-asserted with the same prefixes changes no
+	// rev, so nothing else would ever wake it.
+	p.sent = 0
 	ch.mu.Unlock()
+
+	// The current netview, pushed the moment the stream exists. A spoke that
+	// connects after the routes it needs were installed has no rev change to
+	// answer — a spoke that claims nothing never produces one at all — so
+	// without this push a fresh session starts blind and stays blind until
+	// some other spoke moves the table. This is the common case: a spoke
+	// restarting against a hub that was already carrying its LAN.
+	//
+	// Only when there is one to push: against an empty table this would be a
+	// frame that says nothing, and every spoke's first connect would pay for
+	// it. publish() is per-rev, so a spoke that then claims still gets the
+	// rev it caused — this is not a substitute for that, it is the case the
+	// claim cannot cover.
+	if snap := ch.rib.Snapshot(); len(snap.Claims) > 0 {
+		ch.publish()
+	}
 
 	for {
 		_, claim, err := readMessage(conn)

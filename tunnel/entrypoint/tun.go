@@ -364,7 +364,12 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	// needs the hub-approved routes back. Never fatal by construction: a
 	// channel that cannot open is a spoke that tunnels exactly as it did
 	// before LAN routing existed.
-	StartNetview(ctx, host, s.peer, s.opts.ShareLAN, s.provider, log)
+	//
+	// After the service starts, because the device must exist before a
+	// netview can land: the hub pushes one the moment the stream is up, and
+	// the kernel routes that netview installs are on the device. Starting the
+	// channel before the listener's Init would let the push (and the sync
+	// that follows it) find no link yet.
 
 	var forward service.Service
 	{
@@ -446,6 +451,11 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	}
 
 	started = true // the reference and the provider are Close's now
+
+	// The device exists now (the listener's Init created it before Serve was
+	// reached), so the control channel can start and the first netview it is
+	// pushed has a link to install its routes on.
+	StartNetview(ctx, host, s.peer, s.opts.ShareLAN, s.opts.Net, s.provider, log)
 
 	go func() {
 		serveErr := forward.Serve()
