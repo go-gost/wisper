@@ -15,6 +15,7 @@ import (
 	"time"
 
 	clogger "github.com/go-gost/core/logger"
+	"github.com/go-gost/p2p"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
@@ -3071,5 +3072,30 @@ func TestDoctorShowsLanSection(t *testing.T) {
 	}
 	if plain != nil && strings.Contains(body, "LAN routing (hub Plain)") {
 		t.Errorf("a hub with no LAN state must not produce a section:\n---\n%s", body)
+	}
+}
+
+// TestPeerRTTFieldsMapping: the one mapping point every JSON face shares.
+func TestPeerRTTFieldsMapping(t *testing.T) {
+	diags := map[string]p2p.PeerDiagnostic{
+		"live": {RelayKCP: p2p.RelayKCPStats{SRTT: 23, RTO: 200, RTTVar: 5, Live: true}},
+		"idle": {RelayKCP: p2p.RelayKCPStats{SRTT: 0, RTO: 0, RTTVar: 0, Live: false}},
+	}
+	cases := []struct {
+		name              string
+		peer              string
+		srtt, rto, rttvar int64
+		live              bool
+	}{
+		{"live session", "live", 23, 200, 5, true},
+		{"no session entry", "absent", 0, 0, 0, false},
+		{"dead session", "idle", 0, 0, 0, false},
+		{"no peer at all", "", 0, 0, 0, false},
+	}
+	for _, c := range cases {
+		if srtt, rto, rttvar, live := peerRTTFields(diags, c.peer); srtt != c.srtt || rto != c.rto || rttvar != c.rttvar || live != c.live {
+			t.Errorf("%s: peerRTTFields = %d/%d/%d/%v, want %d/%d/%d/%v",
+				c.name, srtt, rto, rttvar, live, c.srtt, c.rto, c.rttvar, c.live)
+		}
 	}
 }
