@@ -267,8 +267,10 @@ const en: Record<string, string> = {
   peersDiagSession: 'Session',
   peersDiagSilence: 'Silence',
   peersDiagTrace: 'Recent rounds',
-  /** The peer's measured KCP round trip: the tooltip on the inline number. */
-  peersRTTHint: 'KCP smoothed round-trip time to this peer',
+  /** The peer's measured KCP round trip: the tooltip on the inline number.
+   *  Session-level on purpose — the pair runs one KCP session whichever underlay
+   *  is preferred, so the number is not the path named after it. */
+  peersRTTHint: 'KCP smoothed round-trip time to this peer (the pair\'s session value, not this path\'s)',
   peersDiagSRTT: 'SRTT',
   peersDiagRTO: 'RTO',
   peersDiagRTTVar: 'RTT var',

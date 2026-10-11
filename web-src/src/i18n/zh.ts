@@ -256,7 +256,9 @@ const zh: Record<string, string> = {
   peersDiagSession: '会话',
   peersDiagSilence: '静默',
   peersDiagTrace: '最近记录',
-  peersRTTHint: '到该对端的 KCP 平滑往返时延',
+  /** 对端测得的 KCP 往返时延：内联数字上的悬停说明。会话级是刻意的——这对端无论
+   *  当前走哪条底层都只有同一个 KCP 会话，所以这个数字不是后面那条路径的。 */
+  peersRTTHint: '到该对端的 KCP 平滑往返时延（会话级数值，不是当前路径单独测得的）',
   peersDiagSRTT: 'SRTT',
   peersDiagRTO: 'RTO',
   peersDiagRTTVar: 'RTT var',
