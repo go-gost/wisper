@@ -89,6 +89,16 @@ export class PeerStatsRow extends LitElement {
         ${caps ? row(t('peersDiagCaps'), caps) : nothing}
         ${row(t('peersDiagSession'), ageMs(s.session_age_ms))}
         ${row(t('peersDiagSilence'), ageMs(s.last_recv_age_ms))}
+        <!-- The inline value in full: the smoothed RTT, the variance around it,
+             and the resend timeout the pair's KCP settled on. Only a live
+             session reports them. -->
+        ${s.kcp_live
+          ? html`
+              ${row(t('peersDiagSRTT'), `${s.srtt_ms ?? 0}ms`)}
+              ${row(t('peersDiagRTO'), `${s.rto_ms ?? 0}ms`)}
+              ${row(t('peersDiagRTTVar'), `${s.rttvar_ms ?? 0}ms`)}
+            `
+          : nothing}
         ${s.trace && s.trace.length > 0
           ? html`<div class="diag-trace">
               <span class="diag-label">${t('peersDiagTrace')}</span>
@@ -120,6 +130,12 @@ export class PeerStatsRow extends LitElement {
           ${this.disabled
             ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
             : this._renderTransport()}
+          <!-- The peer's measured round-trip time, right where the path it was
+               measured over is named. Only a live session has one: a peer whose
+               KCP never answered yet shows nothing rather than a zero. -->
+          ${s && s.kcp_live && (s.srtt_ms ?? 0) > 0
+            ? html`<span class="peer-rtt" title="${t('peersRTTHint')} · ${s.transport ?? ''}">${s.srtt_ms}ms</span>`
+            : nothing}
           ${expandable
             ? html`<button class="icon-btn" title="${t('peersDiagDetails')}"
                 @click=${() => { this._expanded = !this._expanded; }}>
@@ -221,6 +237,12 @@ export class PeerStatsRow extends LitElement {
       color: var(--text-muted);
       overflow-wrap: anywhere;
       line-height: 1.4;
+    }
+    /* The peer's measured round-trip time, beside the path badge it was
+       measured over: as quiet as the row's traffic line below it. */
+    .peer-rtt {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
     }
     .peer-stats {
       display: flex;

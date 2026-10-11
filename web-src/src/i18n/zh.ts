@@ -256,6 +256,10 @@ const zh: Record<string, string> = {
   peersDiagSession: '会话',
   peersDiagSilence: '静默',
   peersDiagTrace: '最近记录',
+  peersRTTHint: '到该对端的 KCP 平滑往返时延',
+  peersDiagSRTT: 'SRTT',
+  peersDiagRTO: 'RTO',
+  peersDiagRTTVar: 'RTT var',
   // Event history
   eventsTunnelTitle: '历史事件',
   eventsEntrypointTitle: '历史事件',

@@ -267,6 +267,11 @@ const en: Record<string, string> = {
   peersDiagSession: 'Session',
   peersDiagSilence: 'Silence',
   peersDiagTrace: 'Recent rounds',
+  /** The peer's measured KCP round trip: the tooltip on the inline number. */
+  peersRTTHint: 'KCP smoothed round-trip time to this peer',
+  peersDiagSRTT: 'SRTT',
+  peersDiagRTO: 'RTO',
+  peersDiagRTTVar: 'RTT var',
   // Event history
   eventsTunnelTitle: 'History',
   eventsEntrypointTitle: 'History',

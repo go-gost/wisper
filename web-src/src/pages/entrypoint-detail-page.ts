@@ -161,9 +161,11 @@ export class EntrypointDetailPage extends LitElement {
   /** _renderTransport is the peer's path: one word, plus a tappable ⓘ whose
    *  detail says what the word means for the connection. The badge's reason
    *  also lives in its tooltip — but a phone has no hover, so without the tap a
-   *  grey 中继 reads as "not connected" rather than "connected, on the relay". */
-  private _renderTransport(value?: string) {
-    const st = transportStyle(value);
+   *  grey 中继 reads as "not connected" rather than "connected, on the relay".
+   *  A single-peer entrypoint also reports the round-trip time measured over
+   *  that path, drawn beside the badge the same way a peer row draws it. */
+  private _renderTransport(ep: Entrypoint) {
+    const st = transportStyle(ep.peer_transport);
     if (!st) return nothing;
     return html`
       <div class="info-row">
@@ -172,6 +174,9 @@ export class EntrypointDetailPage extends LitElement {
           <span class="peer-badge ${st.tone}" title=${st.hint}>
             ${icon(st.icon)}<span>${st.label}</span>
           </span>
+          ${ep.peer_kcp_live && (ep.peer_rtt_ms ?? 0) > 0
+            ? html`<span class="peer-rtt" title="${t('peersRTTHint')} · ${ep.peer_transport ?? ''}">${ep.peer_rtt_ms}ms</span>`
+            : nothing}
           <button class="detail-btn" title=${t('p2pTransportDetail')}
             aria-label=${t('p2pTransportDetail')} aria-expanded=${this._showTransportDetail ? 'true' : 'false'}
             @click=${() => { this._showTransportDetail = !this._showTransportDetail; }}>
@@ -187,6 +192,24 @@ export class EntrypointDetailPage extends LitElement {
               ${t('p2pTransportConnected')}${st.why ? ` · ${st.why}` : ` · ${t('p2pTransportHint')}`}
             </span>
           </div>
+          <!-- The round trip behind the inline number, in full. Only a live
+               KCP session reports it. -->
+          ${ep.peer_kcp_live
+            ? html`
+              <div class="info-row detail-row">
+                <span class="info-label">${t('peersDiagSRTT')}</span>
+                <span class="info-value text detail-text">${ep.peer_rtt_ms ?? 0}ms</span>
+              </div>
+              <div class="info-row detail-row">
+                <span class="info-label">${t('peersDiagRTO')}</span>
+                <span class="info-value text detail-text">${ep.peer_rto_ms ?? 0}ms</span>
+              </div>
+              <div class="info-row detail-row">
+                <span class="info-label">${t('peersDiagRTTVar')}</span>
+                <span class="info-value text detail-text">${ep.peer_rttvar_ms ?? 0}ms</span>
+              </div>
+            `
+            : nothing}
         `
         : nothing}
     `;
@@ -522,6 +545,13 @@ export class EntrypointDetailPage extends LitElement {
     }
     .peer-badge.warn {
       color: var(--amber);
+    }
+
+    /* The peer's measured round-trip time, beside the badge it was measured
+       over: quiet, small — the same look the peer rows use. */
+    .peer-rtt {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
     }
 
     /* The badge and its ⓘ on one centered line. */
@@ -914,7 +944,7 @@ export class EntrypointDetailPage extends LitElement {
                         </button>`
                         : ''}
                     </div>
-                    ${this._renderTransport(ep.peer_transport)}
+                    ${this._renderTransport(ep)}
                     <div class="p2p-hint">${t('tunPeerHint')}</div>
                   `
                   : this.entrypointType === 'p2p'
@@ -932,7 +962,7 @@ export class EntrypointDetailPage extends LitElement {
                         </button>`
                         : ''}
                     </div>
-                    ${this._renderTransport(ep.peer_transport)}
+                    ${this._renderTransport(ep)}
                     <div class="info-row">
                       <span class="info-label">${t('fieldProtocol')}</span>
                       <span class="info-value text">

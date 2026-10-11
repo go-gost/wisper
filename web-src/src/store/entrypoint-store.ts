@@ -108,6 +108,13 @@ export function applyStats(statsList: Entrypoint[]): void {
             // A p2p entrypoint's path changes under the UI's feet: without
             // this the transport badge would only move on a full refresh.
             peer_transport: s.peer_transport,
+            // The peer's KCP round-trip numbers ride the same poll as the badge
+            // they sit next to, so they must be copied too — otherwise the
+            // number would blink away between full refreshes.
+            peer_rtt_ms: s.peer_rtt_ms,
+            peer_rto_ms: s.peer_rto_ms,
+            peer_rttvar_ms: s.peer_rttvar_ms,
+            peer_kcp_live: s.peer_kcp_live,
             // The LANs this spoke's hub approved. They travel on the same
             // polling path, so a poll must not drop them: the routes row would
             // blink away between full refreshes.
