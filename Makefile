@@ -18,7 +18,11 @@ VERSION := $(patsubst v%,%,$(GIT_TAG))
 ifeq ($(strip $(VERSION)),)
 VERSION := 0.0.0-dev
 endif
-LDFLAGS := -s -w -X github.com/go-gost/wisper/version.Version=$(VERSION)
+# The revision the binary came from. Stamped rather than left to build info:
+# the Android APK build passes -buildvcs=false, so ReadBuildInfo carries no vcs
+# settings on the device and a crash there would be unattributable to a commit.
+GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null)
+LDFLAGS := -s -w -X github.com/go-gost/wisper/version.Version=$(VERSION) -X github.com/go-gost/wisper/version.Commit=$(GIT_COMMIT)
 
 # Output directories
 DIST_DIR   := dist
@@ -384,14 +388,14 @@ android-release: web
 		export CGO_ENABLED=1; \
 		export GOOS=android; \
 		export GOARCH=arm64; \
-		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w -X github.com/go-gost/wisper/version.Commit=$(GIT_COMMIT)" \
 			-o android/app/src/main/jniLibs/arm64-v8a/libwisper.so .; \
 		echo "--- libwisper.so (arm64): $$(wc -c < android/app/src/main/jniLibs/arm64-v8a/libwisper.so) bytes ---"; \
 		echo "--- Cross-compiling libwisper.so (x86_64) ---"; \
 		export CC="$$NDK_BIN/x86_64-linux-android24-clang"; \
 		export CXX="$$NDK_BIN/x86_64-linux-android24-clang++"; \
 		export GOARCH=amd64; \
-		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w" \
+		go build -buildmode=c-shared -buildvcs=false -ldflags="-s -w -X github.com/go-gost/wisper/version.Commit=$(GIT_COMMIT)" \
 			-o android/app/src/main/jniLibs/x86_64/libwisper.so .; \
 		echo "--- libwisper.so (x86_64): $$(wc -c < android/app/src/main/jniLibs/x86_64/libwisper.so) bytes ---"; \
 		rm -f lib_jni.c; \

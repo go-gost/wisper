@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/netip"
 	"slices"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"runtime/debug"
 
 	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/router"
@@ -299,13 +302,33 @@ func RunControlChannel(ctx context.Context, cfg ControlChannelConfig) {
 	}
 
 	for ctx.Err() == nil {
-		if err := controlSession(ctx, cfg); err != nil {
-			cfg.Log.Warnf("control channel: %v", err)
-		}
+		// A panic out of controlSession must not leave this goroutine. This runs
+		// in a c-shared library: the runtime cannot unwind past the cgo boundary,
+		// so an unrecovered panic takes the whole app with it and leaves an
+		// unexplained SIGABRT — which is what happened on 2026-10-12. Recovered,
+		// it is reported with its stack and the loop keeps its retry cadence.
+		runControlIteration(ctx, &cfg)
 		select {
 		case <-ctx.Done():
 		case <-time.After(controlRetryInterval):
 		}
+	}
+}
+
+// runControlIteration is one pass of the control loop's body, with the panic
+// the retry cannot afford. The stack is the part the runtime's own crash output
+// did not deliver on Android, so it is captured here instead of there.
+func runControlIteration(ctx context.Context, cfg *ControlChannelConfig) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("control channel: panic recovered",
+				"panic", r,
+				"stack", string(debug.Stack()),
+			)
+		}
+	}()
+	if err := controlSession(ctx, *cfg); err != nil {
+		cfg.Log.Warnf("control channel: %v", err)
 	}
 }
 
@@ -365,7 +388,14 @@ func deliverNetview(cfg ControlChannelConfig, n netviewMessage) {
 	}
 }
 
-func controlSession(ctx context.Context, cfg ControlChannelConfig) error {
+// controlSession is one connect: dial, magic, claim, then netviews until the
+// stream ends.
+//
+// It is a package var so the retry loop's panic containment can be driven
+// without a hub: the panic this guards against comes off the far end of a
+// stream that is speaking something other than the control format, and
+// producing that against a real hub is not a unit test.
+var controlSession = func(ctx context.Context, cfg ControlChannelConfig) error {
 	// A chain per dial: a chain holds the node's connector state, so each
 	// session builds its own and gives it back on the way out.
 	chCfg := controlChainConfig(cfg)

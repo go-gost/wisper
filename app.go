@@ -57,6 +57,9 @@ func Start(configDir, addr string, opts ...config.Option) (err error) {
 	}()
 
 	config.Init(append([]config.Option{config.WithConfigDir(configDir)}, opts...)...)
+	// After Init: the logger is configured, so the banner lands in whatever sink
+	// the run chose and can be found by whatever reads that sink.
+	startupBanner()
 	tunnel.LoadConfig()
 	entrypoint.LoadConfig()
 
