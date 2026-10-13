@@ -14,12 +14,6 @@ func init() {
 	newKernelRoutes = func() kernelRoutes { return netlinkRoutes{} }
 }
 
-// errRouteGone is the kernel's answer to removing a route it does not hold.
-// errors.Is, because netlink hands back the syscall errno wrapped in a
-// *netlink.NetlinkError, and "the route is already gone" is the outcome the
-// removal wanted regardless of how it is spelled.
-var errRouteGone = errors.New("route gone")
-
 // netlinkRoutes is the production kernelRoutes: the routes live in the
 // kernel's table, so the kernel's own API is the only honest implementation.
 //
