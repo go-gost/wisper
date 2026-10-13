@@ -460,12 +460,22 @@ type ContextRunner interface {
 	RunContext(ctx context.Context) error
 }
 
-// RunWithContext starts s carrying ctx's action id into the p2p seam calls its
-// run makes. A type with no context-aware run falls back to Run: its lifecycle
+// RunWithContext starts s carrying ctx's values into the p2p seam calls its run
+// makes. A type with no context-aware run falls back to Run: its lifecycle
 // opens no p2p seam call, so an id would have nothing to join.
+//
+// ctx's cancellation deliberately does not travel. Run returns while the
+// goroutines it started are still serving — the control channel among them —
+// so a run that inherited a cancellation it does not own is torn down the
+// moment its starter is done with it. That is exactly what a click from the UI
+// is: the API starts the tunnel with r.Context(), net/http cancels it when the
+// handler returns, the control channel logs one "context canceled" and exits,
+// and the spoke claims nothing at the hub for the rest of the process's life.
+// Only Close() stops a tunnel's goroutines, so only its own lifetime may cancel
+// them.
 func RunWithContext(ctx context.Context, s Tunnel) error {
 	if cr, ok := s.(ContextRunner); ok {
-		return cr.RunContext(ctx)
+		return cr.RunContext(context.WithoutCancel(ctx))
 	}
 	return s.Run()
 }
