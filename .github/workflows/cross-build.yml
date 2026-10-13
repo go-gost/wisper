@@ -1,0 +1,58 @@
+name: Cross-build
+
+# CI's test and lint jobs run on Linux, and a symbol declared in a
+# linux-only file is invisible there — so is every other build-tag mistake.
+# PR #6 shipped "undefined: errRouteGone" to every non-Linux release, months
+# after the line that referenced it was written, because nothing in CI ever
+# built the platforms the release workflow ships.
+#
+# These are builds, not tests: the point is the constraint check the compiler
+# does anyway. darwin and windows are the pair that earns its keep — an
+# android build is a linux build as far as constraints go, since a _linux.go
+# file compiles for android too, so it never caught errRouteGone. android is
+# in the matrix for the arch coverage (arm64 and amd64) and because it is the
+# code the phone actually runs; neither desktop target compiles it otherwise.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cross-build:
+    name: ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: android
+            goarch: arm64
+            lib-only: true
+          - goos: android
+            goarch: amd64
+            lib-only: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      # Android's root package links with cgo — it is the c-shared library
+      # the app loads — and android requires external linking, so a
+      # cross-compile without the NDK cannot link it. The packages it is made
+      # of are what has to compile where the spoke actually runs.
+      - name: Build
+        run: |
+          if [ "${{ matrix.lib-only }}" = "true" ]; then
+            pkgs=$(go list ./... | grep -v '^github.com/go-gost/wisper$')
+          else
+            pkgs=./...
+          fi
+          echo "building $pkgs for ${{ matrix.goos }}/${{ matrix.goarch }}"
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build $pkgs
