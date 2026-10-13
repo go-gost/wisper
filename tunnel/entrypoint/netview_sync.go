@@ -10,6 +10,12 @@ import (
 	"github.com/go-gost/core/logger"
 )
 
+// errRouteGone is the kernel's answer to removing a route it does not hold.
+// errors.Is, because netlink hands back the syscall errno wrapped in a
+// *netlink.NetlinkError, and "the route is already gone" is the outcome the
+// removal wanted regardless of how it is spelled.
+var errRouteGone = errors.New("route gone")
+
 // kernelRoutes is the seam this package's netview sync works through: find
 // the link this device's packets ride, and add or remove one destination on
 // it. Production is the kernel's own table, reached through netlink on Linux
