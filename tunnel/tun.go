@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -649,17 +650,37 @@ func (s *tunTunnel) Run() (err error) {
 		// s.forward to nil, and a full-tunnel PUT calls it on this very tunnel
 		// while this goroutine is starting. What is served is the service built
 		// above either way — Close closes that same object, which is the point.
-		serveErr := forward.Serve()
-		if CleanStop(serveErr) {
-			log.Info("tun tunnel stopped")
-			s.setErr(nil)
-		} else {
-			log.Errorf("tun tunnel stopped with error: %v", serveErr)
-			s.setErr(serveErr)
-		}
+		serveForward(s, log, forward.Serve)
 	}()
 
 	return nil
+}
+
+// serveForward runs the tun tunnel's forwarder: the whole data plane, with the
+// peer sessions and the secure layer under them. This is the goroutine the
+// phone died in on 2026-10-12 — the last line the spoke logged was a dial
+// inside this path ("connect /ip", forward/connector.go:44) and crash.log held
+// one "index out of range [0] with length 0" and no stack. The library is
+// c-shared there, so the runtime cannot unwind past the cgo boundary: an
+// unrecovered panic takes the app with it and leaves an unexplained SIGABRT.
+// Recovered here it is reported with its stack and the tunnel is marked
+// failed — a forwarder that panicked is a tunnel that is down, and the answer
+// to that is a failed tunnel the API can show, not a dead process.
+func serveForward(s *tunTunnel, log logger.Logger, serve func() error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("tun forwarder panicked: %v\n%s", r, debug.Stack())
+			s.setErr(fmt.Errorf("tun: forwarder panicked: %v", r))
+		}
+	}()
+	serveErr := serve()
+	if CleanStop(serveErr) {
+		log.Info("tun tunnel stopped")
+		s.setErr(nil)
+	} else {
+		log.Errorf("tun tunnel stopped with error: %v", serveErr)
+		s.setErr(serveErr)
+	}
 }
 
 // Status is the underlying gost service's status, read under the lock for the same
