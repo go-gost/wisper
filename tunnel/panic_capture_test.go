@@ -25,23 +25,18 @@ func TestRunControlChannelSurvivesAPanicInTheLoop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	calls := make(chan struct{}, 4)
-	_ = calls
-	cfg := ControlChannelConfig{
-		HubPeer: "gfyuoMdKHdqS-LjNTqd6x6V5YJhpnU5ebhF-Qpfo1DI",
-	}
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		RunControlChannel(ctx, cfg)
-	}()
-
 	// A dialing controlSession that panicked in the far end of the stream: the
 	// shape that produced the phone's crash.log line. Restored on the way out
 	// because the loop calls it again, and a leaked panic would kill the suite.
+	//
+	// Assigned before the goroutine that reads it starts. controlSession is a
+	// package variable the loop reads once per iteration, so writing it from
+	// here while the loop runs is a data race on that variable — which is what
+	// the CI's -race run caught, on a test that had to be fixed rather than the
+	// code it was testing.
 	prevSession := controlSession
 	t.Cleanup(func() { controlSession = prevSession })
+	calls := make(chan struct{}, 4)
 	controlSession = func(ctx context.Context, cfg ControlChannelConfig) error {
 		select {
 		case calls <- struct{}{}:
@@ -49,6 +44,14 @@ func TestRunControlChannelSurvivesAPanicInTheLoop(t *testing.T) {
 		}
 		panic("index out of range [0] with length 0")
 	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		RunControlChannel(ctx, ControlChannelConfig{
+			HubPeer: "gfyuoMdKHdqS-LjNTqd6x6V5YJhpnU5ebhF-Qpfo1DI",
+		})
+	}()
 
 	// Two recoveries prove the loop keeps going; one entry closes immediately.
 	select {
