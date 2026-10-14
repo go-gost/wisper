@@ -18,6 +18,14 @@ export class EntrypointDetailPage extends LitElement {
   @property() entrypointType: EntrypointType = 'tcp';
   @property() entrypointId = '';
 
+  /** The poll that keeps the page's snapshot current, or 0 when the page is
+   *  not connected. The store notifies only on an explicit mutation, so without
+   *  this the page is a still image: the banner below and the hint line both
+   *  read the event history, and a recovery recorded while the page was open
+   *  never reached it — an accusation of a silent hub outlived the silence and
+   *  stayed on screen until the app was killed. */
+  private _poll = 0;
+
   // ── State ────────────────────────────────────────────────────────────
 
   @state() private mode: PageMode = 'view';
@@ -68,6 +76,15 @@ export class EntrypointDetailPage extends LitElement {
     super.connectedCallback();
     this._load();
 
+    // Re-read the entrypoint on a timer: everything this page draws — status,
+    // banner, hint line, counters — comes from one snapshot taken above, and
+    // the backend's verdicts arrive without asking. 5s is the stats cadence
+    // the phone's own API already runs at, so the page costs no extra polling
+    // beyond what the device does for itself.
+    this._poll = window.setInterval(() => {
+      void refresh();
+    }, 5000);
+
     this._unsubs.push(
       subscribe(() => {
         this._load();
@@ -77,6 +94,8 @@ export class EntrypointDetailPage extends LitElement {
   }
 
   disconnectedCallback() {
+    window.clearInterval(this._poll);
+    this._poll = 0;
     super.disconnectedCallback();
     for (const fn of this._unsubs) fn();
     this._unsubs = [];
