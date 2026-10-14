@@ -1173,7 +1173,14 @@ func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
 // allowlist on its own — the peers page changes the list without touching the
 // rest of the tunnel's config.
 type tunnelPeersRequest struct {
-	Peers []peerJSON `json:"peers"`
+	// Peers is the allowlist as a whole, and it is a pointer for the same
+	// reason the policy fields are: three meanings need three answers. Present
+	// and non-empty replaces the list, which is what the peers page does. An
+	// explicit empty array is the one request that empties it — a hub saved with
+	// no spokes is a hub that starts fresh. Absent is the field not mentioned:
+	// the list stands, because a save carrying only the policy must not be read
+	// as a request to route nothing.
+	Peers *[]peerJSON `json:"peers"`
 	// LanAllow is the hub's lan_allow policy as the row that carries it: a spoke
 	// key and the supernets it may claim inside. A row that is present and empty
 	// is a spoke that may claim nothing, and an absent key keeps whatever rows it
@@ -1215,11 +1222,24 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	peers := make([]string, 0, len(req.Peers))
-	aliases := make(map[string]string, len(req.Peers))
+	// The allowlist is the one field this door may leave alone, and the shape
+	// that needs it is the ordinary one: a save carrying only the policy — a
+	// script, a curl, a form that never mentions the list. Reading an absent
+	// array as an empty one reconciles every spoke's route away, and the streams
+	// then arrive for an unregistered peer while the hub's own save answered 200.
+	// That is what the live hub did, so the list is parsed only when the request
+	// named it, and an absent one falls through to the policy below with the
+	// routes exactly as they stood.
+	if req.Peers == nil {
+		applyLanAllow(w, r, old, req)
+		return
+	}
+
+	peers := make([]string, 0, len(*req.Peers))
+	aliases := make(map[string]string, len(*req.Peers))
 	var disabled []string
-	seen := make(map[string]bool, len(req.Peers))
-	for _, p := range req.Peers {
+	seen := make(map[string]bool, len(*req.Peers))
+	for _, p := range *req.Peers {
 		key := strings.TrimSpace(p.Key)
 		if !tunnel.ValidPeerKey(key) {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("peer %q is not a base64 public key", key))
@@ -1255,7 +1275,7 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	// assignPeerIPs hands back the rows it managed alongside its error, and taking
 	// the map first would answer a refused save with a partial assignment — the
 	// request said no and the response saved half of it.
-	ip, err := settlePeerIPs(old.Type(), req.Peers, old.Options().PeerIPs, old.Options().Net)
+	ip, err := settlePeerIPs(old.Type(), *req.Peers, old.Options().PeerIPs, old.Options().Net)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1285,11 +1305,25 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// The policy a spoke's LAN claim is answered against, taken in place like the
-	// rest of this door: a spoke re-asserts its claim over the control channel,
-	// so a row saved here is what the next assertion reads, and a hub that is not
-	// running — which has no control channel to re-assert on — is answered with
-	// the reason rather than with a save that authorizes nothing.
+	applyLanAllow(w, r, old, req)
+
+	// Removing the last spoke is the moment an existing, working hub stops
+	// answering, so the state is recorded where the user just was.
+	noteNoSpokes(old)
+
+	writeJSON(w, http.StatusOK, toTunnelResponse(old))
+}
+
+// applyLanAllow saves the policy rows a peers request carries, and persists
+// whatever that request changed. Both steps live here because they are the tail
+// of two paths through the door: the one that names its allowlist and the one
+// that carries only the policy.
+//
+// The save is refused with a reason rather than a log line, and nothing is
+// persisted when it is: a hub that is not running has no control channel for a
+// spoke to re-assert on, so the rows would authorize nothing and the operator
+// would be told the save of nothing succeeded.
+func applyLanAllow(w http.ResponseWriter, r *http.Request, old tunnel.Tunnel, req tunnelPeersRequest) {
 	if s, ok := old.(tunnel.LanAllowSetter); ok {
 		if req.LanAllow != nil {
 			if err := s.SetLanAllow(r.Context(), *req.LanAllow); err != nil {
@@ -1301,10 +1335,4 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	if err := tunnel.SaveConfig(); err != nil {
 		slog.Error("save config", "err", err)
 	}
-
-	// Removing the last spoke is the moment an existing, working hub stops
-	// answering, so the state is recorded where the user just was.
-	noteNoSpokes(old)
-
-	writeJSON(w, http.StatusOK, toTunnelResponse(old))
 }

@@ -78,6 +78,60 @@ func TestUpdateTunnelPeersSetsLanAllow(t *testing.T) {
 	}
 }
 
+// The ruling the shape needed, found in production: a save that carries only
+// the policy — which is the shape every script, every curl and every future
+// client that does not restate the allowlist has — must not be read as an empty
+// allowlist. The field is required, so an absent array is a field not mentioned
+// and the list stands; the one request that empties it is an explicit [].
+//
+// This is what the earlier shape got wrong on the live hub: the policy save
+// reconciled every spoke's route away, the streams went to an unregistered peer
+// and the network went dark for a spoke whose row had just been allowed.
+func TestUpdateTunnelPeersLanAllowOnlyKeepsTheAllowlist(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	srv := setupTestServer(t)
+	defer srv.Close()
+	offlineP2P()
+
+	key := strings.Repeat("E", 43)
+	id := startTunHub(t, srv, "10.60.0.1/24")
+
+	resp, saved := putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{{"key": key, "alias": "phone"}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("put the allowlist in place = %d: %v", resp.StatusCode, saved)
+	}
+	if peers := tunnel.Get(id).Options().Peers; len(peers) != 1 {
+		t.Fatalf("the setup is wrong: the hub's allowlist is %v, want one spoke", peers)
+	}
+
+	// The save the ruling is about: nothing but the rows.
+	resp, saved = putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"lan_allow": map[string][]string{key: {"192.168.1.0/24"}},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("save only the rows = %d: %v", resp.StatusCode, saved)
+	}
+	if got := tunnel.Get(id).Options().LanAllow; got != key+"=192.168.1.0/24" {
+		t.Errorf("the rows after the save = %q, want %q", got, key+"=192.168.1.0/24")
+	}
+	if peers := tunnel.Get(id).Options().Peers; len(peers) != 1 {
+		t.Errorf("a rows-only save left the allowlist as %v, want the spoke it had", peers)
+	}
+
+	// An empty array still means what it says: every spoke is gone.
+	resp, saved = putJSON(t, srv.URL+"/api/tunnels/"+id+"/peers", map[string]any{
+		"peers": []map[string]any{},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("empty the allowlist = %d: %v", resp.StatusCode, saved)
+	}
+	if peers := tunnel.Get(id).Options().Peers; len(peers) != 0 {
+		t.Errorf("an explicit empty allowlist = %v, want none", peers)
+	}
+}
+
 // The other half of the ruling: a hub saved from the detail page, whose form
 // knows nothing about the policy, must not empty it. This is the shape that used
 // to lock a whole network out, and it is still the shape the UI is in.
