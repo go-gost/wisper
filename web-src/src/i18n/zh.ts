@@ -303,6 +303,7 @@ const zh: Record<string, string> = {
   p2pTransportWhyPunching: '正在协商直连',
   p2pTransportWhyFailed: '打洞失败（多为对称 NAT）',
   p2pTransportWhyDisabled: '设置里关闭了直连',
+  p2pTransportWhyPeerDirectOff: '对端关闭了直连，走中继',
   p2pTransportWhyNoCandidates: '没有可用的 STUN 服务器且无 IPv6',
   p2pTransportWhyStun: 'STUN 服务器无响应',
   // 传输徽标旁 ⓘ 点开的详情：先说连接是好的，再说为什么没走直连。

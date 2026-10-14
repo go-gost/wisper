@@ -63,14 +63,45 @@ func livenessTick(st *livenessState, upDelta, downDelta uint64, now time.Time, t
 	return false, false
 }
 
+// livenessAction is what one tick's deltas say once every gate is applied:
+// file a warning, retract the one on the record, or say nothing.
+type livenessAction int
+
+const (
+	livenessQuiet livenessAction = iota
+	livenessWarn
+	livenessRecover
+)
+
+// livenessDecide orders the two watchdogs' claims on one tick. The probe's
+// stall is the higher suspect — it proves only the local fd — so while it
+// stands this watchdog files nothing new. It does not get to retract the hub's
+// answer: a downlink delta is direct evidence the hub returns traffic, and
+// suppressing the recovery on top of the warning is what left a warn on the
+// record with no way to take it back. The banner then outlived the state it
+// described, and an operator who is told the hub is silent while packets move
+// both ways learns to ignore it.
+func livenessDecide(st *livenessState, upDelta, downDelta uint64, probeReported bool, now time.Time, tick time.Duration) livenessAction {
+	warn, recovered := livenessTick(st, upDelta, downDelta, now, tick)
+	switch {
+	case recovered:
+		return livenessRecover
+	case warn && probeReported:
+		return livenessQuiet
+	case warn:
+		return livenessWarn
+	}
+	return livenessQuiet
+}
+
 // checkLiveness runs the hub-liveness watchdog for one entrypoint. Only a
 // running tun entrypoint is watched: any downlink byte proves the hub side
 // returns traffic, sustained uplink without any is the signal, and dual-zero
 // is idle. A probe-stalled device is the higher suspect — the device probe
 // proves only the local fd — so while the probe watchdog's stall report
-// stands, this stays silent rather than blaming the hub for a dead device.
-// A service already in failed state is skipped the same way: its error banner
-// is the message.
+// stands, this files nothing new rather than blaming the hub for a dead
+// device. A service already in failed state is skipped the same way: its error
+// banner is the message.
 func (t *updateStatsTask) checkLiveness(ep tunnel.Tunnel, upDelta, downDelta uint64) {
 	if ep == nil || ep.Type() != entrypoint.TunEntryPoint || ep.IsClosed() {
 		return
@@ -78,24 +109,23 @@ func (t *updateStatsTask) checkLiveness(ep tunnel.Tunnel, upDelta, downDelta uin
 	if tunnel.IsServiceFailed(ep) {
 		return
 	}
-	if ps := t.probe[ep.ID()]; ps != nil && ps.reported {
-		return
-	}
+	id := ep.ID()
 	if t.liveness == nil {
 		t.liveness = map[string]*livenessState{}
 	}
-	id := ep.ID()
 	st := t.liveness[id]
 	if st == nil {
 		st = &livenessState{}
 		t.liveness[id] = st
 	}
-	warn, recovered := livenessTick(st, upDelta, downDelta, time.Now(), probeTickInterval())
-	if warn {
-		event.Record(id, event.LevelWarn, "%s", msgLivenessNoReflow)
-		return
+	probeReported := false
+	if ps := t.probe[id]; ps != nil {
+		probeReported = ps.reported
 	}
-	if recovered {
+	switch livenessDecide(st, upDelta, downDelta, probeReported, time.Now(), probeTickInterval()) {
+	case livenessWarn:
+		event.Record(id, event.LevelWarn, "%s", msgLivenessNoReflow)
+	case livenessRecover:
 		event.Record(id, event.LevelInfo, "%s", msgLivenessRecovered)
 	}
 }

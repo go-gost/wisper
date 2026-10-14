@@ -134,3 +134,50 @@ func TestLivenessTick(t *testing.T) {
 		}
 	})
 }
+
+// TestLivenessDecideProbeSilence pins the order the two watchdogs' claims come
+// in, which is the reporting half of a live outage: the phone showed
+// "hub 无回流：只发包、无回包" while packets moved both ways, and the warn on
+// the record could never be taken back.
+//
+// The sequence that produced it: the warn fired (the probe was still fine),
+// the probe stalled on the next reconnect, and from then on the probe's own
+// early return kept this watchdog silent — including the recovery, which is
+// the one thing that clears the banner. The device probe answers nothing on
+// this setup (441 sent, 0 acked), so the silence was permanent.
+func TestLivenessDecideProbeSilence(t *testing.T) {
+	tick := time.Second
+	now := time.Now()
+
+	t.Run("a stalled probe silences a new warning", func(t *testing.T) {
+		st := &livenessState{}
+		livenessDecide(st, 10, 0, false, now, tick) // seed through the same door
+		for i := 0; i < 60; i++ {
+			if got := livenessDecide(st, 10, 0, true, now, tick); got != livenessQuiet {
+				t.Fatalf("tick %d = %v with the probe stalled, want quiet", i, got)
+			}
+		}
+	})
+
+	t.Run("it does not retract the hub's answer", func(t *testing.T) {
+		st := &livenessState{}
+		livenessDecide(st, 10, 0, false, now, tick) // seed
+		// The warn the phone recorded, while the probe was still answering.
+		var warned bool
+		for i := 0; i < 60 && !warned; i++ {
+			warned = livenessDecide(st, 10, 0, false, now, tick) == livenessWarn
+		}
+		if !warned {
+			t.Fatal("the warn never fired, so this test proves nothing")
+		}
+		// The probe stalls on a reconnect and never answers again. The hub is
+		// returning traffic throughout.
+		if got := livenessDecide(st, 10, 50, true, now, tick); got != livenessRecover {
+			t.Errorf("with the probe stalled and the downlink moving, the action = %v, want recovered", got)
+		}
+		if st.reported {
+			t.Error("the warn is still on the record after the recovery")
+		}
+	})
+
+}

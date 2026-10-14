@@ -11,6 +11,7 @@ export type PeerTransport =
   | 'failed'
   | 'derp'
   | 'disabled'
+  | 'peer-direct-off'
   | 'no-candidates'
   | 'stun-unreachable';
 
@@ -52,6 +53,12 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     tone: 'muted',
     labelKey: 'p2pTransportRelay',
     whyKey: 'p2pTransportWhyDisabled',
+  },
+  'peer-direct-off': {
+    icon: 'hub',
+    tone: 'muted',
+    labelKey: 'p2pTransportRelay',
+    whyKey: 'p2pTransportWhyPeerDirectOff',
   },
   'no-candidates': {
     icon: 'hub',

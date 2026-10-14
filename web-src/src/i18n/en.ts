@@ -315,6 +315,7 @@ const en: Record<string, string> = {
   p2pTransportWhyPunching: 'negotiating a direct path',
   p2pTransportWhyFailed: 'punch failed (often a symmetric NAT)',
   p2pTransportWhyDisabled: 'direct path is off in the settings',
+  p2pTransportWhyPeerDirectOff: 'the peer has the direct path off',
   p2pTransportWhyNoCandidates: 'no usable STUN server and no IPv6',
   p2pTransportWhyStun: 'STUN server does not answer',
   // The ⓘ next to the transport badge: the connection first, then why the path
