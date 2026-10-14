@@ -49,6 +49,12 @@ export class PeerStatsRow extends LitElement {
   @property({ type: Boolean }) showKeys = false;
   /** The page's own controls for this row, rendered inside it. */
   @property() rowActions?: unknown;
+  /** The LANs this peer may claim on the hub's device network — its row of the
+   *  hub's lan_allow policy, as the row holds them. It is not the same fact as
+   *  the peer's claimed LANs below: a spoke may be allowed to claim a LAN it has
+   *  not (yet), and a hub that allows nothing refuses every assertion. Empty
+   *  everywhere except a hub's peers page. */
+  @property() peersLAN = '';
 
   @state() private _expanded = false;
 
@@ -149,6 +155,11 @@ export class PeerStatsRow extends LitElement {
              hub's rows hold one (a p2p tunnel has no device network), so it is
              absent — and this line with it — everywhere else. -->
         ${p?.ip ? html`<div class="peer-ip">${t('peersIP')}: ${p.ip}</div>` : nothing}
+        <!-- What the hub lets this spoke claim, rather than what it claimed: a
+             hub with no row for a spoke refuses every assertion it makes, and a
+             row on the peers page is how it is given one. Absent, with this
+             line, for a spoke no policy row covers. -->
+        ${this.peersLAN ? html`<div class="peer-ip">${t('peersLAN')}: ${this.peersLAN}</div>` : nothing}
         <!-- The LANs this peer holds on the hub's network: the CIDRs it claimed
              and the hub installed. Read the same way the address above it is
              (same class, so the two stack as one block of row facts), and

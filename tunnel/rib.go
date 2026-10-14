@@ -185,6 +185,53 @@ func (r *rib) SetMembers(members []memberEntry) {
 	r.rev++
 }
 
+// SetAllow replaces the lan_allow policy while the hub runs: which supernets
+// each spoke may claim inside. It is the live counterpart of newRIB's allow
+// argument, for the peers page, where the operator works on one spoke at a time
+// and cannot be asked to restate the rest of the policy — or to rebuild the hub
+// to change it.
+//
+// A policy tightened by a save withdraws the routes it no longer approves: a
+// spoke re-asserts its claim every ~20s with the LAN its own config still names,
+// so without this the route would stay in force and the hub would keep refusing
+// the assertion that holds it. A policy loosened by a save approves the next
+// assertion instead — the same re-assertion, answered by the new rows.
+//
+// The rows are masked here exactly as newRIB masks them, so a row saved as
+// "192.168.1.7/24" authorizes the same network as one read back as
+// "192.168.1.0/24".
+func (r *rib) SetAllow(allow map[string][]netip.Prefix) {
+	rows := make(map[string][]netip.Prefix, len(allow))
+	for peer, supers := range allow {
+		row := make([]netip.Prefix, 0, len(supers))
+		for _, super := range supers {
+			row = append(row, super.Masked())
+		}
+		rows[peer] = row
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.allow = rows
+
+	// The other direction: a route in force that the new rows no longer approve
+	// leaves the table now, rather than staying in force because a spoke that
+	// was refused keeps asserting it. The spoke does re-assert — every ~20s,
+	// with the LAN its own config still names — so without this a tightened hub
+	// would hold the route forever and refuse its owner on every assertion
+	// while routing it anyway.
+	for prefix, claim := range r.claims {
+		if claim.Static {
+			continue
+		}
+		if _, _, ok := r.approvalRefusal(claim.Origin, prefix); ok {
+			continue
+		}
+		delete(r.claims, prefix)
+	}
+	r.rev++
+}
+
 // ApplyClaim applies one spoke's add/drop and returns the prefixes the RIB
 // accepted for that origin. A refusal is not an error and not a return value:
 // it is an event, because a spoke is told nothing about why its claim did not

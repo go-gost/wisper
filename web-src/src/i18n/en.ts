@@ -227,6 +227,9 @@ const en: Record<string, string> = {
   peersIP: 'IP',
   peersIPHint:
     'The address this spoke may use on the hub\'s network. Leave empty and the hub assigns one from its own subnet; a spoke must be configured with the same address.',
+  peersLANPlaceholder: 'e.g. 192.168.1.0/24',
+  peersLANHint:
+    'The LANs this spoke may share through the hub (comma-separated CIDRs). Left empty it may share none, and it keeps asserting what it shares while the hub keeps refusing it with "no-allow-row". Typed, the next assertion is approved — no restart.',
   /** The peer row's LAN line: the CIDRs this peer claimed and the hub installed. */
   peersLAN: 'LAN',
   peersKeyRequired: 'A key is required.',

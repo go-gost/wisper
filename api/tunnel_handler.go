@@ -181,7 +181,8 @@ type tunnelOptionsResp struct {
 	// LanAllow is the hub-side policy for the LANs a spoke may claim:
 	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
 	// A spoke with no row claims nothing at all. LanRoutes is the hub's own
-	// routes, each a "cidr [via addr] [allow=keys]" spec.
+	// routes, each a "cidr [via addr] [allow=keys]" spec. Both are echoed
+	// whole, so a client can round-trip the policy it read back.
 	LanAllow  string   `json:"lan_allow,omitempty"`
 	LanRoutes []string `json:"lan_routes,omitempty"`
 }
@@ -397,9 +398,13 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			DNS:         opts.DNS,
 			ShareLAN:    opts.ShareLAN,
 			ShareMode:   tunnel.NormalizeShareMode(opts.ShareMode),
-			LanAllow:    opts.LanAllow,
-			LanRoutes:   opts.LanRoutes,
-		},
+			// The policy echoed as a plain string, whatever the request's pointer
+			// form was: a client saving it back mid-edit sends "" — the empty
+			// value it reads — which is a clear, while the pointer form above says
+			// "not mentioned" and carries the hub's rows forward. Those have to
+			// be two different requests, so the echo is not a pointer.
+			LanAllow:  opts.LanAllow,
+			LanRoutes: opts.LanRoutes},
 		Stats: statsResponse{
 			CurrentConns:    s.CurrentConns,
 			TotalConns:      safeSub(s.TotalConns, bl.TotalConns),
@@ -579,7 +584,13 @@ type tunnelCreateRequest struct {
 	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
 	// A spoke with no row claims nothing at all. LanRoutes is the hub's own
 	// routes, each a "cidr [via addr] [allow=keys]" spec.
-	LanAllow  string   `json:"lan_allow,omitempty"`
+	//
+	// LanAllow is a pointer so an absent field is told apart from an empty one:
+	// this PUT replaces the whole config, and a form that fills the fields it
+	// owns would otherwise empty a policy nobody touched — every spoke refused
+	// with "no-allow-row" an assertion later. The tunnel's own rows are carried
+	// forward instead. An explicit empty value still clears it.
+	LanAllow  *string  `json:"lan_allow,omitempty"`
 	LanRoutes []string `json:"lan_routes,omitempty"`
 }
 
@@ -643,7 +654,41 @@ func derefPassword(p *string) string {
 	return *p
 }
 
-func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string) []tunnel.Option {
+// derefPolicy unwraps an optional lan_allow or lan_routes spec: absent means
+// "not mentioned" and settles to "" so the option layer can carry what the
+// tunnel already held. Both are the hub's own policy, and the API replaces the
+// whole config on a PUT — so a form that fills the fields it owns and leaves the
+// rest out would otherwise empty a policy nobody touched, every spoke refused
+// with "no-allow-row" an assertion later. A request that says so deliberately
+// still clears it: an empty string is a value, not an absence.
+func derefPolicy(p *string, current string) string {
+	if p == nil {
+		return current
+	}
+	return *p
+}
+
+// derefRoutes is derefPolicy for the slice: absent means "carry what the tunnel
+// already had" and present means "this list". The nil/empty difference has the
+// same weight here as the pointer has above — a hub's own routes are the other
+// half of the policy nobody's form fills, and a PUT that mentions them means it.
+func derefRoutes(p, current []string) []string {
+	if p == nil {
+		return current
+	}
+	return p
+}
+
+// tunnelPolicy is the hub's own lan_allow and lan_routes strands: the two things
+// a tun hub's full PUT would otherwise silently empty because no form fills them.
+// A tunnel that is not a hub, or a hub with no policy, carries empty strands and
+// is left alone by both.
+type tunnelPolicy struct {
+	LanAllow  string
+	LanRoutes []string
+}
+
+func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string, current tunnelPolicy) []tunnel.Option {
 	peers := make([]string, 0, len(r.Peers))
 	aliases := make(map[string]string, len(r.Peers))
 	var disabled []string
@@ -691,8 +736,13 @@ func (r *tunnelCreateRequest) toOptions(peerIPs map[string]string) []tunnel.Opti
 		tunnel.DNSOption(r.DNS),
 		tunnel.ShareLANOption(r.ShareLAN),
 		tunnel.ShareModeOption(r.ShareMode),
-		tunnel.LanAllowOption(r.LanAllow),
-		tunnel.LanRoutesOption(r.LanRoutes...),
+		// derefPolicy rather than derefPassword, and with the tunnel's own rows
+		// as the default: an absent field means "not mentioned", which on a PUT
+		// that replaces the whole config must settle to what is already there
+		// rather than to nothing. A hub whose operator adds a spoke and knows
+		// nothing about the policy still gets the policy the hub runs with.
+		tunnel.LanAllowOption(derefPolicy(r.LanAllow, current.LanAllow)),
+		tunnel.LanRoutesOption(derefRoutes(r.LanRoutes, current.LanRoutes)...),
 	}
 }
 
@@ -815,13 +865,14 @@ func handleCreateTunnel(w http.ResponseWriter, r *http.Request) {
 	// created with spokes that name no address is given one each, and a row that
 	// cannot be honoured is refused now rather than becoming a hub that authorizes
 	// nothing. Nothing is preserved (nil), because nothing exists to preserve.
+	// Nothing is preserved (nil), because nothing exists to preserve.
 	peerIPs, err := settlePeerIPs(req.Type, req.Peers, nil, req.Net)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	t := tunnel.NewByType(req.Type, req.toOptions(peerIPs)...)
+	t := tunnel.NewByType(req.Type, req.toOptions(peerIPs, tunnelPolicy{})...)
 	if t == nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown tunnel type: %s", req.Type))
 		return
@@ -919,6 +970,13 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	// old.Options().PeerIPs is read before the Close below, because after it the
 	// options are the only place an assignment still lives and the reply would be
 	// built from a tunnel that no longer exists.
+	// Read before the Close below: after it the options are the only place a
+	// hub's policy still lives, and the carry-forward below would then move an
+	// empty string into a hub that had rows.
+	policy := tunnelPolicy{
+		LanAllow:  old.Options().LanAllow,
+		LanRoutes: old.Options().LanRoutes,
+	}
 	peerIPs, err := settlePeerIPs(tunnelType, req.Peers, old.Options().PeerIPs, req.Net)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -950,7 +1008,7 @@ func handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 	opts := append([]tunnel.Option{
 		tunnel.IDOption(id),
 		tunnel.CreatedAtOption(old.Options().CreatedAt),
-	}, req.toOptions(peerIPs)...)
+	}, req.toOptions(peerIPs, policy)...)
 
 	t := tunnel.NewByType(tunnelType, opts...)
 	if t == nil {
@@ -1116,6 +1174,16 @@ func handleResetTunnelStats(w http.ResponseWriter, r *http.Request) {
 // rest of the tunnel's config.
 type tunnelPeersRequest struct {
 	Peers []peerJSON `json:"peers"`
+	// LanAllow is the hub's lan_allow policy as the row that carries it: a spoke
+	// key and the supernets it may claim inside. A row that is present and empty
+	// is a spoke that may claim nothing, and an absent key keeps whatever rows it
+	// already holds — the same distinction the address rows carry, because a save
+	// that restated every row would let one edit drop a policy the operator never
+	// mentioned.
+	//
+	// Left out entirely, the policy is left alone: a p2p tunnel has none, and a
+	// hub saving its allowlist should not be the way a hub's policy is cleared.
+	LanAllow *map[string][]string `json:"lan_allow,omitempty"`
 }
 
 // handleUpdateTunnelPeers replaces a p2p tunnel's or a tun hub's inbound
@@ -1215,6 +1283,19 @@ func handleUpdateTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		if err := s.SetPeerIPs(r.Context(), ip); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
+		}
+	}
+	// The policy a spoke's LAN claim is answered against, taken in place like the
+	// rest of this door: a spoke re-asserts its claim over the control channel,
+	// so a row saved here is what the next assertion reads, and a hub that is not
+	// running — which has no control channel to re-assert on — is answered with
+	// the reason rather than with a save that authorizes nothing.
+	if s, ok := old.(tunnel.LanAllowSetter); ok {
+		if req.LanAllow != nil {
+			if err := s.SetLanAllow(r.Context(), *req.LanAllow); err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
 		}
 	}
 	if err := tunnel.SaveConfig(); err != nil {

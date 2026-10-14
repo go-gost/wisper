@@ -65,10 +65,16 @@ export async function update(id: string, req: TunnelCreateRequest): Promise<Tunn
   return t;
 }
 
-/** Save a p2p tunnel's allowlist: the tunnel is rebuilt (its routes are
- *  per-key and only one tunnel may claim one), so live connections drop. */
-export async function updatePeers(id: string, peers: Peer[]): Promise<Tunnel> {
-  const t = await backend.updateTunnelPeers(id, { peers });
+/** Save a tunnel's allowlist: the tunnel is not rebuilt, so live streams
+ *  survive. This is also a hub's policy door — the LANs each spoke may claim —
+ *  because a hub's spokes are only editable here without closing them, and the
+ *  policy is what answers a spoke the hub refused. */
+export async function updatePeers(
+  id: string,
+  peers: Peer[],
+  lanAllow?: Record<string, string[]>,
+): Promise<Tunnel> {
+  const t = await backend.updateTunnelPeers(id, { peers, lan_allow: lanAllow });
   tunnels = tunnels.map(x => (x.id === id ? t : x));
   notify();
   return t;

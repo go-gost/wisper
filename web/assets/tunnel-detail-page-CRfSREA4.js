@@ -1,6 +1,6 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-6GGaOmSL.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
-import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q as z,u as R,b as s,A as p,o as C,i as E,t as H}from"./index-6GGaOmSL.js";import{c as u,d as I,a as m,b as g,n as y,r as l}from"./format-BOOtdwbt.js";import{i as d}from"./app-scaffold-rr7kKBLn.js";import{c as A}from"./clipboard-C3x8_sid.js";import{s as L}from"./save-error-CTyDOzES.js";var N=Object.defineProperty,F=Object.getOwnPropertyDescriptor,r=(t,i,o,a)=>{for(var c=a>1?void 0:a?F(i,o):i,v=t.length-1,f;v>=0;v--)(f=t[v])&&(c=(a?f(i,o,c):f(c))||c);return a&&c&&N(i,o,c),c};const h=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function _(t){return h.find(i=>i.value===t)??h[2]}let n=class extends w{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._pendingCount=0,this._backend=new x,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=i=>{this._endpoint=i,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push($(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){(this.tunnelType==="p2p"||this.tunnelType==="tun")&&this._loadPendingCount();const t=this.tunnelId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const o=k().find(a=>a.id===t);o&&(this._tunnel=o,i?(this.mode="edit",this._populateForm(o)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(o)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName=""}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??""}_peerKeys(){return(this._tunnel?.options.peers??[]).map(t=>t.key).join(`
-`)}get _isP2P(){return this.tunnelType==="p2p"||this.tunnelType==="tun"}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const i=(t??[])[0];if(!i)return e("eventsEntryDesc");const o=i.count||1;return o>1?`${i.message} ×${o}`:i.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const i={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(i.endpoint="",i.net=this._net.trim()||void 0,i.mtu=this._mtu||void 0,i.device_name=this._deviceName.trim()||void 0),this._isP2P&&this.mode==="edit"&&(i.peers=this._tunnel?.options.peers??[]),this._showAuth&&(i.username=this._username.trim()||void 0,i.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-6GGaOmSL.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.create(i)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-6GGaOmSL.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.update(this.tunnelId,i)),this._showSnackbar(e("saved")),this.mode="view",await T())}catch(i){this._showSnackbar(L(i))}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await D(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await P(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await A(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await z(this.tunnelId,this._resetKind),this._tunnel&&R(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,i){const o=i.indexOf(t);return i[(o+1)%i.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}render(){const t=this._tunnel,i=t?t.stats:null,o=this._typeLabel();return s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CbG_iYE2.js","assets/index-jaGA4r7y.css"])))=>i.map(i=>d[i]);
+import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q as A,u as C,b as s,A as h,o as R,i as N,t as L}from"./index-CbG_iYE2.js";import{m as M,c as v,d as m,a as g,b as _,n as x,r as l}from"./format-1CGFWJHL.js";import{i as d}from"./app-scaffold-DvTgCwMQ.js";import{c as E}from"./clipboard-C3x8_sid.js";import{s as H}from"./save-error-NzZsiQWw.js";var I=Object.defineProperty,O=Object.getOwnPropertyDescriptor,r=(t,a,o,p)=>{for(var c=p>1?void 0:p?O(a,o):a,i=t.length-1,u;i>=0;i--)(u=t[i])&&(c=(p?u(a,o,c):u(c))||c);return p&&c&&I(a,o,c),c};const f=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function w(t){return f.find(a=>a.value===t)??f[2]}let n=class extends y{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._shareLAN="",this._shareMode="auto",this._pendingCount=0,this._backend=new $,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=a=>{this._endpoint=a,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(k(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){(this.tunnelType==="p2p"||this.tunnelType==="tun")&&this._loadPendingCount();const t=this.tunnelId,a=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const o=T().find(p=>p.id===t);o&&(this._tunnel=o,a?(this.mode="edit",this._populateForm(o)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(o)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._shareLAN="",this._shareMode="auto"}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??"",this._shareLAN=t.options.share_lan??"",this._shareMode=t.options.share_mode||"auto"}_peerKeys(){return(this._tunnel?.options.peers??[]).map(t=>t.key).join(`
+`)}_peerName(t){return(this._tunnel?.options.peers??[]).find(o=>o.key===t)?.alias||M(t)}_lanOrigin(t){return t==="static"?e("lanOriginHub"):this._peerName(t)}_lanAllow(t){return!t||t.length===0?e("lanAllowAll"):t.map(a=>this._peerName(a)).join(", ")}get _isP2P(){return this.tunnelType==="p2p"||this.tunnelType==="tun"}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const a=(t??[])[0];if(!a)return e("eventsEntryDesc");const o=a.count||1;return o>1?`${a.message} ×${o}`:a.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const a={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(a.endpoint="",a.net=this._net.trim()||void 0,a.mtu=this._mtu||void 0,a.device_name=this._deviceName.trim()||void 0,a.share_lan=this._shareLAN.trim()||void 0,a.share_mode=this._shareMode||void 0,a.lan_allow=this._tunnel?.options.lan_allow||void 0,a.lan_routes=this._tunnel?.options.lan_routes),this._isP2P&&this.mode==="edit"&&(a.peers=this._tunnel?.options.peers??[]),this._showAuth&&(a.username=this._username.trim()||void 0,a.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-CbG_iYE2.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.create(a)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-CbG_iYE2.js").then(o=>o.F),__vite__mapDeps([0,1])).then(o=>o.update(this.tunnelId,a)),this._showSnackbar(e("saved")),this.mode="view",await S())}catch(a){this._showSnackbar(H(a))}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await D(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await P(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await z(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await E(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await A(this.tunnelId,this._resetKind),this._tunnel&&C(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_typeLabel(){return e(`type${this.tunnelType.charAt(0).toUpperCase()+this.tunnelType.slice(1)}`)}_cycleOption(t,a){const o=a.indexOf(t);return a[(o+1)%a.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}_shareModeLabel(t){switch(t){case"kernel":return e("shareModeKernel");case"userspace":return e("shareModeUserspace");default:return e("shareModeAuto")}}render(){const t=this._tunnel,a=t?t.stats:null,o=this._typeLabel(),p=t?.lan??null,c=p?Object.entries(p.claims).sort(([i],[u])=>i<u?-1:1):[];return s`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
@@ -29,7 +29,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
             <!-- Status banner -->
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
-              ${t.status==="running"?e("statusRunning")+" · "+u(t.stats.current_conns)+" "+e("activeConnections"):t.status==="error"?e("statusError"):e("statusStopped")}
+              ${t.status==="running"?e("statusRunning")+" · "+v(t.stats.current_conns)+" "+e("activeConnections"):t.status==="error"?e("statusError"):e("statusStopped")}
               ${t.error?s` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
@@ -43,10 +43,10 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                 </div>
                 <div class="info-row">
                   <span class="info-label">Created</span>
-                  <span class="info-value text">${I(t.created_at)}</span>
+                  <span class="info-value text">${m(t.created_at)}</span>
                 </div>
                 <!-- A tun hub binds nothing, so it has no target row. -->
-                ${this.tunnelType==="tun"?p:s`
+                ${this.tunnelType==="tun"?h:s`
                 <div class="info-row">
                   <span class="info-label">Target</span>
                   <span class="info-value">${t.endpoint}</span>
@@ -58,6 +58,22 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                     </div>
                     ${t.options.mtu?s`<div class="info-row"><span class="info-label">${e("fieldMTU")}</span><span class="info-value text">${t.options.mtu}</span></div>`:""}
                     ${t.options.device_name?s`<div class="info-row"><span class="info-label">${e("fieldDeviceName")}</span><span class="info-value text">${t.options.device_name}</span></div>`:""}
+                    <!-- LAN sharing: what is shared, and the backend actually
+                         running it. A downgraded hub says so in place, because
+                         ping dying without a reason reads as a broken network. -->
+                    ${t.options.share_lan?s`
+                        <div class="info-row">
+                          <span class="info-label">${e("fieldShareLAN")}</span>
+                          <span class="info-value text">${t.options.share_lan}</span>
+                        </div>
+                        ${t.share_effective?s`
+                            <div class="info-row">
+                              <span class="info-label">${e("fieldShareMode")}</span>
+                              <span class="info-value text">${t.share_effective==="kernel"?e("shareBackendKernel"):e("shareBackendUserspace")}</span>
+                            </div>
+                          `:""}
+                        ${t.share_downgraded?s`<div class="p2p-hint warn">${e("shareDowngradedHint")}</div>`:""}
+                      `:""}
                     <div class="info-row">
                       <span class="info-label">${e("peersLabel")}</span>
                       ${t.options.peers?.length?s`
@@ -68,7 +84,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                         `:s`<span class="info-value empty">${e("tunHubPeersEmpty")}</span>`}
                     </div>
                     <div class="p2p-hint">${e("tunHubHint")}</div>
-                  `:p}
+                  `:h}
                 <!-- p2p: the inbound allowlist, as a count and nothing more. A
                      hub's row is drawn identically from here, so the two must
                      not drift: the identities live on the peers page, the key
@@ -92,8 +108,8 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                           ${d("copy")}
                         </button>
                       </div>
-                    `:p}
-                ${this.tunnelType==="p2p"?s`<div class="p2p-hint">${e("p2pHint")}</div>`:p}
+                    `:h}
+                ${this.tunnelType==="p2p"?s`<div class="p2p-hint">${e("p2pHint")}</div>`:h}
                 ${t.options.prefix?s`
                     <div class="info-row">
                       <span class="info-label">${e("fieldPrefix")}</span>
@@ -129,12 +145,12 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                 ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":s`
                 <div class="info-row">
                   <span class="info-label">Recording</span>
-                  <span class="info-value text">${e(h.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
+                  <span class="info-value text">${e(f.find(i=>i.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
                 </div>
                 <div class="info-row" style="margin-top:-8px;">
                   <span class="info-label"></span>
                   <span class="info-value text ${this._recordMode!=="off"?"record-warn":""}" style="font-size:var(--font-xs);line-height:1.5;">
-                    ${e(_(this._recordMode).descKey)}
+                    ${e(w(this._recordMode).descKey)}
                   </span>
                 </div>`}
                 <div class="info-row">
@@ -147,30 +163,116 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
               </div>
 
               <!-- Stats grid -->
-              ${i?s`
+              ${a?s`
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${u(i.total_conns)}</div>
-                      <div class="stat-rate">${u(i.current_conns)} active · ${i.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-value">${v(a.total_conns)}</div>
+                      <div class="stat-rate">${v(a.current_conns)} active · ${a.request_rate.toFixed(1)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${u(i.total_errs)}</div>
+                      <div class="stat-value">${v(a.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Download <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${m(i.output_bytes)}</div>
-                      <div class="stat-rate">${g(i.output_rate_bytes)}</div>
+                      <div class="stat-value">${g(a.output_bytes)}</div>
+                      <div class="stat-rate">${_(a.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Upload <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${m(i.input_bytes)}</div>
-                      <div class="stat-rate">${g(i.input_rate_bytes)}</div>
+                      <div class="stat-value">${g(a.input_bytes)}</div>
+                      <div class="stat-rate">${_(a.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
             </div>
+
+            <!-- LAN routing: the routes the hub installed, what each spoke
+                 claimed, and what the hub turned down. Only a hub that reports
+                 LAN state draws this — every other tunnel type, and a hub whose
+                 control channel never opened, has no section to show. -->
+            ${p?s`
+                <div class="section">
+                  <div class="section-title">${e("lanTitle")}</div>
+                  <!-- The run's three counts, in the traffic grid's own boxes:
+                       routed is the healthy one, a refusal amber (a spoke asked
+                       and was told nothing), a withdrawal grey (a route left,
+                       which is not a fault). -->
+                  <div class="lan-summary">
+                    <div class="stat-box">
+                      <div class="stat-label">${e("lanRouted")}</div>
+                      <div class="stat-value">${v(a?.lan_routed??0)}</div>
+                    </div>
+                    <div class="stat-box denied">
+                      <div class="stat-label">${e("lanDenied")}</div>
+                      <div class="stat-value">${v(a?.lan_denied??0)}</div>
+                    </div>
+                    <div class="stat-box withdrawn">
+                      <div class="stat-label">${e("lanWithdrawn")}</div>
+                      <div class="stat-value">${v(a?.lan_withdrawn??0)}</div>
+                    </div>
+                  </div>
+
+                  <div class="lan-table card">
+                    <div class="lan-head">${e("lanRoutesTitle")} (${p.routes.length})</div>
+                    <div class="lan-row head">
+                      <span class="lan-prefix">${e("lanColPrefix")}</span>
+                      <span class="lan-origin">${e("lanColOrigin")}</span>
+                      <span class="lan-allow">${e("lanColAllow")}</span>
+                    </div>
+                    ${p.routes.length===0?s`<div class="lan-empty">${e("lanNoRoutes")}</div>`:p.routes.map(i=>s`
+                        <div class="lan-row">
+                          <span class="lan-prefix">${i.prefix}</span>
+                          <span class="lan-origin">${this._lanOrigin(i.origin)}</span>
+                          <span class="lan-allow">${this._lanAllow(i.allow)}</span>
+                        </div>`)}
+                  </div>
+
+                  ${c.length>0?s`
+                      <div class="lan-table card">
+                        <div class="lan-head">${e("lanClaimsTitle")} (${c.length})</div>
+                        <div class="lan-row head">
+                          <span class="lan-prefix">${e("lanColPeer")}</span>
+                          <span class="lan-origin">${e("lanColClaimed")}</span>
+                        </div>
+                        ${c.map(([i,u])=>s`
+                          <div class="lan-row">
+                            <span class="lan-prefix">${this._peerName(i)}</span>
+                            <span class="lan-origin">${u.prefixes.join(", ")}</span>
+                          </div>`)}
+                      </div>
+                    `:h}
+
+                  ${(p.rejected?.length??0)>0?s`
+                      <div class="lan-table card">
+                        <!-- A refusal is never revoked and its prefix never
+                             reaches the table above, so the two read together —
+                             and the refusals are the run's, which is what the
+                             scope note says: restart the hub and they are gone. -->
+                        <div class="lan-head">
+                          ${e("lanRejectedTitle")} <span class="lan-scope">${e("lanRejectedThisRun")}</span>
+                        </div>
+                        <div class="lan-row head">
+                          <span class="lan-prefix">${e("lanColPrefix")}</span>
+                          <span class="lan-origin">${e("lanColPeer")}</span>
+                          <span class="lan-allow">${e("lanColTime")}</span>
+                        </div>
+                        ${(p.rejected??[]).map(i=>s`
+                          <div class="lan-row">
+                            <span class="lan-prefix">${i.prefix}</span>
+                            <span class="lan-origin">${this._peerName(i.peer)}</span>
+                            <span class="lan-allow">${m(i.at)}</span>
+                            <span class="lan-detail">
+                              <span class="lan-reason">${i.reason}</span>${i.detail?` — ${i.detail}`:""}
+                            </span>
+                          </div>`)}
+                      </div>
+                    `:h}
+
+                  <div class="lan-guidance">${e("lanGuidance")}</div>
+                </div>
+              `:h}
 
             <!-- Allowed peers: the allowlist lives on its own page (long lists,
                  per-peer live traffic), where saving it applies in place. A
@@ -190,12 +292,12 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                       </div>
                       ${this._pendingCount>0?s`<span style="font-size:var(--font-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
                             ${e("peersPendingBadge").replace("{n}",String(this._pendingCount))}
-                          </span>`:p}
+                          </span>`:h}
                       <span style="color:var(--text-muted);">&rarr;</span>
                     </div>
                   </div>
                 </div>
-              `:p}
+              `:h}
 
             <!-- History: drops, recoveries and lifecycle events, on their own
                  page — a list this long does not belong inline. -->
@@ -215,11 +317,11 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                     </div>
                   </div>
                 </div>
-              `:p}
+              `:h}
 
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
                  inspecting, and only when an inspector URL is configured. -->
-            ${this.mode==="view"&&t&&(this.tunnelType==="http"||this.tunnelType==="file")&&C().inspector_url?s`
+            ${this.mode==="view"&&t&&(this.tunnelType==="http"||this.tunnelType==="file")&&R().inspector_url?s`
                 <div class="section">
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
@@ -261,13 +363,13 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                 <div class="form-group">
                   <label class="form-label">${e("fieldName")}</label>
                   <input class="form-input" .value=${this._name} placeholder="My Tunnel"
-                    @input=${a=>{this._name=a.target.value}}>
+                    @input=${i=>{this._name=i.target.value}}>
                 </div>
 
                 <!-- Target / Directory. A tun hub has neither: it binds no
                      address, and its whole configuration is the device plus
                      the allowlist below. -->
-                ${this.tunnelType==="tun"?p:s`
+                ${this.tunnelType==="tun"?h:s`
                 <div class="form-group">
                   <label class="form-label">
                     ${this.tunnelType==="file"?e("fieldDirectory"):e("fieldEndpoint")}
@@ -275,7 +377,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                   <div class="dir-input-row">
                     <input class="form-input dir-input" .value=${this._endpoint}
                       placeholder=${this.tunnelType==="file"?"/path/to/dir":"host:port"}
-                      @input=${a=>{this._endpoint=a.target.value}}>
+                      @input=${i=>{this._endpoint=i.target.value}}>
                     ${this.tunnelType==="file"&&this._isNativeDirPicker?s`<button type="button" class="browse-btn"
                           @click=${this._browseDir}>📁 ${e("browseDirectory")}</button>`:""}
                   </div>
@@ -295,20 +397,36 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                     <div class="form-group">
                       <label class="form-label">${e("fieldNet")}</label>
                       <input class="form-input" .value=${this._net} placeholder="10.10.0.1/24"
-                        @input=${a=>{this._net=a.target.value}}>
+                        @input=${i=>{this._net=i.target.value}}>
                       <div class="p2p-hint">${e("fieldNetHint")}</div>
                     </div>
                     <div class="form-group">
                       <label class="form-label">${e("fieldMTU")}</label>
                       <input class="form-input" type="number" .value=${this._mtu?String(this._mtu):""} placeholder="1420"
-                        @input=${a=>{this._mtu=parseInt(a.target.value,10)||0}}>
+                        @input=${i=>{this._mtu=parseInt(i.target.value,10)||0}}>
                     </div>
                     <div class="form-group">
                       <label class="form-label">${e("fieldDeviceName")}</label>
                       <input class="form-input" .value=${this._deviceName} placeholder="wisper0"
-                        @input=${a=>{this._deviceName=a.target.value}}>
+                        @input=${i=>{this._deviceName=i.target.value}}>
                       <div class="p2p-hint">${e("fieldDeviceNameHint")}</div>
                     </div>
+                    <!-- LAN sharing: the hub-side subnets peers may reach, and
+                         which backend runs it. Empty LAN disables sharing. -->
+                    <div class="form-group">
+                      <label class="form-label">${e("fieldShareLAN")}</label>
+                      <input class="form-input" .value=${this._shareLAN} placeholder="192.168.1.0/24"
+                        @input=${i=>{this._shareLAN=i.target.value}}>
+                      <div class="p2p-hint">${e("fieldShareLANHint")}</div>
+                    </div>
+                    <div class="switch-row" @click=${()=>{this._shareMode=this._cycleOption(this._shareMode,[...n.SHARE_MODES]),this.requestUpdate()}}>
+                      <span class="switch-label">${e("fieldShareMode")}</span>
+                      <span style="font-size:var(--font-sm);color:var(--text-muted);display:flex;align-items:center;gap:4px;">
+                        ${this._shareModeLabel(this._shareMode)}
+                        ${d("chevron-right")}
+                      </span>
+                    </div>
+                    <div class="record-desc">${e("fieldShareModeHint")}</div>
                     <!-- No routes, no dns: both are client-side, and a hub runs
                          with host networking, so they would be applied to the
                          host's own routing and resolver. The API refuses them
@@ -321,7 +439,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                     <div class="form-group">
                       <label class="form-label">${e("fieldPrefix")}</label>
                       <input class="form-input" .value=${this._prefix} placeholder="my-app-name"
-                        @input=${a=>{this._prefix=a.target.value}}>
+                        @input=${i=>{this._prefix=i.target.value}}>
                       <div style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding-top:4px;">
                         ${e("fieldPrefixHint")}
                       </div>
@@ -333,7 +451,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                     <div class="form-group">
                       <label class="form-label">${e("fieldHostname")}</label>
                       <input class="form-input" .value=${this._hostname} placeholder="example.com"
-                        @input=${a=>{this._hostname=a.target.value}}>
+                        @input=${i=>{this._hostname=i.target.value}}>
                     </div>
                   `:""}
 
@@ -350,16 +468,16 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
 
                 <!-- Recording mode: p2p and tun have no recorder to attach it to. -->
                 ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":s`
-                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,h.map(a=>a.value)))}>
+                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,f.map(i=>i.value)))}>
                   <span class="switch-label">${e("settingsRecordMode")}</span>
                   <span style="font-size:var(--font-sm);color:var(--text-muted);display:flex;align-items:center;gap:4px;">
-                    ${e(h.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}
+                    ${e(f.find(i=>i.value===this._recordMode)?.labelKey??"settingsRecordFull")}
                     ${d("chevron-right")}
                   </span>
                 </div>
                 <div class="record-desc ${this._recordMode!=="off"?"record-warn":""}"
                   style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding:0 16px 14px;">
-                  ${e(_(this._recordMode).descKey)}
+                  ${e(w(this._recordMode).descKey)}
                 </div>`}
 
                 <!-- Auth section (HTTP/File) -->
@@ -376,14 +494,14 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
                         <div class="form-group" style="margin-top:12px;">
                           <label class="form-label">${e("fieldUsername")}</label>
                           <input class="form-input" .value=${this._username} placeholder="admin"
-                            @input=${a=>{this._username=a.target.value}}>
+                            @input=${i=>{this._username=i.target.value}}>
                         </div>
                         <div class="form-group">
                           <label class="form-label">${e("fieldPassword")}</label>
                           <div class="password-wrapper">
                             <input class="form-input" type=${this._showPassword?"text":"password"}
                               .value=${this._password} placeholder="••••"
-                              @input=${a=>{this._password=a.target.value}}>
+                              @input=${i=>{this._password=i.target.value}}>
                             <button type="button" class="password-toggle"
                               @click=${()=>{this._showPassword=!this._showPassword}}
                               title=${this._showPassword?e("hidePassword"):e("showPassword")}>
@@ -421,7 +539,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
 
         ${this._showResetDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
-              <div class="dialog-box" @click=${a=>a.stopPropagation()}>
+              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${e("resetStatsConfirmTitle")}</div>
                 <div class="dialog-message">${e("resetStatsConfirm")}</div>
                 <div class="dialog-actions">
@@ -438,7 +556,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
 
         ${this._showDeleteDialog?s`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
-              <div class="dialog-box" @click=${a=>a.stopPropagation()}>
+              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${e("deleteConfirmTitle")}</div>
                 <div class="dialog-message">${e("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
@@ -453,7 +571,7 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
             </div>
           `:""}
       </app-scaffold>
-    `}};n.styles=E`
+    `}};n.SHARE_MODES=["auto","kernel","userspace"];n.styles=N`
     /* ── AppBar ── */
     .back-btn {
       background: none;
@@ -705,6 +823,94 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
       margin-bottom: 4px;
     }
 
+    /* ── LAN routing ── */
+    .lan-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    /* A refusal and a withdrawal are not the same kind of number as a route,
+       so they are not the traffic grid's one healthy colour either: amber for
+       a spoke that asked and was told nothing, grey for a route that left. */
+    .stat-box.denied .stat-value {
+      color: var(--amber);
+    }
+    .stat-box.withdrawn .stat-value {
+      color: var(--text-muted);
+    }
+    .lan-table {
+      margin-top: 8px;
+    }
+    .lan-head {
+      padding: 10px 12px 2px;
+      font-size: var(--font-sm);
+      font-weight: 600;
+    }
+    .lan-scope {
+      font-weight: 400;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+    }
+    .lan-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: var(--font-sm);
+    }
+    .lan-row:last-child {
+      border-bottom: none;
+    }
+    .lan-row.head {
+      padding-bottom: 4px;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .lan-prefix {
+      flex: 1;
+      min-width: 0;
+      font-family: var(--font-mono, monospace);
+      overflow-wrap: anywhere;
+    }
+    .lan-origin,
+    .lan-allow {
+      flex: none;
+      max-width: 42%;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+    /* The refusal's own line under its row: the reason code an operator
+       searches for, then the sentence the RIB wrote for it. */
+    .lan-detail {
+      flex-basis: 100%;
+      padding-top: 2px;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .lan-reason {
+      font-family: var(--font-mono, monospace);
+      color: var(--amber);
+    }
+    .lan-empty {
+      padding: 14px 12px;
+      text-align: center;
+      font-size: var(--font-sm);
+      color: var(--text-muted);
+    }
+    .lan-guidance {
+      padding: 10px 2px 0;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
     /* ── Form ── */
     .form-group {
       margin-bottom: 14px;
@@ -953,4 +1159,4 @@ import{a as w,G as x,s as $,g as k,c as e,_ as b,r as T,p as S,k as D,m as P,q a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;r([y()],n.prototype,"tunnelType",2);r([y()],n.prototype,"tunnelId",2);r([l()],n.prototype,"mode",2);r([l()],n.prototype,"_tunnel",2);r([l()],n.prototype,"_saving",2);r([l()],n.prototype,"_snackbar",2);r([l()],n.prototype,"_showDeleteDialog",2);r([l()],n.prototype,"_showResetDialog",2);r([l()],n.prototype,"_name",2);r([l()],n.prototype,"_endpoint",2);r([l()],n.prototype,"_hostname",2);r([l()],n.prototype,"_prefix",2);r([l()],n.prototype,"_username",2);r([l()],n.prototype,"_password",2);r([l()],n.prototype,"_enableTLS",2);r([l()],n.prototype,"_rewriteHost",2);r([l()],n.prototype,"_fileUpload",2);r([l()],n.prototype,"_showAuth",2);r([l()],n.prototype,"_showPassword",2);r([l()],n.prototype,"_recordMode",2);r([l()],n.prototype,"_net",2);r([l()],n.prototype,"_mtu",2);r([l()],n.prototype,"_deviceName",2);r([l()],n.prototype,"_pendingCount",2);n=r([H("tunnel-detail-page")],n);export{n as TunnelDetailPage};
+  `;r([x()],n.prototype,"tunnelType",2);r([x()],n.prototype,"tunnelId",2);r([l()],n.prototype,"mode",2);r([l()],n.prototype,"_tunnel",2);r([l()],n.prototype,"_saving",2);r([l()],n.prototype,"_snackbar",2);r([l()],n.prototype,"_showDeleteDialog",2);r([l()],n.prototype,"_showResetDialog",2);r([l()],n.prototype,"_name",2);r([l()],n.prototype,"_endpoint",2);r([l()],n.prototype,"_hostname",2);r([l()],n.prototype,"_prefix",2);r([l()],n.prototype,"_username",2);r([l()],n.prototype,"_password",2);r([l()],n.prototype,"_enableTLS",2);r([l()],n.prototype,"_rewriteHost",2);r([l()],n.prototype,"_fileUpload",2);r([l()],n.prototype,"_showAuth",2);r([l()],n.prototype,"_showPassword",2);r([l()],n.prototype,"_recordMode",2);r([l()],n.prototype,"_net",2);r([l()],n.prototype,"_mtu",2);r([l()],n.prototype,"_deviceName",2);r([l()],n.prototype,"_shareLAN",2);r([l()],n.prototype,"_shareMode",2);r([l()],n.prototype,"_pendingCount",2);n=r([L("tunnel-detail-page")],n);export{n as TunnelDetailPage};

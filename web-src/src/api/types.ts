@@ -102,9 +102,13 @@ export interface TunnelOptions {
   share_lan?: string;
   /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
   share_mode?: string;
+  /** Hub-side policy for the LANs a peer may claim on the device network, in
+   *  the config's "key=cidr" row form. A peer with no row claims nothing at all,
+   *  which is why a hub that refuses every claim says "no-allow-row" here. */
+  lan_allow?: string;
+  /** The hub's own routes, each a "cidr [via addr] [allow=keys]" spec. */
+  lan_routes?: string[];
 }
-
-/** One peer's traffic during the tunnel's current run, plus the p2p host's
 
 /** One peer's traffic during the tunnel's current run, plus the p2p host's
  *  live diagnostic for it. The diagnostic fields are absent until the peer has
@@ -261,6 +265,14 @@ export interface TunnelCreateRequest {
   share_lan?: string;
   /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
   share_mode?: string;
+  /** Hub-side policy for the LANs a peer may claim, "key=cidr" rows. Omitted
+   *  means "not mentioned" and the hub keeps the rows it has, which is what lets
+   *  the detail page save the device and the allowlist without emptying this;
+   *  an explicit "" is the one request that clears it. */
+  lan_allow?: string;
+  /** The hub's own routes, each a "cidr [via addr] [allow=keys]" spec. Omitted
+   *  means "not mentioned", for the same reason. */
+  lan_routes?: string[];
 }
 
 // ─── Entrypoint ──────────────────────────────────────────────────────────────
@@ -324,6 +336,15 @@ export interface Entrypoint {
 /** TunnelPeersRequest replaces a p2p tunnel's allowlist on its own. */
 export interface TunnelPeersRequest {
   peers: Peer[];
+  /** tun hub only: the LANs each peer may claim on the hub's device network —
+   *  peer key → the supernets its claims are approved inside. A peer's row may
+   *  be omitted entirely, which leaves whatever row the hub already has; an
+   *  empty row is the one way to say "this peer may claim nothing".
+   *
+   *  It travels with the allowlist rather than the whole tunnel because a hub's
+   *  spokes cannot be edited any other way without closing them: the peers door
+   *  keeps their streams. */
+  lan_allow?: Record<string, string[]>;
 }
 
 export interface EntrypointCreateRequest {

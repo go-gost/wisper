@@ -1104,7 +1104,9 @@ func TestPeerAliasesFlow(t *testing.T) {
 	}
 	var opts tunnel.Options
 	// nil is what a non-hub has to settle to: a p2p tunnel's rows carry no address.
-	for _, opt := range req.toOptions(nil) {
+	// tunnelPolicy{} is a create: nothing exists to preserve, so an absent
+	// lan_allow settles to "" rather than to rows another tunnel held.
+	for _, opt := range req.toOptions(nil, tunnelPolicy{}) {
 		opt(&opts)
 	}
 

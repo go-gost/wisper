@@ -313,6 +313,14 @@ export class TunnelDetailPage extends LitElement {
         body.device_name = this._deviceName.trim() || undefined;
         body.share_lan = this._shareLAN.trim() || undefined;
         body.share_mode = this._shareMode || undefined;
+        // The hub's lan_allow and its own LAN routes are edited on the peers
+        // page and in the config, not here, so a save here has to carry them
+        // along: the API replaces the whole config on a PUT. They travel as the
+        // API heard them — and, since `''` is a clear and `undefined` is "not
+        // mentioned", an empty policy goes out as an omission rather than an
+        // explicit empty, so nothing here can wipe a policy by accident.
+        body.lan_allow = this._tunnel?.options.lan_allow || undefined;
+        body.lan_routes = this._tunnel?.options.lan_routes;
       }
       if (this._isP2P && this.mode === 'edit') {
         // The allowlist is managed on its own page; an edit here must carry it

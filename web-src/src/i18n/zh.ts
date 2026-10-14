@@ -220,6 +220,9 @@ const zh: Record<string, string> = {
   peersIPPlaceholder: '例如 10.10.0.2',
   peersIP: 'IP',
   peersIPHint: '该 spoke 在 hub 网络上可用的地址。留空则由 hub 从自己的网段分配；spoke 侧必须配置成同一个地址。',
+  peersLANPlaceholder: '例如 192.168.1.0/24',
+  peersLANHint:
+    '该 spoke 允许在 hub 上共享的局域网（多个用逗号分隔）。留空表示不允许共享——spoke 会一直报 no-allow-row，hub 的拒绝列表里也会不断出现同一断言。填上后，spoke 下一次断言即可通过，无需重启。',
   peersLAN: '局域网',
   peersKeyRequired: '必须填公钥。',
   peersKeyInvalid: '不是 base64 的 32 字节公钥。',

@@ -20,6 +20,20 @@ interface PeerRow {
   /** The address this spoke may claim on the hub's device network, '' when the
    *  row holds none. */
   ip: string;
+  /** The LANs this spoke may claim on the hub's device network, comma-separated
+   *  CIDRs. This is the spoke's row of the hub's lan_allow policy, which is what
+   *  answers a claim with "no-allow-row" — the refusal a hub that was never told
+   *  about a spoke's LAN gives every assertion the spoke makes. A p2p tunnel has
+   *  no policy and its rows always carry none. */
+  lan: string;
+  /**
+   * Whether the operator has edited this row's LAN, with the same reason and the
+   * same rule `ipTouched` carries: the policy is replaced whole by a request that
+   * mentions it, so a row the operator did not edit has to be restated exactly as
+   * the hub holds it. An untouched row's own text is that already, which is why
+   * the flag is only needed to tell "restate as-is" from "cleared on purpose".
+   */
+  lanTouched?: boolean;
   /**
    * Whether the operator has edited this row's address, and the only thing
    * that says which of two requests the row is: no address field at all means
@@ -51,13 +65,55 @@ function validPeerKey(k: string): boolean {
   }
 }
 
+/** A hub's lan_allow policy in its config form: whitespace- or comma-separated
+ *  "key=cidr" rows. A spoke with no row claims nothing, which is why a hub that
+ *  was never told about pixel-9's LAN answers every assertion of it with
+ *  "no-allow-row". Read here rather than asked for per row because the policy is
+ *  one string and the page is one row at a time. */
+function parseLanAllow(spec: string | undefined): Map<string, string[]> {
+  const rows = new Map<string, string[]>();
+  for (const row of (spec ?? '').split(/[\s,]+/)) {
+    const eq = row.indexOf('=');
+    if (eq < 0) continue;
+    const key = row.slice(0, eq);
+    if (!key) continue;
+    const cidr = row.slice(eq + 1);
+    if (!cidr) continue;
+    rows.set(key, [...(rows.get(key) ?? []), cidr]);
+  }
+  return rows;
+}
+
 function rowsOf(t2: Tunnel | null): PeerRow[] {
+  const allow = parseLanAllow(t2?.options.lan_allow);
   return (t2?.options.peers ?? []).map((p: Peer) => ({
     key: p.key,
     alias: p.alias ?? '',
     disabled: p.disabled === true,
     ip: p.ip ?? '',
+    lan: (allow.get(p.key) ?? []).join(', '),
   }));
+}
+
+/** The request this page makes from its rows: the rows themselves, plus the
+ *  policy rows they represent.
+ *
+ *  The API reads lan_allow in place and replaces the policy with what the request
+ *  names, so a row the operator did not touch is restated from what the hub holds
+ *  — the page already read it out of `rowsOf`. A row with no policy row at all is
+ *  left unnamed, which keeps "may claim nothing" and "not configured here" two
+ *  different answers on the hub instead of flattening both into a row the
+ *  operator never wrote. */
+function lanAllowOf(rows: PeerRow[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const r of rows) {
+    if (!r.lanTouched && !r.lan) continue;
+    out[r.key] = r.lan
+      .split(',')
+      .map(c => c.trim())
+      .filter(c => c !== '');
+  }
+  return out;
 }
 
 /**
@@ -80,8 +136,11 @@ export class TunnelPeersPage extends LitElement {
   /** The row's edit buffer. `ipTouched` starts false whatever the address
    *  field holds — it records whether the operator has edited it, not what it
    *  says — so an editor opened and closed again saves as "unchanged" about
-   *  it. */
-  @state() private _draft: PeerRow = { key: '', alias: '', disabled: false, ip: '', ipTouched: false };
+   *  it. `lanTouched` is the same flag for the LAN the spoke may claim. */
+  @state() private _draft: PeerRow = {
+    key: '', alias: '', disabled: false, ip: '', lan: '',
+    ipTouched: false, lanTouched: false,
+  };
   @state() private _saving = false;
   @state() private _rowError = '';
   @state() private _confirmDelete: number | null = null;
@@ -133,13 +192,16 @@ export class TunnelPeersPage extends LitElement {
    *  that address. */
   private _startEdit(i: number) {
     this._editing = i;
-    this._draft = { ...this._rows[i], ipTouched: false };
+    this._draft = { ...this._rows[i], ipTouched: false, lanTouched: false };
     this._rowError = '';
   }
 
   private _startAdd() {
     this._editing = 'new';
-    this._draft = { key: '', alias: '', disabled: false, ip: '', ipTouched: false };
+    this._draft = {
+      key: '', alias: '', disabled: false, ip: '', lan: '',
+      ipTouched: false, lanTouched: false,
+    };
     this._rowError = '';
   }
 
@@ -168,7 +230,7 @@ export class TunnelPeersPage extends LitElement {
   private _addPending = async (key: string) => {
     // ip: '' with no ipTouched: the row asks for no address of its own, which
     // is what a spoke new to the hub should ask for — it is given one anyway.
-    if (await this._save([...this._rows, { key, alias: '', disabled: false, ip: '' }])) {
+    if (await this._save([...this._rows, { key, alias: '', disabled: false, ip: '', lan: '' }])) {
       this._pending = this._pending.filter(p => p.key !== key);
     }
   };
@@ -203,6 +265,11 @@ export class TunnelPeersPage extends LitElement {
       // row is asking for.
       ip: this._draft.ip.trim(),
       ipTouched: this._draft.ipTouched === true,
+      // Same pair for the LAN the spoke may claim: an empty box cleared on
+      // purpose is a row that may claim nothing, and an untouched box is the
+      // row the hub already holds restated.
+      lan: this._draft.lan.trim(),
+      lanTouched: this._draft.lanTouched === true,
     };
     if (!validPeerKey(draft.key)) {
       this._rowError = t('peersKeyInvalid');
@@ -250,6 +317,7 @@ export class TunnelPeersPage extends LitElement {
           // change".
           ...(r.ipTouched ? { ip: r.ip.trim() } : {}),
         })),
+        this._isHub ? lanAllowOf(rows) : undefined,
       );
       this._tunnel = t2;
       this._rows = rowsOf(t2);
@@ -319,6 +387,21 @@ export class TunnelPeersPage extends LitElement {
             <div class="field-hint">${t('peersIPHint')}</div>
           `
           : nothing}
+        <!-- The LANs this spoke may claim on the hub's network, prefilled from
+             the hub's policy. A hub that was never told about a spoke's LAN is
+             the "no-allow-row" refusal: the spoke dials in fine, shares nothing,
+             and the hub's rejected-claims list fills with the same assertion
+             every 20s. Typing a CIDR here is what answers it. -->
+        ${this._isHub
+          ? html`
+            <input class="form-input ip" .value=${this._draft.lan}
+              placeholder=${t('peersLANPlaceholder')}
+              @input=${(e: Event) => {
+                this._draft = { ...this._draft, lan: (e.target as HTMLInputElement).value, lanTouched: true };
+              }}>
+            <div class="field-hint">${t('peersLANHint')}</div>
+          `
+          : nothing}
         ${this._rowError ? html`<div class="row-error">${this._rowError}</div>` : nothing}
       </div>
     `;
@@ -386,6 +469,7 @@ export class TunnelPeersPage extends LitElement {
                     <peer-stats-row
                       .peer=${row}
                       .stat=${this._statFor(row.key) ?? null}
+                      .peersLAN=${this._isHub ? row.lan : ''}
                       ?disabled=${row.disabled}
                       ?showKeys=${this._showKeys}
                       .rowActions=${html`

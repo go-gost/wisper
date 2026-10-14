@@ -38,7 +38,20 @@ var (
 	_ PeerSetter        = (*tunTunnel)(nil)
 	_ PeerIPSetter      = (*tunTunnel)(nil)
 	_ LanStateReporter  = (*tunTunnel)(nil)
+	_ LanAllowSetter    = (*tunTunnel)(nil)
 )
+
+// LanAllowSetter is implemented by the one object that decides what a spoke may
+// claim on a hub's device network: a tun hub. The API calls it from the peers
+// door, which is the page an operator works a hub's spokes from — so a spoke
+// that may share its LAN is a row edit there, not a restart of the hub.
+//
+// The rows arrive masked and keyed by peer key, and are read from the request
+// rather than from the options, so a caller does not have to restate the rows of
+// every spoke it did not touch.
+type LanAllowSetter interface {
+	SetLanAllow(ctx context.Context, allow map[string][]string) error
+}
 
 // LanStateReporter is implemented by the one object that carries LAN routes:
 // a tun hub. The API reads it to fill the doctor's two columns, and every
@@ -866,6 +879,59 @@ func (s *tunTunnel) SetPeerIPs(ctx context.Context, peerIPs map[string]string) e
 	if ch := s.controlHub(); ch != nil {
 		ch.SetMembers(authz.Members())
 	}
+	return nil
+}
+
+// SetLanAllow replaces the rows that decide what a spoke may claim on the hub's
+// device network: the lan_allow policy, as masked prefixes each spoke's row may
+// sit inside. It is the live half of Options.LanAllow, which the hub is built
+// from, so the rows saved and the rows authorizing are the same rows.
+//
+// It is separate from SetPeers and SetPeerIPs because the policy is a third
+// thing a hub's row can say, and the peers door is where all three are edited.
+// A row added here is answered by the spoke's next assertion — the same LAN it
+// keeps asserting every ~20s — and a row taken away withdraws the route that was
+// in force, so both directions of a save are settled without a restart or a
+// wake-up. A hub whose rows were emptied simply refuses every claim with the
+// sentence it has always refused one with.
+//
+// A hub that is not running refuses: the rows would be saved and authorize
+// nothing, and the operator would be told a save that succeeded. The caller has
+// the options' rows, which are what a stopped hub comes back up with.
+func (s *tunTunnel) SetLanAllow(ctx context.Context, allow map[string][]string) error {
+	if s.IsClosed() {
+		return ErrTunnelClosed
+	}
+	ch := s.controlHub()
+	if ch == nil {
+		return errors.New("tun hub is not running")
+	}
+
+	// Parsed and masked here, not by the RIB: an unparseable row is a save
+	// answered with the row and the problem, at the moment the operator can fix
+	// it, rather than a saved row that authorizes nothing and says why only to a
+	// spoke that is not there.
+	rows := make(map[string][]netip.Prefix, len(allow))
+	for peer, supers := range allow {
+		row := make([]netip.Prefix, 0, len(supers))
+		for _, super := range supers {
+			p, err := netip.ParsePrefix(strings.TrimSpace(super))
+			if err != nil {
+				return fmt.Errorf("lan_allow row for %s: %q is not a CIDR", peer, super)
+			}
+			row = append(row, p.Masked())
+		}
+		rows[peer] = row
+	}
+
+	// The options carry the same rows, so what authorizes and what a reload
+	// comes back up with are one fact rather than two that drift.
+	s.mu.Lock()
+	s.opts.LanAllow = FormatLanAllow(rows)
+	s.mu.Unlock()
+
+	ch.SetLanAllow(rows)
+	_ = ctx
 	return nil
 }
 

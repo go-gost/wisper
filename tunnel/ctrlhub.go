@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"os"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -728,6 +729,57 @@ func parseClaimPrefixes(ch *controlHub, peer string, specs []string) []netip.Pre
 		out = append(out, prefix.Masked())
 	}
 	return out
+}
+
+// SetLanAllow replaces the rows that decide what a spoke may claim on the hub's
+// device network, while the hub runs. SetMembers is its counterpart for the
+// assignment and SetStaticRoutes for the hub's own routes; this one is the
+// policy half, and the peers door is what calls it.
+//
+// The network is republished so a spoke deciding whether to install a netview
+// by rev sees the new authorization, and so a hub's own view of what it will
+// route for whom is current.
+//
+// A tightened policy withdraws the routes it disapproves and a loosened one
+// approves the next assertion — a spoke re-asserts every ~20s, so both directions
+// are settled by the ordinary claim protocol rather than by this call.
+func (ch *controlHub) SetLanAllow(allow map[string][]netip.Prefix) {
+	ch.rib.SetAllow(allow)
+	ch.publish()
+}
+
+// FormatLanAllow writes the policy back out in the config form ParseLanAllow
+// reads: "key=cidr" rows, one per spoke and prefix. It is the inverse of that
+// parse, so a hub's rows survive a save it did not touch, and a hub built from
+// rows the peers door wrote reloads with the same rows authorizing.
+//
+// A spoke with no row at all is written as a row with an empty value — "may
+// claim nothing" — because an absent key and an emptied one are the same state
+// in the policy and only the refusal message tells them apart.
+func FormatLanAllow(rows map[string][]netip.Prefix) string {
+	keys := make([]string, 0, len(rows))
+	for key := range rows {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	for _, key := range keys {
+		for _, prefix := range rows[key] {
+			if b.Len() > 0 {
+				b.WriteByte(' ')
+			}
+			fmt.Fprintf(&b, "%s=%s", key, prefix)
+		}
+		if len(rows[key]) == 0 {
+			if b.Len() > 0 {
+				b.WriteByte(' ')
+			}
+			b.WriteString(key)
+			b.WriteByte('=')
+		}
+	}
+	return b.String()
 }
 
 // ParseLanAllow reads the lan_allow policy from its config form:
