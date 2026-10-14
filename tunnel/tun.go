@@ -480,9 +480,16 @@ func (s *tunTunnel) Run() (err error) {
 	// The device is the only privileged part, and it is unchanged: the listener
 	// creates it and hands back one conn carrying the parsed device config on
 	// its context, which is where the hub reads its own addresses.
+	// The device gets no stats object, deliberately: it is the hub's own
+	// interface, not a spoke, and x's listener counts every conn it hands out.
+	// Given the service's stats it would sit in the tunnel's connection count
+	// for the life of the tunnel — a hub with no spoke at all reporting one
+	// connection — and it would count every byte a second time, since the
+	// device and the spoke's stream carry the same traffic from opposite ends.
+	// The streams the service accepts are where the tunnel's numbers come from,
+	// exactly as they are for a p2p tunnel.
 	deviceLn := tunlistener.NewListener(
 		listener.LoggerOption(log.WithFields(map[string]any{"kind": "listener", "listener": "tun"})),
-		listener.StatsOption(pStats),
 	)
 	// Init creates the device (and blocks until it exists), so a failure here
 	// is a failure to start — no listener is left behind. The listener must be

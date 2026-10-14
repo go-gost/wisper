@@ -11,9 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-gost/core/logger"
+	"github.com/go-gost/core/observer/stats"
 	cfg "github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	xlogger "github.com/go-gost/x/logger"
+	xstats "github.com/go-gost/x/observer/stats"
 )
 
 // TestTunTunnelMetadata: the two metadata maps are the whole contract this side
@@ -1125,5 +1128,151 @@ func TestSaveConfigKeepsTunDevice(t *testing.T) {
 		if !bytes.Contains(raw, []byte(key)) {
 			t.Errorf("wisper.yaml carries no %s key:\n%s", key, raw)
 		}
+	}
+}
+
+// TestPeerListenerCountsOneSpokeStreamOnceInEachTally: a spoke's stream is
+// counted once in the peer's counters and once in the service's, and the tunnel's
+// connection count is the sum of the peer rows. Run hangs the same stats object
+// on the route that the service reports, so whatever else is counted into that
+// object — the hub's device, say — reads as a connection no spoke owns, and the
+// tunnel card prints it next to the rows.
+func TestPeerListenerCountsOneSpokeStreamOnceInEachTally(t *testing.T) {
+	ln := newPeerListener([]string{"peer-a"})
+	svcStats := xstats.NewStats(false)
+	ln.setStats(svcStats)
+	peerStats := ln.peerStat("peer-a")
+
+	inbound, far := peerDatagramPipe("peer-a")
+	defer far.Close()
+	ln.deliver(inbound)
+
+	c, err := ln.Accept()
+	if err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+
+	tallies := []struct {
+		name string
+		st   stats.Stats
+	}{{"service", svcStats}, {"peer", peerStats}}
+	for _, tally := range tallies {
+		if got := tally.st.Get(stats.KindCurrentConns); got != 1 {
+			t.Errorf("%s current conns = %d, want 1 while the stream is open", tally.name, got)
+		}
+		if got := tally.st.Get(stats.KindTotalConns); got != 1 {
+			t.Errorf("%s total conns = %d, want 1", tally.name, got)
+		}
+	}
+
+	if err := c.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	for _, tally := range tallies {
+		if got := tally.st.Get(stats.KindCurrentConns); got != 0 {
+			t.Errorf("%s current conns = %d, want 0 once the stream is closed", tally.name, got)
+		}
+		if got := tally.st.Get(stats.KindTotalConns); got != 1 {
+			t.Errorf("%s total conns = %d, want 1 — a closed stream is still one that was accepted", tally.name, got)
+		}
+	}
+}
+
+// TestTunHubRunningCountsSpokeStreamsOnly: what the tunnel card calls "active
+// connections" is the number of spokes holding a stream, and nothing else.
+//
+// The device is the trap. x's tun listener counts every conn it hands out, so a
+// device listener given the service's stats object puts the hub's own interface
+// into that count for as long as the tunnel runs: a hub with no spoke at all
+// reads one connection, and a hub with one spoke reads two — which is what a hub
+// reports on the field, its peer rows summing to one. The same conn doubles every
+// byte on the way through, since the device and the spoke's stream carry the same
+// traffic from opposite ends.
+//
+// It needs a real tun device, which the rest of this file goes out of its way not
+// to need, so it runs only where one can be made. Everywhere else the symmetry
+// above is what stands behind the same claim.
+func TestTunHubRunningCountsSpokeStreamsOnly(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("a tun device needs root")
+	}
+	if logger.Default() == nil {
+		logger.SetDefault(xlogger.Nop())
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// Unreachable relay: the host starts, the connect fails at once and, by
+	// design, non-fatally. The spoke stream below never goes near it.
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+
+	const spoke = "spoke-conns"
+	tun := NewTunTunnel(
+		IDOption("tun-conns"),
+		NameOption("hub-conns"),
+		NetOption("10.78.0.1/24"),
+		MTUOption(1400),
+		DeviceNameOption("wisper-conns"),
+		PeersOption(spoke),
+	).(*tunTunnel)
+	if err := tun.Run(); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	t.Cleanup(func() { _ = tun.Close() })
+
+	conns := func() (current, total uint64) {
+		t.Helper()
+		s := tun.Status()
+		if s == nil || s.Stats() == nil {
+			t.Fatal("no service stats: Run returned without a service reporting any")
+		}
+		return s.Stats().Get(stats.KindCurrentConns), s.Stats().Get(stats.KindTotalConns)
+	}
+
+	// A hub with a device and no spoke has no connections.
+	if current, total := conns(); current != 0 || total != 0 {
+		t.Fatalf("a hub with no spoke reports %d current / %d total connections, want 0 / 0 — the device is counted as a connection", current, total)
+	}
+
+	inbound, far := peerDatagramPipe(spoke)
+	p2pHost.dispatch(inbound)
+
+	// The service accepts in its own goroutine, so the count arrives a moment
+	// after the dispatch does.
+	waitConns(t, "one spoke's stream", conns, 1, 1)
+
+	tun.UpdatePeerStats()
+	rows := tun.PeerStats()
+	var row *PeerStat
+	for i := range rows {
+		if rows[i].Key == spoke {
+			row = &rows[i]
+		}
+	}
+	if row == nil {
+		t.Fatalf("peer rows = %+v, want one for %s", rows, spoke)
+	}
+	if row.CurrentConns != 1 {
+		t.Errorf("the peer's row reports %d connections, want 1", row.CurrentConns)
+	}
+
+	// The spoke leaves: the connection goes, the connection that was stays.
+	_ = far.Close()
+	waitConns(t, "the closed spoke", conns, 0, 1)
+}
+
+// waitConns polls the tunnel's connection count until it reads want, or fails
+// the test naming what never arrived.
+func waitConns(t *testing.T, what string, conns func() (uint64, uint64), wantCurrent, wantTotal uint64) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	var current, total uint64
+	for {
+		current, total = conns()
+		if current == wantCurrent && total == wantTotal {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s: current conns = %d, total = %d; want %d / %d", what, current, total, wantCurrent, wantTotal)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
