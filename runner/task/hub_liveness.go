@@ -1,6 +1,7 @@
 package task
 
 import (
+	"strings"
 	"time"
 
 	"github.com/go-gost/wisper/event"
@@ -94,6 +95,27 @@ func livenessDecide(st *livenessState, upDelta, downDelta uint64, probeReported 
 	return livenessQuiet
 }
 
+// standingWarn is the liveness verdict the history still answers with: the
+// newest one, when that verdict is a warn. The UI reads it the same way (see
+// _hubNoReflow in the entrypoint detail page), so a warn this function reports
+// is a warn the operator is looking at.
+//
+// Oldest-first list, newest verdict scanned first, and the first verdict found
+// decides — the same rule the UI follows, because the two must not disagree
+// about whether a stall is on.
+func standingWarn(id string) bool {
+	list := event.List(id)
+	for i := len(list) - 1; i >= 0; i-- {
+		switch msg := list[i].Message; {
+		case strings.Contains(msg, msgLivenessNoReflow):
+			return true
+		case strings.Contains(msg, msgLivenessRecovered):
+			return false
+		}
+	}
+	return false
+}
+
 // checkLiveness runs the hub-liveness watchdog for one entrypoint. Only a
 // running tun entrypoint is watched: any downlink byte proves the hub side
 // returns traffic, sustained uplink without any is the signal, and dual-zero
@@ -114,9 +136,24 @@ func (t *updateStatsTask) checkLiveness(ep tunnel.Tunnel, upDelta, downDelta uin
 		t.liveness = map[string]*livenessState{}
 	}
 	st := t.liveness[id]
+	fresh := st == nil
 	if st == nil {
 		st = &livenessState{}
 		t.liveness[id] = st
+	}
+	// A restart re-seeds this watchdog's state but not the event history, and
+	// the history is what the banner reads: a warn recorded before the restart
+	// keeps showing with nothing on the record to retract it, so the operator
+	// is told the hub is silent for as long as the app stays up. The first tick
+	// of a fresh watchdog retracts it when the downlink is already moving —
+	// the very fact that makes the warn false, reported the moment it is known
+	// instead of waiting for the link to flap and warn all over again.
+	if fresh && downDelta > 0 && standingWarn(id) {
+		st.seeded = true
+		st.misses = 0
+		st.reported = false
+		event.Record(id, event.LevelInfo, "%s", msgLivenessRecovered)
+		return
 	}
 	probeReported := false
 	if ps := t.probe[id]; ps != nil {

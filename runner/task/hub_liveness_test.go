@@ -3,6 +3,8 @@ package task
 import (
 	"testing"
 	"time"
+
+	"github.com/go-gost/wisper/event"
 )
 
 // TestLivenessTick pins the hub-liveness watchdog's decision table.
@@ -180,4 +182,55 @@ func TestLivenessDecideProbeSilence(t *testing.T) {
 		}
 	})
 
+}
+
+// TestStandingWarn pins the reading of the history the banner is drawn from.
+// A restart re-seeds the watchdog's own state but not the history, so the only
+// thing that says a stall is still on is the newest verdict already written
+// there — and it has to be read the way the UI reads it, or the backend
+// retracts a warn the operator is not being shown.
+func TestStandingWarn(t *testing.T) {
+	const id = "tun-liveness-history"
+	seed := func(msgs ...string) {
+		event.Seed(id, nil)
+		for i, m := range msgs {
+			event.Record(id, event.LevelWarn, "%s", m) // level is irrelevant here
+			_ = i
+		}
+	}
+
+	t.Run("nothing on record is no warn", func(t *testing.T) {
+		event.Seed(id, nil)
+		if standingWarn(id) {
+			t.Error("an empty history reported a standing warn")
+		}
+	})
+
+	t.Run("the newest verdict decides", func(t *testing.T) {
+		seed(msgLivenessNoReflow, "some other event", msgLivenessRecovered)
+		if standingWarn(id) {
+			t.Error("a recovery after the warn left the warn standing")
+		}
+		seed(msgLivenessRecovered, msgLivenessNoReflow)
+		if !standingWarn(id) {
+			t.Error("a warn after the recovery did not stand")
+		}
+	})
+
+	t.Run("a coalesced repeat still counts", func(t *testing.T) {
+		// Record folds an identical message into one row whose count rides
+		// separately, so the message alone must be enough to read it.
+		seed(msgLivenessNoReflow, msgLivenessNoReflow, msgLivenessNoReflow)
+		if !standingWarn(id) {
+			t.Error("three identical warns read as nothing")
+		}
+	})
+
+	t.Run("unrelated events are not a verdict", func(t *testing.T) {
+		seed("peer connected", "kernel NAT unavailable", msgLivenessRecovered)
+		if standingWarn(id) {
+			t.Error("unrelated rows were read as a warn")
+		}
+	})
+	event.Seed(id, nil)
 }
