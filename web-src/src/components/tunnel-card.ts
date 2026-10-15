@@ -143,6 +143,9 @@ export class TunnelCard extends LitElement {
     .transport.direct {
       color: var(--green-text);
     }
+    .transport.info {
+      color: var(--info);
+    }
     .transport.warn {
       color: var(--amber);
     }

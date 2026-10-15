@@ -57,6 +57,10 @@
   --amber: #f59e0b;
   --amber-fg: #fff;
 
+  /* Semantic: blue (informational: on the relay by the peer's own choice) */
+  --info: #2563eb;
+  --info-bg: #eff6ff;
+
   /* Radius */
   --radius-sm: 4px;
   --radius-md: 6px;

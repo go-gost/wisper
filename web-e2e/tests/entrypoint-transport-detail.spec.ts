@@ -116,6 +116,7 @@ test('every transport state carries a tappable detail', async ({ page }) => {
     { transport: 'direct', badge: 'direct' },
     { transport: 'derp', badge: 'relay' },
     { transport: 'disabled', badge: 'relay' },
+    { transport: 'peer-direct-off', badge: 'relay' },
     { transport: 'failed', badge: 'relay' },
     { transport: 'punching', badge: 'punching' },
     { transport: 'no-candidates', badge: 'relay' },

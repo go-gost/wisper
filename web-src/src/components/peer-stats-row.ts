@@ -216,6 +216,10 @@ export class PeerStatsRow extends LitElement {
       color: var(--green-text);
       background: var(--green-bg);
     }
+    .peer-badge.info {
+      color: var(--info);
+      background: var(--info-bg);
+    }
     .peer-badge.warn {
       color: var(--amber);
     }

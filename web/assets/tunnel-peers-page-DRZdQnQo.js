@@ -1,4 +1,4 @@
-import{i as y,a as x,A as o,b as i,c as a,t as $,G as T,s as P,g as D,B as E}from"./index-VDNduCql.js";import{n as f,r as c,m as k,c as A,a as b,b as w}from"./format-DCGumG-v.js";import{i as d}from"./app-scaffold-ABZxo7f0.js";import{c as z}from"./clipboard-C3x8_sid.js";import{s as K}from"./save-error-DfztQTVB.js";import{a as C}from"./transport-BMxvokQv.js";var N=Object.defineProperty,R=Object.getOwnPropertyDescriptor,g=(e,t,s,r)=>{for(var n=r>1?void 0:r?R(t,s):t,h=e.length-1,v;h>=0;h--)(v=e[h])&&(n=(r?v(t,s,n):v(n))||n);return r&&n&&N(t,s,n),n};let u=class extends x{constructor(){super(...arguments),this.peer=null,this.stat=null,this.disabled=!1,this.showKeys=!1,this.peersLAN="",this._expanded=!1}_renderTransport(){const e=C(this.stat?.transport);return e?i`<span class="peer-badge ${e.tone}" title=${e.hint}>
+import{i as y,a as x,A as o,b as i,c as a,t as $,G as T,s as P,g as D,B as E}from"./index-FLzhZJ7M.js";import{n as f,r as c,m as k,c as A,a as b,b as w}from"./format-DZsGvDii.js";import{i as d}from"./app-scaffold-rs2Ye_7r.js";import{c as z}from"./clipboard-C3x8_sid.js";import{s as K}from"./save-error-D9wp7XzY.js";import{a as C}from"./transport-BYPHqG1O.js";var N=Object.defineProperty,R=Object.getOwnPropertyDescriptor,g=(e,t,s,r)=>{for(var n=r>1?void 0:r?R(t,s):t,h=e.length-1,v;h>=0;h--)(v=e[h])&&(n=(r?v(t,s,n):v(n))||n);return r&&n&&N(t,s,n),n};let u=class extends x{constructor(){super(...arguments),this.peer=null,this.stat=null,this.disabled=!1,this.showKeys=!1,this.peersLAN="",this._expanded=!1}_renderTransport(){const e=C(this.stat?.transport);return e?i`<span class="peer-badge ${e.tone}" title=${e.hint}>
       ${d(e.icon)}<span>${e.label}</span>
     </span>`:o}_renderDiag(){const e=this.stat;if(!e)return o;const t=e.caps&&e.caps.length>0?e.caps.join(", "):"",s=(r,n)=>i`
       <div class="diag-row">
@@ -110,6 +110,10 @@ import{i as y,a as x,A as o,b as i,c as a,t as $,G as T,s as P,g as D,B as E}fro
     .peer-badge.direct {
       color: var(--green-text);
       background: var(--green-bg);
+    }
+    .peer-badge.info {
+      color: var(--info);
+      background: var(--info-bg);
     }
     .peer-badge.warn {
       color: var(--amber);

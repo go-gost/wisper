@@ -21,8 +21,9 @@ interface TransportSpec {
    *  path, the hub for every relay state — the reason a peer is on the relay
    *  is the tooltip's job, not a second icon's. */
   icon: string;
-  /** Style hook: a direct path, a fixable problem, or plain relay. */
-  tone: 'direct' | 'warn' | 'muted';
+  /** Style hook: a direct path, a fixable problem, plain relay, or relay
+   *  because the peer itself turned the direct path off. */
+  tone: 'direct' | 'warn' | 'muted' | 'info';
   labelKey: string;
   /** Why it is on the relay — empty for a direct path. */
   whyKey?: string;
@@ -56,7 +57,7 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
   },
   'peer-direct-off': {
     icon: 'hub',
-    tone: 'muted',
+    tone: 'info',
     labelKey: 'p2pTransportRelay',
     whyKey: 'p2pTransportWhyPeerDirectOff',
   },
@@ -76,7 +77,7 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
 
 export interface TransportStyle {
   icon: string;
-  tone: 'direct' | 'warn' | 'muted';
+  tone: 'direct' | 'warn' | 'muted' | 'info';
   /** The badge text: one word per state, the same for every peer — the reason
    *  is what the tooltip is for. */
   label: string;
@@ -109,7 +110,7 @@ export function transportStyle(value?: string): TransportStyle | null {
  *  renderer. */
 export interface TransportView {
   icon: string;
-  tone: 'direct' | 'warn' | 'muted';
+  tone: 'direct' | 'warn' | 'muted' | 'info';
   hint: string;
 }
 
