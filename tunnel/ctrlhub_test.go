@@ -151,7 +151,91 @@ func TestControlHubRoundTripAndPublish(t *testing.T) {
 	}
 }
 
-func TestControlHubIgnoresOversizeAndUnknownType(t *testing.T) {
+// TestControlHubIgnoresUnknownTypeAndBadVersion: the forward-compat refusals
+// are self-framed — readMessage reads the whole body before it judges the
+// version or the type — so the stream stays aligned and a claim behind them
+// still lands. This is the half of the old oversize test that survives: an
+// oversize length is not self-framed and is covered by the desync test.
+func TestControlHubIgnoresUnknownTypeAndBadVersion(t *testing.T) {
+	h := newFakeP2PHandler()
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+
+	if err := ch.Register("peerB"); err != nil {
+		t.Fatal(err)
+	}
+	defer ch.Unregister("peerB")
+
+	hub, ctrl := ch.dialControlForTest("peerB")
+	defer hub.Close()
+	defer ctrl.Close()
+
+	// A version this hub does not speak, then a type it does not know: both
+	// are refused, both are frame-aligned, so the claim after them lands.
+	badVersion := framed(t, netviewMessage{V: 99, Hub: "hub1", Rev: 1})
+	unknownType := framed(t, map[string]any{"type": "future", "v": ctrlVersion})
+	good := framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"192.168.50.0/24"}})
+
+	go func() {
+		_, _ = ctrl.Write(append(append(badVersion, unknownType...), good...))
+	}()
+
+	waitFor(t, "the claim after the refused frames must still land", func() bool {
+		_, ok := h.installed()[netip.MustParsePrefix("192.168.50.0/24")]
+		return ok
+	})
+}
+
+// TestControlHubResyncsAcrossReannouncedMagic: a relay rebuild can hand a new
+// spoke session the same control stream the hub is already reading, and a
+// spoke opens every session by writing ControlMagic. At a frame boundary that
+// magic reads as a length of 0x57495350 — the 1.4 GB frame in the hub's log,
+// once per reconnect. It is recognised and skipped, so the claim the spoke
+// sent behind it lands and no refused-frame warning is logged.
+func TestControlHubResyncsAcrossReannouncedMagic(t *testing.T) {
+	h := newFakeP2PHandler()
+	var buf syncBuffer
+	log := xlogger.NewLogger(xlogger.OutputOption(&buf))
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, log)
+
+	if err := ch.Register("peerB"); err != nil {
+		t.Fatal(err)
+	}
+	defer ch.Unregister("peerB")
+
+	hub, ctrl := ch.dialControlForTest("peerB")
+	defer hub.Close()
+	defer ctrl.Close()
+
+	// The first magic was consumed on the way in (dialControlForTest, as
+	// dispatch does). The spoke re-announces on the same stream, then claims.
+	claim := framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"192.168.50.0/24"}})
+	go func() {
+		_, _ = ctrl.Write(append(append([]byte(nil), ControlMagic...), claim...))
+	}()
+
+	want := netip.MustParsePrefix("192.168.50.0/24")
+	waitFor(t, "the claim behind the re-announced magic must land", func() bool {
+		_, ok := h.installed()[want]
+		return ok
+	})
+	// The warning is written on the reader goroutine before the claim behind
+	// it lands, so once the claim is in a refused-frame line would be here.
+	if got := buf.String(); strings.Contains(got, "refused frame") {
+		t.Fatalf("the hub refused the re-announced magic instead of resyncing:\n%s", got)
+	}
+}
+
+// TestControlHubEndsOnDesyncedFrame: a length the hub refuses leaves the reader
+// mid-frame — the body the length named was never read, so no later byte is
+// reliably a frame boundary. Reading on would refuse every 4 bytes of the
+// mis-framed remainder, which is what a secure-layer desync (the P2PU leak) did
+// in the field. The stream is ended instead, and that is how the spoke comes
+// back: it redials within a second and re-sends its whole claim.
+func TestControlHubEndsOnDesyncedFrame(t *testing.T) {
 	h := newFakeP2PHandler()
 	ch := newControlHub("hub1", map[string][]netip.Prefix{
 		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
@@ -167,21 +251,23 @@ func TestControlHubIgnoresOversizeAndUnknownType(t *testing.T) {
 	defer ctrl.Close()
 
 	var hdr [4]byte
-	// A frame claiming 1 MiB: readMessage refuses it before its body is read,
-	// and a hostile spoke must not make the hub stop listening.
+	// Past maxFrame and not the magic: there is no boundary to resync to.
 	binary.BigEndian.PutUint32(hdr[:], uint32(1<<20))
-	// A version this hub does not speak: refused the same way.
-	badVersion := framed(t, netviewMessage{V: 99, Hub: "hub1", Rev: 1})
+	// A claim the hub would act on if it wrongly read past the desync.
 	good := framed(t, claimMessage{Type: ctrlTypeClaim, V: 1, Add: []string{"192.168.50.0/24"}})
-
 	go func() {
-		_, _ = ctrl.Write(append(append(hdr[:], badVersion...), good...))
+		_, _ = ctrl.Write(append(hdr[:], good...))
 	}()
 
-	waitFor(t, "the claim after the refused frames must still land", func() bool {
-		_, ok := h.installed()[netip.MustParsePrefix("192.168.50.0/24")]
-		return ok
-	})
+	// The hub ends the stream: its end closes, so the next read on the spoke
+	// end is an EOF rather than another frame.
+	_ = ctrl.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, err := ctrl.Read(make([]byte, 1)); err == nil {
+		t.Fatal("the hub kept reading a desynced stream; it must end it so the spoke redials")
+	}
+	if _, ok := h.installed()[netip.MustParsePrefix("192.168.50.0/24")]; ok {
+		t.Fatal("the hub acted on a frame behind a desync it should have ended on")
+	}
 }
 
 func TestParseLanAllow(t *testing.T) {

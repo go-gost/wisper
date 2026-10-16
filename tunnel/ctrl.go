@@ -1,8 +1,10 @@
 package tunnel
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -18,6 +20,14 @@ var ControlMagic = []byte("WISP")
 // maxFrame caps one message body. A spoke that sends a larger length is
 // refused before its body is read.
 const maxFrame = 64 << 10
+
+// errFrameDesync marks a refusal that left the reader mid-frame: the length
+// named more bytes than maxFrame, so the body was never read and the next read
+// has no way to tell where a frame begins. A caller ends the stream on it (the
+// spoke redials and re-sends its whole claim). The other refusals — a version
+// this build does not speak, a type it does not know — are self-framed, the
+// body already consumed, so the stream is read on.
+var errFrameDesync = errors.New("control frame is not frame-aligned")
 
 // message types and the only version this build speaks. A peer that sends
 // anything else gets an error, not a misparse.
@@ -73,19 +83,36 @@ func writeMessage(w io.Writer, m any) error {
 }
 
 // readMessage reads one framed message. An unknown type, a version above 1,
-// or an oversize length is an error the caller turns into "drop the frame,
-// keep the stream" — forward-compat, the same rule derpclient applies
-// (p2p/internal/derpclient/derpclient.go:16). It returns both structs because
+// or an oversize length is an error the caller turns into a refusal — but the
+// two kinds differ in whether the stream survives. An oversize length is
+// wrapped in errFrameDesync because its body was never read and the reader is
+// left mid-frame, while an unknown type or version is self-framed and the
+// stream is read on (forward-compat, the same rule derpclient applies
+// (p2p/internal/derpclient/derpclient.go:16)). It returns both structs because
 // a caller reading a mixed stream does not know which is coming; exactly one
 // is non-zero.
+//
+// A leading ControlMagic is skipped rather than read as a length. A spoke
+// writes the magic to open every control session, and a relay rebuild can hand
+// a new session the stream the hub is already reading, so the magic lands at a
+// frame boundary of a live reader. Read as a length it is 0x57495350 — the
+// 1.4 GB frame the hub logged once per reconnect — and refusing it would log
+// an error on every reconnect; recognised here, the frame behind it is read
+// normally.
 func readMessage(r io.Reader) (netviewMessage, claimMessage, error) {
 	var hdr [4]byte
-	if _, err := io.ReadFull(r, hdr[:]); err != nil {
-		return netviewMessage{}, claimMessage{}, err
+	for {
+		if _, err := io.ReadFull(r, hdr[:]); err != nil {
+			return netviewMessage{}, claimMessage{}, err
+		}
+		if bytes.Equal(hdr[:], ControlMagic) {
+			continue
+		}
+		break
 	}
 	n := binary.BigEndian.Uint32(hdr[:])
 	if n > maxFrame {
-		return netviewMessage{}, claimMessage{}, fmt.Errorf("control frame of %d bytes exceeds the %d byte limit", n, maxFrame)
+		return netviewMessage{}, claimMessage{}, fmt.Errorf("control frame of %d bytes exceeds the %d byte limit: %w", n, maxFrame, errFrameDesync)
 	}
 	body := make([]byte, n)
 	if _, err := io.ReadFull(r, body); err != nil {

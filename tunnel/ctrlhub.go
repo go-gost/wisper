@@ -502,9 +502,11 @@ func (ch *controlHub) serve(peer string, p *controlPeer) {
 }
 
 // runStream reads one spoke's claims and answers every rev change with a
-// netview. A refused frame is dropped and the stream kept (forward-compat,
-// the rule readMessage documents); a stream that ended is simply gone, and the
-// spoke's next session re-sends everything.
+// netview. A self-framed refusal (an unknown type, a version this build does
+// not speak) is dropped and the stream kept; a desynced frame (a length past
+// maxFrame, its body unread) ends the stream, because the reader has no frame
+// boundary to recover to and the spoke redials. A stream that ended is simply
+// gone, and the spoke's next session re-sends everything.
 func (ch *controlHub) runStream(peer string, p *controlPeer, conn net.Conn) {
 	defer func() { _ = conn.Close() }()
 
@@ -539,6 +541,16 @@ func (ch *controlHub) runStream(peer string, p *controlPeer, conn net.Conn) {
 	for {
 		_, claim, err := readMessage(conn)
 		if err != nil {
+			if errors.Is(err, errFrameDesync) {
+				// The length was refused before its body was read, so the
+				// reader is mid-frame and no later byte is reliably a frame
+				// boundary. End the stream rather than read on: the spoke
+				// redials within a second and re-sends its whole claim, which
+				// is cheaper than refusing every 4 bytes of the mis-framed
+				// remainder (what a secure-layer desync did in the field).
+				ch.warnf("control: spoke %q sent a desynced frame: %v", peer, err)
+				return
+			}
 			if !streamDead(err) && !ch.isClosed() {
 				// The frame was refused, not the stream: keep reading. A peer
 				// that floods refusals supplies the bytes each refusal reads,
@@ -825,14 +837,15 @@ func ParseLanAllow(spec string) (map[string][]netip.Prefix, error) {
 // streamDead reports whether a read error means the conn is finished, as
 // opposed to one frame being unreadable.
 //
-// readMessage returns one plain error for both — a length it refuses and a
-// stream that ended — and the difference is the whole behavior here: a refused
-// frame leaves the peer connected and usable (the plan's oversize case), while
-// a finished stream ends the session. The transport errors are named
-// explicitly; anything else is a refused frame the stream survives. A closed
-// pipe is named last because net.Pipe spells it its own way, and treating it
-// as a refused frame would spin a reader on a conn that can never return
-// another byte.
+// readMessage returns one plain error for both — a frame it refuses and a
+// stream that ended — and the difference is the whole behavior here: a
+// self-framed refusal leaves the peer connected and usable, while a finished
+// stream ends the session. (A desynced frame never reaches here: runStream
+// ends the stream on errFrameDesync before consulting this.) The transport
+// errors are named explicitly; anything else is a refused frame the stream
+// survives. A closed pipe is named last because net.Pipe spells it its own
+// way, and treating it as a refused frame would spin a reader on a conn that
+// can never return another byte.
 func streamDead(err error) bool {
 	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
 		errors.Is(err, io.ErrClosedPipe) ||
