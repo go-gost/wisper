@@ -1249,7 +1249,7 @@ export class TunnelDetailPage extends LitElement {
                     <div class="stat-box">
                       <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${() => this._handleResetStats('conns')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatNumber(stats.total_conns)}</div>
-                      <div class="stat-rate">${formatNumber(stats.current_conns)} active · ${stats.request_rate.toFixed(1)} conns/s</div>
+                      <div class="stat-rate">${formatNumber(stats.current_conns)} active · ${stats.request_rate.toFixed(2)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${() => this._handleResetStats('errors')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>

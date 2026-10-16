@@ -9,8 +9,8 @@ export function formatBytes(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   const size = bytes / Math.pow(1024, i);
 
-  if (i === 0) return `${size} B`;
-  return `${size.toFixed(1)} ${units[i]}`;
+  if (i === 0) return Number.isInteger(size) ? `${size} B` : `${size.toFixed(2)} B`;
+  return `${size.toFixed(2)} ${units[i]}`;
 }
 
 /**
@@ -51,8 +51,8 @@ export function formatTimestamp(iso: string): string {
 export function formatDuration(ns: number): string {
   if (!ns || ns <= 0) return '<1ms';
   if (ns < 1_000_000) return `${Math.round(ns / 1000)}µs`;
-  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(1)}ms`;
-  return `${(ns / 1_000_000_000).toFixed(1)}s`;
+  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(2)}ms`;
+  return `${(ns / 1_000_000_000).toFixed(2)}s`;
 }
 
 /**
