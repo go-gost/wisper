@@ -95,6 +95,10 @@ type peerStatsJSON struct {
 	// Trace is the peer's recent punch history: short lines, oldest first
 	// (newest kept), capped by the p2p host's ring.
 	Trace []string `json:"trace,omitempty"`
+	// TraceTimes is when each Trace line happened, as Unix milliseconds, same
+	// order and length, so the UI can stamp each step without threading a
+	// clock through the line text.
+	TraceTimes []int64 `json:"trace_times,omitempty"`
 	// LAN is the LAN routing this peer holds, as a hub's routes name it: what
 	// the peer claimed over the control channel and the hub approved. It rides
 	// on peer_stats rather than on the allowlist row, because the allowlist is
@@ -335,6 +339,20 @@ func peerRTTFields(diags map[string]p2p.PeerDiagnostic, peer string) (srtt, rto,
 	return k.SRTT, k.RTO, k.RTTVar, k.Live
 }
 
+// traceTimesMillis maps the p2p host's per-line punch-trace stamps to Unix
+// milliseconds for the wire. Nil in, nil out, so an absent trace stays absent
+// rather than an empty array.
+func traceTimesMillis(times []time.Time) []int64 {
+	if len(times) == 0 {
+		return nil
+	}
+	out := make([]int64, len(times))
+	for i, t := range times {
+		out[i] = t.UnixMilli()
+	}
+	return out
+}
+
 // safeSub returns a - b, or 0 if b > a (underflow guard for baseline subtraction).
 func safeSub(a, b uint64) uint64 {
 	if a >= b {
@@ -467,6 +485,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 				RttVarMs:        rttvar,
 				KcpLive:         live,
 				Trace:           d.Trace,
+				TraceTimes:      traceTimesMillis(d.TraceTimes),
 				LAN:             peerLAN[p.Key],
 				CurrentConns:    p.CurrentConns,
 				TotalConns:      p.TotalConns,

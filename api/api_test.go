@@ -3165,3 +3165,44 @@ func TestPeerRTTWireShape(t *testing.T) {
 		}
 	}
 }
+
+// TestPeerTraceWireShape pins the punch-trace pair: the lines and their
+// parallel stamps. The web client zips them by index, so a renamed tag or a
+// dropped stamp field would leave the UI with untimed lines — silently, since
+// both fields are omitempty.
+func TestPeerTraceWireShape(t *testing.T) {
+	row, err := json.Marshal(peerStatsJSON{
+		Trace:      []string{"round start", "backoff 30s"},
+		TraceTimes: []int64{1700000000000, 1700000001000},
+	})
+	if err != nil {
+		t.Fatalf("marshal peerStatsJSON: %v", err)
+	}
+	for _, want := range []string{`"trace":["round start","backoff 30s"]`, `"trace_times":[1700000000000,1700000001000]`} {
+		if !strings.Contains(string(row), want) {
+			t.Errorf("peer_stats row missing %s: %s", want, row)
+		}
+	}
+	// Absent when there is no trace, rather than an empty array.
+	zero, err := json.Marshal(peerStatsJSON{})
+	if err != nil {
+		t.Fatalf("marshal zero peerStatsJSON: %v", err)
+	}
+	for _, unwanted := range []string{"trace_times", `"trace":`} {
+		if strings.Contains(string(zero), unwanted) {
+			t.Errorf("untraced peer_stats row carries %s: %s", unwanted, zero)
+		}
+	}
+}
+
+// TestTraceTimesMillis: the millisecond mapping, nil-preserving.
+func TestTraceTimesMillis(t *testing.T) {
+	if got := traceTimesMillis(nil); got != nil {
+		t.Errorf("nil in = %v, want nil", got)
+	}
+	in := []time.Time{time.UnixMilli(1700000000000), time.UnixMilli(1700000001000)}
+	got := traceTimesMillis(in)
+	if len(got) != 2 || got[0] != 1700000000000 || got[1] != 1700000001000 {
+		t.Errorf("traceTimesMillis = %v, want [1700000000000 1700000001000]", got)
+	}
+}

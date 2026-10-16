@@ -56,6 +56,18 @@ export function formatDuration(ns: number): string {
 }
 
 /**
+ * Format a Unix-millisecond stamp as a wall-clock "HH:MM:SS" in local time.
+ * Used for the punch-trace steps, where the day is not in question and the
+ * full date would crowd the line.
+ */
+export function formatClockTime(ms: number): string {
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/**
  * Format an ISO timestamp as a compact relative time string (e.g. "3m", "2h", "5d", "1w").
  * Returns empty string if the input is falsy or unparseable.
  */

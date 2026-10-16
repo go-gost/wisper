@@ -154,6 +154,9 @@ export interface PeerStats {
   /** The peer's recent punch history: short lines, oldest first (newest kept),
    *  capped by the p2p host's ring. */
   trace?: string[];
+  /** When each `trace` line happened, as Unix milliseconds, same order and
+   *  length — zipped by index so the expander can stamp every step. */
+  trace_times?: number[];
   /** The LANs this peer holds on the hub's network — the CIDRs it claimed.
    *  Absent when it holds none (and on an object that has no device network). */
   lan?: string[];

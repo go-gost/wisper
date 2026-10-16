@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
-import { formatBytes, formatRate, formatNumber, maskKey } from '../utils/format';
+import { formatBytes, formatRate, formatNumber, formatClockTime, maskKey } from '../utils/format';
 import { transportStyle } from '../utils/transport';
 import type { Peer, PeerStats } from '../api/types';
 
@@ -109,7 +109,15 @@ export class PeerStatsRow extends LitElement {
           ? html`<div class="diag-trace">
               <span class="diag-label">${t('peersDiagTrace')}</span>
               <div class="trace-lines">
-                ${s.trace.map(line => html`<div class="trace-line">${line}</div>`)}
+                <!-- Each step carries when it happened: the line is short and
+                     the ring holds minutes of history, so a bare list cannot
+                     say how long ago a round ran. The stamp is zipped by index
+                     from trace_times, parallel to trace. -->
+                ${s.trace.map((line, i) => html`<div class="trace-line">${line}${
+                  s.trace_times?.[i]
+                    ? html`<span class="trace-time">${formatClockTime(s.trace_times[i])}</span>`
+                    : nothing
+                }</div>`)}
               </div>
             </div>`
           : nothing}
@@ -318,6 +326,12 @@ export class PeerStatsRow extends LitElement {
     }
     .trace-line {
       overflow-wrap: anywhere;
+    }
+    /* The step's wall-clock stamp, set off from the line text and as quiet as
+       the rest of the diagnostic. */
+    .trace-time {
+      margin-left: 6px;
+      color: var(--text-muted);
     }
     .icon-btn {
       background: none;
