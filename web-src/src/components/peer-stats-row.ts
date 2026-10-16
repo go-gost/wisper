@@ -134,22 +134,24 @@ export class PeerStatsRow extends LitElement {
     return html`
       <div class="peer-row ${this.disabled ? 'off' : ''}">
         <!-- Left to right: what the row is, then what it is doing, then the
-             page's controls. The facts (alias, path word, the diagnostic
+             page's controls. The facts (alias, RTT, path word, the diagnostic
              expander) come before the buttons — the same order the tun
              entrypoint's row uses, and the order this row had before it was
              extracted here. Swapping them puts the controls in the middle and
              the badge at the far right, which reads as a different row. -->
         <div class="row-line">
           <span class="peer-alias">${s?.alias || p?.alias || t('peersNoAlias')}</span>
-          ${this.disabled
-            ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
-            : this._renderTransport()}
-          <!-- The peer's measured round-trip time, right where the path it was
-               measured over is named. Only a live session has one: a peer whose
-               KCP never answered yet shows nothing rather than a zero. -->
+          <!-- The peer's measured round-trip time, ahead of the path badge so
+               the badge keeps a fixed place: the alias above flexes, and a
+               variable-width RTT to the badge's right would shift it as the
+               number changes. Only a live session has one: a peer whose KCP
+               never answered yet shows nothing rather than a zero. -->
           ${s && s.kcp_live && (s.srtt_ms ?? 0) > 0
             ? html`<span class="peer-rtt" title="${t('peersRTTHint')} · ${s.transport ?? ''}">${s.srtt_ms}ms</span>`
             : nothing}
+          ${this.disabled
+            ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
+            : this._renderTransport()}
           ${expandable
             ? html`<button class="icon-btn" title="${t('peersDiagDetails')}"
                 @click=${() => { this._expanded = !this._expanded; }}>
