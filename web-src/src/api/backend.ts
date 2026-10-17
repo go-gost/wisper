@@ -64,11 +64,22 @@ export class GoBackend {
       headers['Content-Type'] = 'application/json';
     }
 
-    const res = await fetch(this.url(path), {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    // Bound every request so a stalled fetch (e.g. while the device switches
+    // networks and the WebView's request queue stalls) cannot pin the loading
+    // state forever and leave the list empty and stuck on a spinner.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let res!: Response;
+    try {
+      res = await fetch(this.url(path), {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     // 204 No Content — no body to parse
     if (res.status === 204) {
@@ -221,9 +232,17 @@ export class GoBackend {
    *  relay's liveness is real. An optional peer key narrows it to one peer. */
   async getP2PDoctor(peer?: string): Promise<string> {
     const q = peer ? `?peer=${encodeURIComponent(peer)}` : '';
-    const res = await fetch(this.url(`/api/p2p/doctor${q}`), {
-      headers: { 'Cache-Control': 'no-cache' },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let res!: Response;
+    try {
+      res = await fetch(this.url(`/api/p2p/doctor${q}`), {
+        headers: { 'Cache-Control': 'no-cache' },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       throw new BackendError(res.status, res.statusText);
     }

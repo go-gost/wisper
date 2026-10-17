@@ -42,10 +42,12 @@ export async function refresh(): Promise<void> {
   try {
     entrypoints = await backend.listEntrypoints();
   } catch {
-    // Keep existing list on error.
+    // Keep existing list on error (including a timed-out fetch while the
+    // device switches networks): never leave loading pinned.
+  } finally {
+    loading = false;
+    notify();
   }
-  loading = false;
-  notify();
 }
 
 export async function create(req: EntrypointCreateRequest): Promise<Entrypoint> {

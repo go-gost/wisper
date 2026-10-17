@@ -43,10 +43,12 @@ export async function refresh(): Promise<void> {
   try {
     tunnels = await backend.listTunnels();
   } catch {
-    // Keep existing list on error.
+    // Keep existing list on error (including a timed-out fetch while the
+    // device switches networks): never leave loading pinned.
+  } finally {
+    loading = false;
+    notify();
   }
-  loading = false;
-  notify();
 }
 
 /** Create a new tunnel and start it. */

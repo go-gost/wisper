@@ -29,13 +29,32 @@ export class WisperApp extends LitElement {
 
   async firstUpdated() {
     // Initialize settings (theme, locale, server config) from backend.
-    await loadSettings();
+    try {
+      await loadSettings();
+    } catch {
+      // Keep going with local defaults if the backend is unreachable (e.g.
+      // while the device switches networks): the app must not stall on load.
+    }
 
-    // Load initial data.
-    await Promise.all([refreshTunnels(), refreshEntrypoints()]);
+    // Load initial data. A stalled fetch must not prevent polling from
+    // starting, or the UI stays on a spinner forever.
+    try {
+      await Promise.all([refreshTunnels(), refreshEntrypoints()]);
+    } catch {
+      // Keep going; the stores already swallow per-request errors.
+    }
 
     // Begin live stats polling.
     startPolling();
+
+    // Re-pull once connectivity comes back after a network switch: the initial
+    // fetch may have timed out while the device was offline, leaving the list
+    // empty until the next manual refresh.
+    const onOnline = () => {
+      void refreshTunnels();
+      void refreshEntrypoints();
+    };
+    window.addEventListener('online', onOnline);
 
     // React to polling interval changes from settings.
     subscribe(() => {
