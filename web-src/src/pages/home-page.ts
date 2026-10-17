@@ -150,10 +150,8 @@ export class HomePage extends LitElement {
    *  mandatory — a session that does not settle encrypted is refused, never
    *  built as plaintext. So a tun hub is as encrypted as a p2p tunnel, and a
    *  tun entrypoint as a p2p one. */
-  private _secure(item: Item): boolean {
-    return item.kind === 'tunnel'
-      ? item.data.type === 'p2p' || item.data.type === 'tun'
-      : item.data.type === 'p2p' || item.data.type === 'tun';
+  private _rtt(item: Item): number {
+    return item.kind === 'entrypoint' ? (item.data.peer_rtt_ms ?? 0) : 0;
   }
 
   private _typeLabel(item: Item): string {
@@ -803,7 +801,7 @@ export class HomePage extends LitElement {
                       <tunnel-card
                         .name=${item.data.name}
                         .typeLabel=${this._typeLabel(item)}
-                        .secure=${this._secure(item)}
+                        .rtt=${this._rtt(item)}
                         .transport=${this._transport(item)}
                         .meta=${this._metaLine(item)}
                         .status=${item.data.status}

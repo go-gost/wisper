@@ -54,6 +54,10 @@ export class TunnelCard extends LitElement {
    *  this object sits). Draws a lock badge. */
   @property({ type: Boolean }) secure = false;
 
+  /** The peer's KCP smoothed RTT in milliseconds, for p2p/tun objects. Shown
+   *  in place of the (now redundant) encryption lock badge. */
+  @property({ type: Number }) rtt = 0;
+
   static styles = css`
     :host {
       display: block;
@@ -158,6 +162,10 @@ export class TunnelCard extends LitElement {
       width: 12px;
       height: 12px;
     }
+    .peer-rtt {
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+    }
 
     /* ── Right column: created-at + traffic ── */
     .right-col {
@@ -253,8 +261,8 @@ export class TunnelCard extends LitElement {
 
         <div class="right-col">
           <div class="right-top">
-            ${this.secure
-              ? html`<span class="secure" title=${t('e2eEncrypted')}>${icon('lock')}</span>`
+            ${this.rtt > 0
+              ? html`<span class="peer-rtt" title=${t('peersRTTHint')}>${this.rtt}ms</span>`
               : nothing}
             ${this.transport
               ? html`<span class="transport ${this.transport.tone}" title=${this.transport.hint}>

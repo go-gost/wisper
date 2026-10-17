@@ -497,9 +497,16 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			resp.PeerStats = append(resp.PeerStats, row)
 		}
 	}
-	if opts.Peer != "" {
-		resp.PeerTransport = transports[opts.Peer]
-		resp.PeerRTTMs, resp.PeerRtoMs, resp.PeerRttVarMs, resp.PeerKcpLive = peerRTTFields(diagnostics, opts.Peer)
+	// For a single-peer entrypoint (p2p) opts.Peer names it; for a tun hub
+	// there is no single peer, so fall back to the first spoke so the detail
+	// page still reports a representative RTT.
+	rttPeer := opts.Peer
+	if rttPeer == "" && len(opts.Peers) > 0 {
+		rttPeer = opts.Peers[0]
+	}
+	if rttPeer != "" {
+		resp.PeerTransport = transports[rttPeer]
+		resp.PeerRTTMs, resp.PeerRtoMs, resp.PeerRttVarMs, resp.PeerKcpLive = peerRTTFields(diagnostics, rttPeer)
 	}
 	// The routes table and the per-spoke column on the allowlist above are the
 	// same snapshot the peer rows were filled from: a hub cannot report one
