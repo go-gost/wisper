@@ -155,7 +155,6 @@ type tunnelOptionsResp struct {
 	RewriteHost bool   `json:"rewriteHost,omitempty"`
 	FileUpload  bool   `json:"file_upload,omitempty"`
 	Keepalive   bool   `json:"keepalive,omitempty"`
-	Probe       bool   `json:"probe,omitempty"`
 	TTL         int    `json:"ttl,omitempty"`
 	RecordMode  string `json:"record_mode,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p entrypoints).
@@ -273,8 +272,6 @@ type statsResponse struct {
 	OutputBytes     uint64  `json:"output_bytes"`
 	InputRateBytes  uint64  `json:"input_rate_bytes"`
 	OutputRateBytes uint64  `json:"output_rate_bytes"`
-	ProbeSent       uint64  `json:"probe_sent"`
-	ProbeAcked      uint64  `json:"probe_acked"`
 	// The hub's LAN routing: LANs routed for, claims refused, LANs withdrawn.
 	// Only a tun hub carries values; every other type leaves them zero.
 	LanRouted    uint64 `json:"lan_routed"`
@@ -402,7 +399,6 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			RewriteHost: opts.RewriteHost,
 			FileUpload:  opts.FileUpload,
 			Keepalive:   opts.Keepalive,
-			Probe:       opts.Probe,
 			TTL:         opts.TTL,
 			RecordMode:  opts.RecordMode,
 			Peer:        opts.Peer,
@@ -432,8 +428,6 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			OutputBytes:     safeSub(s.OutputBytes, bl.OutputBytes),
 			InputRateBytes:  s.InputRateBytes,
 			OutputRateBytes: s.OutputRateBytes,
-			ProbeSent:       safeSub(s.ProbeSent, bl.ProbeSent),
-			ProbeAcked:      safeSub(s.ProbeAcked, bl.ProbeAcked),
 			LanRouted:       safeSub(s.LanRouted, bl.LanRouted),
 			LanDenied:       safeSub(s.LanDenied, bl.LanDenied),
 			LanWithdrawn:    safeSub(s.LanWithdrawn, bl.LanWithdrawn),

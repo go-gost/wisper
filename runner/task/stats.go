@@ -22,7 +22,6 @@ type updateStatsTask struct {
 	service   map[string]serviceState
 	peers     map[string]string
 	punches   map[string]p2p.PeerDiagnostic
-	probe     map[string]*probeState
 	liveness  map[string]*livenessState
 	relay     relaySample
 	relaySeen bool
@@ -33,6 +32,15 @@ type updateStatsTask struct {
 // UpdateStats returns a task that polls service stats.
 func UpdateStats() runner.Task {
 	return &updateStatsTask{}
+}
+
+// statsTickInterval is the stats tick in wall-clock terms. Read per call:
+// Settings.StatsInterval is reconfigurable at runtime.
+func statsTickInterval() time.Duration {
+	if s := config.Get().Settings; s != nil && s.StatsInterval > 0 {
+		return time.Duration(s.StatsInterval) * time.Second
+	}
+	return time.Second
 }
 
 func (t *updateStatsTask) ID() runner.TaskID {
@@ -143,8 +151,6 @@ func (t *updateStatsTask) updateEntrypoint() error {
 			stats.OutputBytes = s.Get(stats_pkg.KindOutputBytes)
 			stats.TotalConns = s.Get(stats_pkg.KindTotalConns)
 			stats.TotalErrs = s.Get(stats_pkg.KindTotalErrs)
-			stats.ProbeSent = s.Get(xstats.KindProbeSent)
-			stats.ProbeAcked = s.Get(xstats.KindProbeAcked)
 			stats.LanRouted = s.Get(xstats.KindLanRouted)
 			stats.LanDenied = s.Get(xstats.KindLanDenied)
 			stats.LanWithdrawn = s.Get(xstats.KindLanWithdrawn)
@@ -170,9 +176,6 @@ func (t *updateStatsTask) updateEntrypoint() error {
 		stats.RequestRate = float64(reqRate) / d.Seconds()
 
 		ep.SetStats(stats)
-
-		// After SetStats so the watchdog reads this tick's acked count.
-		t.checkProbe(ep)
 
 		// Direction: InputBytes enter the service from the device
 		// (spoke→hub uplink), OutputBytes leave it toward the device

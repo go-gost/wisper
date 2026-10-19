@@ -109,7 +109,6 @@ const en: Record<string, string> = {
   switchEnableTLS: 'Enable TLS',
   switchFileUpload: 'File Upload',
   switchKeepalive: 'Keepalive',
-  switchProbe: 'Device probe',
 
   // Status
   labelStatistics: 'Statistics',
@@ -167,12 +166,6 @@ const en: Record<string, string> = {
   settingsInterval10s: '10 seconds',
   settingsInterval30s: '30 seconds',
 
-  // Background activity (screen-off survival)
-  batteryExemptTitle: 'Background activity',
-  batteryExemptOn: 'Unrestricted',
-  batteryExemptOff: 'Restricted',
-  batteryExemptHint: 'Keep the tunnel alive while the screen is off.',
-
   // Settings
   settingsFavorites: 'Favorites',
   settingsServer: 'Tunnel Server',
@@ -201,8 +194,6 @@ const en: Record<string, string> = {
   protocolUdp: 'UDP',
   keepaliveHint:
     'Hold a client session (and its tunnel) between datagrams. Off dials a tunnel per datagram.',
-  probeHint:
-    'Probe the VPN device every 30s. On: a stall warns after ~1min and auto-restarts the entrypoint after ~2min (e.g. a VPN flap left a dead device behind). Off: a dead device looks the same as idle — no warning, no restart.',
   tunHubHint:
     'This device is the network: peers join it as ordinary tun clients over p2p. A peer that is not on the allowlist is refused before any dial.',
   peersLabel: 'Peers',

@@ -159,9 +159,6 @@ func (s *tunEntryPoint) init() error {
 		Handler: &xconfig.HandlerConfig{
 			Type:  "tun",
 			Chain: s.opts.Name,
-			Metadata: map[string]any{
-				"probe": s.opts.Probe,
-			},
 		},
 		Listener: &xconfig.ListenerConfig{
 			Type: "tun",
@@ -414,13 +411,6 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 			pStats.Add(stats.KindOutputBytes, int64(prev.OutputBytes))
 			pStats.Add(stats.KindTotalConns, int64(prev.TotalConns))
 			pStats.Add(stats.KindTotalErrs, int64(prev.TotalErrs))
-			pStats.Add(xstats.KindProbeSent, int64(prev.ProbeSent))
-			pStats.Add(xstats.KindProbeAcked, int64(prev.ProbeAcked))
-		}
-
-		s.config.Services[0].Handler.Metadata["probeReport"] = func(sentDelta, ackedDelta uint64) {
-			pStats.Add(xstats.KindProbeSent, int64(sentDelta))
-			pStats.Add(xstats.KindProbeAcked, int64(ackedDelta))
 		}
 
 		svcCfg := s.config.Services[0]

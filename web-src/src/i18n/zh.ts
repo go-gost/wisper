@@ -106,7 +106,6 @@ const zh: Record<string, string> = {
   switchEnableTLS: '启用 TLS',
   switchFileUpload: '文件上传',
   switchKeepalive: '保活',
-  switchProbe: '设备探针',
 
   // Status
   labelStatistics: '统计',
@@ -164,12 +163,6 @@ const zh: Record<string, string> = {
   settingsInterval10s: '10 秒',
   settingsInterval30s: '30 秒',
 
-  // 后台保活（息屏期间不断链）
-  batteryExemptTitle: '后台保活',
-  batteryExemptOn: '无限制',
-  batteryExemptOff: '优化',
-  batteryExemptHint: '息屏时保持隧道不断。',
-
   // Settings
   settingsFavorites: '收藏',
   settingsServer: '隧道服务器',
@@ -195,7 +188,6 @@ const zh: Record<string, string> = {
   protocolTcp: 'TCP',
   protocolUdp: 'UDP',
   keepaliveHint: '在数据报之间保持客户端会话（及其隧道）；关闭则每个数据报建一条隧道。',
-  probeHint: '每 30 秒探测一次 VPN 设备。开启后：停滞约 1 分钟告警、约 2 分钟自动重启（如 VPN 切换后留下死设备）。关闭后：死设备与空闲看起来一样，无告警也不重启。',
   tunHubHint:
     '设备就是网络本身：各对端用标准 tun 客户端经 p2p 接入。未列入允许列表的对端在拨号前就会被拒绝。',
   peersLabel: '对端',

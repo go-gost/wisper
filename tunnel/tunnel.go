@@ -79,7 +79,6 @@ type Options struct {
 	RewriteHost bool
 	FileUpload  bool
 	Keepalive   bool
-	Probe       bool
 	TTL         int
 	RecordMode  string
 	// Peer is this link's other end: for a p2p entrypoint, the remote host's
@@ -207,12 +206,6 @@ func FileUploadOption(b bool) Option {
 func KeepaliveOption(b bool) Option {
 	return func(opts *Options) {
 		opts.Keepalive = b
-	}
-}
-
-func ProbeOption(b bool) Option {
-	return func(opts *Options) {
-		opts.Probe = b
 	}
 }
 
@@ -824,7 +817,6 @@ func TunnelOptions(opts Options) []Option {
 		RewriteHostOption(opts.RewriteHost),
 		FileUploadOption(opts.FileUpload),
 		KeepaliveOption(opts.Keepalive),
-		ProbeOption(opts.Probe),
 		TTLOption(opts.TTL),
 		RecordModeOption(opts.RecordMode),
 		PeerOption(opts.Peer),

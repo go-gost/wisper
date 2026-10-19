@@ -297,7 +297,6 @@ type Tunnel struct {
 	RewriteHost bool   `yaml:"rewriteHost,omitempty"`
 	FileUpload  bool   `yaml:"fileUpload,omitempty"`
 	Keepalive   bool   `yaml:",omitempty"`
-	Probe       bool   `yaml:"probe,omitempty"`
 	TTL         int    `yaml:"ttl,omitempty"`
 
 	// RecordMode controls traffic recording: "full", "headers", "off".
@@ -468,8 +467,6 @@ type ServiceStats struct {
 	InputRateBytes  uint64
 	OutputBytes     uint64
 	OutputRateBytes uint64
-	ProbeSent       uint64
-	ProbeAcked      uint64
 	// LanRouted, LanDenied and LanWithdrawn count a tun hub's peer-LAN
 	// routing: the LANs routed for, the claims refused (never told to the
 	// spoke), and the LANs withdrawn when their owner went quiet.

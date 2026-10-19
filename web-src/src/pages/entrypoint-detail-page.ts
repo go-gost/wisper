@@ -53,9 +53,6 @@ export class EntrypointDetailPage extends LitElement {
   /** A udp p2p entrypoint's listener keepalive: hold a client's session
    *  (and so its tunnel) between datagrams instead of per-datagram dials. */
   @state() private _keepalive = true;
-  /** A tun entrypoint's device probe: a self-addressed packet every 30s
-   *  proving the device fd still delivers; the watchdog restarts on stall. */
-  @state() private _probe = false;
 
   // tun peer fields: this node's own device (see tunPeerHint)
   @state() private _net = '';
@@ -140,11 +137,6 @@ export class EntrypointDetailPage extends LitElement {
     this._showTransportDetail = false;
     this._protocol = 'tcp';
     this._keepalive = true;
-    // Probe defaults to OFF everywhere: the loopback it depends on does not
-    // work on all platforms (Android: sent advances, acked stays zero), and
-    // a broken probe restarts the entrypoint every ~10min via the watchdog.
-    // Enable it only deliberately, where the loopback is known good.
-    this._probe = false;
     this._net = '';
     this._mtu = 0;
     this._deviceName = '';
@@ -165,10 +157,6 @@ export class EntrypointDetailPage extends LitElement {
     }
     this._protocol = ep.options?.protocol === 'udp' ? 'udp' : 'tcp';
     this._keepalive = ep.options?.keepalive ?? true;
-    // Edit refill reads the stored value (absent key = off, the backend
-    // zero value); create takes the false default from _resetForm. Neither
-    // path silently enables the probe — with its auto-restart — on save.
-    this._probe = ep.options?.probe ?? false;
     this._net = ep.options?.net ?? '';
     this._mtu = ep.options?.mtu ?? 0;
     this._deviceName = ep.options?.device_name ?? '';
@@ -332,8 +320,6 @@ export class EntrypointDetailPage extends LitElement {
           this.entrypointType === 'p2p' && this._protocol === 'udp'
             ? this._keepalive
             : undefined,
-        // Only a tun entrypoint has a device to probe; nothing else sends it.
-        probe: this.entrypointType === 'tun' ? this._probe : undefined,
         net: this.entrypointType === 'tun' ? this._net.trim() || undefined : undefined,
         mtu: this.entrypointType === 'tun' ? this._mtu || undefined : undefined,
         device_name: this.entrypointType === 'tun' ? this._deviceName.trim() || undefined : undefined,
@@ -1136,14 +1122,6 @@ export class EntrypointDetailPage extends LitElement {
                       <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
                         @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
                     </div>
-                    <div class="switch-row">
-                      <span class="switch-label">${t('switchProbe')}</span>
-                      <div class="switch ${this._probe ? 'on' : ''}"
-                        @click=${() => { this._probe = !this._probe; }}>
-                        <div class="switch-knob"></div>
-                      </div>
-                    </div>
-                    <div class="p2p-hint">${t('probeHint')}</div>
                   `
                   : html`
                 <div class="form-group">

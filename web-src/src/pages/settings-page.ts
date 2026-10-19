@@ -54,9 +54,6 @@ export class SettingsPage extends LitElement {
   @state() private _theme: ThemePreference = 'system';
   @state() private _lang: LanguagePreference = 'en';
   @state() private _statsInterval = 3;
-  /** Doze power-save exemption: false until the native bridge says otherwise,
-   *  so a reinstall (which drops the exemption) shows "Restricted" again. */
-  @state() private _batteryExempt = false;
   @state() private _inspectorUrl = '';
   @state() private _inspectorConnected = false;
   @state() private _inspectorTested = false;
@@ -65,9 +62,6 @@ export class SettingsPage extends LitElement {
   @state() private _version = '';
 
   private _unsubs: (() => void)[] = [];
-  private _onWindowFocus?: () => void;
-  private _batteryTimer: ReturnType<typeof setTimeout> | null = null;
-  private _batteryFastUntil = 0;
   private _backend = new GoBackend();
 
   connectedCallback() {
@@ -109,91 +103,6 @@ export class SettingsPage extends LitElement {
 
     this._fetchVersion();
     this._fetchP2PIdentity();
-    this._queryBatteryExempt();
-
-    // Only for coming back to the app from another app: WebView throttles
-    // timers in the background, so the poll can be up to a tick stale on
-    // resume. It does NOT cover the grant dialog — that dialog delivers no
-    // focus event to the WebView at all (verified on a Pixel 9, where the row
-    // stayed stale after granting). The poll is what makes the row correct.
-    this._onWindowFocus = () => this._queryBatteryExempt();
-    window.addEventListener('focus', this._onWindowFocus);
-    this._startBatteryWatch();
-  }
-
-  /** Polls the exemption while this page is open. The system's answer is not
-   *  delivered to the WebView — no focus, no visibilitychange — so without this
-   *  the row keeps the state from before the user answered the dialog.
-   *
-   *  Fast for 30s around a tap or a change (that is when an answer is in
-   *  flight and the user is watching the row), then 10s: nothing changes this
-   *  state on its own, so a steady 2s tick would be 30 reads a minute of
-   *  power_manager for a value that has settled. Lit skips the render when the
-   *  value is unchanged, and WebView suspends timers in the background, so
-   *  this costs nothing while the screen is off. */
-  private _startBatteryWatch() {
-    if (!this._hasBatteryBridge) return;
-    const tick = () => {
-      this._queryBatteryExempt();
-      const delay = Date.now() < this._batteryFastUntil ? 2000 : 10000;
-      this._batteryTimer = setTimeout(tick, delay);
-    };
-    tick();
-  }
-
-  /** Widen the fast window: right after the user answered the dialog, and for
-   *  as long as the answer keeps arriving. */
-  private _batterySettle() {
-    this._batteryFastUntil = Date.now() + 30000;
-  }
-
-  /** The exemption lives on the Android side; without the bridge (desktop,
-   *  browser) there is nothing to read and the row is not rendered at all.
-   *
-   *  Both methods are required, not just the reader: the row shows a value
-   *  AND is a button. Gating on the reader alone would render a live-looking
-   *  row whose tap throws if a platform ever shipped one without the other. */
-  private get _hasBatteryBridge(): boolean {
-    const bridge = (window as any).WisperNative;
-    return !!bridge?.isBatteryExempt && !!bridge?.requestBatteryExemption;
-  }
-
-  /** Reads the exemption through the bridge. Sets false when the bridge is
-   *  absent, so the state never claims something nothing can confirm.
-   *
-   *  The callback is installed once and kept: a focus-driven re-query can
-   *  overlap a pending one (the dialog can close faster than the first
-   *  answer lands), and a deleted name would leave the second query with
-   *  nothing to call back into. Both answers describe the same system state,
-   *  so whichever lands last is the truth. */
-  private _queryBatteryExempt() {
-    if (!this._hasBatteryBridge) {
-      this._batteryExempt = false;
-      return;
-    }
-    const cbName = '__wisper_battery_callback__';
-    if (!(window as any)[cbName]) {
-      (window as any)[cbName] = (exempt: boolean) => {
-        const next = exempt === true;
-        // Only a real change may render (Lit skips the rest) or widen the
-        // fast-poll window.
-        if (next !== this._batteryExempt) this._batterySettle();
-        this._batteryExempt = next;
-      };
-    }
-    (window as any).WisperNative.isBatteryExempt(cbName);
-  }
-
-  /** Hands the tap to the bridge, which decides what to open: the grant
-   *  dialog when not exempt, this app's Settings page when exempt (nothing can
-   *  revoke the exemption but Settings). Nothing here changes
-   *  _batteryExempt — only _queryBatteryExempt writes it, which is why the
-   *  poll and the focus listener exist. */
-  private _onBatteryExemptTap() {
-    if (!this._hasBatteryBridge) return;
-    // The answer lands within a tick or two of the dialog closing.
-    this._batterySettle();
-    (window as any).WisperNative.requestBatteryExemption();
   }
 
   private async _fetchVersion(): Promise<void> {
@@ -308,10 +217,6 @@ export class SettingsPage extends LitElement {
     super.disconnectedCallback();
     for (const fn of this._unsubs) fn();
     if (this._livenessTimer) clearTimeout(this._livenessTimer);
-    if (this._batteryTimer) clearTimeout(this._batteryTimer);
-    this._batteryTimer = null;
-    if (this._onWindowFocus) window.removeEventListener('focus', this._onWindowFocus);
-    this._onWindowFocus = undefined;
   }
 
   private _navigate(path: string) {
@@ -976,17 +881,6 @@ export class SettingsPage extends LitElement {
                 ${icon('chevron-right')}
               </span>
             </div>
-            ${this._hasBatteryBridge ? html`
-              <div class="selector-row" @click=${() => this._onBatteryExemptTap()}>
-                <div>
-                  <div class="selector-label">${t('batteryExemptTitle')}</div>
-                  <div class="hint">${t('batteryExemptHint')}</div>
-                </div>
-                <span class="selector-value">
-                  ${t(this._batteryExempt ? 'batteryExemptOn' : 'batteryExemptOff')}
-                  ${icon('chevron-right')}
-                </span>
-              </div>` : ''}
           </div>
         </div>
 

@@ -20,7 +20,6 @@ type entrypointCreateRequest struct {
 	Name      string `json:"name"`
 	Endpoint  string `json:"endpoint"`
 	Keepalive bool   `json:"keepalive,omitempty"`
-	Probe     bool   `json:"probe,omitempty"`
 	TTL       int    `json:"ttl,omitempty"`
 	// Peer is the remote peer's base64 public key (p2p and tun entrypoints).
 	Peer string `json:"peer,omitempty"`
@@ -51,7 +50,6 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.NameOption(r.Name),
 		tunnel.EndpointOption(r.Endpoint),
 		tunnel.KeepaliveOption(r.Keepalive),
-		tunnel.ProbeOption(r.Probe),
 		tunnel.TTLOption(r.TTL),
 		tunnel.PeerOption(r.Peer),
 		tunnel.ProtocolOption(r.Protocol),

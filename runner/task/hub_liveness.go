@@ -11,7 +11,7 @@ import (
 
 // Liveness watchdog thresholds. Compared against stalled time (misses × tick),
 // never raw tick counts, so a reconfigured StatsInterval keeps the same
-// wall-clock meaning — the same shape as the probe watchdog's.
+// wall-clock meaning.
 const (
 	livenessEventAfter = 60 * time.Second
 )
@@ -74,21 +74,12 @@ const (
 	livenessRecover
 )
 
-// livenessDecide orders the two watchdogs' claims on one tick. The probe's
-// stall is the higher suspect — it proves only the local fd — so while it
-// stands this watchdog files nothing new. It does not get to retract the hub's
-// answer: a downlink delta is direct evidence the hub returns traffic, and
-// suppressing the recovery on top of the warning is what left a warn on the
-// record with no way to take it back. The banner then outlived the state it
-// described, and an operator who is told the hub is silent while packets move
-// both ways learns to ignore it.
-func livenessDecide(st *livenessState, upDelta, downDelta uint64, probeReported bool, now time.Time, tick time.Duration) livenessAction {
+// livenessDecide applies the tick's verdict to the action the runner takes.
+func livenessDecide(st *livenessState, upDelta, downDelta uint64, now time.Time, tick time.Duration) livenessAction {
 	warn, recovered := livenessTick(st, upDelta, downDelta, now, tick)
 	switch {
 	case recovered:
 		return livenessRecover
-	case warn && probeReported:
-		return livenessQuiet
 	case warn:
 		return livenessWarn
 	}
@@ -119,11 +110,8 @@ func standingWarn(id string) bool {
 // checkLiveness runs the hub-liveness watchdog for one entrypoint. Only a
 // running tun entrypoint is watched: any downlink byte proves the hub side
 // returns traffic, sustained uplink without any is the signal, and dual-zero
-// is idle. A probe-stalled device is the higher suspect — the device probe
-// proves only the local fd — so while the probe watchdog's stall report
-// stands, this files nothing new rather than blaming the hub for a dead
-// device. A service already in failed state is skipped the same way: its error
-// banner is the message.
+// is idle. A service already in failed state is skipped: its error banner is
+// the message.
 func (t *updateStatsTask) checkLiveness(ep tunnel.Tunnel, upDelta, downDelta uint64) {
 	if ep == nil || ep.Type() != entrypoint.TunEntryPoint || ep.IsClosed() {
 		return
@@ -155,11 +143,7 @@ func (t *updateStatsTask) checkLiveness(ep tunnel.Tunnel, upDelta, downDelta uin
 		event.Record(id, event.LevelInfo, "%s", msgLivenessRecovered)
 		return
 	}
-	probeReported := false
-	if ps := t.probe[id]; ps != nil {
-		probeReported = ps.reported
-	}
-	switch livenessDecide(st, upDelta, downDelta, probeReported, time.Now(), probeTickInterval()) {
+	switch livenessDecide(st, upDelta, downDelta, time.Now(), statsTickInterval()) {
 	case livenessWarn:
 		event.Record(id, event.LevelWarn, "%s", msgLivenessNoReflow)
 	case livenessRecover:
