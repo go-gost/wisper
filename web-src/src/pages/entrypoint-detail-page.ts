@@ -460,7 +460,12 @@ export class EntrypointDetailPage extends LitElement {
     }
     .back-btn:hover { background: var(--border-subtle); }
 
-    .page-title { font-size: var(--font-md); font-weight: 600; flex: 1; }
+    /* A bare type glyph in the app bar: centre the SVG as a flex item rather
+       than letting it sit on the text baseline. */
+    .page-title {
+      font-size: var(--font-md); font-weight: 600; flex: 1;
+      display: flex; align-items: center; line-height: 1;
+    }
 
     .appbar-btn {
       background: none; border: none; cursor: pointer;

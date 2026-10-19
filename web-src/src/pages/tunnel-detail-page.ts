@@ -449,6 +449,12 @@ export class TunnelDetailPage extends LitElement {
       font-size: var(--font-md);
       font-weight: 600;
       flex: 1;
+      /* The title is now a bare type glyph: as an inline span the SVG sat on
+         the text baseline and read high against the back button. Make the
+         span a flex box so the glyph is centred as a flex item. */
+      display: flex;
+      align-items: center;
+      line-height: 1;
     }
 
     .appbar-btn {
