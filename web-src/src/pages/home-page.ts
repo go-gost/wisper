@@ -38,6 +38,8 @@ type Item =
  *  the entrypoint list, not on the default tab. */
 let activeTab = 0; // 0 = tunnels, 1 = entrypoints
 
+const TAB_COUNT = 2;
+
 @customElement('home-page')
 export class HomePage extends LitElement {
   @state() private _activeTab = activeTab;
@@ -51,6 +53,11 @@ export class HomePage extends LitElement {
   @state() private _expandedId: string | null = null;
 
   private _unsubs: (() => void)[] = [];
+
+  /** Touch start position, used to detect horizontal swipes between tabs. */
+  private _swipeStartX = 0;
+  private _swipeStartY = 0;
+  private _swipeTracking = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -92,6 +99,42 @@ export class HomePage extends LitElement {
 
   private _toggleExpand(id: string) {
     this._expandedId = this._expandedId === id ? null : id;
+  }
+
+  private _setTab(index: number) {
+    if (index === this._activeTab || index < 0 || index >= TAB_COUNT) return;
+    activeTab = index;
+    this._activeTab = index;
+    this._expandedId = null;
+  }
+
+  // ── Swipe between tabs ────────────────────────────────────────────────
+
+  private _onTouchStart(e: TouchEvent) {
+    if (e.touches.length !== 1) {
+      this._swipeTracking = false;
+      return;
+    }
+    const touch = e.touches[0];
+    this._swipeStartX = touch.clientX;
+    this._swipeStartY = touch.clientY;
+    this._swipeTracking = true;
+  }
+
+  private _onTouchEnd(e: TouchEvent) {
+    if (!this._swipeTracking) return;
+    this._swipeTracking = false;
+
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - this._swipeStartX;
+    const dy = touch.clientY - this._swipeStartY;
+
+    // Require a deliberate, mostly-horizontal gesture so vertical list
+    // scrolling (and taps) keep working as before.
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+    this._setTab(dx < 0 ? this._activeTab + 1 : this._activeTab - 1);
   }
 
   // ── Filters ───────────────────────────────────────────────────────────
@@ -200,6 +243,11 @@ export class HomePage extends LitElement {
   // ── Styles ────────────────────────────────────────────────────────────
 
   static styles = css`
+    :host {
+      /* Keep vertical panning native; horizontal gestures are handled below. */
+      touch-action: pan-y;
+    }
+
     /* ── Home header (inside appbar slot) ── */
     .home-header {
       display: flex;
@@ -759,7 +807,10 @@ export class HomePage extends LitElement {
     const fabPath = this._activeTab === 0 ? '/tunnel/new' : '/entrypoint/new';
 
     return html`
-      <app-scaffold>
+      <app-scaffold
+        @touchstart=${this._onTouchStart}
+        @touchend=${this._onTouchEnd}
+      >
         <!-- Appbar -->
         <div slot="appBar" class="home-header">
           <div class="app-icon">
@@ -776,11 +827,7 @@ export class HomePage extends LitElement {
         <nav-tabs
           .tabs=${[t('homeTabTunnel'), t('homeTabEntrypoint')]}
           .activeIndex=${this._activeTab}
-          @tab-change=${(e: CustomEvent) => {
-            activeTab = e.detail.index;
-            this._activeTab = activeTab;
-            this._expandedId = null;
-          }}
+          @tab-change=${(e: CustomEvent) => this._setTab(e.detail.index)}
         ></nav-tabs>
 
         <!-- Body -->
