@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/go-gost/core v0.6.1
-	github.com/go-gost/p2p v0.14.10
+	github.com/go-gost/p2p v0.14.11
 	github.com/go-gost/x v0.26.4
 	github.com/google/uuid v1.6.0
 	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54

@@ -132,7 +132,7 @@ export interface PeerStats {
   peer_addr?: string;
   /** How many candidates the peer announced. */
   candidates?: number;
-  /** The peer's advertised capabilities ('ipv6', 'tightKeepalive'). */
+  /** The peer's advertised capabilities ('ipv6', 'no-direct'). */
   caps?: string[];
   /** How long the live direct session has been up (0 when none). */
   session_age_ms?: number;
