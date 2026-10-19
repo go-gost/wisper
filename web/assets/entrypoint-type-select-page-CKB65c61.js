@@ -1,4 +1,4 @@
-import{a as v,c as r,b as c,i as f,t as g}from"./index-hTjUfwUS.js";import{i as s}from"./app-scaffold-CVcSx0W_.js";import{t as u}from"./type-icons-DsI-rt1W.js";import{E as b}from"./types-DwVOrt_K.js";var y=Object.getOwnPropertyDescriptor,x=(e,i,l,n)=>{for(var t=n>1?void 0:n?y(i,l):i,a=e.length-1,p;a>=0;a--)(p=e[a])&&(t=p(t)||t);return t};const d={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"},tun:{bg:"#ecfeff",fg:"#0e7490"}};let o=class extends v{_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return c`
+import{a as v,c as r,b as c,i as f,t as g}from"./index-Ci5ud6jC.js";import{i as s}from"./app-scaffold-CwdIh8Qy.js";import{t as u}from"./type-icons-DsI-rt1W.js";import{E as b}from"./types-DwVOrt_K.js";var y=Object.getOwnPropertyDescriptor,x=(e,i,l,n)=>{for(var t=n>1?void 0:n?y(i,l):i,a=e.length-1,p;a>=0;a--)(p=e[a])&&(t=p(t)||t);return t};const d={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"},tun:{bg:"#ecfeff",fg:"#0e7490"}};let o=class extends v{_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return c`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
@@ -13,7 +13,7 @@ import{a as v,c as r,b as c,i as f,t as g}from"./index-hTjUfwUS.js";import{i as 
               <div class="type-icon" style="background:${d[e.value].bg};color:${d[e.value].fg}">${s(u(e.value))}</div>
               <div class="type-content">
                 <div class="type-title">
-                  ${r(`type${e.value.charAt(0).toUpperCase()+e.value.slice(1)}`)} Entrypoint
+                  ${r(`type${e.value.charAt(0).toUpperCase()+e.value.slice(1)}`)}
                 </div>
                 <div class="type-desc">
                   ${r(`type${e.value.charAt(0).toUpperCase()+e.value.slice(1)}EntryDesc`)}

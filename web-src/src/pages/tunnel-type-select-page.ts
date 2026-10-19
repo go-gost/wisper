@@ -89,7 +89,7 @@ export class TunnelTypeSelectPage extends LitElement {
               <div class="type-icon" style="background:${TYPE_COLORS[tt.value].bg};color:${TYPE_COLORS[tt.value].fg}">${icon(typeIcon(tt.value))}</div>
               <div class="type-content">
                 <div class="type-title">
-                  ${t(`type${tt.value.charAt(0).toUpperCase() + tt.value.slice(1)}`)} Tunnel
+                  ${t(`type${tt.value.charAt(0).toUpperCase() + tt.value.slice(1)}`)}
                 </div>
                 <div class="type-desc">
                   ${t(`type${tt.value.charAt(0).toUpperCase() + tt.value.slice(1)}Desc`)}

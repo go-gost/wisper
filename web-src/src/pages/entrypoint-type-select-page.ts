@@ -86,7 +86,7 @@ export class EntrypointTypeSelectPage extends LitElement {
               <div class="type-icon" style="background:${TYPE_COLORS[et.value].bg};color:${TYPE_COLORS[et.value].fg}">${icon(typeIcon(et.value))}</div>
               <div class="type-content">
                 <div class="type-title">
-                  ${t(`type${et.value.charAt(0).toUpperCase() + et.value.slice(1)}`)} Entrypoint
+                  ${t(`type${et.value.charAt(0).toUpperCase() + et.value.slice(1)}`)}
                 </div>
                 <div class="type-desc">
                   ${t(`type${et.value.charAt(0).toUpperCase() + et.value.slice(1)}EntryDesc`)}
