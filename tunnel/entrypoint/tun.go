@@ -15,8 +15,10 @@ import (
 	"github.com/go-gost/core/chain"
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/listener"
+	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/observer/stats"
 	"github.com/go-gost/core/service"
+	"github.com/go-gost/p2p/endpoint"
 	cfg "github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
@@ -56,6 +58,14 @@ type tunEntryPoint struct {
 	// and cleared by teardownShare as it runs, so it runs exactly once —
 	// the same shape as the hub's shareCleanup.
 	shareCleanup func()
+
+	// cancelControl stops the LAN-routing control channel this run started.
+	// Close owns it, not the request context the run was started with: the
+	// channel outlives the API handler that clicked Start, and a run that
+	// inherited that handler's cancellation would stop claiming the moment
+	// the click returned (see RunWithContext). Nil until a run has started
+	// one, and cleared by Close so a repeat cannot cancel a successor's.
+	cancelControl context.CancelFunc
 
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
@@ -273,6 +283,23 @@ func (s *tunEntryPoint) teardownShare() {
 	}
 }
 
+// startControlChannel starts this run's LAN-routing control channel under a
+// context the entrypoint's own Close cancels. The request context the run was
+// started with cannot be the one that ends the channel: the API starts an
+// entrypoint with r.Context() and returns as soon as the click does, so a
+// channel bound to it would stop claiming immediately — and, worse in the other
+// direction, nothing would stop it at all, leaving a replaced entrypoint's
+// channel to keep re-asserting the share_lan it revoked. Only Close ends a
+// tunnel's goroutines, so Close holds the cancel.
+func (s *tunEntryPoint) startControlChannel(ctx context.Context, host *endpoint.Endpoint, log logger.Logger) {
+	ctx, cancel := context.WithCancel(ctx)
+	s.mu.Lock()
+	s.cancelControl = cancel
+	s.mu.Unlock()
+
+	startNetview(ctx, host, s.peer, s.opts.ShareLAN, s.opts.Net, s.provider, log)
+}
+
 func (s *tunEntryPoint) Run() error { return s.RunContext(context.Background()) }
 
 // RunContext is Run carrying the caller's action id: the shared host's
@@ -455,7 +482,7 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	// The device exists now (the listener's Init created it before Serve was
 	// reached), so the control channel can start and the first netview it is
 	// pushed has a link to install its routes on.
-	StartNetview(ctx, host, s.peer, s.opts.ShareLAN, s.opts.Net, s.provider, log)
+	s.startControlChannel(ctx, host, log)
 
 	go func() {
 		serveErr := forward.Serve()
@@ -517,8 +544,18 @@ func (s *tunEntryPoint) Close() error {
 		s.mu.Lock()
 		forward, acquired := s.forward, s.acquired
 		s.forward, s.acquired = nil, false
+		// The control channel goes with the run that started it. This is the
+		// moment that matters most for a replaced entrypoint: its successor
+		// claims what the new share_lan says, and a channel that kept running
+		// here would keep re-asserting the revoked one and the hub would never
+		// see the withdrawal.
+		cancel := s.cancelControl
+		s.cancelControl = nil
 		s.mu.Unlock()
 
+		if cancel != nil {
+			cancel()
+		}
 		if forward != nil {
 			err = forward.Close()
 		}

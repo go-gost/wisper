@@ -228,6 +228,70 @@ func TestRIBRoutesCarryThePeerThatReachesThem(t *testing.T) {
 // the time of its last re-claim, and a sweep past the TTL drops it, advancing
 // the rev so every spoke sees the withdrawal in a netview. The static route a
 // hub's own config asked for is not a claim and never expires.
+// TestRIBReplaceClaimWithdrawsWhatItNoLongerNames: a control session's first
+// claim is the spoke's whole intent, not a change to it. A spoke that comes
+// back sharing one LAN instead of two says so by leaving the second out, and
+// the hub has to hear it then — the TTL sweep is for a spoke that went away,
+// and waiting for it would leave a LAN the operator just revoked routed for the
+// better part of a minute. "Gone from the config, still reachable" is the
+// failure this pins.
+func TestRIBReplaceClaimWithdrawsWhatItNoLongerNames(t *testing.T) {
+	r := newRIB("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+		"peerC": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, func(string, ...any) {}, nil, time.Now)
+	r.SetMembers([]memberEntry{{IP: "10.10.100.9", Key: "peerB"}})
+
+	if got := r.ApplyClaim("peerB", []netip.Prefix{
+		netip.MustParsePrefix("192.168.50.0/24"),
+		netip.MustParsePrefix("192.168.60.0/24"),
+	}, nil); len(got) != 2 {
+		t.Fatalf("setup claim refused: %v", got)
+	}
+	if got := r.ApplyClaim("peerC", []netip.Prefix{netip.MustParsePrefix("192.168.70.0/24")}, nil); len(got) != 1 {
+		t.Fatalf("setup claim refused: %v", got)
+	}
+	if err := r.AddStatic("10.20.0.0/16 via 10.10.100.9"); err != nil {
+		t.Fatal(err)
+	}
+	before := r.Snapshot().Rev
+
+	// The message names one of the two the origin held, and names it the way a
+	// config would (the host bits are not zero): masking makes the two the same
+	// network, so this is a keep and not a second claim on a taken prefix.
+	got := r.ReplaceClaim("peerB", []netip.Prefix{netip.MustParsePrefix("192.168.50.7/24")}, nil)
+	if len(got) != 1 || got[0] != netip.MustParsePrefix("192.168.50.0/24") {
+		t.Fatalf("replace accepted %v, want the masked 192.168.50.0/24 kept", got)
+	}
+	if r.Snapshot().Rev <= before {
+		t.Fatal("a replace that withdrew a claim must advance the rev")
+	}
+	routes := r.Routes()
+	if _, ok := routes[netip.MustParsePrefix("192.168.60.0/24")]; ok {
+		t.Fatal("a prefix the new claim left out is still routed")
+	}
+	if _, ok := routes[netip.MustParsePrefix("192.168.50.0/24")]; !ok {
+		t.Fatal("a replace withdrew the prefix it named")
+	}
+	if _, ok := routes[netip.MustParsePrefix("192.168.70.0/24")]; !ok {
+		t.Fatal("a replace withdrew another origin's claim")
+	}
+	if _, ok := routes[netip.MustParsePrefix("10.20.0.0/16")]; !ok {
+		t.Fatal("a replace withdrew the hub's own static route")
+	}
+
+	// A reconnect that shares nothing is the revoke itself: every dynamic claim
+	// of this origin goes, and only its own.
+	r.ReplaceClaim("peerB", nil, nil)
+	routes = r.Routes()
+	if _, ok := routes[netip.MustParsePrefix("192.168.50.0/24")]; ok {
+		t.Fatal("an empty replace left a revoked claim routed")
+	}
+	if len(routes) != 2 {
+		t.Fatalf("an empty replace took more than its own claims: %+v", routes)
+	}
+}
+
 func TestRIBWithdrawsAStaleClaim(t *testing.T) {
 	var events []string
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)

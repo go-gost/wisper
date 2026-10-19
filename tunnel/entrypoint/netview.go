@@ -47,6 +47,10 @@ func netviewRouter() *tunnel.NetviewRouter {
 	return netviewRtr
 }
 
+// startNetview is StartNetview behind a package variable so a test can watch
+// the lifetime the entrypoint gives the control channel without a hub.
+var startNetview = StartNetview
+
 // StartNetview starts the spoke side of the LAN-routing control channel for
 // one tun entrypoint: it claims this spoke's share_lan at the hub and hands
 // every netview the hub pushes back to the router the tun listener resolves

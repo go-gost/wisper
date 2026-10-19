@@ -522,6 +522,10 @@ func (ch *controlHub) runStream(peer string, p *controlPeer, conn net.Conn) {
 	p.sent = 0
 	ch.mu.Unlock()
 
+	// Whether this stream's first claim has been read. The first one is the
+	// session's whole intent (see the loop below), the rest are changes to it.
+	first := true
+
 	// The current netview, pushed the moment the stream exists. A spoke that
 	// connects after the routes it needs were installed has no rev change to
 	// answer — a spoke that claims nothing never produces one at all — so
@@ -566,12 +570,23 @@ func (ch *controlHub) runStream(peer string, p *controlPeer, conn net.Conn) {
 		if claim.Type != ctrlTypeClaim {
 			continue
 		}
-		ch.applyClaim(peer, claim)
+		// The session's first claim is the spoke's whole intent, so it
+		// replaces whatever this origin held before: a spoke that reconnects,
+		// or one whose entrypoint was replaced with a different share_lan,
+		// says so by having left the old prefix out. Every claim after it is a
+		// change to that intent and stays incremental.
+		if first {
+			ch.applyClaimSet(peer, claim)
+			first = false
+		} else {
+			ch.applyClaim(peer, claim)
+		}
 		ch.publish()
 	}
 }
 
-// applyClaim hands one spoke's add/drop to the RIB. A prefix that does not
+// applyClaim hands one spoke's add/drop to the RIB — incrementally, for a
+// message mid-session that is speaking about a change. A prefix that does not
 // parse is an event, not a silence: the spoke was configured with something
 // that names no network, and the operator gets to see which.
 //
@@ -579,9 +594,33 @@ func (ch *controlHub) runStream(peer string, p *controlPeer, conn net.Conn) {
 // the refusal is decided (see refuse), not measured here against what the spoke
 // asked for. Counting it both ways counted every refusal twice.
 func (ch *controlHub) applyClaim(peer string, m claimMessage) {
+	ch.apply(peer, m, false)
+}
+
+// applyClaimSet is applyClaim for a control session's first claim, which is the
+// spoke's whole intent rather than a change to it: a prefix the message no
+// longer names is withdrawn. It is what makes a revoked share_lan leave the
+// hub's table the moment the spoke comes back without it, instead of surviving
+// until the TTL sweep. The distinction matters because the spoke is the one
+// that knows it revoked something, and an empty claim that only said "nothing
+// new" would leave the old route installed and still routing.
+func (ch *controlHub) applyClaimSet(peer string, m claimMessage) {
+	ch.apply(peer, m, true)
+}
+
+// apply is the shared body: parse both halves, then hand them to the RIB with
+// the replace semantics the caller asked for. An empty incremental message
+// changes nothing and is dropped before the RIB sees it; an empty replace is
+// meaningful — it is the whole claim being "none" — and has to reach the RIB to
+// withdraw what the origin still holds.
+func (ch *controlHub) apply(peer string, m claimMessage, replace bool) {
 	add := parseClaimPrefixes(ch, peer, m.Add)
 	drop := parseClaimPrefixes(ch, peer, m.Drop)
-	if len(add) == 0 && len(drop) == 0 {
+	if !replace && len(add) == 0 && len(drop) == 0 {
+		return
+	}
+	if replace {
+		ch.rib.ReplaceClaim(peer, add, drop)
 		return
 	}
 	ch.rib.ApplyClaim(peer, add, drop)

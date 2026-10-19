@@ -237,13 +237,62 @@ func (r *rib) SetAllow(allow map[string][]netip.Prefix) {
 // it is an event, because a spoke is told nothing about why its claim did not
 // take, and the operator reading the hub's history is the one who can fix it.
 //
+// It is the incremental form: a prefix not named in add or drop is left as it
+// is. A reconnect uses ReplaceClaim, which treats the message as the spoke's
+// whole intent.
+//
 // Every prefix is masked first. A spoke sends the string it was configured
 // with, and "192.168.50.7/24" names the same network as "192.168.50.0/24" —
 // unmasked, the two would be two table entries for one destination and the
 // second claim on it would look like a conflict with the first.
 func (r *rib) ApplyClaim(origin string, add, drop []netip.Prefix) []netip.Prefix {
+	return r.applyClaim(origin, add, drop, false)
+}
+
+// ReplaceClaim applies one spoke's claim as its whole intent: every dynamic
+// claim this origin holds that add does not name is withdrawn. It is what a
+// control session's first claim is, because a fresh session re-sends
+// everything the spoke has (see RunControlChannel) — a spoke that came back
+// sharing one LAN instead of two, or none at all, is telling the hub that by
+// leaving the others out, and the hub has no other way to hear it before the
+// TTL sweep.
+//
+// A drop list is still honoured, for a spoke that names one explicitly; with a
+// full claim it is normally empty, because leaving a prefix out of add already
+// withdraws it.
+func (r *rib) ReplaceClaim(origin string, add, drop []netip.Prefix) []netip.Prefix {
+	return r.applyClaim(origin, add, drop, true)
+}
+
+// applyClaim is the one body both entry points share. replace decides whether a
+// prefix add does not name is withdrawn, and only that: the masking, the
+// refusal order and the rev accounting are identical either way.
+func (r *rib) applyClaim(origin string, add, drop []netip.Prefix, replace bool) []netip.Prefix {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// Whether this message withdraws the origin's other claims. Built before
+	// anything is removed so the add loop below — which masks the same way —
+	// agrees with it about what the message names.
+	if replace {
+		keep := make(map[netip.Prefix]struct{}, len(add))
+		for _, prefix := range add {
+			keep[prefix.Masked()] = struct{}{}
+		}
+		for prefix, held := range r.claims {
+			// Only this origin's own claims, and never an injected one: a
+			// claim message is a spoke speaking for itself, and the hub's own
+			// config is not the spoke's to withdraw.
+			if held.Static || held.Origin != origin {
+				continue
+			}
+			if _, ok := keep[prefix]; ok {
+				continue
+			}
+			delete(r.claims, prefix)
+			r.rev++
+		}
+	}
 
 	// Drops before adds. A message naming one prefix in both lists is a spoke
 	// re-asserting itself, and the assertion is the newer half of that.

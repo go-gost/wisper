@@ -151,6 +151,119 @@ func TestControlHubRoundTripAndPublish(t *testing.T) {
 	}
 }
 
+// TestControlHubFirstClaimOfASessionReplacesTheSpokesLast: a control session's
+// first claim is the spoke's whole intent — a fresh stream means the spoke has
+// just started, or restarted, and re-sends everything it has. A prefix it no
+// longer names is therefore withdrawn at once, not left until the TTL sweep:
+// that is what makes revoking a shared LAN on a tun entrypoint reach the hub.
+// The claims after the first are changes and stay incremental.
+func TestControlHubFirstClaimOfASessionReplacesTheSpokesLast(t *testing.T) {
+	h := newFakeP2PHandler()
+	ch := newControlHub("hub1", map[string][]netip.Prefix{
+		"peerB": {netip.MustParsePrefix("192.168.0.0/16")},
+	}, h, testLogger())
+	defer ch.Close()
+	if err := ch.Register("peerB"); err != nil {
+		t.Fatal(err)
+	}
+	defer ch.Unregister("peerB")
+
+	// Isolate: the event store is process-wide, so this run must not read
+	// another's history — and must leave none behind.
+	event.Seed("hub1", nil)
+	t.Cleanup(func() { event.Seed("hub1", nil) })
+
+	// One session shares two LANs.
+	hub1, spoke1 := ch.dialControlForTest("peerB")
+	go func() {
+		_ = writeMessage(spoke1, claimMessage{Type: ctrlTypeClaim, V: ctrlVersion,
+			Add: []string{"192.168.50.0/24", "192.168.60.0/24"}})
+	}()
+	if _, _, err := readMessage(spoke1); err != nil {
+		t.Fatalf("read the first session's netview: %v", err)
+	}
+	if len(h.installed()) != 2 {
+		t.Fatalf("installed %+v, want both LANs", h.installed())
+	}
+	hub1.Close()
+	spoke1.Close()
+
+	// The stream dies and the spoke comes back sharing one of the two. Its
+	// first claim is its whole intent, so the second LAN leaves the table on
+	// this message and not on a sweep.
+	//
+	// The hub serves one stream per peer at a time and releases the dead one
+	// asynchronously, so a reconnect that finds the slot still busy is redialed
+	// — the same thing a real spoke does. A session that was served is not
+	// retried: once a frame arrives the hub has read the claim, and the outcome
+	// is decided. That matters, because the hub sweeps claims on a 15s tick and
+	// a retry loop long enough to reach it would let the TTL do the work the
+	// first claim is supposed to do — passing for the wrong reason.
+	claim := func(s net.Conn) {
+		_ = writeMessage(s, claimMessage{Type: ctrlTypeClaim, V: ctrlVersion,
+			Add: []string{"192.168.50.0/24"}})
+	}
+	onlyKept := func(n netviewMessage) bool {
+		return len(n.Claims) == 1 && n.Claims[0].Prefix == "192.168.50.0/24"
+	}
+	var (
+		spoke2 net.Conn
+		last   netviewMessage
+		kept   bool
+		served bool
+	)
+	for attempt := 0; attempt < 50 && !served; attempt++ {
+		hubN, sN := ch.dialControlForTest("peerB")
+		go claim(sN)
+		_ = sN.SetReadDeadline(time.Now().Add(time.Second))
+		n, _, err := readMessage(sN)
+		if err != nil {
+			// The slot was still the dead stream's; wait for the reader to
+			// release it and redial.
+			hubN.Close()
+			sN.Close()
+			time.Sleep(20 * time.Millisecond)
+			continue
+		}
+		served = true
+		last = n
+		// The reconnect is answered first with the table it has (two), then
+		// with the one the first claim leaves (one).
+		for i := 0; i < 3 && !onlyKept(last); i++ {
+			_ = sN.SetReadDeadline(time.Now().Add(time.Second))
+			n, _, err = readMessage(sN)
+			if err != nil {
+				break
+			}
+			last = n
+		}
+		if onlyKept(last) {
+			kept, spoke2 = true, sN
+			defer hubN.Close()
+		} else {
+			hubN.Close()
+			sN.Close()
+		}
+	}
+	if !kept {
+		t.Fatalf("the reconnecting spoke was pushed %+v, want only the LAN it still claims", last.Claims)
+	}
+	defer spoke2.Close()
+
+	routes := h.installed()
+	if _, ok := routes[netip.MustParsePrefix("192.168.60.0/24")]; ok {
+		t.Fatal("a LAN the spoke no longer claims is still routed after its reconnect")
+	}
+	if _, ok := routes[netip.MustParsePrefix("192.168.50.0/24")]; !ok {
+		t.Fatal("the reconnect dropped the LAN the spoke still claims")
+	}
+	// A route leaving the table is written to the hub's history whatever took
+	// it out — the operator's timeline is the only account of a revoke.
+	if history := routeMessages("hub1"); !strings.Contains(history, `LAN route 192.168.60.0/24 withdrawn (spoke "peerB")`) {
+		t.Fatalf("the reconnect's withdrawal is not in the hub's history: %q", history)
+	}
+}
+
 // TestControlHubIgnoresUnknownTypeAndBadVersion: the forward-compat refusals
 // are self-framed — readMessage reads the whole body before it judges the
 // version or the type — so the stream stays aligned and a claim behind them
