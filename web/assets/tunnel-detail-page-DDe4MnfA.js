@@ -1,13 +1,13 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-Ji9QB8CQ.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
-import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q as A,u as C,b as s,A as p,o as R,i as N,t as M}from"./index-Ji9QB8CQ.js";import{m as E,c as u,d as m,a as g,b as _,n as x,r as l}from"./format-DTwoFe2W.js";import{i as d}from"./app-scaffold-Csr5z4Yq.js";import{t as L}from"./type-icons-DsI-rt1W.js";import{c as H}from"./clipboard-C3x8_sid.js";import{s as I}from"./save-error-De8AAY3I.js";var O=Object.defineProperty,F=Object.getOwnPropertyDescriptor,r=(t,i,n,c)=>{for(var a=c>1?void 0:c?F(i,n):i,h=t.length-1,f;h>=0;h--)(f=t[h])&&(a=(c?f(i,n,a):f(a))||a);return c&&a&&O(i,n,a),a};const v=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function w(t){return v.find(i=>i.value===t)??v[2]}let o=class extends y{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._shareLAN="",this._shareMode="auto",this._pendingCount=0,this._backend=new $,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=i=>{this._endpoint=i,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(k(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){(this.tunnelType==="p2p"||this.tunnelType==="tun")&&this._loadPendingCount();const t=this.tunnelId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const n=T().find(c=>c.id===t);n&&(this._tunnel=n,i?(this.mode="edit",this._populateForm(n)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(n)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._shareLAN="",this._shareMode="auto"}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??"",this._shareLAN=t.options.share_lan??"",this._shareMode=t.options.share_mode||"auto"}_peerKeys(){return(this._tunnel?.options.peers??[]).map(t=>t.key).join(`
-`)}_peerName(t){return(this._tunnel?.options.peers??[]).find(n=>n.key===t)?.alias||E(t)}_lanOrigin(t){return t==="static"?e("lanOriginHub"):this._peerName(t)}_lanAllow(t){return!t||t.length===0?e("lanAllowAll"):t.map(i=>this._peerName(i)).join(", ")}get _isP2P(){return this.tunnelType==="p2p"||this.tunnelType==="tun"}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const i=(t??[])[0];if(!i)return e("eventsEntryDesc");const n=i.count||1;return n>1?`${i.message} ×${n}`:i.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const i={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(i.endpoint="",i.net=this._net.trim()||void 0,i.mtu=this._mtu||void 0,i.device_name=this._deviceName.trim()||void 0,i.share_lan=this._shareLAN.trim()||void 0,i.share_mode=this._shareMode||void 0,i.lan_allow=this._tunnel?.options.lan_allow||void 0,i.lan_routes=this._tunnel?.options.lan_routes),this._isP2P&&this.mode==="edit"&&(i.peers=this._tunnel?.options.peers??[]),this._showAuth&&(i.username=this._username.trim()||void 0,i.password=this._password||void 0),this.mode==="create"?(await b(()=>import("./index-Ji9QB8CQ.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.create(i)),this._showSnackbar(e("saved")),this._navigate("/")):(await b(()=>import("./index-Ji9QB8CQ.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.update(this.tunnelId,i)),this._showSnackbar(e("saved")),this.mode="view",await S())}catch(i){this._showSnackbar(I(i))}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await D(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await P(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await z(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await H(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await A(this.tunnelId,this._resetKind),this._tunnel&&C(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,i){const n=i.indexOf(t);return i[(n+1)%i.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}_shareModeLabel(t){switch(t){case"kernel":return e("shareModeKernel");case"userspace":return e("shareModeUserspace");default:return e("shareModeAuto")}}render(){const t=this._tunnel,i=t?t.stats:null,n=t?.lan??null,c=n?Object.entries(n.claims).sort(([a],[h])=>a<h?-1:1):[];return s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CELjYpUG.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
+import{a as k,G as T,s as S,g as D,c as e,_ as g,r as A,p as R,k as P,m as z,q as N,u as C,b as s,A as p,o as L,i as M,t as E}from"./index-CELjYpUG.js";import{m as H,c as v,d as w,a as _,b as x,n as $,r as l}from"./format-Cqi1LXQB.js";import{i as d}from"./app-scaffold-CBui6SYa.js";import{t as I}from"./type-icons-DsI-rt1W.js";import{c as O}from"./clipboard-C3x8_sid.js";import{s as F,l as U}from"./lan-refusal-C5a6hqyQ.js";var K=Object.defineProperty,B=Object.getOwnPropertyDescriptor,r=(t,i,n,h)=>{for(var c=h>1?void 0:h?B(i,n):i,u=t.length-1,f;u>=0;u--)(f=t[u])&&(c=(h?f(i,n,c):f(c))||c);return h&&c&&K(i,n,c),c};const b=[{value:"off",labelKey:"settingsRecordOff",descKey:"settingsRecordOffDesc"},{value:"headers",labelKey:"settingsRecordHeaders",descKey:"settingsRecordHeadersDesc",warn:!0},{value:"full",labelKey:"settingsRecordFull",descKey:"settingsRecordFullDesc",warn:!0}];function y(t){return b.find(i=>i.value===t)??b[2]}let o=class extends k{constructor(){super(...arguments),this.tunnelType="tcp",this.tunnelId="",this.mode="view",this._tunnel=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._showPassword=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._shareLAN="",this._shareMode="auto",this._pendingCount=0,this._backend=new T,this._unsubs=[]}get _isNativeDirPicker(){return!!window.WisperNative?.pickDir}_browseDir(){const t="__wisper_dir_callback__";window[t]=i=>{this._endpoint=i,this.requestUpdate(),delete window[t]},window.WisperNative.pickDir(t)}connectedCallback(){super.connectedCallback(),this._load(),this._unsubs.push(S(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}async _loadPendingCount(){try{this._pendingCount=(await this._backend.listPendingPeers()).peers?.length??0}catch{}}_load(){(this.tunnelType==="p2p"||this.tunnelType==="tun")&&this._loadPendingCount();const t=this.tunnelId,i=window.location.search.includes("edit");if(t==="new"||!t){if(this.mode==="create")return;this.mode="create",this._tunnel=null,this._resetForm();return}if(this.mode==="edit"&&this._tunnel?.id===t)return;const n=D().find(h=>h.id===t);n&&(this._tunnel=n,i?(this.mode="edit",this._populateForm(n)):(this.mode!=="edit"||this._tunnel?.id!==t)&&(this.mode="view",this._populateForm(n)))}_resetForm(){this._name="",this._endpoint="",this._hostname="",this._prefix="",this._username="",this._password="",this._enableTLS=!1,this._rewriteHost=!1,this._fileUpload=!1,this._showAuth=!1,this._recordMode="off",this._net="",this._mtu=0,this._deviceName="",this._shareLAN="",this._shareMode="auto"}_populateForm(t){this._name=t.name,this._endpoint=t.endpoint,this._hostname=t.options.hostname??"",this._prefix=t.options.prefix??"",this._username=t.options.username??"",this._password=t.options.password??"",this._enableTLS=t.options.enableTLS??!1,this._rewriteHost=t.options.rewriteHost??!1,this._fileUpload=t.options.file_upload??!1,this._showAuth=!!(t.options.username||t.options.basic_auth),this._recordMode=t.options.record_mode||"off",this._net=t.options.net??"",this._mtu=t.options.mtu??0,this._deviceName=t.options.device_name??"",this._shareLAN=t.options.share_lan??"",this._shareMode=t.options.share_mode||"auto"}_peerKeys(){return(this._tunnel?.options.peers??[]).map(t=>t.key).join(`
+`)}_peerName(t){return(this._tunnel?.options.peers??[]).find(n=>n.key===t)?.alias||H(t)}_lanOrigin(t){return t==="static"?e("lanOriginHub"):this._peerName(t)}_lanAllow(t){return!t||t.length===0?e("lanAllowAll"):t.map(i=>this._peerName(i)).join(", ")}get _isP2P(){return this.tunnelType==="p2p"||this.tunnelType==="tun"}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(t){const i=(t??[])[0];if(!i)return e("eventsEntryDesc");const n=i.count||1;return n>1?`${i.message} ×${n}`:i.message}_enterEdit(){this._tunnel&&(this._populateForm(this._tunnel),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.tunnelId){this.mode="view",this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}`);return}this._navigate("/")}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(e("requiredField"));return}const t=this._prefix.trim().toLowerCase();if(t&&(t.length<8||t.length>63||!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(t))){this._showSnackbar(e("invalidPrefix"));return}this._saving=!0;try{const i={name:this._name.trim(),type:this.tunnelType,endpoint:this._endpoint.trim(),prefix:t||void 0,hostname:this._hostname.trim()||void 0,enableTLS:this._enableTLS,rewriteHost:this._rewriteHost,file_upload:this._fileUpload,record_mode:this._recordMode};this.tunnelType==="tun"&&(i.endpoint="",i.net=this._net.trim()||void 0,i.mtu=this._mtu||void 0,i.device_name=this._deviceName.trim()||void 0,i.share_lan=this._shareLAN.trim()||void 0,i.share_mode=this._shareMode||void 0,i.lan_allow=this._tunnel?.options.lan_allow||void 0,i.lan_routes=this._tunnel?.options.lan_routes),this._isP2P&&this.mode==="edit"&&(i.peers=this._tunnel?.options.peers??[]),this._showAuth&&(i.username=this._username.trim()||void 0,i.password=this._password||void 0),this.mode==="create"?(await g(()=>import("./index-CELjYpUG.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.create(i)),this._showSnackbar(e("saved")),this._navigate("/")):(await g(()=>import("./index-CELjYpUG.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.update(this.tunnelId,i)),this._showSnackbar(e("saved")),this.mode="view",await A())}catch(i){this._showSnackbar(F(i))}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await R(this.tunnelId),this._showSnackbar(e("deleted")),this._navigate("/")}catch{this._showSnackbar(e("deleteFailed"))}}async _handleStart(){try{await P(this.tunnelId),this._showSnackbar(e("started"))}catch{this._showSnackbar(e("startFailed"))}}async _handleStop(){try{await z(this.tunnelId),this._showSnackbar(e("stopped"))}catch{this._showSnackbar(e("stopFailed"))}}async _handleCopy(t){await O(t),this._showSnackbar(e("copiedToClipboard"))}_handleResetStats(t){this._resetKind=t,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await N(this.tunnelId,this._resetKind),this._tunnel&&C(this.tunnelId,this._tunnel.stats),this._showSnackbar(e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,i){const n=i.indexOf(t);return i[(n+1)%i.length]}_setRecordMode(t){this._recordMode=t,this.requestUpdate()}_shareModeLabel(t){switch(t){case"kernel":return e("shareModeKernel");case"userspace":return e("shareModeUserspace");default:return e("shareModeAuto")}}render(){const t=this._tunnel,i=t?t.stats:null,n=t?.lan??null,h=n?Object.entries(n.claims).sort(([a],[m])=>a<m?-1:1):[],c=U(n??void 0),u=c.filter(a=>!a.resolved),f=u.map(a=>`${this._peerName(a.peer)}: ${a.prefix} (${a.reason})`).join(", ");return s`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._handleBack()}>
             ${d("chevron-left")}
           </button>
-          <span class="page-title">${d(L(this.tunnelType))}</span>
+          <span class="page-title">${d(I(this.tunnelType))}</span>
 
           ${this.mode==="view"&&t?s`
               ${t.status==="running"?s`<button class="pill-btn danger appbar-action" title="${e("btnStop")}" @click=${()=>this._handleStop()}>
@@ -27,10 +27,26 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
             <!-- Status banner -->
             <div class="status-banner ${t.status}">
               <span class="status-dot-mini"></span>
-              ${t.status==="running"?e("statusRunning")+" · "+u(t.stats.current_conns)+" "+e("activeConnections"):t.status==="error"?e("statusError"):e("statusStopped")}
+              ${t.status==="running"?e("statusRunning")+" · "+v(t.stats.current_conns)+" "+e("activeConnections"):t.status==="error"?e("statusError"):e("statusStopped")}
               ${t.error?s` — ${t.error}`:""}
               <span class="status-spacer"></span>
             </div>
+
+            <!-- A LAN claim is refused and nothing on this page says what to
+                 do about it. The answer is always the peers page: a policy
+                 refusal is approved by writing the prefix into that peer's LAN
+                 allow row. Amber, not red: the hub is working as configured. -->
+            ${u.length>0?s`
+                <div class="status-banner degraded"
+                  @click=${()=>this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/peers`)}>
+                  <span class="status-dot-mini"></span>
+                  <div style="flex:1;">
+                    <div>${e("lanRefusedBannerTitle")}</div>
+                    <div class="degraded-hint">${e("lanRefusedBannerHint",{items:f})}</div>
+                  </div>
+                  <span style="color:var(--text-muted);">&rarr;</span>
+                </div>
+              `:p}
 
             <!-- Info card -->
             <div class="section">
@@ -41,7 +57,7 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
                 </div>
                 <div class="info-row">
                   <span class="info-label">${e("fieldCreated")}</span>
-                  <span class="info-value text">${m(t.created_at)}</span>
+                  <span class="info-value text">${w(t.created_at)}</span>
                 </div>
                 <!-- A tun hub binds nothing, so it has no target row. -->
                 ${this.tunnelType==="tun"?p:s`
@@ -143,12 +159,12 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
                 ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":s`
                 <div class="info-row">
                   <span class="info-label">${e("settingsRecordMode")}</span>
-                  <span class="info-value text">${e(v.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
+                  <span class="info-value text">${e(b.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}</span>
                 </div>
                 <div class="info-row" style="margin-top:-8px;">
                   <span class="info-label"></span>
                   <span class="info-value text ${this._recordMode!=="off"?"record-warn":""}" style="font-size:var(--font-xs);line-height:1.5;">
-                    ${e(w(this._recordMode).descKey)}
+                    ${e(y(this._recordMode).descKey)}
                   </span>
                 </div>`}
                 <div class="info-row">
@@ -165,22 +181,22 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">${e("statTotalConns")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${u(i.total_conns)}</div>
-                      <div class="stat-rate">${u(i.current_conns)} active · ${i.request_rate.toFixed(2)} conns/s</div>
+                      <div class="stat-value">${v(i.total_conns)}</div>
+                      <div class="stat-rate">${v(i.current_conns)} active · ${i.request_rate.toFixed(2)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">${e("statTotalErrors")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${e("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${u(i.total_errs)}</div>
+                      <div class="stat-value">${v(i.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">${e("p2pColDown")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${e("btnResetOutput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${g(i.output_bytes)}</div>
-                      <div class="stat-rate">${_(i.output_rate_bytes)}</div>
+                      <div class="stat-value">${_(i.output_bytes)}</div>
+                      <div class="stat-rate">${x(i.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">${e("p2pColUp")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${e("btnResetInput")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${g(i.input_bytes)}</div>
-                      <div class="stat-rate">${_(i.input_rate_bytes)}</div>
+                      <div class="stat-value">${_(i.input_bytes)}</div>
+                      <div class="stat-rate">${x(i.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
@@ -200,15 +216,15 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
                   <div class="lan-summary">
                     <div class="stat-box">
                       <div class="stat-label">${e("lanRouted")}</div>
-                      <div class="stat-value">${u(i?.lan_routed??0)}</div>
+                      <div class="stat-value">${v(i?.lan_routed??0)}</div>
                     </div>
                     <div class="stat-box denied">
                       <div class="stat-label">${e("lanDenied")}</div>
-                      <div class="stat-value">${u(i?.lan_denied??0)}</div>
+                      <div class="stat-value">${v(i?.lan_denied??0)}</div>
                     </div>
                     <div class="stat-box withdrawn">
                       <div class="stat-label">${e("lanWithdrawn")}</div>
-                      <div class="stat-value">${u(i?.lan_withdrawn??0)}</div>
+                      <div class="stat-value">${v(i?.lan_withdrawn??0)}</div>
                     </div>
                   </div>
 
@@ -227,27 +243,29 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
                         </div>`)}
                   </div>
 
-                  ${c.length>0?s`
+                  ${h.length>0?s`
                       <div class="lan-table card">
-                        <div class="lan-head">${e("lanClaimsTitle")} (${c.length})</div>
+                        <div class="lan-head">${e("lanClaimsTitle")} (${h.length})</div>
                         <div class="lan-row head">
                           <span class="lan-prefix">${e("lanColPeer")}</span>
                           <span class="lan-origin">${e("lanColClaimed")}</span>
                         </div>
-                        ${c.map(([a,h])=>s`
+                        ${h.map(([a,m])=>s`
                           <div class="lan-row">
                             <span class="lan-prefix">${this._peerName(a)}</span>
-                            <span class="lan-origin">${h.prefixes.join(", ")}</span>
+                            <span class="lan-origin">${m.prefixes.join(", ")}</span>
                           </div>`)}
                       </div>
                     `:p}
 
-                  ${(n.rejected?.length??0)>0?s`
+                  ${c.length>0?s`
                       <div class="lan-table card">
                         <!-- A refusal is never revoked and its prefix never
                              reaches the table above, so the two read together —
                              and the refusals are the run's, which is what the
-                             scope note says: restart the hub and they are gone. -->
+                             scope note says: restart the hub and they are gone.
+                             One row per claim: the journal holds every ~20s
+                             assertion, so the repeats collapse into a count. -->
                         <div class="lan-head">
                           ${e("lanRejectedTitle")} <span class="lan-scope">${e("lanRejectedThisRun")}</span>
                         </div>
@@ -256,16 +274,22 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
                           <span class="lan-origin">${e("lanColPeer")}</span>
                           <span class="lan-allow">${e("lanColTime")}</span>
                         </div>
-                        ${(n.rejected??[]).map(a=>s`
+                        ${c.map(a=>s`
                           <div class="lan-row">
                             <span class="lan-prefix">${a.prefix}</span>
                             <span class="lan-origin">${this._peerName(a.peer)}</span>
-                            <span class="lan-allow">${m(a.at)}</span>
+                            <span class="lan-allow">${w(a.at)}${a.count>1?` · ×${a.count}`:""}</span>
                             <span class="lan-detail">
                               <span class="lan-reason">${a.reason}</span>${a.detail?` — ${a.detail}`:""}
                             </span>
                           </div>`)}
                       </div>
+                      <!-- Where the answer lives, in the same voice as the
+                           traffic guidance below: this is the one table whose
+                           entries an operator can act on. A resolved row is
+                           history, so the prompt goes when nothing is left to
+                           answer. -->
+                      ${u.length>0?s`<div class="lan-guidance">${e("lanRejectedHint")}</div>`:p}
                     `:p}
 
                   <div class="lan-guidance">${e("lanGuidance")}</div>
@@ -290,6 +314,9 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
                       </div>
                       ${this._pendingCount>0?s`<span style="font-size:var(--font-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
                             ${e("peersPendingBadge").replace("{n}",String(this._pendingCount))}
+                          </span>`:p}
+                      ${u.length>0?s`<span style="font-size:var(--font-xs);color:var(--amber);border:1px solid var(--amber);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
+                            ${e("peersLANRefusedBadge",{n:u.length})}
                           </span>`:p}
                       <span style="color:var(--text-muted);">&rarr;</span>
                     </div>
@@ -319,7 +346,7 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
 
             <!-- Inspector entry — only HTTP/File tunnels carry HTTP traffic worth
                  inspecting, and only when an inspector URL is configured. -->
-            ${this.mode==="view"&&t&&(this.tunnelType==="http"||this.tunnelType==="file")&&R().inspector_url?s`
+            ${this.mode==="view"&&t&&(this.tunnelType==="http"||this.tunnelType==="file")&&L().inspector_url?s`
                 <div class="section">
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
@@ -460,16 +487,16 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
 
                 <!-- Recording mode: p2p and tun have no recorder to attach it to. -->
                 ${this.tunnelType==="p2p"||this.tunnelType==="tun"?"":s`
-                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,v.map(a=>a.value)))}>
+                <div class="switch-row" @click=${()=>this._setRecordMode(this._cycleOption(this._recordMode,b.map(a=>a.value)))}>
                   <span class="switch-label">${e("settingsRecordMode")}</span>
                   <span style="font-size:var(--font-sm);color:var(--text-muted);display:flex;align-items:center;gap:4px;">
-                    ${e(v.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}
+                    ${e(b.find(a=>a.value===this._recordMode)?.labelKey??"settingsRecordFull")}
                     ${d("chevron-right")}
                   </span>
                 </div>
                 <div class="record-desc ${this._recordMode!=="off"?"record-warn":""}"
                   style="font-size:var(--font-xs);color:var(--text-muted);line-height:1.5;padding:0 16px 14px;">
-                  ${e(w(this._recordMode).descKey)}
+                  ${e(y(this._recordMode).descKey)}
                 </div>`}
 
                 <!-- Auth section (HTTP/File) -->
@@ -563,7 +590,7 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
             </div>
           `:""}
       </app-scaffold>
-    `}};o.SHARE_MODES=["auto","kernel","userspace"];o.styles=N`
+    `}};o.SHARE_MODES=["auto","kernel","userspace"];o.styles=M`
     /* ── AppBar ── */
     .back-btn {
       background: none;
@@ -670,6 +697,23 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
       background: var(--red-bg);
       color: var(--red-text);
       border: 1px solid var(--red-border);
+    }
+    /* A refused LAN claim: amber, not red — the hub is healthy, its policy is
+       deliberately saying no until an operator answers it. Clickable, because
+       the answer lives on the peers page. */
+    .status-banner.degraded {
+      margin-top: 8px;
+      cursor: pointer;
+      background: color-mix(in srgb, var(--amber) 12%, transparent);
+      color: var(--amber);
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+    }
+    .degraded-hint {
+      font-weight: 400;
+      font-size: var(--font-xs);
+      line-height: 1.5;
+      opacity: 0.9;
+      margin-top: 2px;
     }
 
     .status-dot-mini {
@@ -1157,4 +1201,4 @@ import{a as y,G as $,s as k,g as T,c as e,_ as b,r as S,p as D,k as P,m as z,q a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;r([x()],o.prototype,"tunnelType",2);r([x()],o.prototype,"tunnelId",2);r([l()],o.prototype,"mode",2);r([l()],o.prototype,"_tunnel",2);r([l()],o.prototype,"_saving",2);r([l()],o.prototype,"_snackbar",2);r([l()],o.prototype,"_showDeleteDialog",2);r([l()],o.prototype,"_showResetDialog",2);r([l()],o.prototype,"_name",2);r([l()],o.prototype,"_endpoint",2);r([l()],o.prototype,"_hostname",2);r([l()],o.prototype,"_prefix",2);r([l()],o.prototype,"_username",2);r([l()],o.prototype,"_password",2);r([l()],o.prototype,"_enableTLS",2);r([l()],o.prototype,"_rewriteHost",2);r([l()],o.prototype,"_fileUpload",2);r([l()],o.prototype,"_showAuth",2);r([l()],o.prototype,"_showPassword",2);r([l()],o.prototype,"_recordMode",2);r([l()],o.prototype,"_net",2);r([l()],o.prototype,"_mtu",2);r([l()],o.prototype,"_deviceName",2);r([l()],o.prototype,"_shareLAN",2);r([l()],o.prototype,"_shareMode",2);r([l()],o.prototype,"_pendingCount",2);o=r([M("tunnel-detail-page")],o);export{o as TunnelDetailPage};
+  `;r([$()],o.prototype,"tunnelType",2);r([$()],o.prototype,"tunnelId",2);r([l()],o.prototype,"mode",2);r([l()],o.prototype,"_tunnel",2);r([l()],o.prototype,"_saving",2);r([l()],o.prototype,"_snackbar",2);r([l()],o.prototype,"_showDeleteDialog",2);r([l()],o.prototype,"_showResetDialog",2);r([l()],o.prototype,"_name",2);r([l()],o.prototype,"_endpoint",2);r([l()],o.prototype,"_hostname",2);r([l()],o.prototype,"_prefix",2);r([l()],o.prototype,"_username",2);r([l()],o.prototype,"_password",2);r([l()],o.prototype,"_enableTLS",2);r([l()],o.prototype,"_rewriteHost",2);r([l()],o.prototype,"_fileUpload",2);r([l()],o.prototype,"_showAuth",2);r([l()],o.prototype,"_showPassword",2);r([l()],o.prototype,"_recordMode",2);r([l()],o.prototype,"_net",2);r([l()],o.prototype,"_mtu",2);r([l()],o.prototype,"_deviceName",2);r([l()],o.prototype,"_shareLAN",2);r([l()],o.prototype,"_shareMode",2);r([l()],o.prototype,"_pendingCount",2);o=r([E("tunnel-detail-page")],o);export{o as TunnelDetailPage};

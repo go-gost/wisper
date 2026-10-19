@@ -5,6 +5,7 @@ import { icon } from '../utils/icons';
 import { formatBytes, formatRate, formatNumber, formatClockTime, maskKey } from '../utils/format';
 import { transportStyle } from '../utils/transport';
 import type { Peer, PeerStats } from '../api/types';
+import type { LANRefusalGroup } from '../utils/lan-refusal';
 
 /**
  * One allowlist row of a p2p object, drawn read-only: the peer's name and
@@ -55,6 +56,14 @@ export class PeerStatsRow extends LitElement {
    *  not (yet), and a hub that allows nothing refuses every assertion. Empty
    *  everywhere except a hub's peers page. */
   @property() peersLAN = '';
+  /** LAN claims this peer is still making that the hub refuses. They are a
+   *  live state, not the run's history: a claim the hub has since installed is
+   *  filtered out before it gets here. Only a hub's peers page fills this. */
+  @property({ attribute: false }) lanRefused: LANRefusalGroup[] = [];
+  /** The page's own way to answer those refusals (open the LAN editor with
+   *  the refused prefixes filled in), rendered beside them. Absent when the
+   *  refusal is one an allow row cannot fix. */
+  @property() lanRefusedAction?: unknown;
 
   @state() private _expanded = false;
 
@@ -177,6 +186,26 @@ export class PeerStatsRow extends LitElement {
         ${s?.lan && s.lan.length > 0
           ? html`<div class="peer-ip">${t('peersLAN')}: ${s.lan.join(', ')}</div>`
           : nothing}
+        <!-- What the peer keeps asking for and the hub keeps refusing. This is
+             the one row fact that asks the operator to do something, so it is
+             drawn apart from the quiet grey lines above it: the prefix, the
+             hub's reason code, and the page's action when an allow row can
+             answer the refusal. -->
+        ${this.lanRefused.length > 0
+          ? html`
+            <div class="lan-refused">
+              <div class="lan-refused-head">${t('peersLANRefused')}</div>
+              ${this.lanRefused.map(g => html`
+                <div class="lan-refused-line">
+                  <span class="lan-refused-prefix">${g.prefix}</span>
+                  <span class="lan-refused-reason">${g.reason}</span>
+                </div>`)}
+              <div class="lan-refused-hint">${t('peersLANRefusedHint')}</div>
+              ${this.lanRefusedAction
+                ? html`<div class="lan-refused-action">${this.lanRefusedAction}</div>`
+                : nothing}
+            </div>`
+          : nothing}
         ${s
           ? html`<div class="peer-stats">
               <span>${formatNumber(s.current_conns)} ${t('p2pColConns')}</span>
@@ -286,6 +315,52 @@ export class PeerStatsRow extends LitElement {
       display: block;
       color: var(--text-muted);
       opacity: 0.8;
+    }
+    /* A refused LAN claim: amber, like the refusal count on the hub's LAN
+       section — the peer is fine, the policy is what says no. */
+    .lan-refused {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--amber) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+      color: var(--amber);
+      font-size: var(--font-xs);
+      line-height: 1.5;
+    }
+    .lan-refused-head {
+      font-weight: 600;
+    }
+    .lan-refused-line {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .lan-refused-prefix {
+      font-family: var(--font-mono, monospace);
+    }
+    .lan-refused-reason {
+      opacity: 0.9;
+    }
+    .lan-refused-hint {
+      opacity: 0.9;
+    }
+    .lan-refused-action {
+      margin-top: 6px;
+    }
+    .lan-refused-action button {
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--amber);
+      background: transparent;
+      color: var(--amber);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .lan-refused-action button:disabled {
+      opacity: 0.5;
+      cursor: default;
     }
     /* The row's expand: the raw per-peer state, one label/value line each. */
     .peer-diag {

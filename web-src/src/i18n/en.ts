@@ -97,6 +97,11 @@ const en: Record<string, string> = {
   lanNoRoutes: 'No LAN routes yet — share a LAN above and a peer claiming one lands here.',
   lanGuidance:
     'Routes installed but still no traffic? Check the peer\'s transport badge, the sharing backend events (kernel/userspace) and the punch state in the diagnostics panel.',
+  lanRefusedBannerTitle: 'LAN sharing is being refused',
+  lanRefusedBannerHint:
+    '{items} — open the peers page to answer it. A policy refusal is approved by adding the prefix to that peer\'s LAN row.',
+  lanRejectedHint:
+    'A refused claim is approved by adding its prefix to that peer\'s LAN row on the peers page. The peer re-asserts every ~20 seconds, so the approval takes effect without a restart.',
   fieldRoutes: 'Routes',
   fieldRoutesHint: 'Subnets to send through the device, comma-separated: 192.168.50.0/24, or 0.0.0.0/0 for everything. Empty defaults to the local net subnet (hub and other peers included).',
   fieldDNS: 'DNS',
@@ -232,6 +237,11 @@ const en: Record<string, string> = {
     'The LANs this spoke may share through the hub (comma-separated CIDRs). Left empty it may share none, and it keeps asserting what it shares while the hub keeps refusing it with "no-allow-row". Typed, the next assertion is approved — no restart.',
   /** The peer row's LAN line: the CIDRs this peer claimed and the hub installed. */
   peersLAN: 'LAN',
+  peersLANRefused: 'Shared LAN refused',
+  peersLANRefusedHint:
+    'The hub keeps refusing this claim. Add the prefix to this row\'s LAN field to approve it; the peer re-asserts every ~20 seconds.',
+  peersLANRefusedFix: 'Fill in LAN…',
+  peersLANRefusedBadge: '{n} LAN refused',
   peersKeyRequired: 'A key is required.',
   peersKeyInvalid: 'Not a base64 32-byte public key.',
   peersKeyDuplicate: 'Listed twice.',

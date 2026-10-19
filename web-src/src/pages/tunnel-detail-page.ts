@@ -9,6 +9,7 @@ import { getSettings } from '../store/settings-store';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import { saveErrorText } from '../utils/save-error';
+import { lanRefusalGroups } from '../utils/lan-refusal';
 import { GoBackend } from '../api/backend';
 import type { Tunnel, TunnelType, TunnelCreateRequest, WisperEvent } from '../api/types';
 import '../components/app-scaffold';
@@ -537,6 +538,23 @@ export class TunnelDetailPage extends LitElement {
       color: var(--red-text);
       border: 1px solid var(--red-border);
     }
+    /* A refused LAN claim: amber, not red — the hub is healthy, its policy is
+       deliberately saying no until an operator answers it. Clickable, because
+       the answer lives on the peers page. */
+    .status-banner.degraded {
+      margin-top: 8px;
+      cursor: pointer;
+      background: color-mix(in srgb, var(--amber) 12%, transparent);
+      color: var(--amber);
+      border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+    }
+    .degraded-hint {
+      font-weight: 400;
+      font-size: var(--font-xs);
+      line-height: 1.5;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
 
     .status-dot-mini {
       width: 6px;
@@ -1034,6 +1052,13 @@ export class TunnelDetailPage extends LitElement {
     // are read once here and drawn from the same snapshot.
     const lan = t2?.lan ?? null;
     const lanClaims = lan ? Object.entries(lan.claims).sort(([a], [b]) => (a < b ? -1 : 1)) : [];
+    // The journal repeats a refused claim every ~20s; the table wants the
+    // claim, and the prompt wants only the claims that are still refused.
+    const lanRefusals = lanRefusalGroups(lan ?? undefined);
+    const lanRefusedActive = lanRefusals.filter(g => !g.resolved);
+    const lanRefusedItems = lanRefusedActive
+      .map(g => `${this._peerName(g.peer)}: ${g.prefix} (${g.reason})`)
+      .join(', ');
 
     return html`
       <app-scaffold>
@@ -1075,6 +1100,24 @@ export class TunnelDetailPage extends LitElement {
               ${t2.error ? html` — ${t2.error}` : ''}
               <span class="status-spacer"></span>
             </div>
+
+            <!-- A LAN claim is refused and nothing on this page says what to
+                 do about it. The answer is always the peers page: a policy
+                 refusal is approved by writing the prefix into that peer's LAN
+                 allow row. Amber, not red: the hub is working as configured. -->
+            ${lanRefusedActive.length > 0
+              ? html`
+                <div class="status-banner degraded"
+                  @click=${() => this._navigate(`/tunnel/${this.tunnelType}/${this.tunnelId}/peers`)}>
+                  <span class="status-dot-mini"></span>
+                  <div style="flex:1;">
+                    <div>${t('lanRefusedBannerTitle')}</div>
+                    <div class="degraded-hint">${t('lanRefusedBannerHint', { items: lanRefusedItems })}</div>
+                  </div>
+                  <span style="color:var(--text-muted);">&rarr;</span>
+                </div>
+              `
+              : nothing}
 
             <!-- Info card -->
             <div class="section">
@@ -1329,13 +1372,15 @@ export class TunnelDetailPage extends LitElement {
                     `
                     : nothing}
 
-                  ${(lan.rejected?.length ?? 0) > 0
+                  ${lanRefusals.length > 0
                     ? html`
                       <div class="lan-table card">
                         <!-- A refusal is never revoked and its prefix never
                              reaches the table above, so the two read together —
                              and the refusals are the run's, which is what the
-                             scope note says: restart the hub and they are gone. -->
+                             scope note says: restart the hub and they are gone.
+                             One row per claim: the journal holds every ~20s
+                             assertion, so the repeats collapse into a count. -->
                         <div class="lan-head">
                           ${t('lanRejectedTitle')} <span class="lan-scope">${t('lanRejectedThisRun')}</span>
                         </div>
@@ -1344,16 +1389,24 @@ export class TunnelDetailPage extends LitElement {
                           <span class="lan-origin">${t('lanColPeer')}</span>
                           <span class="lan-allow">${t('lanColTime')}</span>
                         </div>
-                        ${(lan.rejected ?? []).map(r => html`
+                        ${lanRefusals.map(g => html`
                           <div class="lan-row">
-                            <span class="lan-prefix">${r.prefix}</span>
-                            <span class="lan-origin">${this._peerName(r.peer)}</span>
-                            <span class="lan-allow">${formatTimestamp(r.at)}</span>
+                            <span class="lan-prefix">${g.prefix}</span>
+                            <span class="lan-origin">${this._peerName(g.peer)}</span>
+                            <span class="lan-allow">${formatTimestamp(g.at)}${g.count > 1 ? ` · ×${g.count}` : ''}</span>
                             <span class="lan-detail">
-                              <span class="lan-reason">${r.reason}</span>${r.detail ? ` — ${r.detail}` : ''}
+                              <span class="lan-reason">${g.reason}</span>${g.detail ? ` — ${g.detail}` : ''}
                             </span>
                           </div>`)}
                       </div>
+                      <!-- Where the answer lives, in the same voice as the
+                           traffic guidance below: this is the one table whose
+                           entries an operator can act on. A resolved row is
+                           history, so the prompt goes when nothing is left to
+                           answer. -->
+                      ${lanRefusedActive.length > 0
+                        ? html`<div class="lan-guidance">${t('lanRejectedHint')}</div>`
+                        : nothing}
                     `
                     : nothing}
 
@@ -1386,6 +1439,11 @@ export class TunnelDetailPage extends LitElement {
                       ${this._pendingCount > 0
                         ? html`<span style="font-size:var(--font-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
                             ${t('peersPendingBadge').replace('{n}', String(this._pendingCount))}
+                          </span>`
+                        : nothing}
+                      ${lanRefusedActive.length > 0
+                        ? html`<span style="font-size:var(--font-xs);color:var(--amber);border:1px solid var(--amber);border-radius:var(--radius-pill);padding:2px 8px;white-space:nowrap;">
+                            ${t('peersLANRefusedBadge', { n: lanRefusedActive.length })}
                           </span>`
                         : nothing}
                       <span style="color:var(--text-muted);">&rarr;</span>

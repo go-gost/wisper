@@ -7,6 +7,7 @@ import { GoBackend } from '../api/backend';
 import { copyToClipboard } from '../utils/clipboard';
 import { maskKey } from '../utils/format';
 import { saveErrorText } from '../utils/save-error';
+import { lanRefusalGroups, type LANRefusalGroup } from '../utils/lan-refusal';
 import type { Peer, PendingPeer, Tunnel } from '../api/types';
 import '../components/app-scaffold';
 import '../components/peer-stats-row';
@@ -215,6 +216,27 @@ export class TunnelPeersPage extends LitElement {
    *  ignores the field — a box there would take typing and do nothing. */
   private get _isHub(): boolean {
     return this._tunnel?.type === 'tun';
+  }
+
+  /** The LAN claims this peer is still making that the hub refuses. A claim it
+   *  has since installed is history, not a prompt, so it is filtered out. */
+  private _refusedFor(key: string): LANRefusalGroup[] {
+    return lanRefusalGroups(this._tunnel?.lan).filter(g => !g.resolved && g.peer === key);
+  }
+
+  /** _allowRefused opens the row's editor with the refused prefixes added to
+   *  its LAN field. It does not save by itself: granting a peer a LAN is the
+   *  operator's call, so the value is staged for review. A row the hub already
+   *  holds keeps its own text, with the refused prefixes appended. */
+  private _allowRefused(i: number, refused: LANRefusalGroup[]) {
+    const row = this._rows[i];
+    const cidrs = row.lan.split(',').map(c => c.trim()).filter(c => c !== '');
+    for (const g of refused) {
+      if (g.fixableByAllow && !cidrs.includes(g.prefix)) cidrs.push(g.prefix);
+    }
+    this._editing = i;
+    this._draft = { ...row, lan: cidrs.join(', '), lanTouched: true };
+    this._rowError = '';
   }
 
   /** _toggleRow switches a peer off or back on and saves. Off keeps the row
@@ -465,11 +487,20 @@ export class TunnelPeersPage extends LitElement {
                   : nothing}
                 ${this._rows.map((row, i) => {
                   if (this._editing === i) return this._renderEditor();
+                  const refused = this._isHub ? this._refusedFor(row.key) : [];
+                  const fixable = refused.filter(g => g.fixableByAllow);
                   return html`
                     <peer-stats-row
                       .peer=${row}
                       .stat=${this._statFor(row.key) ?? null}
                       .peersLAN=${this._isHub ? row.lan : ''}
+                      .lanRefused=${refused}
+                      .lanRefusedAction=${fixable.length > 0
+                        ? html`<button ?disabled=${this._saving}
+                            @click=${() => this._allowRefused(i, refused)}>
+                            ${t('peersLANRefusedFix')}
+                          </button>`
+                        : nothing}
                       ?disabled=${row.disabled}
                       ?showKeys=${this._showKeys}
                       .rowActions=${html`
