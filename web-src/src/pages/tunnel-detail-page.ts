@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
+import { typeIcon } from '../utils/type-icons';
 import { getTunnels, refresh, remove, start, stop, subscribe, resetStats } from '../store/tunnel-store';
 import { setItemStats } from '../store/stats-store';
 import { getSettings } from '../store/settings-store';
@@ -404,10 +405,6 @@ export class TunnelDetailPage extends LitElement {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
-
-  private _typeLabel(): string {
-    return t(`type${this.tunnelType.charAt(0).toUpperCase() + this.tunnelType.slice(1)}`);
-  }
 
   private _cycleOption<T>(current: T, options: T[]): T {
     const idx = options.indexOf(current);
@@ -1027,7 +1024,6 @@ export class TunnelDetailPage extends LitElement {
   render() {
     const t2 = this._tunnel;
     const stats = t2 ? t2.stats : null;
-    const typeLabel = this._typeLabel();
     // The LAN table arrives as one read of the hub's RIB, so its three lists
     // are read once here and drawn from the same snapshot.
     const lan = t2?.lan ?? null;
@@ -1040,11 +1036,7 @@ export class TunnelDetailPage extends LitElement {
           <button class="back-btn" @click=${() => this._handleBack()}>
             ${icon('chevron-left')}
           </button>
-          <span class="page-title">
-            ${this.mode === 'create'
-              ? `${t('tunnelNewTitle')} — ${typeLabel}`
-              : typeLabel + ' Tunnel'}
-          </span>
+          <span class="page-title">${icon(typeIcon(this.tunnelType))}</span>
 
           ${this.mode === 'view' && t2
             ? html`
@@ -1082,11 +1074,11 @@ export class TunnelDetailPage extends LitElement {
             <div class="section">
               <div class="card">
                 <div class="info-row">
-                  <span class="info-label">Type</span>
-                  <span class="info-value text">${typeLabel} Tunnel</span>
+                  <span class="info-label">${t('fieldName')}</span>
+                  <span class="info-value text">${t2.name}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">Created</span>
+                  <span class="info-label">${t('fieldCreated')}</span>
                   <span class="info-value text">${formatTimestamp(t2.created_at)}</span>
                 </div>
                 <!-- A tun hub binds nothing, so it has no target row. -->
@@ -1094,7 +1086,7 @@ export class TunnelDetailPage extends LitElement {
                   ? nothing
                   : html`
                 <div class="info-row">
-                  <span class="info-label">Target</span>
+                  <span class="info-label">${t('fieldTarget')}</span>
                   <span class="info-value">${t2.endpoint}</span>
                 </div>`}
                 ${this.tunnelType === 'tun'
@@ -1167,7 +1159,7 @@ export class TunnelDetailPage extends LitElement {
                   : t2.entrypoint
                     ? html`
                       <div class="info-row">
-                        <span class="info-label">Entrypoint</span>
+                        <span class="info-label">${t('fieldEntrypoint')}</span>
                         <span class="info-value">${t2.entrypoint}</span>
                         <button class="copy-btn-mini" @click=${() => this._handleCopy(t2.entrypoint)}>
                           ${icon('copy')}
@@ -1189,7 +1181,7 @@ export class TunnelDetailPage extends LitElement {
                 ${t2.options.hostname
                   ? html`
                     <div class="info-row">
-                      <span class="info-label">Hostname</span>
+                      <span class="info-label">${t('fieldHostname')}</span>
                       <span class="info-value text">${t2.options.hostname}</span>
                     </div>
                   `
@@ -1198,23 +1190,23 @@ export class TunnelDetailPage extends LitElement {
                   ? html`
                     <div class="info-row">
                       <span class="info-label">TLS</span>
-                      <span class="info-value text">${t2.options.enableTLS ? 'Enabled' : 'Disabled'}</span>
+                      <span class="info-value text">${t2.options.enableTLS ? t('commonEnabled') : t('commonDisabled')}</span>
                     </div>
                   `
                   : ''}
                 ${t2.options.username
                   ? html`
                     <div class="info-row">
-                      <span class="info-label">Auth</span>
-                      <span class="info-value text">Basic · ${t2.options.username}</span>
+                      <span class="info-label">${t('fieldAuth')}</span>
+                      <span class="info-value text">${t('switchBasicAuth')} · ${t2.options.username}</span>
                     </div>
                   `
                   : ''}
                 ${this.tunnelType === 'file'
                   ? html`
                     <div class="info-row">
-                      <span class="info-label">Upload</span>
-                      <span class="info-value text">${t2.options.file_upload ? 'Enabled' : 'Disabled'}</span>
+                      <span class="info-label">${t('switchFileUpload')}</span>
+                      <span class="info-value text">${t2.options.file_upload ? t('commonEnabled') : t('commonDisabled')}</span>
                     </div>
                   `
                   : ''}
@@ -1224,7 +1216,7 @@ export class TunnelDetailPage extends LitElement {
                   ? ''
                   : html`
                 <div class="info-row">
-                  <span class="info-label">Recording</span>
+                  <span class="info-label">${t('settingsRecordMode')}</span>
                   <span class="info-value text">${t(RECORD_MODE_OPTIONS.find(o => o.value === this._recordMode)?.labelKey ?? 'settingsRecordFull')}</span>
                 </div>
                 <div class="info-row" style="margin-top:-8px;">
@@ -1247,21 +1239,21 @@ export class TunnelDetailPage extends LitElement {
                 ? html`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${() => this._handleResetStats('conns')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('statTotalConns')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('conns')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatNumber(stats.total_conns)}</div>
                       <div class="stat-rate">${formatNumber(stats.current_conns)} active · ${stats.request_rate.toFixed(2)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${() => this._handleResetStats('errors')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('statTotalErrors')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('errors')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatNumber(stats.total_errs)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('p2pColDown')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatBytes(stats.output_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${() => this._handleResetStats('input')} title="${t('btnResetInput')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('p2pColUp')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('input')} title="${t('btnResetInput')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatBytes(stats.input_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.input_rate_bytes)}</div>
                     </div>
@@ -1459,16 +1451,10 @@ export class TunnelDetailPage extends LitElement {
           ? html`
             <div class="section">
               <div class="card" style="padding:16px;">
-                <!-- Type (readonly) -->
-                <div class="form-group">
-                  <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${typeLabel + ' Tunnel'}>
-                </div>
-
                 <!-- Name -->
                 <div class="form-group">
                   <label class="form-label">${t('fieldName')}</label>
-                  <input class="form-input" .value=${this._name} placeholder="My Tunnel"
+                  <input class="form-input" .value=${this._name} placeholder="${t('tunnelNamePlaceholder')}"
                     @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
                 </div>
 
@@ -1659,7 +1645,7 @@ export class TunnelDetailPage extends LitElement {
                 ${this.mode === 'edit'
                   ? html`
                     <div class="danger-zone">
-                      <div class="danger-zone-label">Danger Zone</div>
+                      <div class="danger-zone-label">${t('dangerZone')}</div>
                       <button class="pill-btn danger" title="${t('btnDelete')}" @click=${() => { this._showDeleteDialog = true; }}>
                         ${icon('trash')}
                       </button>

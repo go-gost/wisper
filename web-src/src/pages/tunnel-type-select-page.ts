@@ -2,18 +2,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
+import { typeIcon } from '../utils/type-icons';
 import { TUNNEL_TYPES } from '../api/types';
 import type { TunnelType } from '../api/types';
 import '../components/app-scaffold';
-
-const TYPE_ICONS: Record<TunnelType, string> = {
-  file: 'folder',
-  http: 'globe',
-  tcp: 'link',
-  udp: 'broadcast',
-  p2p: 'hub',
-  tun: 'network',
-};
 
 const TYPE_COLORS: Record<TunnelType, { bg: string; fg: string }> = {
   file: { bg: '#ecfdf5', fg: '#059669' },
@@ -94,7 +86,7 @@ export class TunnelTypeSelectPage extends LitElement {
         <div class="list">
           ${TUNNEL_TYPES.map(tt => html`
             <div class="type-card" @click=${() => this._navigate(`/tunnel/${tt.value}/new`)}>
-              <div class="type-icon" style="background:${TYPE_COLORS[tt.value].bg};color:${TYPE_COLORS[tt.value].fg}">${icon(TYPE_ICONS[tt.value])}</div>
+              <div class="type-icon" style="background:${TYPE_COLORS[tt.value].bg};color:${TYPE_COLORS[tt.value].fg}">${icon(typeIcon(tt.value))}</div>
               <div class="type-content">
                 <div class="type-title">
                   ${t(`type${tt.value.charAt(0).toUpperCase() + tt.value.slice(1)}`)} Tunnel

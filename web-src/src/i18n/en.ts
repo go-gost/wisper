@@ -372,6 +372,45 @@ const en: Record<string, string> = {
   settingsRecordHeadersDesc: 'Only request/response metadata (method, URL, status, headers) is recorded. Body content is excluded. Metadata is transmitted to the Wisper server.',
   settingsRecordOff: 'Off',
   settingsRecordOffDesc: 'No traffic data is captured. Only aggregate byte/connection counts are collected.',
+
+  // Detail-page info card
+  fieldCreated: 'Created',
+  fieldTarget: 'Target',
+  fieldEntrypoint: 'Entrypoint',
+  fieldAuth: 'Auth',
+  fieldTunnelId: 'Tunnel ID',
+  dangerZone: 'Danger Zone',
+  statTotalConns: 'Total Conns',
+  statTotalErrors: 'Total Errors',
+  commonEnabled: 'Enabled',
+  commonDisabled: 'Disabled',
+  tunnelNamePlaceholder: 'My Tunnel',
+  entrypointNamePlaceholder: 'My Entrypoint',
+  tunnelIdPlaceholder: 'Paste tunnel UUID',
+
+  // Settings page sections
+  settingsServerConfig: 'Server Configuration',
+  settingsPreferences: 'Preferences',
+  inspectorSettingsHint: 'Leave empty to disable traffic inspection.',
+  linkHome: 'Home',
+
+  // 404 page
+  pageNotFound: 'Page not found',
+  goHome: 'Go to Home',
+
+  // Inspector record detail (acronyms such as Host, Proto, URI, OpCode stay as-is)
+  recOverview: 'Overview',
+  recRemote: 'Remote',
+  recLocal: 'Local',
+  recClientIP: 'Client IP',
+  recService: 'Service',
+  recDuration: 'Duration',
+  recRequest: 'Request',
+  recMethod: 'Method',
+  recFrom: 'From',
+  recLength: 'Length',
+  recResponse: 'Response',
+  recLoading: 'Loading details…',
 };
 
 export default en;

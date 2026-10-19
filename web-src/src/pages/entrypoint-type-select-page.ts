@@ -2,16 +2,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
+import { typeIcon } from '../utils/type-icons';
 import { ENTRYPOINT_TYPES } from '../api/types';
 import type { EntrypointType } from '../api/types';
 import '../components/app-scaffold';
-
-const TYPE_ICONS: Record<EntrypointType, string> = {
-  tcp: 'link',
-  udp: 'broadcast',
-  p2p: 'hub',
-  tun: 'network',
-};
 
 const TYPE_COLORS: Record<EntrypointType, { bg: string; fg: string }> = {
   tcp: { bg: '#fef2f2', fg: '#dc2626' },
@@ -89,7 +83,7 @@ export class EntrypointTypeSelectPage extends LitElement {
         <div class="list">
           ${ENTRYPOINT_TYPES.map(et => html`
             <div class="type-card" @click=${() => this._navigate(`/entrypoint/${et.value}/new`)}>
-              <div class="type-icon" style="background:${TYPE_COLORS[et.value].bg};color:${TYPE_COLORS[et.value].fg}">${icon(TYPE_ICONS[et.value])}</div>
+              <div class="type-icon" style="background:${TYPE_COLORS[et.value].bg};color:${TYPE_COLORS[et.value].fg}">${icon(typeIcon(et.value))}</div>
               <div class="type-content">
                 <div class="type-title">
                   ${t(`type${et.value.charAt(0).toUpperCase() + et.value.slice(1)}`)} Entrypoint

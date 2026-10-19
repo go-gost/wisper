@@ -113,55 +113,55 @@ export class RecordDetail extends LitElement {
     return html`
       <div class="panel">
         ${this._loadingDetail ? html`
-          <div class="loading-detail"><wisper-spinner></wisper-spinner> Loading details...</div>
+          <div class="loading-detail"><wisper-spinner></wisper-spinner> ${t('recLoading')}</div>
         ` : ''}
 
         <div class="section">
-          <div class="section-title">Overview</div>
+          <div class="section-title">${t('recOverview')}</div>
           <div class="meta-grid">
             <div class="meta-item"><span class="meta-label">Host</span><span class="meta-value">${r.host}</span></div>
-            <div class="meta-item"><span class="meta-label">Remote</span><span class="meta-value">${r.remote}</span></div>
-            <div class="meta-item"><span class="meta-label">Local</span><span class="meta-value">${r.local}</span></div>
-            <div class="meta-item"><span class="meta-label">Client IP</span><span class="meta-value">${r.clientIP}</span></div>
-            <div class="meta-item"><span class="meta-label">Service</span><span class="meta-value">${r.service}</span></div>
+            <div class="meta-item"><span class="meta-label">${t('recRemote')}</span><span class="meta-value">${r.remote}</span></div>
+            <div class="meta-item"><span class="meta-label">${t('recLocal')}</span><span class="meta-value">${r.local}</span></div>
+            <div class="meta-item"><span class="meta-label">${t('recClientIP')}</span><span class="meta-value">${r.clientIP}</span></div>
+            <div class="meta-item"><span class="meta-label">${t('recService')}</span><span class="meta-value">${r.service}</span></div>
             <div class="meta-item"><span class="meta-label">Proto</span><span class="meta-value">${r.http?.proto || r.proto || '—'}</span></div>
             <div class="meta-item"><span class="meta-label">Bytes ↓</span><span class="meta-value">${r.inputBytes.toLocaleString()}</span></div>
             <div class="meta-item"><span class="meta-label">Bytes ↑</span><span class="meta-value">${r.outputBytes.toLocaleString()}</span></div>
-            <div class="meta-item"><span class="meta-label">Duration</span><span class="meta-value">${(r.duration / 1e6).toFixed(2)}ms</span></div>
-            <div class="meta-item"><span class="meta-label">Error</span><span class="meta-value">${r.err || '—'}</span></div>
+            <div class="meta-item"><span class="meta-label">${t('recDuration')}</span><span class="meta-value">${(r.duration / 1e6).toFixed(2)}ms</span></div>
+            <div class="meta-item"><span class="meta-label">${t('eventsLevelError')}</span><span class="meta-value">${r.err || '—'}</span></div>
           </div>
         </div>
 
         ${r.http ? html`
           <div class="section">
-            <div class="section-title">Request</div>
+            <div class="section-title">${t('recRequest')}</div>
             <div class="meta-grid">
-              <div class="meta-item"><span class="meta-label">Method</span><span class="meta-value">${r.http.method || '—'}</span></div>
+              <div class="meta-item"><span class="meta-label">${t('recMethod')}</span><span class="meta-value">${r.http.method || '—'}</span></div>
               <div class="meta-item"><span class="meta-label">Host</span><span class="meta-value">${r.http.host || '—'}</span></div>
               <div class="meta-item uri-item"><span class="meta-label">URI</span><span class="meta-value uri-text">${r.http.uri || '—'}</span></div>
             </div>
           </div>
           ${r.http.request.header ? html`
             <div class="section">
-              <div class="section-title">${t('inspectorDetailHeaders')} — Request</div>
+              <div class="section-title">${t('inspectorDetailHeaders')} — ${t('recRequest')}</div>
               <pre>${formatHeaders(r.http.request.header)}</pre>
             </div>
           ` : ''}
           ${r.http.response.header ? html`
             <div class="section">
-              <div class="section-title">${t('inspectorDetailHeaders')} — Response</div>
+              <div class="section-title">${t('inspectorDetailHeaders')} — ${t('recResponse')}</div>
               <pre>${formatHeaders(r.http.response.header)}</pre>
             </div>
           ` : ''}
           ${r.http.request.body ? html`
             <div class="section">
-              <div class="section-title">${t('inspectorDetailBody')} — Request</div>
+              <div class="section-title">${t('inspectorDetailBody')} — ${t('recRequest')}</div>
               <body-viewer .body=${r.http.request.body}></body-viewer>
             </div>
           ` : ''}
           ${r.http.response.body ? html`
             <div class="section">
-              <div class="section-title">${t('inspectorDetailBody')} — Response</div>
+              <div class="section-title">${t('inspectorDetailBody')} — ${t('recResponse')}</div>
               <body-viewer .body=${r.http.response.body}></body-viewer>
             </div>
           ` : ''}
@@ -171,9 +171,9 @@ export class RecordDetail extends LitElement {
           <div class="section">
             <div class="section-title">WebSocket</div>
             <div class="meta-grid">
-              <div class="meta-item"><span class="meta-label">From</span><span class="meta-value">${r.websocket.from}</span></div>
+              <div class="meta-item"><span class="meta-label">${t('recFrom')}</span><span class="meta-value">${r.websocket.from}</span></div>
               <div class="meta-item"><span class="meta-label">OpCode</span><span class="meta-value">${r.websocket.opcode}</span></div>
-              <div class="meta-item"><span class="meta-label">Length</span><span class="meta-value">${r.websocket.length}</span></div>
+              <div class="meta-item"><span class="meta-label">${t('recLength')}</span><span class="meta-value">${r.websocket.length}</span></div>
             </div>
             ${r.websocket.payload ? html`
               <div class="section-title" style="margin-top:8px;">Payload</div>

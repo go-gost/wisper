@@ -1,4 +1,4 @@
-import{a as v,c as r,b as c,i as f,t as u}from"./index-DsEvkZUG.js";import{i as s}from"./app-scaffold-DTdfNPYy.js";import{E as g}from"./types-DwVOrt_K.js";var b=Object.getOwnPropertyDescriptor,y=(t,n,l,i)=>{for(var e=i>1?void 0:i?b(n,l):n,a=t.length-1,p;a>=0;a--)(p=t[a])&&(e=p(e)||e);return e};const x={tcp:"link",udp:"broadcast",p2p:"hub",tun:"network"},d={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"},tun:{bg:"#ecfeff",fg:"#0e7490"}};let o=class extends v{_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return c`
+import{a as v,c as r,b as c,i as f,t as g}from"./index-CUnfJ7Vo.js";import{i as s}from"./app-scaffold-DdsZixJz.js";import{t as u}from"./type-icons-DsI-rt1W.js";import{E as b}from"./types-DwVOrt_K.js";var y=Object.getOwnPropertyDescriptor,x=(e,i,l,n)=>{for(var t=n>1?void 0:n?y(i,l):i,a=e.length-1,p;a>=0;a--)(p=e[a])&&(t=p(t)||t);return t};const d={tcp:{bg:"#fef2f2",fg:"#dc2626"},udp:{bg:"#fefce8",fg:"#d97706"},p2p:{bg:"#f5f3ff",fg:"#7c3aed"},tun:{bg:"#ecfeff",fg:"#0e7490"}};let o=class extends v{_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){return c`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
@@ -8,15 +8,15 @@ import{a as v,c as r,b as c,i as f,t as u}from"./index-DsEvkZUG.js";import{i as 
         </div>
 
         <div class="list">
-          ${g.map(t=>c`
-            <div class="type-card" @click=${()=>this._navigate(`/entrypoint/${t.value}/new`)}>
-              <div class="type-icon" style="background:${d[t.value].bg};color:${d[t.value].fg}">${s(x[t.value])}</div>
+          ${b.map(e=>c`
+            <div class="type-card" @click=${()=>this._navigate(`/entrypoint/${e.value}/new`)}>
+              <div class="type-icon" style="background:${d[e.value].bg};color:${d[e.value].fg}">${s(u(e.value))}</div>
               <div class="type-content">
                 <div class="type-title">
-                  ${r(`type${t.value.charAt(0).toUpperCase()+t.value.slice(1)}`)} Entrypoint
+                  ${r(`type${e.value.charAt(0).toUpperCase()+e.value.slice(1)}`)} Entrypoint
                 </div>
                 <div class="type-desc">
-                  ${r(`type${t.value.charAt(0).toUpperCase()+t.value.slice(1)}EntryDesc`)}
+                  ${r(`type${e.value.charAt(0).toUpperCase()+e.value.slice(1)}EntryDesc`)}
                 </div>
               </div>
               <span class="type-arrow">${s("chevron-right")}</span>
@@ -71,4 +71,4 @@ import{a as v,c as r,b as c,i as f,t as u}from"./index-DsEvkZUG.js";import{i as 
     .type-arrow {
       color: var(--text-muted); flex-shrink: 0;
     }
-  `;o=y([u("entrypoint-type-select-page")],o);export{o as EntrypointTypeSelectPage};
+  `;o=x([g("entrypoint-type-select-page")],o);export{o as EntrypointTypeSelectPage};

@@ -1,6 +1,7 @@
 import { Router } from '@lit-labs/router';
 import type { ReactiveControllerHost } from 'lit';
 import { html } from 'lit';
+import { t } from '../i18n/i18n';
 
 // Lazy imports — Vite code-splits these automatically.
 const homePage = () => import('../pages/home-page');
@@ -158,8 +159,8 @@ export function createRouter(host: ReactiveControllerHost & HTMLElement) {
         render: () => html`
           <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center;color:var(--text-muted);gap:12px">
             <div style="font-size:48px;font-weight:300;color:var(--text-muted)">404</div>
-            <div style="font-size:var(--font-md);color:var(--text-secondary)">Page not found</div>
-            <a href="/" style="color:var(--accent);font-size:var(--font-sm);text-decoration:none;margin-top:8px">Go to Home</a>
+            <div style="font-size:var(--font-md);color:var(--text-secondary)">${t('pageNotFound')}</div>
+            <a href="/" style="color:var(--accent);font-size:var(--font-sm);text-decoration:none;margin-top:8px">${t('goHome')}</a>
           </div>
         `,
         enter: async () => true,

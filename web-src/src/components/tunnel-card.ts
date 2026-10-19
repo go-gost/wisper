@@ -13,7 +13,7 @@ import type { ServiceStatus } from '../api/types';
  * Renders separately inside its own Shadow DOM with design-token colours.
  *
  * @attr name      - Display name.
- * @attr typeLabel - Service type label (e.g. "HTTP").
+ * @attr typeIcon  - Type glyph name (see utils/type-icons).
  * @attr meta      - Secondary line text (e.g. "3 conns" or "Stopped").
  * @attr status    - running | stopped | error (drives dot colour).
  * @attr endpoint  - Copyable address shown in expanded/standalone mode.
@@ -23,7 +23,7 @@ import type { ServiceStatus } from '../api/types';
 @customElement('tunnel-card')
 export class TunnelCard extends LitElement {
   @property() name = '';
-  @property() typeLabel = '';
+  @property() typeIcon = '';
   @property() meta = '';
   @property() status: ServiceStatus = 'stopped';
   @property() endpoint = '';
@@ -122,10 +122,21 @@ export class TunnelCard extends LitElement {
       white-space: nowrap;
     }
 
-    .type-label,
     .meta {
       font-size: var(--font-sm);
       color: var(--text-muted);
+    }
+
+    /* The service type as its icon, on its own line under the name: the same
+       glyph a detail page's header draws, at the meta line's own scale. */
+    .type-icon {
+      display: flex;
+      align-items: center;
+      color: var(--text-muted);
+    }
+    .type-icon svg {
+      width: 14px;
+      height: 14px;
     }
 
     /* ── p2p transport: one small icon beside the created-at, the reason in
@@ -255,7 +266,7 @@ export class TunnelCard extends LitElement {
 
         <div class="info">
           <div class="name">${this.name}</div>
-          ${this.typeLabel ? html`<div class="type-label">${this.typeLabel}</div>` : ''}
+          ${this.typeIcon ? html`<div class="type-icon">${icon(this.typeIcon)}</div>` : ''}
           ${this.meta ? html`<div class="meta">${this.meta}</div>` : ''}
         </div>
 

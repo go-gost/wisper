@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
+import { typeIcon } from '../utils/type-icons';
 import { transportStyle } from '../utils/transport';
 import { armVpn, tunDeviceHolder } from '../utils/vpn';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
@@ -431,10 +432,6 @@ export class EntrypointDetailPage extends LitElement {
     }
   }
 
-  private _typeLabel(): string {
-    return this.entrypointType.toUpperCase();
-  }
-
   private _cycleOption<T>(current: T, options: T[]): T {
     const idx = options.indexOf(current);
     return options[(idx + 1) % options.length];
@@ -839,7 +836,6 @@ export class EntrypointDetailPage extends LitElement {
   render() {
     const ep = this._entrypoint;
     const stats = ep ? ep.stats : null;
-    const typeLabel = this._typeLabel();
     const peer = ep?.options?.peer ?? '';
 
     return html`
@@ -848,11 +844,7 @@ export class EntrypointDetailPage extends LitElement {
           <button class="back-btn" @click=${() => this._handleBack()}>
             ${icon('chevron-left')}
           </button>
-          <span class="page-title">
-            ${this.mode === 'create'
-              ? `${t('entrypointNewTitle')} — ${typeLabel}`
-              : typeLabel + ' Entrypoint'}
-          </span>
+          <span class="page-title">${icon(typeIcon(this.entrypointType))}</span>
 
           ${this.mode === 'view' && ep
             ? html`
@@ -903,18 +895,18 @@ export class EntrypointDetailPage extends LitElement {
             <div class="section">
               <div class="card">
                 <div class="info-row">
-                  <span class="info-label">Type</span>
-                  <span class="info-value text">${typeLabel} Entrypoint</span>
+                  <span class="info-label">${t('fieldName')}</span>
+                  <span class="info-value text">${ep.name}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">Created</span>
+                  <span class="info-label">${t('fieldCreated')}</span>
                   <span class="info-value text">${formatTimestamp(ep.created_at)}</span>
                 </div>
                 ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
                   ? ''
                   : html`
                 <div class="info-row">
-                  <span class="info-label">Tunnel ID</span>
+                  <span class="info-label">${t('fieldTunnelId')}</span>
                   <span class="info-value uuid">${ep.id ?? '—'}</span>
                   ${ep.id
                     ? html`<button class="copy-btn-mini" @click=${() => this._handleCopy(ep.id)}>
@@ -923,11 +915,7 @@ export class EntrypointDetailPage extends LitElement {
                     : ''}
                 </div>`}
                 <div class="info-row">
-                  <span class="info-label">Name</span>
-                  <span class="info-value text">${ep.name}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">${this.entrypointType === 'tun' ? t('fieldNet') : 'Bind Address'}</span>
+                  <span class="info-label">${this.entrypointType === 'tun' ? t('fieldNet') : t('fieldBindAddress')}</span>
                   <span class="info-value">${ep.entrypoint}</span>
                 </div>
                 ${this.entrypointType === 'tun'
@@ -1002,21 +990,21 @@ export class EntrypointDetailPage extends LitElement {
                 ? html`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">Total Conns <span class="stat-reset-mini" @click=${() => this._handleResetStats('conns')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('statTotalConns')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('conns')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatNumber(stats.total_conns)}</div>
                       <div class="stat-rate">${formatNumber(stats.current_conns)} active · ${stats.request_rate.toFixed(2)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Total Errors <span class="stat-reset-mini" @click=${() => this._handleResetStats('errors')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('statTotalErrors')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('errors')} title="${t('btnResetStats')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatNumber(stats.total_errs)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Download <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('p2pColDown')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('output')} title="${t('btnResetOutput')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatBytes(stats.output_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">Upload <span class="stat-reset-mini" @click=${() => this._handleResetStats('input')} title="${t('btnResetInput')}">${icon('rotate-cw')}</span></div>
+                      <div class="stat-label">${t('p2pColUp')} <span class="stat-reset-mini" @click=${() => this._handleResetStats('input')} title="${t('btnResetInput')}">${icon('rotate-cw')}</span></div>
                       <div class="stat-value">${formatBytes(stats.input_bytes)}</div>
                       <div class="stat-rate">${formatRate(stats.input_rate_bytes)}</div>
                     </div>
@@ -1058,11 +1046,6 @@ export class EntrypointDetailPage extends LitElement {
           ? html`
             <div class="section">
               <div class="card" style="padding:16px;">
-                <div class="form-group">
-                  <label class="form-label">Type</label>
-                  <input class="form-input" readonly .value=${typeLabel + ' Entrypoint'}>
-                </div>
-
                 <!-- What a tun entrypoint is and what it needs, before the fields
                      it implies: the device is the one thing here that can make
                      the save fail. -->
@@ -1078,17 +1061,17 @@ export class EntrypointDetailPage extends LitElement {
                   ? ''
                   : html`
                 <div class="form-group">
-                  <label class="form-label">Tunnel ID</label>
+                  <label class="form-label">${t('fieldTunnelId')}</label>
                   <input class="form-input"
                     ?readonly=${this.mode === 'edit'}
                     .value=${this._tunnelId}
-                    placeholder="Paste tunnel UUID"
+                    placeholder="${t('tunnelIdPlaceholder')}"
                     @input=${(e: Event) => { this._tunnelId = (e.target as HTMLInputElement).value; }}>
                 </div>`}
 
                 <div class="form-group">
                   <label class="form-label">${t('fieldName')}</label>
-                  <input class="form-input" .value=${this._name} placeholder="My Entrypoint"
+                  <input class="form-input" .value=${this._name} placeholder="${t('entrypointNamePlaceholder')}"
                     @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
                 </div>
 
@@ -1168,7 +1151,7 @@ export class EntrypointDetailPage extends LitElement {
                   ? html`
                     <div class="form-group">
                       <label class="form-label">${t('entrypointPeerKey')}</label>
-                      <input class="form-input" .value=${this._peer} placeholder="Base64 public key"
+                      <input class="form-input" .value=${this._peer} placeholder="${t('peersKeyPlaceholder')}"
                         @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
                     </div>
                     <!-- No keepalive, no ttl: this entrypoint reaches its hub
@@ -1206,7 +1189,7 @@ export class EntrypointDetailPage extends LitElement {
                 ${this.mode === 'edit'
                   ? html`
                     <div class="danger-zone">
-                      <div class="danger-zone-label">Danger Zone</div>
+                      <div class="danger-zone-label">${t('dangerZone')}</div>
                       <button class="pill-btn danger" @click=${() => { this._showDeleteDialog = true; }}>
                         ${icon('trash')} ${t('btnDelete')}
                       </button>

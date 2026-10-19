@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
+import { typeIcon } from '../utils/type-icons';
 import { copyToClipboard } from '../utils/clipboard';
 import { formatNumber } from '../utils/format';
 import { transportView, type TransportView } from '../utils/transport';
@@ -154,8 +155,8 @@ export class HomePage extends LitElement {
     return item.kind === 'entrypoint' ? (item.data.peer_rtt_ms ?? 0) : 0;
   }
 
-  private _typeLabel(item: Item): string {
-    return item.data.type.toUpperCase();
+  private _typeIcon(item: Item): string {
+    return typeIcon(item.data.type);
   }
 
   // ── Empty state ───────────────────────────────────────────────────────
@@ -800,7 +801,7 @@ export class HomePage extends LitElement {
                     <div data-item-id="${item.data.id}">
                       <tunnel-card
                         .name=${item.data.name}
-                        .typeLabel=${this._typeLabel(item)}
+                        .typeIcon=${this._typeIcon(item)}
                         .rtt=${this._rtt(item)}
                         .transport=${this._transport(item)}
                         .meta=${this._metaLine(item)}
@@ -840,12 +841,12 @@ export class HomePage extends LitElement {
                               </div>
                               ${item.kind === 'tunnel' && (item.data as import('../api/types').Tunnel).options?.hostname
                                 ? html`<div class="detail-row">
-                                  <span class="dlabel">Host Rewrite</span>
+                                  <span class="dlabel">${t('switchRewriteHost')}</span>
                                   <span class="dval"><span class="dval-mono">${(item.data as import('../api/types').Tunnel).options.hostname}</span></span>
                                 </div>`
                                 : ''}
                               ${item.data.error
-                                ? html`<div class="detail-row error"><span class="dlabel">Error</span><span class="dval error-text"><span class="dval-mono">${item.data.error}</span></span></div>`
+                                ? html`<div class="detail-row error"><span class="dlabel">${t('eventsLevelError')}</span><span class="dval error-text"><span class="dval-mono">${item.data.error}</span></span></div>`
                                 : ''}
                             </div>
                             <div class="expand-actions">

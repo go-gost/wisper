@@ -359,6 +359,45 @@ const zh: Record<string, string> = {
   settingsRecordHeadersDesc: '仅记录请求/响应元数据（方法、URL、状态码、头信息），不含正文。元数据将传输到 Wisper 服务器。',
   settingsRecordOff: '关闭',
   settingsRecordOffDesc: '不捕获任何流量数据，仅收集聚合的字节数和连接数统计。',
+
+  // 详情页信息卡
+  fieldCreated: '创建时间',
+  fieldTarget: '目标',
+  fieldEntrypoint: '入口',
+  fieldAuth: '认证',
+  fieldTunnelId: '隧道 ID',
+  dangerZone: '危险操作',
+  statTotalConns: '总连接数',
+  statTotalErrors: '总错误数',
+  commonEnabled: '已启用',
+  commonDisabled: '已禁用',
+  tunnelNamePlaceholder: '我的隧道',
+  entrypointNamePlaceholder: '我的入口',
+  tunnelIdPlaceholder: '粘贴隧道 UUID',
+
+  // 设置页分区
+  settingsServerConfig: '服务器配置',
+  settingsPreferences: '偏好设置',
+  inspectorSettingsHint: '留空则不启用流量检查。',
+  linkHome: '主页',
+
+  // 404 页面
+  pageNotFound: '页面不存在',
+  goHome: '返回首页',
+
+  // 流量检查记录详情（Host、Proto、URI、OpCode 等缩写保留原样）
+  recOverview: '概览',
+  recRemote: '远端',
+  recLocal: '本地',
+  recClientIP: '客户端 IP',
+  recService: '服务',
+  recDuration: '耗时',
+  recRequest: '请求',
+  recMethod: '方法',
+  recFrom: '来源',
+  recLength: '长度',
+  recResponse: '响应',
+  recLoading: '正在加载详情…',
 };
 
 export default zh;
