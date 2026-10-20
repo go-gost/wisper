@@ -91,7 +91,7 @@ func TestProbeEventSignals(t *testing.T) {
 
 	direct := true
 	peer, err := endpoint.New(&p2p.Config{
-		Derp: derpURL, KeyHex: strings.Repeat("45", 32), Stun: stun,
+		Derp: derpURL, Key: strings.Repeat("45", 32), Stun: stun,
 		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
 	})
 	if err != nil {

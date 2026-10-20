@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -328,6 +329,49 @@ func TestEnsureP2PIdentity(t *testing.T) {
 	// The host is idle again; P2PHostPublicKey still reports the identity.
 	if got := P2PHostPublicKey(); got != pub {
 		t.Fatalf("P2PHostPublicKey with the host idle = %q, want %q", got, pub)
+	}
+}
+
+// TestEnsureP2PIdentityConcurrent: the identity is created once even when
+// several callers ask for it at the same time. Every caller must see the same
+// key and the file must stay 0600.
+func TestEnsureP2PIdentityConcurrent(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+	if p2pHost.refs != 0 || p2pHost.host != nil {
+		t.Fatal("manager is not idle: a previous test leaked a reference")
+	}
+
+	const n = 16
+	pubs := make([]string, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			pubs[i], errs[i] = EnsureP2PIdentity()
+		}(i)
+	}
+	wg.Wait()
+
+	for i := range pubs {
+		if errs[i] != nil {
+			t.Fatalf("caller %d: %v", i, errs[i])
+		}
+		if pubs[i] != pubs[0] {
+			t.Fatalf("caller %d got %q, want %q", i, pubs[i], pubs[0])
+		}
+	}
+	if len(pubs[0]) != 43 {
+		t.Fatalf("public key = %q (%d chars), want a 43-char base64 key", pubs[0], len(pubs[0]))
+	}
+	fi, err := os.Stat(P2PHostKeyPath())
+	if err != nil {
+		t.Fatalf("host.key: %v", err)
+	}
+	if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("host.key mode = %o, want 600", perm)
 	}
 }
 

@@ -41,7 +41,7 @@ func newDialingHost(t *testing.T, derp, keyHex string) *endpoint.Endpoint {
 	t.Helper()
 	direct, secure := false, false
 	h, err := endpoint.New(&p2p.Config{
-		Derp: derp, KeyHex: keyHex,
+		Derp: derp, Key: keyHex,
 		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
 	})
 	if err != nil {
@@ -291,7 +291,7 @@ func TestP2PTunnelDirectPath(t *testing.T) {
 	// candidate source (Wisper's own host gets one from the same STUN setting).
 	direct := true
 	peer, err := endpoint.New(&p2p.Config{
-		Derp: derp, KeyHex: strings.Repeat("45", 32), Stun: stun,
+		Derp: derp, Key: strings.Repeat("45", 32), Stun: stun,
 		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
 	})
 	if err != nil {

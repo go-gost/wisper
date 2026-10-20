@@ -37,7 +37,7 @@ func TestP2PEntryPointDialsPeerByKey(t *testing.T) {
 
 	// The peer side: an in-process host holding the echo as its target.
 	peer, err := endpoint.New(&p2p.Config{
-		Derp: derp, KeyHex: strings.Repeat("44", 32),
+		Derp: derp, Key: strings.Repeat("44", 32),
 		Direct: &direct, TLS: &p2p.TLSConfig{Secure: &secure},
 		Targets: []string{"tcp://" + echo},
 	})

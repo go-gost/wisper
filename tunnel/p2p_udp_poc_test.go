@@ -290,7 +290,7 @@ func startUDPEntrypoint(t *testing.T, wrap func(xp2p.Tunnel) xp2p.Tunnel, echoDe
 	newHost := func(keyHex string, targets []string) *endpoint.Endpoint {
 		h, err := endpoint.New(&p2p.Config{
 			Derp:    derp,
-			KeyHex:  keyHex,
+			Key:     keyHex,
 			Direct:  &direct,
 			TLS:     &p2p.TLSConfig{Secure: &secure},
 			Targets: targets,

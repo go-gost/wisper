@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -57,10 +59,12 @@ type PendingPeer struct {
 }
 
 // P2PHostKeyPath is the process-wide p2p identity: <config dir>/p2p/host.key
-// (0600, created on first use). One host, one identity, shared by every p2p
-// tunnel and entrypoint. It hangs off the app's config directory rather than
-// $XDG_CONFIG_HOME: Android defines neither that nor $HOME, and the desktop
-// default config directory already is $XDG_CONFIG_HOME/wisper.
+// (0600, created on first use by wisper). One host, one identity, shared by
+// every p2p tunnel and entrypoint. p2p itself never creates the file; it only
+// consumes the key passed in Config.Key. It hangs off the app's config
+// directory rather than $XDG_CONFIG_HOME: Android defines neither that nor
+// $HOME, and the desktop default config directory already is
+// $XDG_CONFIG_HOME/wisper.
 func P2PHostKeyPath() string {
 	return filepath.Join(cfg.Dir(), "p2p", "host.key")
 }
@@ -109,9 +113,8 @@ func P2PHostPublicKey() string {
 }
 
 // EnsureP2PIdentity returns the process-wide p2p public key, creating the
-// identity file on first use. It needs no running service: p2p.New performs no
-// network I/O (the DERP connect is deferred to Connect), so two sides can
-// exchange keys before either is configured.
+// identity file on first use. Wisper owns generation and storage: p2p only
+// consumes the key, so no host has to run (or even exist) to name the identity.
 func EnsureP2PIdentity() (string, error) { return p2pHost.ensurePublicKey() }
 
 // P2PHostRunning reports whether the shared host is started (a p2p tunnel or
@@ -195,24 +198,84 @@ func P2PHostStatus() p2p.Status {
 }
 
 // ensurePublicKey returns the running host's key, or materializes the identity
-// reader-only when no host is running. The manager lock keeps a concurrent
-// acquire from racing the transient host on the same key file.
+// when no host is running. The manager lock keeps concurrent callers from
+// racing on the key file; no host is started just to read the identity.
 func (m *p2pHostManager) ensurePublicKey() (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.host != nil {
 		return m.host.PublicKey(), nil
 	}
-	host, err := endpoint.New(&p2p.Config{
-		Derp: P2PDerpURL(cfg.Get().Settings),
-		Key:  P2PHostKeyPath(),
-	})
+	_, pub, err := m.ensureIdentityLocked()
 	if err != nil {
 		return "", fmt.Errorf("p2p identity: %w", err)
 	}
-	pub := host.PublicKey()
-	_ = host.Close()
 	return pub, nil
+}
+
+// ensureIdentityLocked reads the process-wide identity, creating the key file
+// on first use. The caller holds m.mu. O_EXCL makes creation atomic across
+// processes; if another process wins the race, read back what it wrote (a
+// small file write can briefly be observed as empty).
+func (m *p2pHostManager) ensureIdentityLocked() (hexKey, publicKey string, err error) {
+	path := P2PHostKeyPath()
+	hexKey, publicKey, err = readIdentity(path)
+	if err == nil {
+		return hexKey, publicKey, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return "", "", fmt.Errorf("p2p identity %s: %w", path, err)
+	}
+
+	hexKey, publicKey, err = p2p.GenerateKey()
+	if err != nil {
+		return "", "", fmt.Errorf("p2p identity: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", "", fmt.Errorf("p2p identity %s: %w", path, err)
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, fs.ErrExist) {
+		// Another process created it between our read and our create.
+		return readIdentityEventually(path)
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("p2p identity %s: %w", path, err)
+	}
+	if _, err := f.WriteString(hexKey + "\n"); err != nil {
+		_ = f.Close()
+		return "", "", fmt.Errorf("p2p identity %s: %w", path, err)
+	}
+	if err := f.Close(); err != nil {
+		return "", "", fmt.Errorf("p2p identity %s: %w", path, err)
+	}
+	return hexKey, publicKey, nil
+}
+
+func readIdentity(path string) (hexKey, publicKey string, err error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", err
+	}
+	hexKey = strings.TrimSpace(string(b))
+	publicKey, err = p2p.PublicKeyFromHex(hexKey)
+	if err != nil {
+		return "", "", err
+	}
+	return hexKey, publicKey, nil
+}
+
+// readIdentityEventually waits out a concurrent creator's write. The window is
+// tiny (one small write), but a reader that lands inside it must not fail.
+func readIdentityEventually(path string) (hexKey, publicKey string, err error) {
+	for i := 0; i < 20; i++ {
+		hexKey, publicKey, err = readIdentity(path)
+		if err == nil {
+			return hexKey, publicKey, nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return "", "", fmt.Errorf("p2p identity %s: %w", path, err)
 }
 
 // acquire starts the host on first use (key + relay + Listen + accept loop) and
@@ -234,10 +297,14 @@ func (m *p2pHostManager) acquire(ctx context.Context) (*endpoint.Endpoint, error
 		m.teardownLocked()
 	}
 	if m.host == nil {
+		hexKey, _, err := m.ensureIdentityLocked()
+		if err != nil {
+			return nil, fmt.Errorf("p2p identity: %w", err)
+		}
 		direct := P2PDirect(settings)
 		conf := &p2p.Config{
 			Derp:   P2PDerpURL(settings),
-			Key:    P2PHostKeyPath(),
+			Key:    hexKey,
 			Stun:   p2pHostStun(settings),
 			Direct: &direct,
 		}
@@ -817,7 +884,7 @@ func TestP2PRelay(derp string, secure *bool, caFile string) (string, time.Durati
 	direct := false
 	host, err := endpoint.New(&p2p.Config{
 		Derp:   derp,
-		KeyHex: hex.EncodeToString(key[:]),
+		Key:    hex.EncodeToString(key[:]),
 		Direct: &direct,
 		TLS:    &p2p.TLSConfig{Secure: secure, CAFile: caFile},
 	})
