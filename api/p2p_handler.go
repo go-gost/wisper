@@ -126,6 +126,12 @@ func handleGetP2PDoctor(w http.ResponseWriter, r *http.Request) {
 		Version:  version.Version,
 		Identity: tunnel.P2PHostPublicKey(),
 		Peer:     r.URL.Query().Get("peer"),
+		// The status is read in process, so a field the engine left at zero
+		// means the measurement has not happened — not that the control plane
+		// did not carry it. Without this the report says "not reported by the
+		// control plane" about the relay's liveness and the per-peer NAT shape
+		// while printing both of them two lines above.
+		InProcess: true,
 	}
 	if s := config.Get().Settings; s != nil && s.P2P != nil {
 		opts.RelayURL = tunnel.P2PDerpURL(s)
