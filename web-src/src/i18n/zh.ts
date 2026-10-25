@@ -308,7 +308,7 @@ const zh: Record<string, string> = {
   p2pTransportWhyNoCandidates: '没有可用的 STUN 服务器且无 IPv6',
   p2pTransportWhyStun: 'STUN 服务器无响应',
   p2pTransportWhyServerUnreachable: '服务器（中继）不可达',
-  // 传输徽标旁 ⓘ 点开的详情：先说连接是好的，再说为什么没走直连。  p2pTransportConnected: '已连接',
+  p2pTransportUnreachable: '不可达',  // 传输徽标旁 ⓘ 点开的详情：先说连接是好的，再说为什么没走直连。  p2pTransportConnected: '已连接',
   p2pTransportDetail: '状态详情',
   e2eEncrypted: '端到端加密',
   p2pPeersEmpty: '未配置对端——没有入站流量能到达该隧道。',

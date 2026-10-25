@@ -75,9 +75,9 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     whyKey: 'p2pTransportWhyStun',
   },
   'server-unreachable': {
-    icon: 'hub',
+    icon: 'close',
     tone: 'warn',
-    labelKey: 'p2pTransportRelay',
+    labelKey: 'p2pTransportUnreachable',
     whyKey: 'p2pTransportWhyServerUnreachable',
   },
 };
