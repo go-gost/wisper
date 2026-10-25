@@ -211,7 +211,9 @@ const en: Record<string, string> = {
   hubNoReflowTitle: 'No return traffic from the hub',
   hubNoReflowHint:
     'Uplink only, no downlink for about a minute. Check: is the hub running, is this address on the hub allowlist, does the token match; tap to see the event history.',
-  tunNetMatchesHub:
+  serverUnreachableTitle: 'Server (hub) is unreachable',
+  serverUnreachableHint:
+    'This entrypoint is running but has no session to the server. Check: is the hub started, is the network up, does the peer key match.',  tunNetMatchesHub:
     'This must be the address the hub assigned to this peer — copy it from the hub\'s peers page.',
   peersTitle: 'Allowed peers',
   peersEntryDesc: '{n} allowed — manage the list',

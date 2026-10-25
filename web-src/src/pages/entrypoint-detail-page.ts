@@ -882,6 +882,17 @@ export class EntrypointDetailPage extends LitElement {
                 </div>
               `
               : nothing}
+            ${this.entrypointType === 'tun' && ep.status === 'running' && (ep.peer_transport === 'server-unreachable' || !ep.peer_transport)
+              ? html`
+                <div class="status-banner degraded">
+                  <span class="status-dot-mini"></span>
+                  <div style="flex:1;">
+                    <div>${t('serverUnreachableTitle')}</div>
+                    <div class="degraded-hint">${t('serverUnreachableHint')}</div>
+                  </div>
+                </div>
+              `
+              : nothing}
 
             <div class="section">
               <div class="card">

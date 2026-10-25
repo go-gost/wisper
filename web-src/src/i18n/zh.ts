@@ -205,7 +205,9 @@ const zh: Record<string, string> = {
   hubNoReflowTitle: 'hub 无回流：只发包、无回包',
   hubNoReflowHint:
     '已持续约 1 分钟只有上行、没有下行。排查：hub 是否在运行、本机地址是否在 hub 白名单、token 是否一致；点此看历史事件。',
-  tunNetMatchesHub: '这里必须填 hub 分配给该 peer 的地址，从 hub 的 peers 页复制。',
+  serverUnreachableTitle: '服务器（hub）不可达',
+  serverUnreachableHint:
+    '该 entrypoint 正在运行，但与服务器没有会话。排查：hub 是否已启动、网络是否通畅、peer key 是否一致。',  tunNetMatchesHub: '这里必须填 hub 分配给该 peer 的地址，从 hub 的 peers 页复制。',
   peersTitle: '允许的对端',
   peersEntryDesc: '{n} 个已允许 — 管理列表',
   peersNoAlias: '无别名',
