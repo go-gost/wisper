@@ -319,9 +319,9 @@ const en: Record<string, string> = {
   p2pTransportWhyPeerDirectOff: 'the peer has the direct path off',
   p2pTransportWhyNoCandidates: 'no usable STUN server and no IPv6',
   p2pTransportWhyStun: 'STUN server does not answer',
+  p2pTransportWhyServerUnreachable: 'Server (relay) is unreachable',
   // The ⓘ next to the transport badge: the connection first, then why the path
-  // is not direct.
-  p2pTransportConnected: 'Connected',
+  // is not direct.  p2pTransportConnected: 'Connected',
   p2pTransportDetail: 'Status details',
   e2eEncrypted: 'End-to-end encrypted',
   p2pPeersEmpty: 'No peers configured — no inbound traffic reaches this tunnel.',

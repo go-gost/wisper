@@ -13,7 +13,8 @@ export type PeerTransport =
   | 'disabled'
   | 'peer-direct-off'
   | 'no-candidates'
-  | 'stun-unreachable';
+  | 'stun-unreachable'
+  | 'server-unreachable';
 
 /** The i18n keys are resolved per call: labels must follow the locale. */
 interface TransportSpec {
@@ -72,6 +73,12 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     tone: 'warn',
     labelKey: 'p2pTransportRelay',
     whyKey: 'p2pTransportWhyStun',
+  },
+  'server-unreachable': {
+    icon: 'hub',
+    tone: 'warn',
+    labelKey: 'p2pTransportRelay',
+    whyKey: 'p2pTransportWhyServerUnreachable',
   },
 };
 

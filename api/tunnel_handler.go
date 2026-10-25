@@ -440,10 +440,18 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	// both the path word and the per-peer diagnostics.
 	var transports map[string]string
 	var diagnostics map[string]p2p.PeerDiagnostic
+	relayConnected := true
 	if hasP2PPeers(opts) {
 		st := tunnel.P2PHostStatus()
 		transports = st.PeerTransports
 		diagnostics = st.PeerDiagnostics
+		// A running p2p host whose relay is down cannot reach the server
+		// (relay) at all: peers that have no live session read as
+		// "server-unreachable" rather than nothing, so the condition is
+		// visible on the card instead of only in the event log.
+		if tunnel.P2PHostRunning() {
+			relayConnected = st.RelayConnected
+		}
 	}
 	// The hub's LAN routing, read once and used twice: the peer rows' LAN
 	// column below and the routes list at the end are two views of one RIB
@@ -461,10 +469,14 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		for _, p := range ps.PeerStats() {
 			d := diagnostics[p.Key]
 			srtt, rto, rttvar, live := peerRTTFields(diagnostics, p.Key)
+			transport := transports[p.Key]
+			if transport == "" && !relayConnected && tunnel.P2PHostRunning() {
+				transport = "server-unreachable"
+			}
 			row := peerStatsJSON{
 				Key:             p.Key,
 				Alias:           opts.PeerAliases[p.Key],
-				Transport:       transports[p.Key],
+				Transport:       transport,
 				Reason:          d.Reason,
 				State:           d.State,
 				Failed:          d.Failed,
@@ -500,6 +512,9 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	}
 	if rttPeer != "" {
 		resp.PeerTransport = transports[rttPeer]
+		if resp.PeerTransport == "" && !relayConnected && tunnel.P2PHostRunning() {
+			resp.PeerTransport = "server-unreachable"
+		}
 		resp.PeerRTTMs, resp.PeerRtoMs, resp.PeerRttVarMs, resp.PeerKcpLive = peerRTTFields(diagnostics, rttPeer)
 	}
 	// The routes table and the per-spoke column on the allowlist above are the
