@@ -150,6 +150,7 @@ All routes under `/api/`:
 | `GET` | `/api/events` | Host-level event history |
 | `DELETE` | `/api/events` | Clear the host-level event history |
 | `GET` | `/api/p2p` | This host's p2p identity (public key, status) |
+| `POST` | `/api/p2p/reset` | Rotate the p2p identity; requires `{"confirm":true}` and restarts p2p consumers |
 | `POST` | `/api/p2p/test` | Probe the configured DERP relay |
 | `POST` | `/api/p2p/test-stun` | Probe the STUN server |
 | `GET` | `/api/p2p/pending` | Peers that knocked but are not allowlisted |

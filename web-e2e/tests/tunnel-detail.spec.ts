@@ -174,6 +174,60 @@ test('the tun hub form explains itself before its fields', async ({ page }) => {
 });
 
 /**
+ * Every hint in the tun hub form reads at one size.
+ *
+ * The sharing-backend hint already sat in the right place but was written with
+ * the view-mode `record-desc` class instead of the form's `p2p-hint`, so it
+ * rendered a step larger than the hints directly above it — invisible to the
+ * Go tests and to `make typecheck`, obvious on the page. Comparing computed
+ * sizes (not class names) is what catches that.
+ */
+test('the tun hub form renders all its hints at one size', async ({ page }) => {
+  await page.goto('/tunnel/tun/new');
+
+  const shareMode = page.locator('.p2p-hint').filter({ hasText: 'kernel NAT' });
+  await expect(shareMode).toBeVisible();
+
+  const size = async (loc: typeof shareMode) =>
+    (await loc.evaluate(el => getComputedStyle(el).fontSize));
+  const others = page.locator('.p2p-hint').filter({ hasNotText: 'kernel NAT' });
+  expect(await others.count()).toBeGreaterThan(1);
+
+  for (let i = 0; i < (await others.count()); i++) {
+    expect(await size(others.nth(i))).toBe(await size(shareMode));
+  }
+});
+
+/**
+ * The hub form spaces its fields evenly, captions included.
+ *
+ * A caption used to carry 10px of bottom padding *and* the field group's 14px
+ * margin, so a field with a hint sat 24px above the next label while one without
+ * sat 14px. The gaps are compared to each other, not to a fixed number, so the
+ * margin can move as long as the rhythm stays even. The first gap is left out:
+ * it spans the leading hint block, which sits between Name and the device
+ * fields by design (see the test above).
+ */
+test('the tun hub form spaces its fields evenly', async ({ page }) => {
+  await page.goto('/tunnel/tun/new');
+
+  const groups = page.locator('.form-group');
+  const count = await groups.count();
+  expect(count).toBeGreaterThan(3);
+
+  const gaps: number[] = [];
+  let prevBottom: number | null = null;
+  for (let i = 0; i < count; i++) {
+    const box = (await groups.nth(i).boundingBox())!;
+    if (prevBottom !== null) gaps.push(Math.round(box.y - prevBottom));
+    prevBottom = box.y + box.height;
+  }
+
+  expect(gaps.length).toBeGreaterThan(2);
+  expect(new Set(gaps.slice(1)).size).toBe(1);
+});
+
+/**
  * The privilege hint is styled, not merely marked: `warn` is a suffix nothing
  * implements unless the page defines it, and this defect shipped exactly that —
  * the class was on the element and no `.p2p-hint.warn` rule existed, so the

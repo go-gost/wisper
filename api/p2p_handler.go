@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-gost/p2p"
 	"github.com/go-gost/p2p/doctor"
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
+	"github.com/go-gost/wisper/tunnel/entrypoint"
 	"github.com/go-gost/wisper/version"
 )
 
@@ -109,6 +111,42 @@ func handleGetP2PIdentity(w http.ResponseWriter, r *http.Request) {
 		PunchSuccess:    st.PunchSuccess,
 		PeerDiagnostics: peerDiagnosticsJSON(st.PeerDiagnostics),
 	})
+}
+
+// p2pResetRequest is the body of POST /api/p2p/reset. The explicit flag is a
+// human confirmation guard, not a security boundary: the API is unauthenticated
+// by design.
+type p2pResetRequest struct {
+	Confirm bool `json:"confirm"`
+}
+
+var p2pResetMu sync.Mutex
+
+// handleResetP2PIdentity rotates the process-wide identity and brings every
+// running p2p consumer back on the new key. Peers that know the old key lose
+// access until they are updated; the response carries the new key.
+func handleResetP2PIdentity(w http.ResponseWriter, r *http.Request) {
+	var req p2pResetRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if !req.Confirm {
+		writeError(w, http.StatusBadRequest, "confirmation required")
+		return
+	}
+
+	// Two resets must not interleave a key write with the other's rebuild: the
+	// file and the host have to agree on one key.
+	p2pResetMu.Lock()
+	defer p2pResetMu.Unlock()
+
+	if _, err := tunnel.ResetP2PIdentity(); err != nil {
+		writeError(w, http.StatusInternalServerError, "reset p2p identity: "+err.Error())
+		return
+	}
+	tunnel.RestartP2PRunning()
+	entrypoint.RestartP2PRunning()
+	handleGetP2PIdentity(w, r)
 }
 
 // handleGetP2PDoctor renders the shared doctor report as plain text. In-process,

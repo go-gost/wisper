@@ -562,7 +562,26 @@ func Delete(id string) {
 // config (e.g. a changed server address). Stopped tunnels are left as-is.
 // Tunnels are closed before new ones start to avoid conflicts on the relay
 // server (same tunnel ID cannot be registered twice concurrently).
-func RestartRunning() {
+func RestartRunning() { restartRunning(nil) }
+
+// RestartP2PRunning recreates the running tunnels that consume the shared p2p
+// host — p2p tunnels and tun hubs — so they come back on a new identity after
+// ResetP2PIdentity. Other tunnel types are left untouched.
+func RestartP2PRunning() {
+	restartRunning(func(t Tunnel) bool {
+		switch t.Type() {
+		case P2PTunnel, TunTunnel:
+			return true
+		}
+		return false
+	})
+}
+
+// restartRunning applies the restart to every running tunnel match accepts
+// (all of them when match is nil). One pass collects and closes, the next
+// starts replacements, so a restart never has two services with the same ID
+// registered at once.
+func restartRunning(match func(Tunnel) bool) {
 	type restartInfo struct {
 		index         int
 		opts          Options
@@ -576,7 +595,7 @@ func RestartRunning() {
 	// Phase 1: close all running tunnels and collect their info.
 	for i := 0; i < Count(); i++ {
 		t := GetIndex(i)
-		if t == nil || t.IsClosed() {
+		if t == nil || t.IsClosed() || (match != nil && !match(t)) {
 			continue
 		}
 		pending = append(pending, restartInfo{
@@ -637,8 +656,10 @@ func RestartRunning() {
 		Set(newT)
 	}
 
-	if err := SaveConfig(); err != nil {
-		slog.Error("save config", "err", err)
+	if len(pending) > 0 {
+		if err := SaveConfig(); err != nil {
+			slog.Error("save config", "err", err)
+		}
 	}
 }
 

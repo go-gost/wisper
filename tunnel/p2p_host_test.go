@@ -375,6 +375,125 @@ func TestEnsureP2PIdentityConcurrent(t *testing.T) {
 	}
 }
 
+// TestResetP2PIdentity: a reset rotates the identity without starting the
+// host — the key is materialized on read, so the settings page can show the
+// new value even when no p2p consumer runs. Each reset is a new key.
+func TestResetP2PIdentity(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+	if p2pHost.refs != 0 || p2pHost.host != nil {
+		t.Fatal("manager is not idle: a previous test leaked a reference")
+	}
+
+	old, err := EnsureP2PIdentity()
+	if err != nil {
+		t.Fatalf("EnsureP2PIdentity: %v", err)
+	}
+	got, err := ResetP2PIdentity()
+	if err != nil {
+		t.Fatalf("ResetP2PIdentity: %v", err)
+	}
+	if got == old {
+		t.Fatal("reset returned the old public key")
+	}
+	if len(got) != 43 {
+		t.Fatalf("public key = %q (%d chars), want a 43-char base64 key", got, len(got))
+	}
+	again, err := EnsureP2PIdentity()
+	if err != nil || again != got {
+		t.Fatalf("identity after reset = %q, %v; want %q", again, err, got)
+	}
+	fi, err := os.Stat(P2PHostKeyPath())
+	if err != nil {
+		t.Fatalf("host.key: %v", err)
+	}
+	if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("host.key mode = %o, want 600", perm)
+	}
+	if p2pHost.host != nil || p2pHost.refs != 0 {
+		t.Fatalf("reset started the host: host %v refs %d", p2pHost.host, p2pHost.refs)
+	}
+
+	// Every reset is a new identity.
+	third, err := ResetP2PIdentity()
+	if err != nil || third == got {
+		t.Fatalf("second reset = %q, %v; want a key different from %q", third, err, got)
+	}
+}
+
+// TestResetP2PIdentityStopsRunningHost: the running host captures its key when
+// it is built, so the reset must tear it down; otherwise the old identity would
+// keep serving until the process restarted.
+func TestResetP2PIdentityStopsRunningHost(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+	tn := NewP2PTunnel(IDOption("reset-host"), EndpointOption("127.0.0.1:9"), PeersOption(testPeerKey))
+	if err := tn.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	t.Cleanup(func() { _ = tn.Close() })
+	old := p2pHost.PublicKey()
+	if old == "" || !P2PHostRunning() {
+		t.Fatal("host is not running after Run")
+	}
+
+	pub, err := ResetP2PIdentity()
+	if err != nil {
+		t.Fatalf("ResetP2PIdentity: %v", err)
+	}
+	if P2PHostRunning() {
+		t.Fatal("host still running after reset")
+	}
+	if pub == old {
+		t.Fatal("reset kept the host key")
+	}
+}
+
+// TestResetP2PIdentityKeepsHostOnWriteFailure: the write must commit before
+// the host is torn down. A reset that cannot replace the file reports the error
+// and keeps the old identity serving — the alternative would destroy a working
+// identity for nothing.
+func TestResetP2PIdentityKeepsHostOnWriteFailure(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+	tn := NewP2PTunnel(IDOption("reset-write-fail"), EndpointOption("127.0.0.1:9"), PeersOption(testPeerKey))
+	if err := tn.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	t.Cleanup(func() { _ = tn.Close() })
+
+	old := p2pHost.PublicKey()
+	oldHex, _, err := readIdentity(P2PHostKeyPath())
+	if err != nil {
+		t.Fatalf("read old identity: %v", err)
+	}
+
+	identityRename = func(string, string) error { return errors.New("injected rename failure") }
+	t.Cleanup(func() { identityRename = os.Rename })
+
+	pub, err := ResetP2PIdentity()
+	if err == nil || pub != "" {
+		t.Fatalf("reset = %q, %v; want an error and no new key", pub, err)
+	}
+	if !P2PHostRunning() {
+		t.Fatal("a failed reset stopped the running host")
+	}
+	if got := p2pHost.PublicKey(); got != old {
+		t.Fatalf("running host key = %q, want the old key %q", got, old)
+	}
+	hexKey, publicKey, err := readIdentity(P2PHostKeyPath())
+	if err != nil || hexKey != oldHex || publicKey != old {
+		t.Fatalf("identity file after a failed reset = %q/%q, %v; want the old key", hexKey, publicKey, err)
+	}
+	entries, err := os.ReadDir(filepath.Dir(P2PHostKeyPath()))
+	if err != nil {
+		t.Fatalf("read identity dir: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "host.key" {
+		t.Fatalf("identity dir = %v, want only host.key (no temp file left)", entries)
+	}
+}
+
 // peerDatagramPipe is peerPipe's datagram twin: the inbound conn also
 // satisfies net.PacketConn, the shape p2p's Listen hands over for a udp
 // tunnel.

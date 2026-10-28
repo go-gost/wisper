@@ -158,6 +158,7 @@ func NewHandler(webHandler http.Handler, debugPprof bool) http.Handler {
 
 	// Process-wide p2p identity, and the relay/STUN connectivity probes
 	mux.HandleFunc("GET /api/p2p", handleGetP2PIdentity)
+	mux.HandleFunc("POST /api/p2p/reset", handleResetP2PIdentity)
 	mux.HandleFunc("POST /api/p2p/test", handleTestP2PRelay)
 	mux.HandleFunc("POST /api/p2p/test-stun", handleTestP2PStun)
 	mux.HandleFunc("GET /api/p2p/pending", handleListPendingPeers)

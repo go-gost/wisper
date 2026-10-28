@@ -117,6 +117,13 @@ func P2PHostPublicKey() string {
 // consumes the key, so no host has to run (or even exist) to name the identity.
 func EnsureP2PIdentity() (string, error) { return p2pHost.ensurePublicKey() }
 
+// ResetP2PIdentity rotates the process-wide p2p identity: it generates a new
+// key, replaces the key file atomically, and stops the shared host so the next
+// acquire rebuilds it with the new key. Running p2p consumers are left to the
+// caller (RestartP2PRunning in both packages), which must restart them after
+// this returns, or they keep a dead host.
+func ResetP2PIdentity() (string, error) { return p2pHost.resetIdentity() }
+
 // P2PHostRunning reports whether the shared host is started (a p2p tunnel or
 // entrypoint holds a reference). The identity exists either way — see
 // EnsureP2PIdentity.
@@ -213,6 +220,26 @@ func (m *p2pHostManager) ensurePublicKey() (string, error) {
 	return pub, nil
 }
 
+// resetIdentity replaces the identity file under the manager lock, so a
+// concurrent EnsureP2PIdentity cannot read (or build a host with) a key that is
+// being replaced, then tears the running host down. References are kept: their
+// holders are restarted and will return them.
+func (m *p2pHostManager) resetIdentity() (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	hexKey, publicKey, err := p2p.GenerateKey()
+	if err != nil {
+		return "", fmt.Errorf("p2p identity: %w", err)
+	}
+	path := P2PHostKeyPath()
+	if err := writeIdentityFile(path, hexKey); err != nil {
+		return "", fmt.Errorf("p2p identity %s: %w", path, err)
+	}
+	m.teardownLocked()
+	return publicKey, nil
+}
+
 // ensureIdentityLocked reads the process-wide identity, creating the key file
 // on first use. The caller holds m.mu. O_EXCL makes creation atomic across
 // processes; if another process wins the race, read back what it wrote (a
@@ -250,6 +277,46 @@ func (m *p2pHostManager) ensureIdentityLocked() (hexKey, publicKey string, err e
 		return "", "", fmt.Errorf("p2p identity %s: %w", path, err)
 	}
 	return hexKey, publicKey, nil
+}
+
+// identityRename is os.Rename in production. The reset's failure path — the
+// old identity must survive a write that cannot be committed — is only
+// reachable by making the rename fail, and permission tricks do not do that
+// when the tests run as root.
+var identityRename = os.Rename
+
+// writeIdentityFile replaces path with hexKey atomically: the key file is
+// either the old identity or the new one, never missing or half-written. A
+// failed write leaves the old file in place.
+func writeIdentityFile(path, hexKey string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, ".host.key-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp) // gone after a successful rename; cleans up on failure
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.WriteString(hexKey + "\n"); err != nil {
+		_ = f.Close()
+		return err
+	}
+	// Flush the data before the rename publishes it: without this a crash
+	// between the two can leave host.key naming an empty inode.
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return identityRename(tmp, path)
 }
 
 func readIdentity(path string) (hexKey, publicKey string, err error) {

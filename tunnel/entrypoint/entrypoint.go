@@ -253,7 +253,26 @@ func Restart(id string) EntryPoint {
 // config (e.g. a changed server address). Stopped entrypoints are left as-is.
 // Endpoints are closed before new ones start to avoid conflicts on the relay
 // server (same tunnel ID cannot be registered twice concurrently).
-func RestartRunning() {
+func RestartRunning() { restartRunning(nil) }
+
+// RestartP2PRunning recreates the running entrypoints that consume the shared
+// p2p host — p2p and tun entrypoints — so they come back on a new identity after
+// tunnel.ResetP2PIdentity. Other entrypoint types are left untouched.
+func RestartP2PRunning() {
+	restartRunning(func(ep EntryPoint) bool {
+		switch ep.Type() {
+		case P2PEntryPoint, TunEntryPoint:
+			return true
+		}
+		return false
+	})
+}
+
+// restartRunning applies the restart to every running entrypoint match accepts
+// (all of them when match is nil). One pass collects and closes, the next
+// starts replacements, so a restart never has two endpoints with the same ID
+// registered at once.
+func restartRunning(match func(EntryPoint) bool) {
 	type restartInfo struct {
 		index         int
 		opts          tunnel.Options
@@ -267,7 +286,7 @@ func RestartRunning() {
 	// Phase 1: close all running entrypoints and collect their info.
 	for i := 0; i < Count(); i++ {
 		ep := GetIndex(i)
-		if ep == nil || ep.IsClosed() {
+		if ep == nil || ep.IsClosed() || (match != nil && !match(ep)) {
 			continue
 		}
 		pending = append(pending, restartInfo{
@@ -318,8 +337,10 @@ func RestartRunning() {
 		Start(context.Background(), newEP)
 	}
 
-	if err := SaveConfig(); err != nil {
-		slog.Error("save config", "err", err)
+	if len(pending) > 0 {
+		if err := SaveConfig(); err != nil {
+			slog.Error("save config", "err", err)
+		}
 	}
 }
 

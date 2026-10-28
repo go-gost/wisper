@@ -49,6 +49,8 @@ export class SettingsPage extends LitElement {
   @state() private _p2pPublicKey = '';
   @state() private _p2pRunning = false;
   @state() private _p2pTransport: { direct: number; derp: number; attempts: number; success: number } | null = null;
+  @state() private _showResetKeyDialog = false;
+  @state() private _resettingKey = false;
   @state() private _doctor = '';
   @state() private _doctorLoading = false;
   @state() private _theme: ThemePreference = 'system';
@@ -114,7 +116,7 @@ export class SettingsPage extends LitElement {
     }
   }
 
-  private async _fetchP2PIdentity(): Promise<void> {
+  private async _fetchP2PIdentity(keepOnError = false): Promise<void> {
     try {
       const id = await this._backend.getP2PIdentity();
       this._p2pPublicKey = id.public_key;
@@ -123,6 +125,7 @@ export class SettingsPage extends LitElement {
         ? { direct: id.direct_peers, derp: id.derp_peers, attempts: id.punch_attempts, success: id.punch_success }
         : null;
     } catch {
+      if (keepOnError) return;
       this._p2pPublicKey = '';
       this._p2pRunning = false;
       this._p2pTransport = null;
@@ -187,6 +190,56 @@ export class SettingsPage extends LitElement {
   private async _copyP2PKey() {
     await copyToClipboard(this._p2pPublicKey);
     this._showSnackbar(t('copiedToClipboard'));
+  }
+
+  /** _resetP2PKey rotates the identity and shows it: the value just changed,
+   *  so hiding it would only make the user click reveal. A timeout or a dropped
+   *  response is not proof of failure — the server may have finished — so the
+   *  error path re-reads the identity before reporting one. */
+  private async _resetP2PKey() {
+    const before = this._p2pPublicKey;
+    this._resettingKey = true;
+    try {
+      const res = await this._backend.resetP2PIdentity();
+      this._p2pPublicKey = res.public_key;
+      this._p2pRunning = res.running;
+      this._p2pTransport = res.running
+        ? { direct: res.direct_peers, derp: res.derp_peers, attempts: res.punch_attempts, success: res.punch_success }
+        : null;
+      this._showP2PKey = true;
+      this._showResetKeyDialog = false;
+      this._showSnackbar(t('p2pKeyResetDone'));
+      this._reconcileP2PIdentity();
+    } catch (e) {
+      // A timeout or dropped response is not proof of failure: the server may
+      // have finished. Re-read (with a short retry, since a request can still
+      // be queued behind the mutex) before telling the user it failed — a
+      // retry of a rotation that already happened would rotate it again.
+      for (const wait of [0, 400, 1200]) {
+        if (wait) await new Promise<void>((resolve) => setTimeout(resolve, wait));
+        await this._fetchP2PIdentity(true);
+        if (before && this._p2pPublicKey && this._p2pPublicKey !== before) {
+          this._showResetKeyDialog = false;
+          this._showSnackbar(t('p2pKeyResetDone'));
+          this._reconcileP2PIdentity();
+          return;
+        }
+      }
+      this._showSnackbar(`${t('p2pKeyResetFailed')}: ${e}`);
+    } finally {
+      this._resettingKey = false;
+    }
+  }
+
+  /** _reconcileP2PIdentity re-reads the status right away and again after the
+   *  Android tun entrypoint's asynchronous restart has had time to acquire the
+   *  host — otherwise the first read lands in the gap and reports idle. The
+   *  device wait can take several seconds, hence the second delay. */
+  private _reconcileP2PIdentity() {
+    void this._fetchP2PIdentity(true);
+    for (const wait of [1500, 5000]) {
+      setTimeout(() => { void this._fetchP2PIdentity(true); }, wait);
+    }
   }
 
   /** _runDoctor fetches the diagnostic report. In-process, so the relay's
@@ -440,6 +493,26 @@ export class SettingsPage extends LitElement {
       line-height: 1.5;
       margin-top: 6px;
     }
+    .reset-key-btn {
+      margin-top: 10px;
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--red);
+      background: transparent;
+      color: var(--red);
+      font-size: var(--font-sm);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .reset-key-btn:hover { background: var(--red-bg); }
+    /* The P2P card groups its rows explicitly (identity / relay / TLS /
+       direct); a divider marks each boundary so the groups do not run
+       together. The switch rows' own list border would double the line. */
+    .p2p-divider {
+      border-top: 1px solid var(--border-subtle);
+      margin: 16px 0;
+    }
+    .switch-row.p2p-switch { border-bottom: none; }
     .identity-key {
       flex: 1;
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -569,6 +642,11 @@ export class SettingsPage extends LitElement {
       font-size: var(--font-md);
       font-weight: 600;
     }
+    .dialog-message {
+      font-size: var(--font-sm);
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
     .dialog-actions {
       display: flex;
       justify-content: flex-end;
@@ -586,6 +664,11 @@ export class SettingsPage extends LitElement {
       background: var(--border-subtle);
       color: var(--text);
     }
+    .dialog-btn.danger {
+      background: var(--red);
+      color: #fff;
+    }
+    .dialog-btn:disabled { opacity: 0.5; cursor: default; }
     .qr-body {
       display: flex;
       flex-direction: column;
@@ -717,7 +800,6 @@ export class SettingsPage extends LitElement {
                   </button>
                 </div>
                 <p class="hint">${t('p2pIdentityHint')}</p>
-                <p class="p2p-warning">${t('p2pKeyWarning')}</p>
                 ${this._p2pRunning ? '' : html`<p class="hint">${t('p2pIdentityIdle')}</p>`}
                 ${this._p2pTransport
                   ? html`<p class="hint">
@@ -728,7 +810,13 @@ export class SettingsPage extends LitElement {
                         : nothing}
                     </p>`
                   : nothing}
+                <button class="reset-key-btn" @click=${() => { this._showResetKeyDialog = true; }}>
+                  ${t('p2pKeyReset')}
+                </button>
               </div>
+
+              <div class="p2p-divider"></div>
+
               <div class="form-group">
                 <label class="form-label">${t('settingsP2PDerp')}</label>
                 <input class="form-input" .value=${this._p2pDerp}
@@ -736,7 +824,10 @@ export class SettingsPage extends LitElement {
                   @input=${(e: Event) => { this._p2pDerp = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
               </div>
               ${this._renderProbeRow(this._p2pTest, this._p2pTesting, '', () => this._testP2P())}
-              <div class="switch-row" style="padding-bottom:18px;">
+
+              <div class="p2p-divider"></div>
+
+              <div class="switch-row p2p-switch">
                 <div>
                   <div class="switch-label">${t('settingsP2PSecure')}</div>
                   <div class="switch-desc">${t('settingsP2PSecureDesc')}</div>
@@ -746,14 +837,17 @@ export class SettingsPage extends LitElement {
                   <div class="switch-knob"></div>
                 </div>
               </div>
-              <div class="form-group" style="margin-top:18px;">
+              <div class="form-group">
                 <label class="form-label">${t('settingsP2PCAFile')}</label>
                 <input class="form-input" .value=${this._p2pCaFile}
                   placeholder="/path/to/ca.pem"
                   @input=${(e: Event) => { this._p2pCaFile = (e.target as HTMLInputElement).value; this._p2pTest = null; }}>
                 <p class="hint">${t('settingsP2PCAFileHint')}</p>
               </div>
-              <div class="switch-row" style="padding-top:18px;">
+
+              <div class="p2p-divider"></div>
+
+              <div class="switch-row p2p-switch">
                 <div>
                   <div class="switch-label">${t('settingsP2PDirect')}</div>
                   <div class="switch-desc">${t('settingsP2PDirectDesc')}</div>
@@ -763,7 +857,7 @@ export class SettingsPage extends LitElement {
                   <div class="switch-knob"></div>
                 </div>
               </div>
-              <div class="form-group" style="margin-top:18px;">
+              <div class="form-group">
                 <label class="form-label">${t('settingsP2PStun')}</label>
                 <input class="form-input" .value=${this._p2pStun}
                   list="p2p-stun-presets"
@@ -896,6 +990,28 @@ export class SettingsPage extends LitElement {
                 <div class="dialog-actions">
                   <button class="dialog-btn cancel" @click=${() => { this._qrKey = ''; }}>
                     ${t('btnClose')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `
+          : nothing}
+
+        ${this._showResetKeyDialog
+          ? html`
+            <div class="dialog-overlay"
+              @click=${() => { if (!this._resettingKey) this._showResetKeyDialog = false; }}>
+              <div class="dialog-box" @click=${(e: Event) => e.stopPropagation()}>
+                <div class="dialog-title">${t('p2pKeyResetTitle')}</div>
+                <div class="dialog-message">${t('p2pKeyResetWarning')}</div>
+                <div class="dialog-actions">
+                  <button class="dialog-btn cancel" ?disabled=${this._resettingKey}
+                    @click=${() => { this._showResetKeyDialog = false; }}>
+                    ${t('btnCancel')}
+                  </button>
+                  <button class="dialog-btn danger" ?disabled=${this._resettingKey}
+                    @click=${() => this._resetP2PKey()}>
+                    ${this._resettingKey ? t('p2pKeyResetting') : t('btnReset')}
                   </button>
                 </div>
               </div>

@@ -286,6 +286,17 @@ export class EntrypointDetailPage extends LitElement {
       return;
     }
 
+    // Both p2p and tun entrypoints dial their hub by key: without one there is
+    // nobody to reach, and Listen() refuses it ("requires a peer public key").
+    // Refuse it here, before a tun arm creates a device for a dead tunnel.
+    if (
+      (this.entrypointType === 'p2p' || this.entrypointType === 'tun') &&
+      !this._peer.trim()
+    ) {
+      this._showSnackbar(`${t('entrypointPeerKey')}: ${t('requiredField')}`);
+      return;
+    }
+
     // A tun entrypoint's device must exist before it can be created, and only
     // the app can create it: arm the VPN with the form's values and wait for it.
     // Refused before the arm when another tun entrypoint holds the one device —
@@ -617,6 +628,14 @@ export class EntrypointDetailPage extends LitElement {
       line-height: 1.5;
       padding: 0 14px 10px;
     }
+    /* A hint inside a field group is that field's caption: it hugs the input
+       above it, and the group's own margin supplies the gap to the next field.
+       The 10px bottom padding above is for standalone hints (the leading block),
+       which have no group margin under them — leaving it on captions added 10px
+       to every second field, so the form read 14/24/14 rather than evenly. */
+    .form-group > .p2p-hint {
+      padding: 4px 14px 0;
+    }
 
     /* Same as the tun hub form's, which is the only other place a privilege
        hint is shown: a warning that is not yet an error (the user may be root,
@@ -729,6 +748,13 @@ export class EntrypointDetailPage extends LitElement {
       font-size: var(--font-sm); font-weight: 500; color: var(--text-muted);
       margin-bottom: 4px;
       text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    /* Marks a field the backend will refuse to start without, so the form
+       says so before the save. The asterisk carries the explanation in its
+       title for a pointer, and the snackbar repeats it on submit. */
+    .required-mark {
+      color: var(--red);
+      margin-left: 3px;
     }
     .form-input {
       width: 100%; padding: 10px 12px;
@@ -1090,6 +1116,18 @@ export class EntrypointDetailPage extends LitElement {
                            restating a subnet it cannot know. -->
                       <div class="p2p-hint">${t('tunNetMatchesHub')}</div>
                     </div>
+                    <!-- The hub this device dials. It belongs with the device
+                         address above, not at the bottom of the form: the two
+                         together are "which side of the tunnel is this node".
+                         Required — a tun entrypoint with no peer has nobody to
+                         reach, and the host refuses to start it. -->
+                    <div class="form-group">
+                      <label class="form-label">
+                        ${t('entrypointPeerKey')}<span class="required-mark" title="${t('requiredField')}">*</span>
+                      </label>
+                      <input class="form-input" .value=${this._peer} placeholder="${t('peersKeyPlaceholder')}"
+                        @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
+                    </div>
                     <div class="form-group">
                       <label class="form-label">${t('fieldMTU')}</label>
                       <input class="form-input" type="number" .value=${this._mtu ? String(this._mtu) : ''} placeholder="1420"
@@ -1101,10 +1139,22 @@ export class EntrypointDetailPage extends LitElement {
                         @input=${(e: Event) => { this._deviceName = (e.target as HTMLInputElement).value; }}>
                       <div class="p2p-hint">${t('fieldDeviceNameHint')}</div>
                     </div>
-                    <!-- LAN sharing: the subnets of this node's own LAN that the
-                         hub may let its peers reach, and the backend that would
-                         run them. What actually reaches the peers is the hub's
-                         decision, shown below the form on the routes row. -->
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldRoutes')}</label>
+                      <input class="form-input" .value=${this._routes} placeholder="0.0.0.0/0"
+                        @input=${(e: Event) => { this._routes = (e.target as HTMLInputElement).value; }}>
+                      <div class="p2p-hint">${t('fieldRoutesHint')}</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldDNS')}</label>
+                      <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
+                        @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
+                    </div>
+                    <!-- LAN sharing, last: the subnets of this node's own LAN the
+                         hub may let its peers reach, and the backend that runs
+                         them. Opt-in and decided by the hub (its peers page shows
+                         what was approved), so a spoke that shares nothing never
+                         has to read it. -->
                     <div class="form-group">
                       <label class="form-label">${t('fieldShareLAN')}</label>
                       <input class="form-input" .value=${this._shareLAN} placeholder="192.168.1.0/24"
@@ -1122,17 +1172,6 @@ export class EntrypointDetailPage extends LitElement {
                       </span>
                     </div>
                     <div class="p2p-hint">${t('fieldShareModeHint')}</div>
-                    <div class="form-group">
-                      <label class="form-label">${t('fieldRoutes')}</label>
-                      <input class="form-input" .value=${this._routes} placeholder="0.0.0.0/0"
-                        @input=${(e: Event) => { this._routes = (e.target as HTMLInputElement).value; }}>
-                      <div class="p2p-hint">${t('fieldRoutesHint')}</div>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">${t('fieldDNS')}</label>
-                      <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
-                        @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
-                    </div>
                   `
                   : html`
                 <div class="form-group">
@@ -1141,10 +1180,15 @@ export class EntrypointDetailPage extends LitElement {
                     @input=${(e: Event) => { this._endpoint = (e.target as HTMLInputElement).value; }}>
                 </div>`}
 
-                ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
+                <!-- The peer key and the controls only a p2p entrypoint has. A
+                     tun entrypoint's key sits above, with the device it dials
+                     from. -->
+                ${this.entrypointType === 'p2p'
                   ? html`
                     <div class="form-group">
-                      <label class="form-label">${t('entrypointPeerKey')}</label>
+                      <label class="form-label">
+                        ${t('entrypointPeerKey')}<span class="required-mark" title="${t('requiredField')}">*</span>
+                      </label>
                       <input class="form-input" .value=${this._peer} placeholder="${t('peersKeyPlaceholder')}"
                         @input=${(e: Event) => { this._peer = (e.target as HTMLInputElement).value; }}>
                     </div>
@@ -1153,8 +1197,6 @@ export class EntrypointDetailPage extends LitElement {
                          its address is sent either way, and a hub's route table
                          has no TTL to refresh. Both controls would set values
                          nothing reads. See tunnel/entrypoint/tun.go. -->
-                    ${this.entrypointType === 'p2p'
-                      ? html`
                     <div class="switch-row" @click=${() => {
                       this._protocol = this._protocol === 'tcp' ? 'udp' : 'tcp';
                     }}>
@@ -1174,8 +1216,6 @@ export class EntrypointDetailPage extends LitElement {
                       </div>
                     </div>
                     <div class="p2p-hint">${t('keepaliveHint')}</div>`
-                      : ''}
-                  `
                       : ''}
                   `
                   : ''}

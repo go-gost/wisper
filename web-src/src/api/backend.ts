@@ -53,6 +53,7 @@ export class GoBackend {
     method: string,
     path: string,
     body?: unknown,
+    timeoutMs = 8000,
   ): Promise<T> {
     const headers: Record<string, string> = {
       'Cache-Control': 'no-cache',
@@ -66,9 +67,11 @@ export class GoBackend {
 
     // Bound every request so a stalled fetch (e.g. while the device switches
     // networks and the WebView's request queue stalls) cannot pin the loading
-    // state forever and leave the list empty and stuck on a spinner.
+    // state forever and leave the list empty and stuck on a spinner. A caller
+    // whose work legitimately outlives the default (a key reset restarts the
+    // p2p host, whose relay dial alone can take 10s) passes a longer bound.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res!: Response;
     try {
       res = await fetch(this.url(path), {
@@ -203,6 +206,22 @@ export class GoBackend {
     punch_success: number;
   }> {
     return this.request('GET', '/api/p2p');
+  }
+
+  /**
+   * Rotate the process-wide p2p identity. Every running p2p consumer (p2p
+   * tunnel, tun hub, p2p/tun entrypoint) restarts on the new key; peers that
+   * know the old key lose access until they are updated.
+   */
+  resetP2PIdentity(): Promise<{
+    public_key: string;
+    running: boolean;
+    direct_peers: number;
+    derp_peers: number;
+    punch_attempts: number;
+    punch_success: number;
+  }> {
+    return this.request('POST', '/api/p2p/reset', { confirm: true }, 30000);
   }
 
   /** Probe the relay from the wisper process (its real network path and TLS

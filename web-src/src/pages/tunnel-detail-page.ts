@@ -636,6 +636,14 @@ export class TunnelDetailPage extends LitElement {
       line-height: 1.5;
       padding: 0 14px 10px;
     }
+    /* A hint inside a field group is that field's caption: it hugs the input
+       above it, and the group's own margin supplies the gap to the next field.
+       The 10px bottom padding above is for standalone hints (the leading block),
+       which have no group margin under them — leaving it on captions added 10px
+       to every second field, so the form read 14/24/14 rather than evenly. */
+    .form-group > .p2p-hint {
+      padding: 4px 14px 0;
+    }
 
     .copy-btn-mini {
       background: none;
@@ -1592,7 +1600,7 @@ export class TunnelDetailPage extends LitElement {
                         ${icon('chevron-right')}
                       </span>
                     </div>
-                    <div class="record-desc">${t('fieldShareModeHint')}</div>
+                    <div class="p2p-hint">${t('fieldShareModeHint')}</div>
                     <!-- No routes, no dns: both are client-side, and a hub runs
                          with host networking, so they would be applied to the
                          host's own routing and resolver. The API refuses them

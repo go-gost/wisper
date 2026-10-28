@@ -152,6 +152,7 @@ POST   /api/entrypoints/{id}/stop    stop a running entrypoint
 
 GET    /api/stats                    aggregated stats for all tunnels + entrypoints
 GET    /api/p2p                      this host's p2p identity (public key, status)
+POST   /api/p2p/reset                rotate the p2p identity and restart p2p consumers
 POST   /api/p2p/test                 probe the configured DERP relay
 POST   /api/p2p/test-stun            probe the STUN server
 GET    /api/p2p/pending              peers that knocked but are not allowlisted
