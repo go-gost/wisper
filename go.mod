@@ -4,8 +4,8 @@ go 1.26.4
 
 require (
 	github.com/go-gost/core v0.6.1
-	github.com/go-gost/p2p v0.15.1
-	github.com/go-gost/x v0.27.3
+	github.com/go-gost/p2p v0.15.2
+	github.com/go-gost/x v0.28.0
 	github.com/google/uuid v1.6.0
 	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54
 	github.com/xjasonlyu/tun2socks/v2 v2.6.0
@@ -40,6 +40,7 @@ require (
 	github.com/klauspost/reedsolomon v1.12.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
+	github.com/miekg/dns v1.1.61 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
@@ -51,6 +52,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/quic-go/quic-go v0.63.0 // indirect
 	github.com/rs/xid v1.3.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -78,10 +80,13 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20241210194714-1829a127f884 // indirect
+	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260723215102-3fe39f3c1018 // indirect
