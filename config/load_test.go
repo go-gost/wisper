@@ -261,7 +261,9 @@ func TestCorruptCopyNameIsUnique(t *testing.T) {
 			t.Fatal(err)
 		}
 		var c Config
-		c.load()
+		if _, err := c.load(); err == nil {
+			t.Fatal("load of a corrupt config succeeded")
+		}
 	}
 	if got := corruptFiles(t, dir); len(got) != 2 {
 		t.Fatalf("kept %d corrupt files, want two", len(got))
