@@ -125,6 +125,9 @@ func NewTunTunnel(opts ...Option) Tunnel {
 	if options.ID == "" {
 		options.ID = uuid.NewString()
 	}
+	if options.MTU <= 0 {
+		options.MTU = DefaultTunMTU
+	}
 	if options.Name == "" {
 		v := md5.Sum([]byte(options.ID))
 		options.Name = hex.EncodeToString(v[:8])

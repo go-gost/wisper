@@ -192,7 +192,7 @@ Android 侧要新增一条 VpnService 通道 + 一处 x 改动。Android 可行�
 - **前台服务类型**：manifest 声明 `dataSync|systemExempted` + `FOREGROUND_SERVICE_SYSTEM_EXEMPTED`；
   API 34 上建立 VPN 后重新 `startForeground(..., DATA_SYNC or SYSTEM_EXEMPTED)`（`systemExempted`
   只有「已经是 VPN」时才被接受）。
-- **MTU**：入口点未配时 Java 侧按 1420（= x 的 `defaultMTU`）设置，避免 Builder 默认 1500 超出 p2p 路径。
+- **MTU**：入口点未配时 Java 侧按 wisper 的默认 1300 设置，避免 Builder 默认 1500 或旧的 1420 超出 p2p 的 KCP 路径。
 - **设备名**：Android 上由系统命名（`VpnService` 不给名字），入口点的 `device_name` 在 Android 上无效。
 
 不在这一阶段：全流量出口（要 `protect()`，侵入 p2p/x）、tun↔tun 直连的手动链路。

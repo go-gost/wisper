@@ -23,6 +23,11 @@ const (
 	defaultServerName   = "wisper.gost.run"
 	// defaultP2PDerp is the DERP relay used when settings.p2p.derp is empty.
 	defaultP2PDerp = "wss://derp.gost.run/derp"
+	// DefaultTunMTU is the MTU used for a tun device when the configuration
+	// leaves it unset. It leaves room for the inner IP/TCP headers and the p2p
+	// framing under the KCP transport's 1400-byte segment MTU; the previous
+	// 1420 default sat above that boundary and fragmented.
+	DefaultTunMTU = 1300
 )
 
 // GetEndpointAddr returns the public entrypoint domain, reading from config
@@ -108,7 +113,7 @@ type Options struct {
 	// Net is a tun device's address: a CIDR, or several comma-separated.
 	// A hub tunnel and a spoke entrypoint both carry it.
 	Net string
-	// MTU is the tun device's MTU (0 leaves the implementation default).
+	// MTU is the tun device's MTU (0 selects DefaultTunMTU).
 	MTU int
 	// DeviceName is the tun device's name (empty lets the kernel choose).
 	DeviceName string
@@ -317,7 +322,7 @@ func NetOption(net string) Option {
 	}
 }
 
-// MTUOption sets a tun device's MTU (0 leaves the implementation default).
+// MTUOption sets a tun device's MTU (0 selects DefaultTunMTU).
 func MTUOption(mtu int) Option {
 	return func(opts *Options) {
 		opts.MTU = mtu

@@ -1130,7 +1130,7 @@ export class EntrypointDetailPage extends LitElement {
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t('fieldMTU')}</label>
-                      <input class="form-input" type="number" .value=${this._mtu ? String(this._mtu) : ''} placeholder="1420"
+                      <input class="form-input" type="number" .value=${this._mtu ? String(this._mtu) : ''} placeholder="1300"
                         @input=${(e: Event) => { this._mtu = parseInt((e.target as HTMLInputElement).value, 10) || 0; }}>
                     </div>
                     <div class="form-group">

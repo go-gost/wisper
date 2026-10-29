@@ -96,6 +96,9 @@ func NewTunEntryPoint(opts ...tunnel.Option) EntryPoint {
 	if options.ID == "" {
 		options.ID = uuid.NewString()
 	}
+	if options.MTU <= 0 {
+		options.MTU = tunnel.DefaultTunMTU
+	}
 	if options.Name == "" {
 		options.Name = "tun-ep-" + options.ID
 		if len(options.ID) > 8 {

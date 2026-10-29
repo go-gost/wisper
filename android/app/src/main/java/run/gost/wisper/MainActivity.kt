@@ -23,6 +23,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -190,8 +191,15 @@ class MainActivity : AppCompatActivity() {
 
             // Dark content algorithmic darkening (API 33+) — helps
             // with pages that don't natively support dark mode.
+            //
+            // Off: the web UI paints its own light/dark palette from the
+            // in-app theme setting (theme.css). With darkening on, a light
+            // page is repainted dark whenever the system is in night mode,
+            // so choosing "Light" in settings had no visible effect.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                settings.isAlgorithmicDarkeningAllowed = true
+                settings.isAlgorithmicDarkeningAllowed = false
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                settings.forceDark = WebSettings.FORCE_DARK_OFF
             }
 
             webViewClient = WisperWebViewClient()

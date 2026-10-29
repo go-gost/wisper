@@ -71,7 +71,7 @@ class TunVpnService : VpnService() {
         for ((addr, prefix) in cidrs(device.routes)) {
             builder.addRoute(addr, prefix)
         }
-        // The listener falls back to 1420 when the entrypoint sets no MTU; the
+        // The listener falls back to wisper's 1300 when the entrypoint sets no MTU; the
         // device has to match that, or packets will not fit the p2p path.
         builder.setMtu(if (device.mtu > 0) device.mtu else DEFAULT_MTU)
         for (dns in device.dns.split(",").map { it.trim() }.filter { it.isNotEmpty() }) {
@@ -168,8 +168,8 @@ class TunVpnService : VpnService() {
     companion object {
         private const val TAG = "TunVpnService"
 
-        /** Matches the tun listener's default when the entrypoint sets none. */
-        private const val DEFAULT_MTU = 1420
+        /** Matches wisper's entrypoint default when none is set. */
+        private const val DEFAULT_MTU = 1300
 
         private const val ACTION_ENSURE = "run.gost.wisper.action.VPN_ENSURE"
         private const val ACTION_RELEASE = "run.gost.wisper.action.VPN_RELEASE"
