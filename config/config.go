@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -21,11 +22,24 @@ import (
 
 const (
 	configFile = "wisper.yaml"
+	backupFile = "wisper.yaml.bak"
 	logFile    = "wisper.log"
 )
 
 // writeMu serializes all config file writes to prevent concurrent file corruption.
 var writeMu sync.Mutex
+
+// renameFile is os.Rename in production. The publish failure path — the old
+// config must survive a write that cannot be committed — is only reachable by
+// making the rename fail.
+var renameFile = os.Rename
+
+// preserveFile moves an unreadable config aside. It is a separate seam from
+// renameFile so a test can fail only that step.
+var preserveFile = os.Rename
+
+// configNow is time.Now in production; tests pin the corrupt-copy timestamp.
+var configNow = time.Now
 
 var (
 	configDir string
@@ -116,18 +130,39 @@ func Init(opts ...Option) {
 	slog.Info(fmt.Sprintf("configDir: %s", configDir))
 
 	cfg := Get()
-	if err := cfg.load(); err != nil {
-		slog.Error(fmt.Sprintf("load config: %v", err))
-		if _, ok := err.(*os.PathError); ok {
-			if err := cfg.Write(); err != nil {
-				slog.Error(fmt.Sprintf("write config: %v", err))
-			}
+	mainExisted := false
+	if _, err := os.Stat(filepath.Join(configDir, configFile)); err == nil {
+		mainExisted = true
+	}
+	recovered, loadErr := cfg.load()
+	var writeErr error
+	if !recovered {
+		// Write the defaults when there is no main file to publish over. A
+		// corrupt one was moved aside by load; one that could not be moved is
+		// still there and must not be overwritten.
+		if _, err := os.Stat(filepath.Join(configDir, configFile)); os.IsNotExist(err) {
+			writeErr = cfg.Write()
 		}
 	}
 	Set(cfg)
 	event.SeedGlobal(cfg.Events)
 
 	initLog()
+
+	// After initLog: the configured sink is what Android can read (its stdout
+	// goes nowhere), so a load failure has to be reported here, not above.
+	switch {
+	case loadErr == nil:
+	case recovered:
+		slog.Warn("config restored from backup", "cause", loadErr)
+	default:
+		if mainExisted {
+			slog.Error("load config", "err", loadErr)
+		}
+	}
+	if writeErr != nil {
+		slog.Error("write config", "err", writeErr)
+	}
 }
 
 func initLog() {
@@ -334,7 +369,7 @@ type Tunnel struct {
 	// hub's tun server).
 	Net string `yaml:",omitempty" json:"net,omitempty"`
 
-	// MTU is the tun device's MTU. 0 leaves the implementation default (1420).
+	// MTU is the tun device's MTU. 0 selects wisper's 1300-byte default.
 	MTU int `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 
 	// DeviceName is the tun device's name. Empty lets the kernel choose.
@@ -390,18 +425,93 @@ type Config struct {
 	Log *xconfig.LogConfig
 }
 
-func (c *Config) load() error {
-	f, err := os.Open(filepath.Join(configDir, configFile))
-	if err != nil {
-		return err
+// load reads the main config file, falling back to the backup when the main
+// file is missing or corrupt. It returns recovered=true when the backup was
+// the source (the main file has already been rewritten from it). A non-nil
+// error describes what was wrong with the main file, or, when neither file
+// yielded a config, both failures; the receiver is empty in that case.
+func (c *Config) load() (recovered bool, err error) {
+	path := filepath.Join(configDir, configFile)
+	loaded, err := loadConfigFile(path)
+	if err == nil {
+		*c = *loaded
+		return false, nil
 	}
-	defer f.Close()
 
-	return yaml.NewDecoder(f).Decode(c)
+	switch {
+	case os.IsNotExist(err):
+		// No main file: the backup (if any) is the best source.
+	case errors.Is(err, errBadConfig):
+		// Keep the corrupt file: it is the only copy of what the user had.
+		corrupt := corruptName(path)
+		if rerr := preserveFile(path, corrupt); rerr == nil {
+			err = fmt.Errorf("%w (kept as %s)", err, filepath.Base(corrupt))
+		} else if !os.IsNotExist(rerr) {
+			err = fmt.Errorf("%w (keep unreadable file: %v)", err, rerr)
+		}
+	default:
+		// An open/read failure (permissions, I/O, a directory) is not
+		// corruption: leave the file alone and do not replace a newer config
+		// with an older backup.
+		*c = Config{}
+		return false, err
+	}
+
+	backup, berr := loadConfigFile(filepath.Join(configDir, backupFile))
+	if berr != nil {
+		*c = Config{}
+		return false, errors.Join(err, berr)
+	}
+
+	*c = *backup
+	// write(false): never rotate the main into .bak here. It is either missing
+	// or the corrupt file that could not be moved, and the good backup must
+	// survive.
+	if werr := c.write(false); werr != nil {
+		return true, fmt.Errorf("%w; restored from %s but rewrite failed: %v", err, backupFile, werr)
+	}
+	return true, fmt.Errorf("%w; restored from %s", err, backupFile)
+}
+
+// corruptName returns an unused path for a preserved unreadable config.
+func corruptName(path string) string {
+	base := path + ".corrupt-" + configNow().UTC().Format("20060102T150405Z")
+	name := base
+	for i := 1; ; i++ {
+		if _, err := os.Lstat(name); os.IsNotExist(err) {
+			return name
+		}
+		name = fmt.Sprintf("%s-%d", base, i)
+	}
+}
+
+// errBadConfig marks a decode failure, as opposed to an open/read failure.
+var errBadConfig = errors.New("bad config")
+
+// loadConfigFile decodes path into a fresh Config. Read failures are returned
+// as they are; decode failures (including an empty file) carry errBadConfig.
+func loadConfigFile(path string) (*Config, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &Config{}
+	if err := yaml.NewDecoder(bytes.NewReader(b)).Decode(c); err != nil {
+		return nil, fmt.Errorf("%w: %v", errBadConfig, err)
+	}
+	return c, nil
 }
 
 // Write persists the configuration to disk. It is safe for concurrent use.
 func (c *Config) Write() error {
+	return c.write(true)
+}
+
+// write persists the configuration. rotate keeps the current file as .bak
+// before publishing; only recovery passes false, because the main file there is
+// unreadable and must not replace the good backup.
+func (c *Config) write(rotate bool) error {
 	writeMu.Lock()
 	defer writeMu.Unlock()
 
@@ -414,7 +524,84 @@ func (c *Config) Write() error {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(configDir, configFile), buf.Bytes(), 0644)
+	path := filepath.Join(configDir, configFile)
+	// The config carries tunnel passwords: keep whatever mode the file already
+	// has instead of widening it on every rewrite. When the main file is gone
+	// (recovery), the backup is the file whose mode this one should keep.
+	perm := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		perm = fi.Mode().Perm()
+	} else if fi, err := os.Stat(filepath.Join(configDir, backupFile)); err == nil {
+		perm = fi.Mode().Perm()
+	}
+	return writeFileAtomic(path, buf.Bytes(), perm, rotate)
+}
+
+// writeFileAtomic publishes data at path through a temp file in the same
+// directory. A crash leaves either the old file or the new one, never an empty
+// or half-written file.
+func writeFileAtomic(path string, data []byte, perm os.FileMode, rotate bool) error {
+	dir := filepath.Dir(path)
+
+	f, err := os.CreateTemp(dir, ".wisper.yaml-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp) // no-op after a successful rename; cleans up on failure
+
+	if err := f.Chmod(perm); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	// Flush the data before publishing it: without this a crash can leave the
+	// new name pointing at an empty inode.
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	return replaceFile(tmp, path, rotate)
+}
+
+// replaceFile keeps the current file as path+".bak" (when rotate is set) and
+// publishes tmp at path. A crash between the two renames leaves the backup as
+// the only file, which load restores on the next start.
+func replaceFile(tmp, path string, rotate bool) error {
+	if rotate {
+		if _, err := os.Stat(path); err == nil {
+			if err := renameFile(path, path+".bak"); err != nil {
+				return err
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	if err := renameFile(tmp, path); err != nil {
+		return err
+	}
+	syncDir(filepath.Dir(path))
+	return nil
+}
+
+// syncDir flushes the directory entry after a rename. It is best effort: some
+// filesystems and platforms (notably Windows) cannot sync a directory, and the
+// rename itself is already atomic on the ones that can.
+func syncDir(dir string) {
+	d, err := os.Open(dir)
+	if err != nil {
+		return
+	}
+	_ = d.Sync()
+	_ = d.Close()
 }
 
 // deepCopyConfig returns a fully independent copy of the Config.

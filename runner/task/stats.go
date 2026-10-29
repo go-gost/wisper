@@ -27,6 +27,9 @@ type updateStatsTask struct {
 	relaySeen bool
 	hostOn    bool
 	hostSet   bool
+	// lastSave is when the config was last written. Rates and liveness still
+	// update every tick; only the whole-file rewrite is throttled.
+	lastSave time.Time
 }
 
 // UpdateStats returns a task that polls service stats.
@@ -48,20 +51,38 @@ func (t *updateStatsTask) ID() runner.TaskID {
 }
 
 func (t *updateStatsTask) Run(context.Context) error {
-	// Ahead of the saves below, so this tick's events are persisted by the same
-	// SaveConfig that already runs every tick.
+	// Ahead of the periodic save below, so this tick's events are persisted by
+	// the same save as the stats sampled after it.
 	t.observeTransitions()
 
-	if err := t.updateTunnel(); err != nil {
-		slog.Error("stats", "err", err)
-	}
-	if err := t.updateEntrypoint(); err != nil {
-		slog.Error("stats", "err", err)
-	}
+	t.updateTunnel()
+	t.updateEntrypoint()
+	t.persist()
 	return nil
 }
 
-func (t *updateStatsTask) updateTunnel() error {
+// configSaveInterval is how often the stats task may rewrite the whole config.
+// It runs every stats interval to compute rates and liveness, but a whole-file
+// write every second is both flash wear and a needless window for a crash to
+// lose the file. API handlers and Stop() still save immediately.
+const configSaveInterval = 10 * time.Second
+
+func (t *updateStatsTask) persist() {
+	now := time.Now()
+	if !t.lastSave.IsZero() && now.Sub(t.lastSave) < configSaveInterval {
+		return
+	}
+	t.lastSave = now
+
+	if err := tunnel.SaveConfig(); err != nil {
+		slog.Error("stats: save tunnel config", "err", err)
+	}
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("stats: save entrypoint config", "err", err)
+	}
+}
+
+func (t *updateStatsTask) updateTunnel() {
 	for i := 0; i < tunnel.Count(); i++ {
 		tun := tunnel.GetIndex(i)
 		if tun == nil {
@@ -120,11 +141,9 @@ func (t *updateStatsTask) updateTunnel() error {
 
 		tun.SetStats(stats)
 	}
-
-	return tunnel.SaveConfig()
 }
 
-func (t *updateStatsTask) updateEntrypoint() error {
+func (t *updateStatsTask) updateEntrypoint() {
 	for i := 0; i < entrypoint.Count(); i++ {
 		ep := entrypoint.GetIndex(i)
 		if ep == nil {
@@ -195,8 +214,6 @@ func (t *updateStatsTask) updateEntrypoint() error {
 		}
 		t.checkLiveness(ep, upDelta, downDelta)
 	}
-
-	return entrypoint.SaveConfig()
 }
 
 // observeTransitions records what changed since the previous tick: a service

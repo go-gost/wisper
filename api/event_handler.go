@@ -43,8 +43,8 @@ func handleGetEvents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, eventsResponse{Events: toEventResponses(event.ListGlobal())})
 }
 
-// handleClearEvents forgets the host-level history. The next stats tick writes
-// the empty list out through the ordinary SaveConfig path.
+// handleClearEvents forgets the host-level history. The next periodic stats
+// save (within 10s) writes the empty list out through SaveConfig.
 func handleClearEvents(w http.ResponseWriter, r *http.Request) {
 	event.ClearGlobal()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

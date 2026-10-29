@@ -51,3 +51,7 @@ tunnel/entrypoint/wisper.yaml
 
 # Extension npm dependencies
 /extension/node_modules/
+
+# Backup left next to the test config
+api/wisper.yaml.bak
+tunnel/entrypoint/wisper.yaml.bak

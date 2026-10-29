@@ -1,9 +1,12 @@
 package task
 
 import (
+	"bytes"
 	"context"
 	"net"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/metadata"
@@ -82,8 +85,8 @@ func (t *servicedTunnel) Status() *xservice.Status { return t.status }
 // routed/denied/withdrawn counters reach /api/stats instead of staying zero
 // for a hub that carries that state in its head and never says it out loud.
 func TestUpdateTunnelReportsLanCounters(t *testing.T) {
-	// updateTunnel ends in SaveConfig, which writes ./wisper.yaml: keep that
-	// artifact out of the repo, the way tunnel/event_persist_test.go does.
+	// updateTunnel no longer writes the config (the save moved to Run's 10s
+	// throttle), but keep the artifact out of the repo anyway.
 	t.Chdir(t.TempDir())
 
 	sink := xstats.NewStats(false)
@@ -115,9 +118,7 @@ func TestUpdateTunnelReportsLanCounters(t *testing.T) {
 	})
 
 	var task updateStatsTask
-	if err := task.updateTunnel(); err != nil {
-		t.Fatalf("updateTunnel: %v", err)
-	}
+	task.updateTunnel()
 
 	stats := tun.Stats()
 	for _, tc := range []struct {
@@ -132,5 +133,50 @@ func TestUpdateTunnelReportsLanCounters(t *testing.T) {
 		if tc.got != tc.want {
 			t.Errorf("%s = %d, want %d", tc.field, tc.got, tc.want)
 		}
+	}
+}
+
+// TestStatsPersistThrottled: the stats task computes every tick but writes the
+// config at most once per window — the first tick, then only after the window.
+func TestStatsPersistThrottled(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Cleanup(func() { config.Set(&config.Config{}) })
+
+	var task updateStatsTask
+	if err := task.Run(context.Background()); err != nil {
+		t.Fatalf("first tick: %v", err)
+	}
+	if _, err := os.Stat("wisper.yaml"); err != nil {
+		t.Fatalf("first tick did not persist: %v", err)
+	}
+
+	// Replace the file with a sentinel so a rewrite is visible even on a
+	// filesystem with coarse mtime granularity; the task does not reload it.
+	sentinel := []byte("settings: {}\n# throttle sentinel\n")
+	if err := os.WriteFile("wisper.yaml", sentinel, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Run(context.Background()); err != nil {
+		t.Fatalf("second tick: %v", err)
+	}
+	got, err := os.ReadFile("wisper.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, sentinel) {
+		t.Fatal("a tick inside the window rewrote the config")
+	}
+
+	task.lastSave = time.Now().Add(-configSaveInterval - time.Second)
+	if err := task.Run(context.Background()); err != nil {
+		t.Fatalf("tick past the window: %v", err)
+	}
+	got, err = os.ReadFile("wisper.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(got, sentinel) {
+		t.Fatal("a tick past the window did not persist")
 	}
 }
