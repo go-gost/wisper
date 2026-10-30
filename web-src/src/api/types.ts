@@ -417,6 +417,8 @@ export interface P2PSettings {
   stun?: string;
   /** Attempt a direct (hole-punched) path; omitted = true. */
   direct?: boolean;
+  /** Use IPv6 for the direct path; omitted = false. */
+  ipv6?: boolean;
   /** Global p2p data plane; omitted = kcp. */
   transport?: 'kcp' | 'quic';
   /** QUIC tuning; ignored when transport is kcp. Empty fields = defaults. */

@@ -223,6 +223,12 @@ func P2PDirect(s *cfg.Settings) bool {
 	return s == nil || s.P2P == nil || s.P2P.Direct == nil || *s.P2P.Direct
 }
 
+// P2PIPv6 reports whether the IPv6 direct-path family is enabled. A missing
+// setting means off, matching p2p's opt-in default.
+func P2PIPv6(s *cfg.Settings) bool {
+	return s != nil && s.P2P != nil && s.P2P.IPv6 != nil && *s.P2P.IPv6
+}
+
 // P2PTLSConfig returns the relay TLS options, or nil to keep p2p's defaults
 // (verify against the system roots) when settings.p2p is unset.
 func P2PTLSConfig(s *cfg.Settings) *p2p.TLSConfig {

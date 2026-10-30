@@ -131,6 +131,24 @@ func TestWriteKeepsBackupModeWhenMainIsGone(t *testing.T) {
 	}
 }
 
+func TestWriteP2PIPv6(t *testing.T) {
+	dir := t.TempDir()
+	withConfigDir(t, dir)
+
+	on := true
+	c := &Config{Settings: &Settings{P2P: &P2PSettings{
+		Derp: "wss://relay.example/derp",
+		IPv6: &on,
+	}}}
+	if err := c.Write(); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got := readConfig(t, filepath.Join(dir, configFile)).Settings.P2P
+	if got == nil || got.IPv6 == nil || !*got.IPv6 {
+		t.Fatalf("p2p = %+v, want ipv6 true", got)
+	}
+}
+
 func TestWriteP2PTransportSettings(t *testing.T) {
 	dir := t.TempDir()
 	withConfigDir(t, dir)

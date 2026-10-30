@@ -364,30 +364,14 @@ func (m *p2pHostManager) acquire(ctx context.Context) (*endpoint.Endpoint, error
 		m.teardownLocked()
 	}
 	if m.host == nil {
-		quicCfg, err := P2PQUICConfig(settings)
-		if err != nil {
-			return nil, fmt.Errorf("p2p quic config: %w", err)
-		}
-		timeouts, err := P2PTimeouts(settings)
-		if err != nil {
-			return nil, fmt.Errorf("p2p timeouts: %w", err)
-		}
 		hexKey, _, err := m.ensureIdentityLocked()
 		if err != nil {
 			return nil, fmt.Errorf("p2p identity: %w", err)
 		}
-		direct := P2PDirect(settings)
-		conf := &p2p.Config{
-			Derp:      P2PDerpURL(settings),
-			Key:       hexKey,
-			Stun:      p2pHostStun(settings),
-			Direct:    &direct,
-			Transport: P2PTransport(settings),
-			QUIC:      quicCfg,
-			Timeouts:  timeouts,
+		conf, err := p2pHostConfig(settings, hexKey)
+		if err != nil {
+			return nil, err
 		}
-		conf.TLS = P2PTLSConfig(settings)
-		conf.Faults = P2PFaults(settings)
 		host, err := endpoint.New(conf)
 		if err != nil {
 			return nil, fmt.Errorf("p2p host: %w", err)
@@ -405,6 +389,34 @@ func (m *p2pHostManager) acquire(ctx context.Context) (*endpoint.Endpoint, error
 	}
 	m.refs++
 	return m.host, nil
+}
+
+// p2pHostConfig builds the p2p endpoint config from the saved settings and the
+// host identity. The host captures this config, so every field here is a build
+// input that p2pHostSig must cover.
+func p2pHostConfig(settings *cfg.Settings, hexKey string) (*p2p.Config, error) {
+	quicCfg, err := P2PQUICConfig(settings)
+	if err != nil {
+		return nil, fmt.Errorf("p2p quic config: %w", err)
+	}
+	timeouts, err := P2PTimeouts(settings)
+	if err != nil {
+		return nil, fmt.Errorf("p2p timeouts: %w", err)
+	}
+	direct := P2PDirect(settings)
+	conf := &p2p.Config{
+		Derp:      P2PDerpURL(settings),
+		Key:       hexKey,
+		Stun:      p2pHostStun(settings),
+		Direct:    &direct,
+		IPv6:      P2PIPv6(settings),
+		Transport: P2PTransport(settings),
+		QUIC:      quicCfg,
+		Timeouts:  timeouts,
+	}
+	conf.TLS = P2PTLSConfig(settings)
+	conf.Faults = P2PFaults(settings)
+	return conf, nil
 }
 
 // teardownLocked stops the host, its accept loop and every peer route, and
@@ -447,8 +459,8 @@ func p2pHostSig(s *cfg.Settings) string {
 		return ""
 	}
 	p := s.P2P
-	return fmt.Sprintf("derp=%s|stun=%s|direct=%s|secure=%s|ca=%s|transport=%s|quic=%s|smux=%s|faults=%s",
-		p.Derp, p.Stun, triState(p.Direct), triState(p.Secure), p.CAFile,
+	return fmt.Sprintf("derp=%s|stun=%s|direct=%s|ipv6=%s|secure=%s|ca=%s|transport=%s|quic=%s|smux=%s|faults=%s",
+		p.Derp, p.Stun, triState(p.Direct), triState(p.IPv6), triState(p.Secure), p.CAFile,
 		p.Transport, p2pQUICSig(p.QUIC), p2pSmuxSig(p.Timeouts), p2pFaultsSig(p.Faults))
 }
 

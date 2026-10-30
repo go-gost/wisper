@@ -36,6 +36,7 @@ type P2PSettingsResp struct {
 	CAFile    string                      `json:"ca_file,omitempty"`
 	Stun      string                      `json:"stun,omitempty"`
 	Direct    *bool                       `json:"direct,omitempty"`
+	IPv6      *bool                       `json:"ipv6,omitempty"`
 	Transport string                      `json:"transport,omitempty"`
 	QUIC      *config.QUICSettings        `json:"quic,omitempty"`
 	Timeouts  *config.P2PTimeoutsSettings `json:"timeouts,omitempty"`
@@ -63,6 +64,7 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			CAFile:    settings.P2P.CAFile,
 			Stun:      settings.P2P.Stun,
 			Direct:    settings.P2P.Direct,
+			IPv6:      settings.P2P.IPv6,
 			Transport: settings.P2P.Transport,
 			QUIC:      settings.P2P.QUIC,
 			Timeouts:  settings.P2P.Timeouts,
@@ -126,6 +128,7 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			prev.Transport != req.P2P.Transport ||
 			!boolPtrEqual(prev.Secure, req.P2P.Secure) ||
 			!boolPtrEqual(prev.Direct, req.P2P.Direct) ||
+			!boolPtrEqual(prev.IPv6, req.P2P.IPv6) ||
 			!quicSettingsEqual(prev.QUIC, req.P2P.QUIC) ||
 			!timeoutsSettingsEqual(prev.Timeouts, req.P2P.Timeouts) ||
 			!faultsEqual(prev.Faults, req.P2P.Faults)
@@ -161,6 +164,7 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			CAFile:    req.P2P.CAFile,
 			Stun:      req.P2P.Stun,
 			Direct:    req.P2P.Direct,
+			IPv6:      req.P2P.IPv6,
 			Transport: req.P2P.Transport,
 			QUIC:      req.P2P.QUIC,
 			Timeouts:  req.P2P.Timeouts,

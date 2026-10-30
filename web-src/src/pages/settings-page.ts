@@ -60,6 +60,7 @@ export class SettingsPage extends LitElement {
   @state() private _p2pCaFile = '';
   @state() private _p2pStun = '';
   @state() private _p2pDirect = true;
+  @state() private _p2pIPv6 = false;
   @state() private _p2pMode: 'kcp' | 'quic' = 'kcp';
   @state() private _p2pAdvanced = false;
   @state() private _p2pQuicMtu = '';
@@ -107,6 +108,7 @@ export class SettingsPage extends LitElement {
     this._p2pCaFile = s.p2p?.ca_file || '';
     this._p2pStun = s.p2p?.stun || '';
     this._p2pDirect = s.p2p?.direct ?? true;
+    this._p2pIPv6 = s.p2p?.ipv6 ?? false;
     this._applyP2PAdvanced(s.p2p);
     this._theme = s.theme;
     this._lang = s.lang;
@@ -124,6 +126,7 @@ export class SettingsPage extends LitElement {
         this._p2pCaFile = s2.p2p?.ca_file || '';
         this._p2pStun = s2.p2p?.stun || '';
         this._p2pDirect = s2.p2p?.direct ?? true;
+        this._p2pIPv6 = s2.p2p?.ipv6 ?? false;
         this._applyP2PAdvanced(s2.p2p);
         this._theme = s2.theme;
         this._lang = s2.lang;
@@ -428,6 +431,7 @@ export class SettingsPage extends LitElement {
           ca_file: this._p2pCaFile,
           stun: this._p2pStun,
           direct: this._p2pDirect,
+          ipv6: this._p2pIPv6,
           transport: this._p2pMode,
           quic: this._quicPayload(),
           timeouts: smux ? { smux } : undefined,
@@ -1000,6 +1004,16 @@ export class SettingsPage extends LitElement {
                 </div>
                 <div class="switch ${this._p2pDirect ? 'on' : ''}"
                   @click=${() => { this._p2pDirect = !this._p2pDirect; }}>
+                  <div class="switch-knob"></div>
+                </div>
+              </div>
+              <div class="switch-row p2p-switch">
+                <div>
+                  <div class="switch-label">${t('settingsP2PIPv6')}</div>
+                  <div class="switch-desc">${t('settingsP2PIPv6Desc')}</div>
+                </div>
+                <div class="switch ${this._p2pIPv6 ? 'on' : ''}"
+                  @click=${() => { this._p2pIPv6 = !this._p2pIPv6; }}>
                   <div class="switch-knob"></div>
                 </div>
               </div>

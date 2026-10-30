@@ -179,6 +179,8 @@ const zh: Record<string, string> = {
   settingsP2PCAFileHint: '用于信任中继自签证书的 PEM CA 文件；留空则使用系统根证书。',
   settingsP2PDirect: '直连（打洞）路径',
   settingsP2PDirectDesc: '优先在对端之间打洞直连，失败时自动回退中继。需要 UDP 可达；IPv6 不需要 STUN。',
+  settingsP2PIPv6: 'IPv6 直连',
+  settingsP2PIPv6Desc: '双方都有全局 IPv6 地址时使用 IPv6 直连。默认关闭；关闭时不探测也不通告 IPv6。IPv6 不需要 STUN。',
   settingsP2PStun: 'STUN 服务器',
   settingsP2PStunHint: '用于探测公网地址以打洞。留空 = 中继主机 + 3478 端口（derper 默认在该端口提供 STUN）；用候选里的公共服务器，它同样会看到你的公网地址。',
   settingsP2PTransport: '传输协议',

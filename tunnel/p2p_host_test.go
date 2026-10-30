@@ -935,6 +935,40 @@ func acceptWithin(t *testing.T, conns <-chan net.Conn, what string) net.Conn {
 	}
 }
 
+// TestP2PHostConfigIPv6: the host config is what p2p actually reads, so the
+// saved switch must reach p2p.Config and not just the settings struct.
+func TestP2PHostConfigIPv6(t *testing.T) {
+	for _, on := range []bool{false, true} {
+		on := on
+		s := &cfg.Settings{P2P: &cfg.P2PSettings{
+			Derp: "wss://relay.example/derp",
+			Stun: "192.0.2.1:9", // explicit: p2pHostConfig probes a derived STUN
+			IPv6: &on,
+		}}
+		conf, err := p2pHostConfig(s, "test-key")
+		if err != nil {
+			t.Fatalf("IPv6=%v: p2pHostConfig: %v", on, err)
+		}
+		if conf.IPv6 != on {
+			t.Errorf("IPv6=%v: p2p.Config.IPv6 = %v", on, conf.IPv6)
+		}
+	}
+}
+
+// TestP2PHostSigIncludesIPv6: toggling the IPv6 family must rebuild the host;
+// the host captures its config, so a stale signature would keep the old value.
+func TestP2PHostSigIncludesIPv6(t *testing.T) {
+	on := true
+	off := &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://relay.example/derp"}}
+	withIPv6 := &cfg.Settings{P2P: &cfg.P2PSettings{
+		Derp: "wss://relay.example/derp",
+		IPv6: &on,
+	}}
+	if p2pHostSig(off) == p2pHostSig(withIPv6) {
+		t.Fatal("ipv6 change did not change the host signature")
+	}
+}
+
 func TestP2PHostSigIncludesTransportAndAdvanced(t *testing.T) {
 	base := &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://relay.example/derp"}}
 	if p2pHostSig(base) != p2pHostSig(base) {

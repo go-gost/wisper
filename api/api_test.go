@@ -218,6 +218,31 @@ func TestUpdateConfigP2PDirect(t *testing.T) {
 	}
 }
 
+// TestUpdateConfigP2PIPv6: the IPv6 family switch survives the settings round
+// trip, so the UI can turn it on and the host reads the same value back.
+func TestUpdateConfigP2PIPv6(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	resp, _ := putJSON(t, srv.URL+"/api/config", map[string]any{
+		"p2p": map[string]any{
+			"derp": "wss://relay.example/derp", "ipv6": true,
+		},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	_, body := getJSON(t, srv.URL+"/api/config")
+	p2p, _ := body["p2p"].(map[string]any)
+	if p2p == nil {
+		t.Fatalf("config has no p2p block: %v", body)
+	}
+	if ipv6, ok := p2p["ipv6"].(bool); !ok || !ipv6 {
+		t.Errorf("ipv6 = %v, want true", p2p["ipv6"])
+	}
+}
+
 // TestUpdateConfigP2PFaults: the fault-injection block survives the settings
 // round trip the manual harness drives (PUT /api/config, then the host reads it
 // back on acquire), so a faults config set through the API reaches the engine

@@ -601,6 +601,26 @@ func TestP2PDirect(t *testing.T) {
 	}
 }
 
+// TestP2PIPv6: the IPv6 family is opt-in, so only an explicit true turns it on.
+func TestP2PIPv6(t *testing.T) {
+	no, yes := false, true
+	for _, tc := range []struct {
+		name string
+		s    *cfg.Settings
+		want bool
+	}{
+		{"no settings", nil, false},
+		{"no p2p block", &cfg.Settings{}, false},
+		{"unset", &cfg.Settings{P2P: &cfg.P2PSettings{}}, false},
+		{"explicit off", &cfg.Settings{P2P: &cfg.P2PSettings{IPv6: &no}}, false},
+		{"explicit on", &cfg.Settings{P2P: &cfg.P2PSettings{IPv6: &yes}}, true},
+	} {
+		if got := P2PIPv6(tc.s); got != tc.want {
+			t.Errorf("P2PIPv6(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestP2PTLSConfig: an unset settings.p2p must not panic and keeps p2p's
 // defaults; a configured one is passed through.
 func TestP2PTLSConfig(t *testing.T) {

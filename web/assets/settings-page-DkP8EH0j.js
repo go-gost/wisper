@@ -1,4 +1,4 @@
-import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t as C}from"./index-BSQNO7dB.js";import{m as Q,r}from"./format-CpQ6X3fS.js";import{i as u}from"./app-scaffold-C9d3FWtc.js";import{c as k}from"./clipboard-C3x8_sid.js";import{r as D}from"./qr-B9waFAF2.js";var q=Object.defineProperty,R=Object.getOwnPropertyDescriptor,a=(t,s,n,o)=>{for(var p=o>1?void 0:o?R(s,n):s,c=t.length-1,d;c>=0;c--)(d=t[c])&&(p=(o?d(s,n,p):d(p))||p);return o&&p&&q(s,n,p),p};const y=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],x=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],$=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];function U(t){const s=t.trim();if(!s)return 0;const n=/(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)/g,o={ns:1e-9,us:1e-6,µs:1e-6,ms:.001,s:1,m:60,h:3600};let p=0,c=0,d;for(;(d=n.exec(s))!==null;){if(d.index!==c)return null;p+=Number(d[1])*o[d[2]],c=n.lastIndex}return c===s.length&&c>0?p:null}let i=class extends P{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._p2pDerp="",this._p2pSecure=!0,this._p2pCaFile="",this._p2pStun="",this._p2pDirect=!0,this._p2pMode="kcp",this._p2pAdvanced=!1,this._p2pQuicMtu="",this._p2pQuicBatch="",this._p2pQuicRelayFlush="",this._p2pQuicKeepAlive="",this._p2pQuicIdle="",this._p2pQuicHandshake="",this._p2pSmuxInterval="",this._p2pSmuxTimeout="",this._showP2PKey=!1,this._qrKey="",this._p2pTesting=!1,this._p2pTest=null,this._p2pStunTesting=!1,this._p2pStunTest=null,this._p2pPublicKey="",this._p2pRunning=!1,this._p2pTransport=null,this._showResetKeyDialog=!1,this._resettingKey=!1,this._doctor="",this._doctorLoading=!1,this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._inspectorTested=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new S,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=w();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._p2pDerp=t.p2p?.derp||"",this._p2pSecure=t.p2p?.secure??!0,this._p2pCaFile=t.p2p?.ca_file||"",this._p2pStun=t.p2p?.stun||"",this._p2pDirect=t.p2p?.direct??!0,this._applyP2PAdvanced(t.p2p),this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(T(()=>{const s=w();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._p2pDerp=s.p2p?.derp||"",this._p2pSecure=s.p2p?.secure??!0,this._p2pCaFile=s.p2p?.ca_file||"",this._p2pStun=s.p2p?.stun||"",this._p2pDirect=s.p2p?.direct??!0,this._applyP2PAdvanced(s.p2p),this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate(),this._fetchP2PIdentity()}),I(()=>this.requestUpdate())),this._fetchVersion(),this._fetchP2PIdentity()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}async _fetchP2PIdentity(t=!1){try{const s=await this._backend.getP2PIdentity();this._p2pPublicKey=s.public_key,this._p2pRunning=s.running,this._p2pTransport=s.running?{direct:s.direct_peers,derp:s.derp_peers,attempts:s.punch_attempts,success:s.punch_success}:null}catch{if(t)return;this._p2pPublicKey="",this._p2pRunning=!1,this._p2pTransport=null}}async _testP2P(){this._p2pTesting=!0,this._p2pTest=null;try{const t=await this._backend.testP2PRelay({derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile});this._p2pTest={ok:t.ok,latency:t.latency_ms,error:t.error}}catch(t){this._p2pTest={ok:!1,error:String(t)}}this._p2pTesting=!1}async _testStun(){this._p2pStunTesting=!0,this._p2pStunTest=null;try{const t=await this._backend.testP2PStun({stun:this._p2pStun});this._p2pStunTest={ok:t.ok,mapped:t.mapped,latency:t.latency_ms,error:t.error}}catch(t){this._p2pStunTest={ok:!1,error:String(t)}}this._p2pStunTesting=!1}_renderProbeRow(t,s,n,o){return l`
+import{a as P,G as S,o as w,j as T,y as I,A as u,c as e,b as l,z as g,i as K,t as C}from"./index-BUqLOfsH.js";import{m as Q,r}from"./format-CjTD33Pr.js";import{i as h}from"./app-scaffold-DFFXLJfc.js";import{c as k}from"./clipboard-C3x8_sid.js";import{r as D}from"./qr-B9waFAF2.js";var q=Object.defineProperty,R=Object.getOwnPropertyDescriptor,a=(t,s,n,o)=>{for(var p=o>1?void 0:o?R(s,n):s,c=t.length-1,d;c>=0;c--)(d=t[c])&&(p=(o?d(s,n,p):d(p))||p);return o&&p&&q(s,n,p),p};const y=[{value:"system",labelKey:"settingsThemeSystem"},{value:"light",labelKey:"settingsThemeLight"},{value:"dark",labelKey:"settingsThemeDark"}],x=[{value:"en",labelKey:"settingsLangEn"},{value:"zh",labelKey:"settingsLangZh"}],$=[{value:1,labelKey:"settingsInterval1s"},{value:2,labelKey:"settingsInterval2s"},{value:3,labelKey:"settingsInterval3s"},{value:5,labelKey:"settingsInterval5s"},{value:10,labelKey:"settingsInterval10s"},{value:30,labelKey:"settingsInterval30s"}];function U(t){const s=t.trim();if(!s)return 0;const n=/(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)/g,o={ns:1e-9,us:1e-6,µs:1e-6,ms:.001,s:1,m:60,h:3600};let p=0,c=0,d;for(;(d=n.exec(s))!==null;){if(d.index!==c)return null;p+=Number(d[1])*o[d[2]],c=n.lastIndex}return c===s.length&&c>0?p:null}let i=class extends P{constructor(){super(...arguments),this._server="",this._entrypoint="",this._insecure=!1,this._p2pDerp="",this._p2pSecure=!0,this._p2pCaFile="",this._p2pStun="",this._p2pDirect=!0,this._p2pIPv6=!1,this._p2pMode="kcp",this._p2pAdvanced=!1,this._p2pQuicMtu="",this._p2pQuicBatch="",this._p2pQuicRelayFlush="",this._p2pQuicKeepAlive="",this._p2pQuicIdle="",this._p2pQuicHandshake="",this._p2pSmuxInterval="",this._p2pSmuxTimeout="",this._showP2PKey=!1,this._qrKey="",this._p2pTesting=!1,this._p2pTest=null,this._p2pStunTesting=!1,this._p2pStunTest=null,this._p2pPublicKey="",this._p2pRunning=!1,this._p2pTransport=null,this._showResetKeyDialog=!1,this._resettingKey=!1,this._doctor="",this._doctorLoading=!1,this._theme="system",this._lang="en",this._statsInterval=3,this._inspectorUrl="",this._inspectorConnected=!1,this._inspectorTested=!1,this._snackbar="",this._saving=!1,this._version="",this._unsubs=[],this._backend=new S,this._livenessTimer=null}connectedCallback(){super.connectedCallback();const t=w();this._server=t.server,this._entrypoint=t.entrypoint,this._insecure=t.insecure,this._p2pDerp=t.p2p?.derp||"",this._p2pSecure=t.p2p?.secure??!0,this._p2pCaFile=t.p2p?.ca_file||"",this._p2pStun=t.p2p?.stun||"",this._p2pDirect=t.p2p?.direct??!0,this._p2pIPv6=t.p2p?.ipv6??!1,this._applyP2PAdvanced(t.p2p),this._theme=t.theme,this._lang=t.lang,this._statsInterval=t.stats_interval||1,this._inspectorUrl=t.inspector_url||"",this._unsubs.push(T(()=>{const s=w();this._server=s.server,this._entrypoint=s.entrypoint,this._insecure=s.insecure,this._p2pDerp=s.p2p?.derp||"",this._p2pSecure=s.p2p?.secure??!0,this._p2pCaFile=s.p2p?.ca_file||"",this._p2pStun=s.p2p?.stun||"",this._p2pDirect=s.p2p?.direct??!0,this._p2pIPv6=s.p2p?.ipv6??!1,this._applyP2PAdvanced(s.p2p),this._theme=s.theme,this._lang=s.lang,this._statsInterval=s.stats_interval||1,this._inspectorUrl=s.inspector_url||"",this.requestUpdate(),this._fetchP2PIdentity()}),I(()=>this.requestUpdate())),this._fetchVersion(),this._fetchP2PIdentity()}async _fetchVersion(){try{const t=await this._backend.getVersion();this._version=t.version}catch{this._version=""}}async _fetchP2PIdentity(t=!1){try{const s=await this._backend.getP2PIdentity();this._p2pPublicKey=s.public_key,this._p2pRunning=s.running,this._p2pTransport=s.running?{direct:s.direct_peers,derp:s.derp_peers,attempts:s.punch_attempts,success:s.punch_success}:null}catch{if(t)return;this._p2pPublicKey="",this._p2pRunning=!1,this._p2pTransport=null}}async _testP2P(){this._p2pTesting=!0,this._p2pTest=null;try{const t=await this._backend.testP2PRelay({derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile});this._p2pTest={ok:t.ok,latency:t.latency_ms,error:t.error}}catch(t){this._p2pTest={ok:!1,error:String(t)}}this._p2pTesting=!1}async _testStun(){this._p2pStunTesting=!0,this._p2pStunTest=null;try{const t=await this._backend.testP2PStun({stun:this._p2pStun});this._p2pStunTest={ok:t.ok,mapped:t.mapped,latency:t.latency_ms,error:t.error}}catch(t){this._p2pStunTest={ok:!1,error:String(t)}}this._p2pStunTesting=!1}_renderProbeRow(t,s,n,o){return l`
       <div style="display:flex;align-items:center;justify-content:space-between;font-size:var(--font-sm);padding-top:8px;">
         <span style="display:flex;align-items:center;gap:6px;color:var(--text-muted);">
           <span style="width:8px;height:8px;border-radius:50%;background:${t?t.ok?"var(--green)":"var(--red)":"var(--text-muted)"};display:inline-block;"></span>
@@ -9,13 +9,13 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
           ${s?e("p2pTesting"):e("p2pTest")}
         </button>
       </div>
-      ${t&&!t.ok?l`<p class="p2p-warning">${t.error??""}</p>`:h}
-    `}async _copyP2PKey(){await k(this._p2pPublicKey),this._showSnackbar(e("copiedToClipboard"))}async _resetP2PKey(){const t=this._p2pPublicKey;this._resettingKey=!0;try{const s=await this._backend.resetP2PIdentity();this._p2pPublicKey=s.public_key,this._p2pRunning=s.running,this._p2pTransport=s.running?{direct:s.direct_peers,derp:s.derp_peers,attempts:s.punch_attempts,success:s.punch_success}:null,this._showP2PKey=!0,this._showResetKeyDialog=!1,this._showSnackbar(e("p2pKeyResetDone")),this._reconcileP2PIdentity()}catch(s){for(const n of[0,400,1200])if(n&&await new Promise(o=>setTimeout(o,n)),await this._fetchP2PIdentity(!0),t&&this._p2pPublicKey&&this._p2pPublicKey!==t){this._showResetKeyDialog=!1,this._showSnackbar(e("p2pKeyResetDone")),this._reconcileP2PIdentity();return}this._showSnackbar(`${e("p2pKeyResetFailed")}: ${s}`)}finally{this._resettingKey=!1}}_reconcileP2PIdentity(){this._fetchP2PIdentity(!0);for(const t of[1500,5e3])setTimeout(()=>{this._fetchP2PIdentity(!0)},t)}async _runDoctor(){this._doctorLoading=!0;try{this._doctor=await this._backend.getP2PDoctor()}catch(t){this._doctor=String(t)}this._doctorLoading=!1}async _copyDoctor(){await k(this._doctor),this._showSnackbar(e("copiedToClipboard"))}updated(t){if(t.has("_qrKey")&&this._qrKey){const s=this.renderRoot.querySelector("#qrCanvas");D(s,this._qrKey)}}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}_applyP2PAdvanced(t){this._p2pMode=t?.transport==="quic"?"quic":"kcp",this._p2pQuicMtu=t?.quic?.mtu?String(t.quic.mtu):"",this._p2pQuicBatch=t?.quic?.relay_batch_bytes?String(t.quic.relay_batch_bytes):"",this._p2pQuicRelayFlush=t?.quic?.relay_flush||"",this._p2pQuicKeepAlive=t?.quic?.keep_alive||"",this._p2pQuicIdle=t?.quic?.idle||"",this._p2pQuicHandshake=t?.quic?.handshake_timeout||"",this._p2pSmuxInterval=t?.timeouts?.smux?.interval||"",this._p2pSmuxTimeout=t?.timeouts?.smux?.timeout||""}_quicPayload(){const t={};return this._p2pQuicMtu.trim()&&(t.mtu=Number(this._p2pQuicMtu)),this._p2pQuicBatch.trim()&&(t.relay_batch_bytes=Number(this._p2pQuicBatch)),this._p2pQuicRelayFlush.trim()&&(t.relay_flush=this._p2pQuicRelayFlush.trim()),this._p2pQuicKeepAlive.trim()&&(t.keep_alive=this._p2pQuicKeepAlive.trim()),this._p2pQuicIdle.trim()&&(t.idle=this._p2pQuicIdle.trim()),this._p2pQuicHandshake.trim()&&(t.handshake_timeout=this._p2pQuicHandshake.trim()),Object.keys(t).length?t:void 0}_smuxPayload(){const t={};return this._p2pSmuxInterval.trim()&&(t.interval=this._p2pSmuxInterval.trim()),this._p2pSmuxTimeout.trim()&&(t.timeout=this._p2pSmuxTimeout.trim()),Object.keys(t).length?t:void 0}_advancedError(){const t=v=>{if(!v.trim())return null;const _=Number(v);return Number.isInteger(_)?_:NaN},s=t(this._p2pQuicMtu);if(s!==null&&(Number.isNaN(s)||s<1200||s>1452))return e("settingsQUICMTUInvalid");const n=t(this._p2pQuicBatch);if(n!==null&&(Number.isNaN(n)||n<1||n>65536))return e("settingsQUICBatchInvalid");const o=v=>{if(!v.trim())return null;const _=U(v);return _===null?NaN:_},p=o(this._p2pQuicRelayFlush);if(p!==null&&(Number.isNaN(p)||p<0))return e("settingsDurationInvalid",{field:e("settingsQUICRelayFlush")});const c=o(this._p2pQuicKeepAlive);if(c!==null&&(Number.isNaN(c)||c<0))return e("settingsDurationInvalid",{field:e("settingsQUICKeepAlive")});const d=o(this._p2pQuicIdle);if(d!==null&&(Number.isNaN(d)||d<0))return e("settingsDurationInvalid",{field:e("settingsQUICIdle")});const f=o(this._p2pQuicHandshake);if(f!==null&&(Number.isNaN(f)||f<0))return e("settingsDurationInvalid",{field:e("settingsQUICHandshake")});if((d||15)<=(c||5))return e("settingsQUICIdleInvalid");const b=o(this._p2pSmuxInterval);if(b!==null&&(Number.isNaN(b)||b<0))return e("settingsDurationInvalid",{field:e("settingsSmuxInterval")});const m=o(this._p2pSmuxTimeout);return m!==null&&(Number.isNaN(m)||m<0)?e("settingsDurationInvalid",{field:e("settingsSmuxTimeout")}):(m||15)<2*(b||3)?e("settingsSmuxTimeoutInvalid"):null}async _saveSettings(){const t=this._advancedError();if(t){this._showSnackbar(t);return}const s=this._smuxPayload();this._saving=!0;try{await g({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure,p2p:{derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile,stun:this._p2pStun,direct:this._p2pDirect,transport:this._p2pMode,quic:this._quicPayload(),timeouts:s?{smux:s}:void 0}}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(y.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await g({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(x.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await g({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e($.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await g({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1,this._inspectorTested=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok,this._inspectorTested=!0}catch{this._inspectorConnected=!1,this._inspectorTested=!0}this.requestUpdate()}async _saveInspectorUrl(){try{await g({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const n=s.indexOf(t);return s[(n+1)%s.length]}render(){return l`
+      ${t&&!t.ok?l`<p class="p2p-warning">${t.error??""}</p>`:u}
+    `}async _copyP2PKey(){await k(this._p2pPublicKey),this._showSnackbar(e("copiedToClipboard"))}async _resetP2PKey(){const t=this._p2pPublicKey;this._resettingKey=!0;try{const s=await this._backend.resetP2PIdentity();this._p2pPublicKey=s.public_key,this._p2pRunning=s.running,this._p2pTransport=s.running?{direct:s.direct_peers,derp:s.derp_peers,attempts:s.punch_attempts,success:s.punch_success}:null,this._showP2PKey=!0,this._showResetKeyDialog=!1,this._showSnackbar(e("p2pKeyResetDone")),this._reconcileP2PIdentity()}catch(s){for(const n of[0,400,1200])if(n&&await new Promise(o=>setTimeout(o,n)),await this._fetchP2PIdentity(!0),t&&this._p2pPublicKey&&this._p2pPublicKey!==t){this._showResetKeyDialog=!1,this._showSnackbar(e("p2pKeyResetDone")),this._reconcileP2PIdentity();return}this._showSnackbar(`${e("p2pKeyResetFailed")}: ${s}`)}finally{this._resettingKey=!1}}_reconcileP2PIdentity(){this._fetchP2PIdentity(!0);for(const t of[1500,5e3])setTimeout(()=>{this._fetchP2PIdentity(!0)},t)}async _runDoctor(){this._doctorLoading=!0;try{this._doctor=await this._backend.getP2PDoctor()}catch(t){this._doctor=String(t)}this._doctorLoading=!1}async _copyDoctor(){await k(this._doctor),this._showSnackbar(e("copiedToClipboard"))}updated(t){if(t.has("_qrKey")&&this._qrKey){const s=this.renderRoot.querySelector("#qrCanvas");D(s,this._qrKey)}}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._livenessTimer&&clearTimeout(this._livenessTimer)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2e3)}_applyP2PAdvanced(t){this._p2pMode=t?.transport==="quic"?"quic":"kcp",this._p2pQuicMtu=t?.quic?.mtu?String(t.quic.mtu):"",this._p2pQuicBatch=t?.quic?.relay_batch_bytes?String(t.quic.relay_batch_bytes):"",this._p2pQuicRelayFlush=t?.quic?.relay_flush||"",this._p2pQuicKeepAlive=t?.quic?.keep_alive||"",this._p2pQuicIdle=t?.quic?.idle||"",this._p2pQuicHandshake=t?.quic?.handshake_timeout||"",this._p2pSmuxInterval=t?.timeouts?.smux?.interval||"",this._p2pSmuxTimeout=t?.timeouts?.smux?.timeout||""}_quicPayload(){const t={};return this._p2pQuicMtu.trim()&&(t.mtu=Number(this._p2pQuicMtu)),this._p2pQuicBatch.trim()&&(t.relay_batch_bytes=Number(this._p2pQuicBatch)),this._p2pQuicRelayFlush.trim()&&(t.relay_flush=this._p2pQuicRelayFlush.trim()),this._p2pQuicKeepAlive.trim()&&(t.keep_alive=this._p2pQuicKeepAlive.trim()),this._p2pQuicIdle.trim()&&(t.idle=this._p2pQuicIdle.trim()),this._p2pQuicHandshake.trim()&&(t.handshake_timeout=this._p2pQuicHandshake.trim()),Object.keys(t).length?t:void 0}_smuxPayload(){const t={};return this._p2pSmuxInterval.trim()&&(t.interval=this._p2pSmuxInterval.trim()),this._p2pSmuxTimeout.trim()&&(t.timeout=this._p2pSmuxTimeout.trim()),Object.keys(t).length?t:void 0}_advancedError(){const t=v=>{if(!v.trim())return null;const _=Number(v);return Number.isInteger(_)?_:NaN},s=t(this._p2pQuicMtu);if(s!==null&&(Number.isNaN(s)||s<1200||s>1452))return e("settingsQUICMTUInvalid");const n=t(this._p2pQuicBatch);if(n!==null&&(Number.isNaN(n)||n<1||n>65536))return e("settingsQUICBatchInvalid");const o=v=>{if(!v.trim())return null;const _=U(v);return _===null?NaN:_},p=o(this._p2pQuicRelayFlush);if(p!==null&&(Number.isNaN(p)||p<0))return e("settingsDurationInvalid",{field:e("settingsQUICRelayFlush")});const c=o(this._p2pQuicKeepAlive);if(c!==null&&(Number.isNaN(c)||c<0))return e("settingsDurationInvalid",{field:e("settingsQUICKeepAlive")});const d=o(this._p2pQuicIdle);if(d!==null&&(Number.isNaN(d)||d<0))return e("settingsDurationInvalid",{field:e("settingsQUICIdle")});const f=o(this._p2pQuicHandshake);if(f!==null&&(Number.isNaN(f)||f<0))return e("settingsDurationInvalid",{field:e("settingsQUICHandshake")});if((d||15)<=(c||5))return e("settingsQUICIdleInvalid");const b=o(this._p2pSmuxInterval);if(b!==null&&(Number.isNaN(b)||b<0))return e("settingsDurationInvalid",{field:e("settingsSmuxInterval")});const m=o(this._p2pSmuxTimeout);return m!==null&&(Number.isNaN(m)||m<0)?e("settingsDurationInvalid",{field:e("settingsSmuxTimeout")}):(m||15)<2*(b||3)?e("settingsSmuxTimeoutInvalid"):null}async _saveSettings(){const t=this._advancedError();if(t){this._showSnackbar(t);return}const s=this._smuxPayload();this._saving=!0;try{await g({server:this._server,entrypoint:this._entrypoint,insecure:this._insecure,p2p:{derp:this._p2pDerp,secure:this._p2pSecure,ca_file:this._p2pCaFile,stun:this._p2pStun,direct:this._p2pDirect,ipv6:this._p2pIPv6,transport:this._p2pMode,quic:this._quicPayload(),timeouts:s?{smux:s}:void 0}}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}this._saving=!1}async _setTheme(t){this._theme=t,this.requestUpdate(),this._showSnackbar("✓ "+e(y.find(s=>s.value===t)?.labelKey??"settingsThemeSystem"));try{await g({theme:t})}catch{}}async _setLang(t){this._lang=t,this.requestUpdate(),this._showSnackbar("✓ "+e(x.find(s=>s.value===t)?.labelKey??"settingsLangEn"));try{await g({lang:t})}catch{}}async _setInterval(t){this._statsInterval=t,this.requestUpdate(),this._showSnackbar("✓ "+e($.find(s=>s.value===t)?.labelKey??"settingsInterval1s"));try{await g({stats_interval:t})}catch{}}_onInspectorUrlChange(t){this._inspectorUrl=t,this._livenessTimer&&clearTimeout(this._livenessTimer),this._livenessTimer=setTimeout(()=>this._checkLiveness(),500)}async _checkLiveness(){if(!this._inspectorUrl){this._inspectorConnected=!1,this._inspectorTested=!1;return}try{const t=await fetch(`${this._inspectorUrl.replace(/\/$/,"")}/liveness`);this._inspectorConnected=t.ok,this._inspectorTested=!0}catch{this._inspectorConnected=!1,this._inspectorTested=!0}this.requestUpdate()}async _saveInspectorUrl(){try{await g({inspector_url:this._inspectorUrl}),this._showSnackbar("✓ "+e("saved"))}catch{this._showSnackbar(e("saveFailed"))}}_cycleOption(t,s){const n=s.indexOf(t);return s[(n+1)%s.length]}render(){return l`
       <app-scaffold>
         <!-- AppBar -->
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._navigate("/")}>
-            ${u("chevron-left")}
+            ${h("chevron-left")}
           </button>
           <span class="page-title">${e("settingsTitle")}</span>
         </div>
@@ -72,7 +72,7 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                 </div>
               </div>
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
-                ${u("check")} ${e("btnSave")}
+                ${h("check")} ${e("btnSave")}
               </button>
             </div>
           </div>
@@ -88,14 +88,14 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                 <div style="display:flex;align-items:center;gap:8px;">
                   <span class="identity-key ${this._showP2PKey?"":"masked"}">${this._showP2PKey?this._p2pPublicKey:Q(this._p2pPublicKey)}</span>
                   <button class="copy-btn-mini" title="${e("qrCode")}" @click=${()=>{this._qrKey=this._p2pPublicKey}}>
-                    ${u("qr")}
+                    ${h("qr")}
                   </button>
                   <button class="copy-btn-mini" title="${e("btnCopy")}" @click=${()=>this._copyP2PKey()}>
-                    ${u("copy")}
+                    ${h("copy")}
                   </button>
                   <button class="copy-btn-mini" title="${this._showP2PKey?e("hideKey"):e("revealKey")}"
                     @click=${()=>{this._showP2PKey=!this._showP2PKey}}>
-                    ${u(this._showP2PKey?"eye-off":"eye")}
+                    ${h(this._showP2PKey?"eye-off":"eye")}
                   </button>
                 </div>
                 <p class="hint">${e("p2pIdentityHint")}</p>
@@ -103,8 +103,8 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                 ${this._p2pTransport?l`<p class="hint">
                       ${e("p2pTransport")}: ${e("p2pTransportDirect")} ${this._p2pTransport.direct} ·
                       ${e("p2pTransportRelay")} ${this._p2pTransport.derp}
-                      ${this._p2pTransport.attempts>0?l`· ${e("p2pTransportPunch")} ${this._p2pTransport.success}/${this._p2pTransport.attempts}`:h}
-                    </p>`:h}
+                      ${this._p2pTransport.attempts>0?l`· ${e("p2pTransportPunch")} ${this._p2pTransport.success}/${this._p2pTransport.attempts}`:u}
+                    </p>`:u}
                 <button class="reset-key-btn" @click=${()=>{this._showResetKeyDialog=!0}}>
                   ${e("p2pKeyReset")}
                 </button>
@@ -152,6 +152,16 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                   <div class="switch-knob"></div>
                 </div>
               </div>
+              <div class="switch-row p2p-switch">
+                <div>
+                  <div class="switch-label">${e("settingsP2PIPv6")}</div>
+                  <div class="switch-desc">${e("settingsP2PIPv6Desc")}</div>
+                </div>
+                <div class="switch ${this._p2pIPv6?"on":""}"
+                  @click=${()=>{this._p2pIPv6=!this._p2pIPv6}}>
+                  <div class="switch-knob"></div>
+                </div>
+              </div>
               <div class="form-group">
                 <label class="form-label">${e("settingsP2PStun")}</label>
                 <input class="form-input" .value=${this._p2pStun}
@@ -180,7 +190,7 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
 
               <button class="advanced-btn" @click=${()=>{this._p2pAdvanced=!this._p2pAdvanced}}>
                 <span>${e("settingsAdvanced")}</span>
-                ${u(this._p2pAdvanced?"chevron-up":"chevron-down")}
+                ${h(this._p2pAdvanced?"chevron-up":"chevron-down")}
               </button>
               ${this._p2pAdvanced?l`<div class="advanced-fields">
                     ${this._p2pMode==="kcp"?l`
@@ -236,10 +246,10 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                               @input=${t=>{this._p2pQuicHandshake=t.target.value}}>
                           </div>
                         `}
-                  </div>`:h}
+                  </div>`:u}
 
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
-                ${u("check")} ${e("btnSave")}
+                ${h("check")} ${e("btnSave")}
               </button>
             </div>
           </div>
@@ -258,16 +268,16 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                 </button>
                 ${this._doctor?l`<button class="copy-btn-mini" style="border:1px solid var(--border);padding:6px;"
                       title="${e("btnCopy")}" @click=${this._copyDoctor}>
-                      ${u("copy")}
-                    </button>`:h}
+                      ${h("copy")}
+                    </button>`:u}
               </div>
-              ${this._doctor?l`<pre class="doctor-output">${this._doctor}</pre>`:h}
+              ${this._doctor?l`<pre class="doctor-output">${this._doctor}</pre>`:u}
             </div>
             <!-- The host's own event history sits with the diagnostics: both
                  answer "what happened", and neither is a setting. -->
             <div class="selector-row" @click=${()=>this._navigate("/settings/events")}>
               <span class="selector-label">${e("eventsGlobalTitle")}</span>
-              <span class="selector-value">${u("chevron-right")}</span>
+              <span class="selector-value">${h("chevron-right")}</span>
             </div>
           </div>
         </div>
@@ -310,21 +320,21 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
               <span class="selector-label">${e("settingsLanguage")}</span>
               <span class="selector-value">
                 ${e(x.find(t=>t.value===this._lang)?.labelKey??"settingsLangEn")}
-                ${u("chevron-right")}
+                ${h("chevron-right")}
               </span>
             </div>
             <div class="selector-row" @click=${()=>this._setTheme(this._cycleOption(this._theme,y.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsTheme")}</span>
               <span class="selector-value">
                 ${e(y.find(t=>t.value===this._theme)?.labelKey??"settingsThemeSystem")}
-                ${u("chevron-right")}
+                ${h("chevron-right")}
               </span>
             </div>
             <div class="selector-row" @click=${()=>this._setInterval(this._cycleOption(this._statsInterval,$.map(t=>t.value)))}>
               <span class="selector-label">${e("settingsStatsInterval")}</span>
               <span class="selector-value">
                 ${e($.find(t=>t.value===this._statsInterval)?.labelKey??"settingsInterval1s")}
-                ${u("chevron-right")}
+                ${h("chevron-right")}
               </span>
             </div>
           </div>
@@ -345,7 +355,7 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                 </div>
               </div>
             </div>
-          `:h}
+          `:u}
 
         ${this._showResetKeyDialog?l`
             <div class="dialog-overlay"
@@ -365,7 +375,7 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
                 </div>
               </div>
             </div>
-          `:h}
+          `:u}
 
         ${this._snackbar?l`<div class="toast">${this._snackbar}</div>`:""}
       </app-scaffold>
@@ -711,4 +721,4 @@ import{a as P,G as S,o as w,j as T,y as I,A as h,c as e,b as l,z as g,i as K,t a
       from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-  `;a([r()],i.prototype,"_server",2);a([r()],i.prototype,"_entrypoint",2);a([r()],i.prototype,"_insecure",2);a([r()],i.prototype,"_p2pDerp",2);a([r()],i.prototype,"_p2pSecure",2);a([r()],i.prototype,"_p2pCaFile",2);a([r()],i.prototype,"_p2pStun",2);a([r()],i.prototype,"_p2pDirect",2);a([r()],i.prototype,"_p2pMode",2);a([r()],i.prototype,"_p2pAdvanced",2);a([r()],i.prototype,"_p2pQuicMtu",2);a([r()],i.prototype,"_p2pQuicBatch",2);a([r()],i.prototype,"_p2pQuicRelayFlush",2);a([r()],i.prototype,"_p2pQuicKeepAlive",2);a([r()],i.prototype,"_p2pQuicIdle",2);a([r()],i.prototype,"_p2pQuicHandshake",2);a([r()],i.prototype,"_p2pSmuxInterval",2);a([r()],i.prototype,"_p2pSmuxTimeout",2);a([r()],i.prototype,"_showP2PKey",2);a([r()],i.prototype,"_qrKey",2);a([r()],i.prototype,"_p2pTesting",2);a([r()],i.prototype,"_p2pTest",2);a([r()],i.prototype,"_p2pStunTesting",2);a([r()],i.prototype,"_p2pStunTest",2);a([r()],i.prototype,"_p2pPublicKey",2);a([r()],i.prototype,"_p2pRunning",2);a([r()],i.prototype,"_p2pTransport",2);a([r()],i.prototype,"_showResetKeyDialog",2);a([r()],i.prototype,"_resettingKey",2);a([r()],i.prototype,"_doctor",2);a([r()],i.prototype,"_doctorLoading",2);a([r()],i.prototype,"_theme",2);a([r()],i.prototype,"_lang",2);a([r()],i.prototype,"_statsInterval",2);a([r()],i.prototype,"_inspectorUrl",2);a([r()],i.prototype,"_inspectorConnected",2);a([r()],i.prototype,"_inspectorTested",2);a([r()],i.prototype,"_snackbar",2);a([r()],i.prototype,"_saving",2);a([r()],i.prototype,"_version",2);i=a([C("settings-page")],i);export{i as SettingsPage};
+  `;a([r()],i.prototype,"_server",2);a([r()],i.prototype,"_entrypoint",2);a([r()],i.prototype,"_insecure",2);a([r()],i.prototype,"_p2pDerp",2);a([r()],i.prototype,"_p2pSecure",2);a([r()],i.prototype,"_p2pCaFile",2);a([r()],i.prototype,"_p2pStun",2);a([r()],i.prototype,"_p2pDirect",2);a([r()],i.prototype,"_p2pIPv6",2);a([r()],i.prototype,"_p2pMode",2);a([r()],i.prototype,"_p2pAdvanced",2);a([r()],i.prototype,"_p2pQuicMtu",2);a([r()],i.prototype,"_p2pQuicBatch",2);a([r()],i.prototype,"_p2pQuicRelayFlush",2);a([r()],i.prototype,"_p2pQuicKeepAlive",2);a([r()],i.prototype,"_p2pQuicIdle",2);a([r()],i.prototype,"_p2pQuicHandshake",2);a([r()],i.prototype,"_p2pSmuxInterval",2);a([r()],i.prototype,"_p2pSmuxTimeout",2);a([r()],i.prototype,"_showP2PKey",2);a([r()],i.prototype,"_qrKey",2);a([r()],i.prototype,"_p2pTesting",2);a([r()],i.prototype,"_p2pTest",2);a([r()],i.prototype,"_p2pStunTesting",2);a([r()],i.prototype,"_p2pStunTest",2);a([r()],i.prototype,"_p2pPublicKey",2);a([r()],i.prototype,"_p2pRunning",2);a([r()],i.prototype,"_p2pTransport",2);a([r()],i.prototype,"_showResetKeyDialog",2);a([r()],i.prototype,"_resettingKey",2);a([r()],i.prototype,"_doctor",2);a([r()],i.prototype,"_doctorLoading",2);a([r()],i.prototype,"_theme",2);a([r()],i.prototype,"_lang",2);a([r()],i.prototype,"_statsInterval",2);a([r()],i.prototype,"_inspectorUrl",2);a([r()],i.prototype,"_inspectorConnected",2);a([r()],i.prototype,"_inspectorTested",2);a([r()],i.prototype,"_snackbar",2);a([r()],i.prototype,"_saving",2);a([r()],i.prototype,"_version",2);i=a([C("settings-page")],i);export{i as SettingsPage};

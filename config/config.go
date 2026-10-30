@@ -313,6 +313,10 @@ type P2PSettings struct {
 	// Direct attempts a direct (hole-punched) path, falling back to the relay.
 	// nil = true.
 	Direct *bool `yaml:",omitempty" json:"direct,omitempty"`
+	// IPv6 enables the IPv6 direct-path family: the egress probe, the v6
+	// candidates and the peer capability bit. nil = false, so an unconfigured
+	// host never probes or advertises IPv6.
+	IPv6 *bool `yaml:"ipv6,omitempty" json:"ipv6,omitempty"`
 	// Transport selects the p2p data plane: "kcp" (the default when empty) or
 	// "quic". It is global for the host and read when the host is built.
 	Transport string `yaml:"transport,omitempty" json:"transport,omitempty"`

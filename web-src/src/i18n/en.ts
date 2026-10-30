@@ -183,6 +183,9 @@ const en: Record<string, string> = {
   settingsP2PDirect: 'Direct (hole-punched) path',
   settingsP2PDirectDesc:
     'Try a direct path between the peers first and fall back to the relay. Needs UDP; IPv6 works without STUN.',
+  settingsP2PIPv6: 'IPv6 direct path',
+  settingsP2PIPv6Desc:
+    'Use IPv6 for direct connections when both peers have a global IPv6 address. Off by default: when disabled, IPv6 is never probed or advertised. IPv6 does not need STUN.',
   settingsP2PStun: 'STUN server',
   settingsP2PStunHint:
     'Used to find the public address for hole punching. Empty = the relay host on port 3478, which a derper serves by default; a suggested public server sees that address too.',
