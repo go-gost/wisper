@@ -971,8 +971,9 @@ func TestP2PHostSigIncludesIPv6(t *testing.T) {
 
 func TestP2PHostSigIncludesTransportAndAdvanced(t *testing.T) {
 	base := &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://relay.example/derp"}}
-	if p2pHostSig(base) != p2pHostSig(base) {
-		t.Fatal("p2pHostSig is not stable")
+	same := &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://relay.example/derp"}}
+	if p2pHostSig(base) != p2pHostSig(same) {
+		t.Fatal("equal settings produced different host signatures")
 	}
 	quic := &cfg.Settings{P2P: &cfg.P2PSettings{
 		Derp:      "wss://relay.example/derp",
