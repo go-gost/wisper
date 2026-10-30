@@ -383,6 +383,32 @@ export interface StatsSnapshot {
 // ─── App Settings ────────────────────────────────────────────────────────────
 
 /** Private p2p mode settings. Empty `derp` means the default public relay. */
+export interface QUICSettings {
+  /** QUIC packet size; empty = 1200. */
+  mtu?: number;
+  /** Most relay payload bytes per DERP frame; empty = 32768. */
+  relay_batch_bytes?: number;
+  /** Longest relay batch wait; Go duration string, empty = 200µs. */
+  relay_flush?: string;
+  /** QUIC keepalive; Go duration string, empty = 5s. */
+  keep_alive?: string;
+  /** QUIC idle timeout; Go duration string, empty = 15s. */
+  idle?: string;
+  /** QUIC handshake timeout; Go duration string, empty = 10s. */
+  handshake_timeout?: string;
+}
+
+export interface SmuxSettings {
+  /** smux keepalive interval; Go duration string, empty = 3s. */
+  interval?: string;
+  /** smux keepalive timeout; Go duration string, empty = 15s. */
+  timeout?: string;
+}
+
+export interface P2PTimeoutsSettings {
+  smux?: SmuxSettings;
+}
+
 export interface P2PSettings {
   derp: string;
   secure?: boolean;
@@ -391,6 +417,12 @@ export interface P2PSettings {
   stun?: string;
   /** Attempt a direct (hole-punched) path; omitted = true. */
   direct?: boolean;
+  /** Global p2p data plane; omitted = kcp. */
+  transport?: 'kcp' | 'quic';
+  /** QUIC tuning; ignored when transport is kcp. Empty fields = defaults. */
+  quic?: QUICSettings;
+  /** The exposed session timings (currently only the KCP smux keepalive). */
+  timeouts?: P2PTimeoutsSettings;
 }
 
 export interface AppSettings {

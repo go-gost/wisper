@@ -934,3 +934,25 @@ func acceptWithin(t *testing.T, conns <-chan net.Conn, what string) net.Conn {
 		return nil
 	}
 }
+
+func TestP2PHostSigIncludesTransportAndAdvanced(t *testing.T) {
+	base := &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://relay.example/derp"}}
+	if p2pHostSig(base) != p2pHostSig(base) {
+		t.Fatal("p2pHostSig is not stable")
+	}
+	quic := &cfg.Settings{P2P: &cfg.P2PSettings{
+		Derp:      "wss://relay.example/derp",
+		Transport: "quic",
+		QUIC:      &cfg.QUICSettings{MTU: 1400},
+	}}
+	smux := &cfg.Settings{P2P: &cfg.P2PSettings{
+		Derp:     "wss://relay.example/derp",
+		Timeouts: &cfg.P2PTimeoutsSettings{Smux: &cfg.SmuxSettings{Interval: "4s"}},
+	}}
+	if p2pHostSig(base) == p2pHostSig(quic) {
+		t.Fatal("transport/quic change did not change the host signature")
+	}
+	if p2pHostSig(base) == p2pHostSig(smux) {
+		t.Fatal("smux change did not change the host signature")
+	}
+}

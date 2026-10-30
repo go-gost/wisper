@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-gost/p2p"
@@ -29,12 +31,15 @@ type configResponse struct {
 // P2PSettingsResp mirrors config.P2PSettings (secure is a pointer so an
 // omitted value keeps the "verify" default).
 type P2PSettingsResp struct {
-	Derp   string            `json:"derp"`
-	Secure *bool             `json:"secure,omitempty"`
-	CAFile string            `json:"ca_file,omitempty"`
-	Stun   string            `json:"stun,omitempty"`
-	Direct *bool             `json:"direct,omitempty"`
-	Faults *p2p.FaultsConfig `json:"faults,omitempty"`
+	Derp      string                      `json:"derp"`
+	Secure    *bool                       `json:"secure,omitempty"`
+	CAFile    string                      `json:"ca_file,omitempty"`
+	Stun      string                      `json:"stun,omitempty"`
+	Direct    *bool                       `json:"direct,omitempty"`
+	Transport string                      `json:"transport,omitempty"`
+	QUIC      *config.QUICSettings        `json:"quic,omitempty"`
+	Timeouts  *config.P2PTimeoutsSettings `json:"timeouts,omitempty"`
+	Faults    *p2p.FaultsConfig           `json:"faults,omitempty"`
 }
 
 func handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -53,12 +58,15 @@ func handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	var p2p *P2PSettingsResp
 	if settings.P2P != nil {
 		p2p = &P2PSettingsResp{
-			Derp:   settings.P2P.Derp,
-			Secure: settings.P2P.Secure,
-			CAFile: settings.P2P.CAFile,
-			Stun:   settings.P2P.Stun,
-			Direct: settings.P2P.Direct,
-			Faults: settings.P2P.Faults,
+			Derp:      settings.P2P.Derp,
+			Secure:    settings.P2P.Secure,
+			CAFile:    settings.P2P.CAFile,
+			Stun:      settings.P2P.Stun,
+			Direct:    settings.P2P.Direct,
+			Transport: settings.P2P.Transport,
+			QUIC:      settings.P2P.QUIC,
+			Timeouts:  settings.P2P.Timeouts,
+			Faults:    settings.P2P.Faults,
 		}
 	}
 
@@ -91,6 +99,12 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
+	if req.P2P != nil {
+		if err := validateP2PSettings(req.P2P); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
 	cfg := config.Get()
 	if cfg.Settings == nil {
@@ -109,8 +123,11 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			prev.Derp != req.P2P.Derp ||
 			prev.CAFile != req.P2P.CAFile ||
 			prev.Stun != req.P2P.Stun ||
+			prev.Transport != req.P2P.Transport ||
 			!boolPtrEqual(prev.Secure, req.P2P.Secure) ||
 			!boolPtrEqual(prev.Direct, req.P2P.Direct) ||
+			!quicSettingsEqual(prev.QUIC, req.P2P.QUIC) ||
+			!timeoutsSettingsEqual(prev.Timeouts, req.P2P.Timeouts) ||
 			!faultsEqual(prev.Faults, req.P2P.Faults)
 	}
 
@@ -139,12 +156,15 @@ func handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		// Settings is shallow-copied into cfg, so never mutate the previous
 		// struct through its pointer — assign a whole new one.
 		cfg.Settings.P2P = &config.P2PSettings{
-			Derp:   req.P2P.Derp,
-			Secure: req.P2P.Secure,
-			CAFile: req.P2P.CAFile,
-			Stun:   req.P2P.Stun,
-			Direct: req.P2P.Direct,
-			Faults: req.P2P.Faults,
+			Derp:      req.P2P.Derp,
+			Secure:    req.P2P.Secure,
+			CAFile:    req.P2P.CAFile,
+			Stun:      req.P2P.Stun,
+			Direct:    req.P2P.Direct,
+			Transport: req.P2P.Transport,
+			QUIC:      req.P2P.QUIC,
+			Timeouts:  req.P2P.Timeouts,
+			Faults:    req.P2P.Faults,
 		}
 	}
 
@@ -192,4 +212,49 @@ func faultsEqual(a, b *p2p.FaultsConfig) bool {
 		return a == b
 	}
 	return *a == *b
+}
+
+// quicSettingsEqual compares two optional QUIC blocks by value.
+func quicSettingsEqual(a, b *config.QUICSettings) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+// timeoutsSettingsEqual compares the exposed timeout blocks by value.
+func timeoutsSettingsEqual(a, b *config.P2PTimeoutsSettings) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return smuxSettingsEqual(a.Smux, b.Smux)
+}
+
+// smuxSettingsEqual compares two optional smux keepalive blocks by value.
+func smuxSettingsEqual(a, b *config.SmuxSettings) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+// validateP2PSettings rejects an invalid transport or advanced block before it
+// is written to the config and used to rebuild the host.
+func validateP2PSettings(p *P2PSettingsResp) error {
+	switch strings.TrimSpace(p.Transport) {
+	case "", "kcp", "quic":
+	default:
+		return fmt.Errorf("p2p transport %q must be kcp or quic", p.Transport)
+	}
+	s := &config.Settings{P2P: &config.P2PSettings{
+		QUIC:     p.QUIC,
+		Timeouts: p.Timeouts,
+	}}
+	if _, err := tunnel.P2PQUICConfig(s); err != nil {
+		return err
+	}
+	if _, err := tunnel.P2PTimeouts(s); err != nil {
+		return err
+	}
+	return nil
 }

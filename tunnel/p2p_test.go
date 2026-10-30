@@ -619,3 +619,95 @@ func TestP2PTLSConfig(t *testing.T) {
 		t.Fatalf("P2PTLSConfig(configured) = %+v, want the configured values", got)
 	}
 }
+
+func TestP2PTransportAndQUICConfig(t *testing.T) {
+	if got := P2PTransport(nil); got != "kcp" {
+		t.Fatalf("P2PTransport(nil) = %q, want kcp", got)
+	}
+	if got := P2PTransport(&cfg.Settings{P2P: &cfg.P2PSettings{Transport: "quic"}}); got != "quic" {
+		t.Fatalf("P2PTransport(quic) = %q", got)
+	}
+	if got, err := P2PQUICConfig(nil); got != nil || err != nil {
+		t.Fatalf("P2PQUICConfig(nil) = %+v, %v", got, err)
+	}
+	if got, err := P2PQUICConfig(&cfg.Settings{P2P: &cfg.P2PSettings{}}); got != nil || err != nil {
+		t.Fatalf("P2PQUICConfig(unset) = %+v, %v", got, err)
+	}
+
+	s := &cfg.Settings{P2P: &cfg.P2PSettings{QUIC: &cfg.QUICSettings{
+		MTU: 1400, RelayBatchBytes: 16384,
+		RelayFlush: "250µs", KeepAlive: "6s", Idle: "20s", HandshakeTimeout: "12s",
+	}}}
+	got, err := P2PQUICConfig(s)
+	if err != nil {
+		t.Fatalf("P2PQUICConfig: %v", err)
+	}
+	if got.MTU != 1400 || got.RelayBatchBytes != 16384 ||
+		got.RelayFlush != 250*time.Microsecond || got.KeepAlive != 6*time.Second ||
+		got.Idle != 20*time.Second || got.HandshakeTimeout != 12*time.Second {
+		t.Fatalf("P2PQUICConfig = %+v", got)
+	}
+
+	for _, tc := range []struct {
+		name string
+		q    *cfg.QUICSettings
+	}{
+		{"mtu below 1200", &cfg.QUICSettings{MTU: 1000}},
+		{"batch above 64 KiB", &cfg.QUICSettings{RelayBatchBytes: 65537}},
+		{"idle not above keepalive", &cfg.QUICSettings{KeepAlive: "6s", Idle: "5s"}},
+		{"negative idle", &cfg.QUICSettings{Idle: "-1s"}},
+		{"bad duration", &cfg.QUICSettings{Idle: "soon"}},
+	} {
+		if _, err := P2PQUICConfig(&cfg.Settings{P2P: &cfg.P2PSettings{QUIC: tc.q}}); err == nil {
+			t.Errorf("%s: expected an error", tc.name)
+		}
+	}
+}
+
+func TestP2PTimeoutsSmux(t *testing.T) {
+	for name, s := range map[string]*cfg.Settings{
+		"nil":   nil,
+		"unset": {P2P: &cfg.P2PSettings{}},
+	} {
+		got, err := P2PTimeouts(s)
+		if err != nil {
+			t.Fatalf("%s: P2PTimeouts: %v", name, err)
+		}
+		if got.Smux == nil || got.Smux.Interval != 3*time.Second || got.Smux.Timeout != 15*time.Second {
+			t.Fatalf("%s: P2PTimeouts = %+v, want 3s/15s defaults", name, got)
+		}
+	}
+
+	s := &cfg.Settings{P2P: &cfg.P2PSettings{Timeouts: &cfg.P2PTimeoutsSettings{
+		Smux: &cfg.SmuxSettings{Interval: "4s", Timeout: "12s"},
+	}}}
+	got, err := P2PTimeouts(s)
+	if err != nil {
+		t.Fatalf("P2PTimeouts: %v", err)
+	}
+	if got.Smux == nil || got.Smux.Interval != 4*time.Second || got.Smux.Timeout != 12*time.Second {
+		t.Fatalf("P2PTimeouts = %+v", got)
+	}
+	partial, err := P2PTimeouts(&cfg.Settings{P2P: &cfg.P2PSettings{Timeouts: &cfg.P2PTimeoutsSettings{
+		Smux: &cfg.SmuxSettings{Interval: "4s"},
+	}}})
+	if err != nil || partial.Smux.Interval != 4*time.Second || partial.Smux.Timeout != 15*time.Second {
+		t.Fatalf("partial P2PTimeouts = %+v, %v; want 4s/15s", partial, err)
+	}
+
+	if _, err := P2PTimeouts(&cfg.Settings{P2P: &cfg.P2PSettings{Timeouts: &cfg.P2PTimeoutsSettings{
+		Smux: &cfg.SmuxSettings{Interval: "3s", Timeout: "5s"},
+	}}}); err == nil {
+		t.Fatal("smux timeout below 2x interval was accepted")
+	}
+	if _, err := P2PTimeouts(&cfg.Settings{P2P: &cfg.P2PSettings{Timeouts: &cfg.P2PTimeoutsSettings{
+		Smux: &cfg.SmuxSettings{Interval: "soon"},
+	}}}); err == nil {
+		t.Fatal("malformed smux interval was accepted")
+	}
+	if _, err := P2PTimeouts(&cfg.Settings{P2P: &cfg.P2PSettings{Timeouts: &cfg.P2PTimeoutsSettings{
+		Smux: &cfg.SmuxSettings{Interval: "-1s"},
+	}}}); err == nil {
+		t.Fatal("negative smux interval was accepted")
+	}
+}

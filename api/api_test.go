@@ -252,6 +252,67 @@ func TestUpdateConfigP2PFaults(t *testing.T) {
 	}
 }
 
+// TestUpdateConfigP2PAdvanced: the transport selector and both advanced
+// blocks survive the settings round trip the host reads on acquire.
+func TestUpdateConfigP2PAdvanced(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	resp, _ := putJSON(t, srv.URL+"/api/config", map[string]any{
+		"p2p": map[string]any{
+			"derp":      "wss://relay.example/derp",
+			"transport": "quic",
+			"quic": map[string]any{
+				"mtu": 1400, "relay_batch_bytes": 16384,
+				"relay_flush": "250µs", "keep_alive": "6s",
+				"idle": "20s", "handshake_timeout": "12s",
+			},
+			"timeouts": map[string]any{
+				"smux": map[string]any{"interval": "4s", "timeout": "12s"},
+			},
+		},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	_, body := getJSON(t, srv.URL+"/api/config")
+	p2p, _ := body["p2p"].(map[string]any)
+	if p2p == nil {
+		t.Fatalf("config has no p2p block: %v", body)
+	}
+	if p2p["transport"] != "quic" {
+		t.Errorf("transport = %v, want quic", p2p["transport"])
+	}
+	quic, _ := p2p["quic"].(map[string]any)
+	if quic == nil || quic["mtu"] != float64(1400) || quic["relay_flush"] != "250µs" ||
+		quic["keep_alive"] != "6s" || quic["idle"] != "20s" {
+		t.Errorf("quic = %v", quic)
+	}
+	timeouts, _ := p2p["timeouts"].(map[string]any)
+	smux, _ := timeouts["smux"].(map[string]any)
+	if smux == nil || smux["interval"] != "4s" || smux["timeout"] != "12s" {
+		t.Errorf("timeouts = %v", timeouts)
+	}
+}
+
+func TestUpdateConfigP2PRejectsInvalid(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	for name, p2p := range map[string]map[string]any{
+		"transport": {"derp": "wss://relay.example/derp", "transport": "sctp"},
+		"mtu":       {"derp": "wss://relay.example/derp", "quic": map[string]any{"mtu": 1000}},
+		"smux":      {"derp": "wss://relay.example/derp", "timeouts": map[string]any{"smux": map[string]any{"interval": "3s", "timeout": "5s"}}},
+		"negative":  {"derp": "wss://relay.example/derp", "timeouts": map[string]any{"smux": map[string]any{"interval": "-1s"}}},
+	} {
+		resp, _ := putJSON(t, srv.URL+"/api/config", map[string]any{"p2p": p2p})
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", name, resp.StatusCode)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tunnel list/get/delete tests (using pre-registered, non-running tunnels)
 // ---------------------------------------------------------------------------

@@ -364,16 +364,27 @@ func (m *p2pHostManager) acquire(ctx context.Context) (*endpoint.Endpoint, error
 		m.teardownLocked()
 	}
 	if m.host == nil {
+		quicCfg, err := P2PQUICConfig(settings)
+		if err != nil {
+			return nil, fmt.Errorf("p2p quic config: %w", err)
+		}
+		timeouts, err := P2PTimeouts(settings)
+		if err != nil {
+			return nil, fmt.Errorf("p2p timeouts: %w", err)
+		}
 		hexKey, _, err := m.ensureIdentityLocked()
 		if err != nil {
 			return nil, fmt.Errorf("p2p identity: %w", err)
 		}
 		direct := P2PDirect(settings)
 		conf := &p2p.Config{
-			Derp:   P2PDerpURL(settings),
-			Key:    hexKey,
-			Stun:   p2pHostStun(settings),
-			Direct: &direct,
+			Derp:      P2PDerpURL(settings),
+			Key:       hexKey,
+			Stun:      p2pHostStun(settings),
+			Direct:    &direct,
+			Transport: P2PTransport(settings),
+			QUIC:      quicCfg,
+			Timeouts:  timeouts,
 		}
 		conf.TLS = P2PTLSConfig(settings)
 		conf.Faults = P2PFaults(settings)
@@ -436,8 +447,27 @@ func p2pHostSig(s *cfg.Settings) string {
 		return ""
 	}
 	p := s.P2P
-	return fmt.Sprintf("derp=%s|stun=%s|direct=%s|secure=%s|ca=%s|faults=%s",
-		p.Derp, p.Stun, triState(p.Direct), triState(p.Secure), p.CAFile, p2pFaultsSig(p.Faults))
+	return fmt.Sprintf("derp=%s|stun=%s|direct=%s|secure=%s|ca=%s|transport=%s|quic=%s|smux=%s|faults=%s",
+		p.Derp, p.Stun, triState(p.Direct), triState(p.Secure), p.CAFile,
+		p.Transport, p2pQUICSig(p.QUIC), p2pSmuxSig(p.Timeouts), p2pFaultsSig(p.Faults))
+}
+
+// p2pQUICSig renders the QUIC block into the host build signature so a
+// changed MTU, duration or batch size rebuilds the host.
+func p2pQUICSig(q *cfg.QUICSettings) string {
+	if q == nil {
+		return ""
+	}
+	return fmt.Sprintf("mtu=%d|batch=%d|flush=%s|keep=%s|idle=%s|handshake=%s",
+		q.MTU, q.RelayBatchBytes, q.RelayFlush, q.KeepAlive, q.Idle, q.HandshakeTimeout)
+}
+
+// p2pSmuxSig renders the exposed smux keepalive into the signature.
+func p2pSmuxSig(t *cfg.P2PTimeoutsSettings) string {
+	if t == nil || t.Smux == nil {
+		return ""
+	}
+	return fmt.Sprintf("interval=%s|timeout=%s", t.Smux.Interval, t.Smux.Timeout)
 }
 
 // p2pFaultsSig renders a faults config as a stable build signature component

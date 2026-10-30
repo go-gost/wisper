@@ -130,3 +130,27 @@ func TestWriteKeepsBackupModeWhenMainIsGone(t *testing.T) {
 		t.Errorf("restored mode = %o, want 600 (the backup's mode)", got)
 	}
 }
+
+func TestWriteP2PTransportSettings(t *testing.T) {
+	dir := t.TempDir()
+	withConfigDir(t, dir)
+
+	c := &Config{Settings: &Settings{P2P: &P2PSettings{
+		Derp:      "wss://relay.example/derp",
+		Transport: "quic",
+		QUIC: &QUICSettings{
+			MTU: 1400, RelayBatchBytes: 16384,
+			RelayFlush: "250µs", KeepAlive: "6s", Idle: "20s", HandshakeTimeout: "12s",
+		},
+		Timeouts: &P2PTimeoutsSettings{Smux: &SmuxSettings{Interval: "4s", Timeout: "12s"}},
+	}}}
+	if err := c.Write(); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got := readConfig(t, filepath.Join(dir, configFile)).Settings.P2P
+	if got == nil || got.Transport != "quic" || got.QUIC == nil || got.QUIC.MTU != 1400 ||
+		got.QUIC.RelayFlush != "250µs" || got.Timeouts == nil || got.Timeouts.Smux == nil ||
+		got.Timeouts.Smux.Interval != "4s" {
+		t.Fatalf("p2p = %+v", got)
+	}
+}

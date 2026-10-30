@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand/v2"
 	"net"
@@ -243,6 +244,142 @@ func P2PFaults(s *cfg.Settings) *p2p.FaultsConfig {
 		return nil
 	}
 	return s.P2P.Faults
+}
+
+// QUIC defaults, mirrored from p2p so validation here rejects the same
+// combinations p2p would reject when it builds the host.
+const (
+	defaultQUICKeepAlive         = 5 * time.Second
+	defaultQUICIdle              = 15 * time.Second
+	maxQUICRelayBatchBytes       = 64 * 1024
+	minQUICMTU                   = 1200
+	defaultSmuxKeepAliveInterval = 3 * time.Second
+	defaultSmuxKeepAliveTimeout  = 15 * time.Second
+)
+
+// P2PTransport returns the configured data plane: "kcp" when unset, otherwise
+// the configured value (p2p validates unknown values and rejects them).
+func P2PTransport(s *cfg.Settings) string {
+	if s == nil || s.P2P == nil || strings.TrimSpace(s.P2P.Transport) == "" {
+		return "kcp"
+	}
+	return strings.TrimSpace(s.P2P.Transport)
+}
+
+// P2PQUICConfig converts the UI's string-valued QUIC block into the p2p form.
+// Nil means "use p2p's defaults". The returned config carries only the values
+// the user set; p2p fills the rest. Validation mirrors p2p's documented limits
+// so an invalid save fails before it can break the next host build.
+func P2PQUICConfig(s *cfg.Settings) (*p2p.QUICConfig, error) {
+	if s == nil || s.P2P == nil || s.P2P.QUIC == nil {
+		return nil, nil
+	}
+	q := s.P2P.QUIC
+	if *q == (cfg.QUICSettings{}) {
+		return nil, nil
+	}
+
+	conf := &p2p.QUICConfig{
+		MTU:             q.MTU,
+		RelayBatchBytes: q.RelayBatchBytes,
+	}
+	var err error
+	if conf.RelayFlush, err = parseOptionalDuration(q.RelayFlush); err != nil {
+		return nil, fmt.Errorf("quic relay_flush: %w", err)
+	}
+	if conf.KeepAlive, err = parseOptionalDuration(q.KeepAlive); err != nil {
+		return nil, fmt.Errorf("quic keep_alive: %w", err)
+	}
+	if conf.Idle, err = parseOptionalDuration(q.Idle); err != nil {
+		return nil, fmt.Errorf("quic idle: %w", err)
+	}
+	if conf.HandshakeTimeout, err = parseOptionalDuration(q.HandshakeTimeout); err != nil {
+		return nil, fmt.Errorf("quic handshake_timeout: %w", err)
+	}
+
+	if conf.MTU != 0 && conf.MTU < minQUICMTU {
+		return nil, fmt.Errorf("quic mtu %d must be at least %d", conf.MTU, minQUICMTU)
+	}
+	if conf.RelayBatchBytes < 0 || conf.RelayBatchBytes > maxQUICRelayBatchBytes {
+		return nil, fmt.Errorf("quic relay_batch_bytes %d must be in [0, %d]", conf.RelayBatchBytes, maxQUICRelayBatchBytes)
+	}
+	if conf.RelayFlush < 0 {
+		return nil, errors.New("quic relay_flush must be positive")
+	}
+	if conf.KeepAlive < 0 {
+		return nil, errors.New("quic keep_alive must be positive")
+	}
+	if conf.Idle < 0 {
+		return nil, errors.New("quic idle must be positive")
+	}
+	idle := conf.Idle
+	if idle == 0 {
+		idle = defaultQUICIdle
+	}
+	keepAlive := conf.KeepAlive
+	if keepAlive == 0 {
+		keepAlive = defaultQUICKeepAlive
+	}
+	if idle <= keepAlive {
+		return nil, fmt.Errorf("quic idle (%s) must exceed keep_alive (%s)", idle, keepAlive)
+	}
+	if conf.HandshakeTimeout < 0 {
+		return nil, errors.New("quic handshake_timeout must be positive")
+	}
+	return conf, nil
+}
+
+// P2PTimeouts converts the exposed smux keepalive into p2p's timeouts block.
+// It always returns explicit values, even when the block is unset: p2p's
+// applyTimeouts treats zero as "keep the process's current value", so returning
+// nil after the user cleared a custom value would leave that custom value
+// sticky for the rest of the process. Blank fields resolve to the shipped
+// defaults (3s/15s), which is also what the UI shows as placeholders.
+func P2PTimeouts(s *cfg.Settings) (*p2p.TimeoutsConfig, error) {
+	interval := time.Duration(0)
+	timeout := time.Duration(0)
+	if s != nil && s.P2P != nil && s.P2P.Timeouts != nil && s.P2P.Timeouts.Smux != nil {
+		var err error
+		if interval, err = parseOptionalDuration(s.P2P.Timeouts.Smux.Interval); err != nil {
+			return nil, fmt.Errorf("timeouts.smux.interval: %w", err)
+		}
+		if timeout, err = parseOptionalDuration(s.P2P.Timeouts.Smux.Timeout); err != nil {
+			return nil, fmt.Errorf("timeouts.smux.timeout: %w", err)
+		}
+	}
+	if interval < 0 {
+		return nil, errors.New("timeouts.smux.interval must be positive")
+	}
+	if timeout < 0 {
+		return nil, errors.New("timeouts.smux.timeout must be positive")
+	}
+	if interval == 0 {
+		interval = defaultSmuxKeepAliveInterval
+	}
+	if timeout == 0 {
+		timeout = defaultSmuxKeepAliveTimeout
+	}
+	if timeout < 2*interval {
+		return nil, fmt.Errorf("timeouts.smux.timeout (%s) must be at least 2x interval (%s)", timeout, interval)
+	}
+	return &p2p.TimeoutsConfig{Smux: &p2p.SmuxTimeouts{
+		Interval: interval,
+		Timeout:  timeout,
+	}}, nil
+}
+
+// parseOptionalDuration parses a settings duration; an empty string means
+// "unset" (zero) and a negative value is rejected by the caller.
+func parseOptionalDuration(v string) (time.Duration, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, err
+	}
+	return d, nil
 }
 
 // Run joins the process-wide p2p host, claims this tunnel's peer routes on it

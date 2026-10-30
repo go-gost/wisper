@@ -7,7 +7,7 @@ import { copyToClipboard } from '../utils/clipboard';
 import { maskKey } from '../utils/format';
 import { renderQrCanvas } from '../utils/qr';
 import { GoBackend } from '../api/backend';
-import type { ThemePreference, LanguagePreference } from '../api/types';
+import type { ThemePreference, LanguagePreference, P2PSettings, QUICSettings, SmuxSettings } from '../api/types';
 import '../components/app-scaffold';
 
 const THEME_OPTIONS: { value: ThemePreference; labelKey: string }[] = [
@@ -30,6 +30,26 @@ const INTERVAL_OPTIONS: { value: number; labelKey: string }[] = [
   { value: 30, labelKey: 'settingsInterval30s' },
 ];
 
+/** Parse a Go duration string into seconds. Returns null when the whole
+ *  string is not a valid positive-or-zero Go duration. */
+function parseGoDuration(value: string): number | null {
+  const v = value.trim();
+  if (!v) return 0;
+  const re = /(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)/g;
+  const scale: Record<string, number> = {
+    ns: 1e-9, us: 1e-6, 'µs': 1e-6, ms: 1e-3, s: 1, m: 60, h: 3600,
+  };
+  let total = 0;
+  let end = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(v)) !== null) {
+    if (m.index !== end) return null;
+    total += Number(m[1]) * scale[m[2]];
+    end = re.lastIndex;
+  }
+  return end === v.length && end > 0 ? total : null;
+}
+
 @customElement('settings-page')
 export class SettingsPage extends LitElement {
   @state() private _server = '';
@@ -40,6 +60,16 @@ export class SettingsPage extends LitElement {
   @state() private _p2pCaFile = '';
   @state() private _p2pStun = '';
   @state() private _p2pDirect = true;
+  @state() private _p2pMode: 'kcp' | 'quic' = 'kcp';
+  @state() private _p2pAdvanced = false;
+  @state() private _p2pQuicMtu = '';
+  @state() private _p2pQuicBatch = '';
+  @state() private _p2pQuicRelayFlush = '';
+  @state() private _p2pQuicKeepAlive = '';
+  @state() private _p2pQuicIdle = '';
+  @state() private _p2pQuicHandshake = '';
+  @state() private _p2pSmuxInterval = '';
+  @state() private _p2pSmuxTimeout = '';
   @state() private _showP2PKey = false;
   @state() private _qrKey = '';
   @state() private _p2pTesting = false;
@@ -77,6 +107,7 @@ export class SettingsPage extends LitElement {
     this._p2pCaFile = s.p2p?.ca_file || '';
     this._p2pStun = s.p2p?.stun || '';
     this._p2pDirect = s.p2p?.direct ?? true;
+    this._applyP2PAdvanced(s.p2p);
     this._theme = s.theme;
     this._lang = s.lang;
     this._statsInterval = s.stats_interval || 1;
@@ -93,6 +124,7 @@ export class SettingsPage extends LitElement {
         this._p2pCaFile = s2.p2p?.ca_file || '';
         this._p2pStun = s2.p2p?.stun || '';
         this._p2pDirect = s2.p2p?.direct ?? true;
+        this._applyP2PAdvanced(s2.p2p);
         this._theme = s2.theme;
         this._lang = s2.lang;
         this._statsInterval = s2.stats_interval || 1;
@@ -285,7 +317,105 @@ export class SettingsPage extends LitElement {
     }, 2000);
   }
 
+  /** _applyP2PAdvanced loads the transport-dependent advanced values without
+   *  touching the disclosure state, so a settings refresh does not collapse an
+   *  open Advanced panel. */
+  private _applyP2PAdvanced(p2p?: P2PSettings) {
+    this._p2pMode = p2p?.transport === 'quic' ? 'quic' : 'kcp';
+    this._p2pQuicMtu = p2p?.quic?.mtu ? String(p2p.quic.mtu) : '';
+    this._p2pQuicBatch = p2p?.quic?.relay_batch_bytes ? String(p2p.quic.relay_batch_bytes) : '';
+    this._p2pQuicRelayFlush = p2p?.quic?.relay_flush || '';
+    this._p2pQuicKeepAlive = p2p?.quic?.keep_alive || '';
+    this._p2pQuicIdle = p2p?.quic?.idle || '';
+    this._p2pQuicHandshake = p2p?.quic?.handshake_timeout || '';
+    this._p2pSmuxInterval = p2p?.timeouts?.smux?.interval || '';
+    this._p2pSmuxTimeout = p2p?.timeouts?.smux?.timeout || '';
+  }
+
+  private _quicPayload(): QUICSettings | undefined {
+    const q: QUICSettings = {};
+    if (this._p2pQuicMtu.trim()) q.mtu = Number(this._p2pQuicMtu);
+    if (this._p2pQuicBatch.trim()) q.relay_batch_bytes = Number(this._p2pQuicBatch);
+    if (this._p2pQuicRelayFlush.trim()) q.relay_flush = this._p2pQuicRelayFlush.trim();
+    if (this._p2pQuicKeepAlive.trim()) q.keep_alive = this._p2pQuicKeepAlive.trim();
+    if (this._p2pQuicIdle.trim()) q.idle = this._p2pQuicIdle.trim();
+    if (this._p2pQuicHandshake.trim()) q.handshake_timeout = this._p2pQuicHandshake.trim();
+    return Object.keys(q).length ? q : undefined;
+  }
+
+  private _smuxPayload(): SmuxSettings | undefined {
+    const s: SmuxSettings = {};
+    if (this._p2pSmuxInterval.trim()) s.interval = this._p2pSmuxInterval.trim();
+    if (this._p2pSmuxTimeout.trim()) s.timeout = this._p2pSmuxTimeout.trim();
+    return Object.keys(s).length ? s : undefined;
+  }
+
+  /** _advancedError mirrors the server-side parser so an invalid advanced
+   *  value is caught before the save can restart the p2p host. */
+  private _advancedError(): string | null {
+    const intField = (v: string): number | null => {
+      if (!v.trim()) return null;
+      const n = Number(v);
+      return Number.isInteger(n) ? n : NaN;
+    };
+    const mtu = intField(this._p2pQuicMtu);
+    if (mtu !== null && (Number.isNaN(mtu) || mtu < 1200 || mtu > 1452)) {
+      return t('settingsQUICMTUInvalid');
+    }
+    const batch = intField(this._p2pQuicBatch);
+    if (batch !== null && (Number.isNaN(batch) || batch < 1 || batch > 65536)) {
+      return t('settingsQUICBatchInvalid');
+    }
+    const durField = (v: string): number | null => {
+      if (!v.trim()) return null;
+      const parsed = parseGoDuration(v);
+      return parsed === null ? NaN : parsed;
+    };
+    const flush = durField(this._p2pQuicRelayFlush);
+    if (flush !== null && (Number.isNaN(flush) || flush < 0)) {
+      return t('settingsDurationInvalid', { field: t('settingsQUICRelayFlush') });
+    }
+    const keepAlive = durField(this._p2pQuicKeepAlive);
+    if (keepAlive !== null && (Number.isNaN(keepAlive) || keepAlive < 0)) {
+      return t('settingsDurationInvalid', { field: t('settingsQUICKeepAlive') });
+    }
+    const idle = durField(this._p2pQuicIdle);
+    if (idle !== null && (Number.isNaN(idle) || idle < 0)) {
+      return t('settingsDurationInvalid', { field: t('settingsQUICIdle') });
+    }
+    const handshake = durField(this._p2pQuicHandshake);
+    if (handshake !== null && (Number.isNaN(handshake) || handshake < 0)) {
+      return t('settingsDurationInvalid', { field: t('settingsQUICHandshake') });
+    }
+    const effKeepAlive = keepAlive || 5;
+    const effIdle = idle || 15;
+    if (effIdle <= effKeepAlive) {
+      return t('settingsQUICIdleInvalid');
+    }
+
+    const interval = durField(this._p2pSmuxInterval);
+    if (interval !== null && (Number.isNaN(interval) || interval < 0)) {
+      return t('settingsDurationInvalid', { field: t('settingsSmuxInterval') });
+    }
+    const timeout = durField(this._p2pSmuxTimeout);
+    if (timeout !== null && (Number.isNaN(timeout) || timeout < 0)) {
+      return t('settingsDurationInvalid', { field: t('settingsSmuxTimeout') });
+    }
+    const effInterval = interval || 3;
+    const effTimeout = timeout || 15;
+    if (effTimeout < 2 * effInterval) {
+      return t('settingsSmuxTimeoutInvalid');
+    }
+    return null;
+  }
+
   private async _saveSettings() {
+    const advancedError = this._advancedError();
+    if (advancedError) {
+      this._showSnackbar(advancedError);
+      return;
+    }
+    const smux = this._smuxPayload();
     this._saving = true;
     try {
       await updateSettings({
@@ -298,6 +428,9 @@ export class SettingsPage extends LitElement {
           ca_file: this._p2pCaFile,
           stun: this._p2pStun,
           direct: this._p2pDirect,
+          transport: this._p2pMode,
+          quic: this._quicPayload(),
+          timeouts: smux ? { smux } : undefined,
         },
       });
       this._showSnackbar('✓ ' + t('saved'));
@@ -511,6 +644,19 @@ export class SettingsPage extends LitElement {
     .p2p-divider {
       border-top: 1px solid var(--border-subtle);
       margin: 16px 0;
+    }
+    .advanced-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; padding: 8px 0; border: none; background: none;
+      color: var(--text-muted); font-family: inherit; font-size: var(--font-sm);
+      cursor: pointer;
+    }
+    .advanced-btn:hover { color: var(--text); }
+    .advanced-btn svg { width: 16px; height: 16px; }
+    .advanced-fields {
+      padding: 8px 12px 0;
+      margin-bottom: 4px;
+      border-left: 2px solid var(--border-subtle);
     }
     .switch-row.p2p-switch { border-bottom: none; }
     .identity-key {
@@ -878,6 +1024,87 @@ export class SettingsPage extends LitElement {
                   () => this._testStun(),
                 )}
               </div>
+
+              <div class="p2p-divider"></div>
+
+              <div class="form-group">
+                <label class="form-label">${t('settingsP2PTransport')}</label>
+                <select class="form-input" .value=${this._p2pMode}
+                  @change=${(e: Event) => {
+                    this._p2pMode = (e.target as HTMLSelectElement).value === 'quic' ? 'quic' : 'kcp';
+                  }}>
+                  <option value="kcp">${t('settingsTransportKCP')}</option>
+                  <option value="quic">${t('settingsTransportQUIC')}</option>
+                </select>
+                <p class="hint">${this._p2pMode === 'quic'
+                  ? t('settingsTransportQUICHint')
+                  : t('settingsTransportKCPHint')}</p>
+              </div>
+
+              <button class="advanced-btn" @click=${() => { this._p2pAdvanced = !this._p2pAdvanced; }}>
+                <span>${t('settingsAdvanced')}</span>
+                ${icon(this._p2pAdvanced ? 'chevron-up' : 'chevron-down')}
+              </button>
+              ${this._p2pAdvanced
+                ? html`<div class="advanced-fields">
+                    ${this._p2pMode === 'kcp'
+                      ? html`
+                          <p class="hint">${t('settingsSmuxHint')}</p>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsSmuxInterval')}</label>
+                            <input class="form-input" .value=${this._p2pSmuxInterval}
+                              placeholder="3s"
+                              @input=${(e: Event) => { this._p2pSmuxInterval = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsSmuxTimeout')}</label>
+                            <input class="form-input" .value=${this._p2pSmuxTimeout}
+                              placeholder="15s"
+                              @input=${(e: Event) => { this._p2pSmuxTimeout = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                        `
+                      : html`
+                          <p class="hint">${t('settingsQUICHint')}</p>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsQUICMTU')}</label>
+                            <input class="form-input" type="number" min="1200" max="1452"
+                              .value=${this._p2pQuicMtu} placeholder="1200"
+                              @input=${(e: Event) => { this._p2pQuicMtu = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsQUICBatch')}</label>
+                            <input class="form-input" type="number" min="1" max="65536"
+                              .value=${this._p2pQuicBatch} placeholder="32768"
+                              @input=${(e: Event) => { this._p2pQuicBatch = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsQUICRelayFlush')}</label>
+                            <input class="form-input" .value=${this._p2pQuicRelayFlush}
+                              placeholder="200µs"
+                              @input=${(e: Event) => { this._p2pQuicRelayFlush = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsQUICKeepAlive')}</label>
+                            <input class="form-input" .value=${this._p2pQuicKeepAlive}
+                              placeholder="5s"
+                              @input=${(e: Event) => { this._p2pQuicKeepAlive = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsQUICIdle')}</label>
+                            <input class="form-input" .value=${this._p2pQuicIdle}
+                              placeholder="15s"
+                              @input=${(e: Event) => { this._p2pQuicIdle = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                          <div class="form-group">
+                            <label class="form-label">${t('settingsQUICHandshake')}</label>
+                            <input class="form-input" .value=${this._p2pQuicHandshake}
+                              placeholder="10s"
+                              @input=${(e: Event) => { this._p2pQuicHandshake = (e.target as HTMLInputElement).value; }}>
+                          </div>
+                        `}
+                  </div>`
+                : nothing}
+
               <button class="save-btn" ?disabled=${this._saving} @click=${this._saveSettings}>
                 ${icon('check')} ${t('btnSave')}
               </button>

@@ -313,9 +313,43 @@ type P2PSettings struct {
 	// Direct attempts a direct (hole-punched) path, falling back to the relay.
 	// nil = true.
 	Direct *bool `yaml:",omitempty" json:"direct,omitempty"`
+	// Transport selects the p2p data plane: "kcp" (the default when empty) or
+	// "quic". It is global for the host and read when the host is built.
+	Transport string `yaml:"transport,omitempty" json:"transport,omitempty"`
+	// QUIC tunes the QUIC data plane; ignored when Transport is kcp. Empty
+	// fields keep p2p's built-in defaults.
+	QUIC *QUICSettings `yaml:"quic,omitempty" json:"quic,omitempty"`
+	// Timeouts carries the p2p session timings exposed by the UI. Only the
+	// smux keepalive is exposed; other p2p timings remain config-only.
+	Timeouts *P2PTimeoutsSettings `yaml:"timeouts,omitempty" json:"timeouts,omitempty"`
 	// Faults injects deliberate transport failures on the shared host (debug
 	// only — see p2p.FaultsConfig). Nil or zero means nothing is injected.
 	Faults *p2p.FaultsConfig `yaml:"faults,omitempty" json:"faults,omitempty"`
+}
+
+// QUICSettings is the JSON/YAML form of the QUIC tuning block. Durations are
+// strings so the settings file and API stay human-readable; the tunnel parses
+// them into p2p.QUICConfig.
+type QUICSettings struct {
+	MTU              int    `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	RelayBatchBytes  int    `yaml:"relay_batch_bytes,omitempty" json:"relay_batch_bytes,omitempty"`
+	RelayFlush       string `yaml:"relay_flush,omitempty" json:"relay_flush,omitempty"`
+	KeepAlive        string `yaml:"keep_alive,omitempty" json:"keep_alive,omitempty"`
+	Idle             string `yaml:"idle,omitempty" json:"idle,omitempty"`
+	HandshakeTimeout string `yaml:"handshake_timeout,omitempty" json:"handshake_timeout,omitempty"`
+}
+
+// P2PTimeoutsSettings is the UI-facing subset of p2p.TimeoutsConfig. Only the
+// smux keepalive is exposed; the other timings stay config-file only.
+type P2PTimeoutsSettings struct {
+	Smux *SmuxSettings `yaml:"smux,omitempty" json:"smux,omitempty"`
+}
+
+// SmuxSettings is the KCP session's smux keepalive. Empty fields keep p2p's
+// built-in 3s/15s defaults.
+type SmuxSettings struct {
+	Interval string `yaml:"interval,omitempty" json:"interval,omitempty"`
+	Timeout  string `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // Tunnel holds the persistent state of a single tunnel or entrypoint.
