@@ -299,51 +299,75 @@ class WisperService : Service() {
     // Default network watch
     // ---------------------------------------------------------------
     /**
-     * Re-registers the relay when Android moves the default network (Wi-Fi <->
-     * cellular). An existing socket stays bound to the network it was created
-     * on, so without this the relay connection keeps writing into a path that
-     * no longer routes while every status still reads connected.
+     * Re-registers the relay when the phone's physical egress changes (Wi-Fi
+     * <-> cellular). An existing socket stays bound to the network it was
+     * created on, so without this the relay connection keeps writing into a
+     * path that no longer routes while every status still reads connected.
+     *
+     * The callback is only a trigger. Its network is not usable as the answer:
+     * once the app's own VPN is up the default callback reports `tun0`, and the
+     * underlying physical switch does not change that name. A UDP connect probe
+     * asks the kernel which source address this app's sockets actually get —
+     * the app is excluded from its own VPN, so that is the physical path — and
+     * only a changed address re-registers the relay.
      */
     private val networkThread = HandlerThread("NetworkWatch").apply { start() }
     private val networkHandler = Handler(networkThread.looper)
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    private var networkSeen = false
-    private var lastDefaultIface: String? = null
+    private var lastEgress: String? = null
 
     private fun startNetworkWatch() {
         val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        // The physical networks, not the VPN: this registration must survive
+        // the VPN taking over the default path, so the switch underneath is
+        // still visible.
+        val req = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
         val cb = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                val iface = cm.getLinkProperties(network)?.interfaceName ?: return
-                networkHandler.post { onDefaultNetwork(iface) }
-            }
-
-            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                val iface = cm.getLinkProperties(network)?.interfaceName ?: return
-                networkHandler.post { onDefaultNetwork(iface) }
-            }
+            override fun onAvailable(network: Network) = probeSoon()
+            override fun onLost(network: Network) = probeSoon()
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = probeSoon()
         }
         try {
-            cm.registerDefaultNetworkCallback(cb)
+            cm.registerNetworkCallback(req, cb)
             networkCallback = cb
+            probeSoon()
         } catch (e: Exception) {
-            Log.w(TAG, "registerDefaultNetworkCallback failed", e)
+            Log.w(TAG, "registerNetworkCallback failed", e)
         }
     }
 
-    private fun onDefaultNetwork(iface: String) {
-        if (!networkSeen) {
-            // registerDefaultNetworkCallback reports the current network
-            // immediately: that is the starting point, not a change.
-            networkSeen = true
-            lastDefaultIface = iface
-            Log.i(TAG, "default network: $iface")
+    /** Debounces a burst of network events into one probe after routing settles. */
+    private fun probeSoon() {
+        networkHandler.removeCallbacksAndMessages(null)
+        networkHandler.postDelayed({ probeEgress() }, 500)
+    }
+
+    private fun probeEgress() {
+        val addr = try {
+            // connect() on UDP sends nothing; it only asks the kernel for the
+            // route (and therefore the source address) a socket would use.
+            java.net.DatagramSocket().use { s ->
+                s.connect(java.net.InetAddress.getByName("1.1.1.1"), 53)
+                s.localAddress?.hostAddress
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "egress probe failed", e)
             return
         }
-        if (iface == lastDefaultIface) return
-        lastDefaultIface = iface
-        val up = WisperJNI.networkChanged(iface)
-        Log.i(TAG, "default network changed: $iface (relay was up: $up)")
+        if (addr == null) return
+        val prev = lastEgress
+        if (prev == null) {
+            lastEgress = addr
+            Log.i(TAG, "default network: egress=$addr")
+            return
+        }
+        if (addr == prev) return
+        lastEgress = addr
+        val up = WisperJNI.networkChanged(addr)
+        Log.i(TAG, "default network changed: $prev -> $addr (relay was up: $up)")
     }
 
     private fun stopNetworkWatch() {
@@ -355,6 +379,7 @@ class WisperService : Service() {
             }
         }
         networkCallback = null
+        networkHandler.removeCallbacksAndMessages(null)
         networkThread.quitSafely()
     }
 
