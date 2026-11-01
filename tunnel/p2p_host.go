@@ -101,6 +101,23 @@ func AcquireP2PHost(ctx context.Context) (*endpoint.Endpoint, error) { return p2
 // would cut someone else's reference short.
 func ReleaseP2PHost() { p2pHost.release() }
 
+// ReconnectP2PRelay forces the shared host to register with the relay again,
+// for a caller that knows the platform's default network changed: an existing
+// socket stays bound to the network it was created on, so after a Wi-Fi <->
+// cellular switch the old relay connection can keep writing into a path that
+// no longer routes while every status still reads connected. It reports
+// whether a host was up and its relay connection torn down; no acquired host
+// is simply false, not an error.
+func ReconnectP2PRelay(cause string) bool {
+	p2pHost.mu.Lock()
+	h := p2pHost.host
+	p2pHost.mu.Unlock()
+	if h == nil {
+		return false
+	}
+	return h.ReconnectRelay(cause)
+}
+
 // P2PHostPublicKey returns the shared host's base64 public key — the value a
 // peer's p2p entrypoint dials — materializing the identity on demand so the
 // settings page can always show it. Errors are logged and reported as "".

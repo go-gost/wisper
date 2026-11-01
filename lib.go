@@ -47,5 +47,13 @@ func wisperVpnTakenGo() {
 	}
 }
 
+//export wisperNetworkChangedGo
+func wisperNetworkChangedGo(ifaceC *C.char) C.int {
+	if api.NetworkChanged(C.GoString(ifaceC)) {
+		return 1
+	}
+	return 0
+}
+
 // main is required by -buildmode=c-shared; never called directly.
 func main() {}

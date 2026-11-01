@@ -22,6 +22,14 @@ object WisperJNI {
     external fun setTunFd(fd: Int, reason: String)
 
     /**
+     * The default network changed (Wi-Fi <-> cellular). The Go side
+     * re-registers the relay so its existing socket does not stay bound to the
+     * network that is no longer the default. [iface] names the new interface
+     * for the log. Returns whether a relay connection was replaced.
+     */
+    external fun networkChanged(iface: String): Boolean
+
+    /**
      * Android took our VPN away and another app's is up: the backend stops the
      * tun entrypoint that held the device instead of racing the other app for
      * it. See api.StopForVpnTaken.

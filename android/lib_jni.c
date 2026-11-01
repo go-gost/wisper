@@ -13,6 +13,7 @@ extern int wisperStartGo(char* configDir, char* addr);
 extern void wisperStopGo();
 extern void wisperSetTunFdGo(int fd, char* reason);
 extern void wisperVpnTakenGo();
+extern int wisperNetworkChangedGo(char* iface);
 
 JNIEXPORT jint JNICALL
 Java_run_gost_wisper_WisperJNI_start(JNIEnv *env, jclass clazz,
@@ -54,4 +55,16 @@ Java_run_gost_wisper_WisperJNI_setTunFd(JNIEnv *env, jclass clazz, jint fd, jstr
 JNIEXPORT void JNICALL
 Java_run_gost_wisper_WisperJNI_vpnTaken(JNIEnv *env, jclass clazz) {
 	wisperVpnTakenGo();
+}
+
+// Android moved the default network (Wi-Fi <-> cellular). The Go side
+// re-registers the relay, because its existing socket stays bound to the
+// network it was created on. The interface name rides the Go log line so a
+// stale path can be attributed without logcat.
+JNIEXPORT jboolean JNICALL
+Java_run_gost_wisper_WisperJNI_networkChanged(JNIEnv *env, jclass clazz, jstring iface) {
+	const char *ifaceC = (*env)->GetStringUTFChars(env, iface, NULL);
+	jboolean up = wisperNetworkChangedGo((char*)ifaceC) ? JNI_TRUE : JNI_FALSE;
+	(*env)->ReleaseStringUTFChars(env, iface, ifaceC);
+	return up;
 }

@@ -7,6 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Binder
 import android.os.Build
@@ -286,8 +289,73 @@ class WisperService : Service() {
             Log.e(TAG, "startForeground failed", e)
         }
 
+        startNetworkWatch()
+
         // Start periodic stats polling on background thread
         pollHandler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
+    }
+
+    // ---------------------------------------------------------------
+    // Default network watch
+    // ---------------------------------------------------------------
+    /**
+     * Re-registers the relay when Android moves the default network (Wi-Fi <->
+     * cellular). An existing socket stays bound to the network it was created
+     * on, so without this the relay connection keeps writing into a path that
+     * no longer routes while every status still reads connected.
+     */
+    private val networkThread = HandlerThread("NetworkWatch").apply { start() }
+    private val networkHandler = Handler(networkThread.looper)
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var networkSeen = false
+    private var lastDefaultIface: String? = null
+
+    private fun startNetworkWatch() {
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                val iface = cm.getLinkProperties(network)?.interfaceName ?: return
+                networkHandler.post { onDefaultNetwork(iface) }
+            }
+
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                val iface = cm.getLinkProperties(network)?.interfaceName ?: return
+                networkHandler.post { onDefaultNetwork(iface) }
+            }
+        }
+        try {
+            cm.registerDefaultNetworkCallback(cb)
+            networkCallback = cb
+        } catch (e: Exception) {
+            Log.w(TAG, "registerDefaultNetworkCallback failed", e)
+        }
+    }
+
+    private fun onDefaultNetwork(iface: String) {
+        if (!networkSeen) {
+            // registerDefaultNetworkCallback reports the current network
+            // immediately: that is the starting point, not a change.
+            networkSeen = true
+            lastDefaultIface = iface
+            Log.i(TAG, "default network: $iface")
+            return
+        }
+        if (iface == lastDefaultIface) return
+        lastDefaultIface = iface
+        val up = WisperJNI.networkChanged(iface)
+        Log.i(TAG, "default network changed: $iface (relay was up: $up)")
+    }
+
+    private fun stopNetworkWatch() {
+        networkCallback?.let {
+            try {
+                getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(it)
+            } catch (e: Exception) {
+                Log.w(TAG, "unregisterNetworkCallback failed", e)
+            }
+        }
+        networkCallback = null
+        networkThread.quitSafely()
     }
 
     override fun onBind(intent: Intent?): IBinder = LocalBinder()
@@ -298,6 +366,7 @@ class WisperService : Service() {
 
     override fun onDestroy() {
         Log.i(TAG, "onDestroy")
+        stopNetworkWatch()
         pollHandler.removeCallbacks(pollRunnable)
         pollThread.quitSafely()
         // The backend is stopping, so nothing will read the device again: the
