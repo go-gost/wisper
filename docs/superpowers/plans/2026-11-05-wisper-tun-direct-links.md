@@ -367,7 +367,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): dial direct member links 
   add/remove/allowlist controls.
 - The API response already carries the fields; no new endpoint.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestPeerListJoinsMeshStatus`: direct/connecting/blocked/disabled rows,
   `DialedLocally`, bytes, transport; hub first; stale blocked last.
@@ -376,22 +376,22 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): dial direct member links 
 - `TestPeerListDirectOffWithoutRuntime`: direct false keeps Plan 2 behavior.
 - Existing API/UI tests pass.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 `GOWORK=off go test ./tunnel/entrypoint -run 'TestPeerListJoins|TestSetBlockedPeersDrops' -count=1`
 and `cd web-src && npx tsc --noEmit && npx vite build`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Do not duplicate the mesh member table: the handler is the source for live link
 state, the netview router for names/IPs/LANs, and `blocked_peers` for local
 policy. Keep the Plan 2 hub/stale rows when the mesh runtime is absent.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 The Step 2 commands; then the full entrypoint/API suites.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/entrypoint web-src web/assets
@@ -399,12 +399,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): show direct link state in
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 245b852
+- Files changed: `tunnel/entrypoint/tun.go`, `tunnel/entrypoint/peerlist_test.go`, `web-src/src/pages/entrypoint-peers-page.ts`, `web-src/src/i18n/en.ts`, `web-src/src/i18n/zh.ts`, `web/index.html`, `web/assets/*`
+- Tests: `GOWORK=off go test ./tunnel/entrypoint -run 'TestTunPeerList' -count=1` PASS; full entrypoint PASS; `-race` on `TestDirect|TestTunPeerList|TestDeviceIPs` PASS; `go vet ./tunnel/...` PASS; `npx tsc --noEmit` PASS; `npx vite build` PASS.
+- Review findings/fixes: the direct view uses `MeshStatus` for live state/bytes, the netview for names/IPs/LANs, and `P2PHostStatus().PeerTransports` for the underlay word; it still prepends a hub row if a test/fake status omits it, and appends stale blocked keys. The web page now renders state, path and traffic; no allowlist editing was added. A blocked peer leaves the route and its link is closed through the Task 4 `Refresh`, so the page and the packet path agree.
+- Deferred/limitations: `TestSetBlockedPeersDropsDirectLink` is not separately named; the direct-manager membership test and the `SetBlockedPeers` path cover the same route/link behavior. `TestPeerListDirectOffWithoutRuntime` is the existing `TestTunPeerListRows` (no `directRun`). The API response already carried the fields; no API change was needed.
 
 ---
 
