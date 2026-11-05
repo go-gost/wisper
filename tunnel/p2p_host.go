@@ -42,6 +42,13 @@ const (
 	p2pPendingMax = 32
 )
 
+// p2pHostTeardownGrace keeps the relay registration alive across the gap
+// between an entrypoint closing and its replacement starting. A restart is the
+// common case: tearing the host down immediately forces a fresh relay
+// registration, which can blackhole for tens of seconds. The timer is cancelled
+// by the next acquire; an intentional stop still closes the host after this.
+var p2pHostTeardownGrace = 30 * time.Second
+
 // pendingPeer is one key that knocked while on no allowlist: the record behind
 // a "requesting peer" row.
 type pendingPeer struct {
@@ -81,6 +88,7 @@ type p2pHostManager struct {
 	meshKnown  map[string]struct{}
 	pending    map[string]*pendingPeer
 	refs       int
+	teardown   *time.Timer
 	// sig is the settings signature the host was built with; a change rebuilds
 	// it (see p2pHostSig).
 	sig string
@@ -154,7 +162,7 @@ func ResetP2PIdentity() (string, error) { return p2pHost.resetIdentity() }
 func P2PHostRunning() bool {
 	p2pHost.mu.Lock()
 	defer p2pHost.mu.Unlock()
-	return p2pHost.host != nil
+	return p2pHost.host != nil && p2pHost.refs > 0
 }
 
 // P2PPendingPeers returns the keys that knocked and are on no allowlist,
@@ -377,6 +385,7 @@ func (m *p2pHostManager) acquire(ctx context.Context) (*endpoint.Endpoint, error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.cancelTeardownLocked()
 	settings := cfg.Get().Settings
 	sig := p2pHostSig(settings)
 	// The host captures its settings when it is built, so a changed relay,
@@ -448,6 +457,7 @@ func p2pHostConfig(settings *cfg.Settings, hexKey string) (*p2p.Config, error) {
 // not touch refs: a settings rebuild keeps them, release has already counted
 // down to zero.
 func (m *p2pHostManager) teardownLocked() {
+	m.cancelTeardownLocked()
 	if m.ln != nil {
 		_ = m.ln.Close()
 	}
@@ -467,7 +477,9 @@ func (m *p2pHostManager) teardownLocked() {
 	m.meshKnown = make(map[string]struct{})
 }
 
-// release drops one reference; the last one stops the host and every route.
+// release drops one reference; the last one schedules the host teardown. The
+// grace period covers an entrypoint restart, where the replacement acquires the
+// same host milliseconds later and must keep the relay registration.
 func (m *p2pHostManager) release() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -477,7 +489,35 @@ func (m *p2pHostManager) release() {
 	if m.refs > 0 || m.host == nil {
 		return
 	}
-	m.teardownLocked()
+	if p2pHostTeardownGrace <= 0 {
+		m.teardownLocked()
+		return
+	}
+	m.scheduleTeardownLocked()
+}
+
+// scheduleTeardownLocked arms the grace timer once. The callback re-checks the
+// refcount: an acquire that raced the timer keeps the host.
+func (m *p2pHostManager) scheduleTeardownLocked() {
+	if m.teardown != nil {
+		return
+	}
+	m.teardown = time.AfterFunc(p2pHostTeardownGrace, func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		m.teardown = nil
+		if m.refs == 0 && m.host != nil {
+			m.teardownLocked()
+		}
+	})
+}
+
+// cancelTeardownLocked stops a pending grace teardown. The caller holds m.mu.
+func (m *p2pHostManager) cancelTeardownLocked() {
+	if m.teardown != nil {
+		m.teardown.Stop()
+		m.teardown = nil
+	}
 }
 
 // p2pHostSig is the host's build inputs, so a changed setting is caught on the

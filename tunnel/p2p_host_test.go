@@ -25,6 +25,15 @@ import (
 // peerPipe returns the conn shape the manager sees for an inbound stream from
 // a given peer plus the dialing peer's far end: a net.Pipe conn whose
 // RemoteAddr is the peer key.
+
+// TestMain disables the host teardown grace by default: most tests assert the
+// manager is idle immediately after the last Close. TestP2PHostGraceKeepsHost-
+// AcrossRestart overrides the variable to exercise the grace path itself.
+func TestMain(m *testing.M) {
+	p2pHostTeardownGrace = 0
+	os.Exit(m.Run())
+}
+
 func peerPipe(peer string) (inbound, far net.Conn) {
 	far, inbound = net.Pipe()
 	return peerConn{Conn: inbound, peer: peer}, far
@@ -1096,5 +1105,81 @@ func TestMeshKnownKeyIsNotPending(t *testing.T) {
 	got := p2pHost.pendingSnapshot()
 	if len(got) != 1 || got[0].Key != unknown {
 		t.Fatalf("unknown key pending = %+v, want %s", got, unknown)
+	}
+}
+
+// TestP2PHostGraceKeepsHostAcrossRestart: a tun entrypoint save closes the old
+// run before starting the new one. Tearing the shared host down on that gap
+// throws away the relay registration and makes the replacement wait through a
+// relay blackhole. A short grace period lets the replacement reuse the host.
+func TestP2PHostGraceKeepsHostAcrossRestart(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+	t.Cleanup(func() {
+		p2pHost.mu.Lock()
+		p2pHost.cancelTeardownLocked()
+		p2pHost.teardownLocked()
+		p2pHost.mu.Unlock()
+	})
+
+	oldGrace := p2pHostTeardownGrace
+	p2pHostTeardownGrace = 50 * time.Millisecond
+	t.Cleanup(func() { p2pHostTeardownGrace = oldGrace })
+
+	first := NewP2PTunnel(IDOption("grace-first"), EndpointOption("127.0.0.1:9"), PeersOption(testPeerKey))
+	if err := first.Run(); err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	p2pHost.mu.Lock()
+	host := p2pHost.host
+	p2pHost.mu.Unlock()
+	if host == nil {
+		t.Fatal("first run did not start a host")
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+
+	p2pHost.mu.Lock()
+	still := p2pHost.host
+	refs := p2pHost.refs
+	p2pHost.mu.Unlock()
+	if still != host || refs != 0 {
+		t.Fatalf("host after release = %p refs=%d, want the same host with zero refs", still, refs)
+	}
+	if P2PHostRunning() {
+		t.Fatal("P2PHostRunning reported a stopped host as running")
+	}
+
+	second := NewP2PTunnel(IDOption("grace-second"), EndpointOption("127.0.0.1:9"), PeersOption(testPeerKey))
+	if err := second.Run(); err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	p2pHost.mu.Lock()
+	reused := p2pHost.host
+	refs = p2pHost.refs
+	p2pHost.mu.Unlock()
+	if reused != host || refs != 1 {
+		t.Fatalf("host after re-acquire = %p refs=%d, want the original host with one ref", reused, refs)
+	}
+	if !P2PHostRunning() {
+		t.Fatal("P2PHostRunning did not see the re-acquired host")
+	}
+	if err := second.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		p2pHost.mu.Lock()
+		gone := p2pHost.host == nil
+		p2pHost.mu.Unlock()
+		if gone {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("host was not torn down after the grace period")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

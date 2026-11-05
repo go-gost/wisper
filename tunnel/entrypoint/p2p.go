@@ -224,7 +224,7 @@ func (s *p2pEntryPoint) RunContext(ctx context.Context) (err error) {
 	// metadata.p2p by name at parse time. The Unregister clears a stale
 	// registration left by a previous Run in this process.
 	registry.P2PRegistry().Unregister(s.provider)
-	if err = registry.P2PRegistry().Register(s.provider, host); err != nil {
+	if err = registry.P2PRegistry().Register(s.provider, p2pProvider{host}); err != nil {
 		return
 	}
 
