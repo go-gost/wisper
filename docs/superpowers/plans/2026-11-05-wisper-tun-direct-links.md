@@ -124,7 +124,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): add the opt-in direct-lin
 - Unregistering an explicit route does not close mesh routes; the next
   `Reconcile` may claim the key again.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestMeshRouteClaimsOnlyFreeKeys`: mesh claims A/B, skips an explicitly held
   C; `Peers()` and Accept routing match.
@@ -137,11 +137,11 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): add the opt-in direct-lin
   a mesh-known key does not.
 - Existing p2p host route tests pass.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 `GOWORK=off go test ./tunnel -run 'TestMeshRoute|TestExplicitRoute|TestMeshReclaims|TestMeshKnown' -count=1`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Keep the existing explicit `routes` map semantics. Add the mesh map and a
 small route wrapper rather than changing every existing caller. Preemption
@@ -149,11 +149,11 @@ must not close the mesh listener: it only removes the key from its `peers` and
 notifies the owner to drop its link and fall back to the hub. A mesh route is
 closed only by its owner.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 The Step 2 command.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/p2p_host.go tunnel/p2p_host_test.go
@@ -161,12 +161,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): give mesh routes second p
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 428aa22
+- Files changed: `tunnel/p2p_host.go`, `tunnel/p2p_host_test.go`
+- Tests: `GOWORK=off go test ./tunnel -run 'TestMeshRoute|TestExplicitRoute|TestMeshReclaims|TestMeshKnown' -count=1` PASS; the same under `-race` PASS; all `TestP2PHost|TestMesh` PASS; `GOWORK=off go vet ./tunnel` PASS.
+- Review findings/fixes: `reconcileMesh` updates the listener's peers while holding the host lock, closing the window where a concurrent explicit preemption could be overwritten by a stale reconcile. Explicit registration preempts mesh only after its whole allowlist is validated, so a rejected explicit list changes nothing; the callback is read under the host lock to avoid a race with `SetPreempt`. `MeshRoute` compiles against both `listener.Listener` and `net.Listener`.
+- Deferred/limitations: only one mesh route holder is expected (the one direct-enabled entrypoint); a second mesh route skips keys already owned by the first. `meshKnown` entries survive preemption on purpose, so a member's knock never lands in the pending list while it is still a member.
 
 ---
 
