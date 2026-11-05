@@ -70,6 +70,120 @@ func TestNetviewRouterIgnoresStaleRevAndAcceptsNewHub(t *testing.T) {
 	}
 }
 
+// A hub restart keeps its id (the id is its peer key) but starts a new
+// generation at rev 1. Without the generation check every push from the new
+// process would look stale for as long as the old rev was higher — the wedge
+// the hub's per-run Gen exists to close.
+func TestNetviewRouterGenResetsRev(t *testing.T) {
+	r := NewNetviewRouter()
+	if !r.Apply(netviewMessage{V: 1, Hub: "hub1", Gen: "g1", Rev: 5,
+		Claims: []claimEntry{{Prefix: "192.168.50.0/24", Origin: "peerA"}}}) {
+		t.Fatal("the first netview must be accepted")
+	}
+	if r.Apply(netviewMessage{V: 1, Hub: "hub1", Gen: "g1", Rev: 4,
+		Claims: []claimEntry{{Prefix: "10.0.0.0/8", Origin: "peerB"}}}) {
+		t.Fatal("an older rev in the same generation must be rejected")
+	}
+	if rt := r.GetRoute(context.Background(), "10.1.2.3"); rt != nil {
+		t.Fatalf("a stale rev must not install: got %+v", rt)
+	}
+
+	if !r.Apply(netviewMessage{V: 1, Hub: "hub1", Gen: "g2", Rev: 1,
+		Claims: []claimEntry{{Prefix: "10.0.0.0/8", Origin: "peerB"}}}) {
+		t.Fatal("a new generation at rev 1 must be accepted")
+	}
+	if rt := r.GetRoute(context.Background(), "10.1.2.3"); rt == nil || rt.Dst != "10.0.0.0/8" {
+		t.Fatalf("the new generation's claim must be installed: got %+v", rt)
+	}
+	if hub, gen, rev := r.Generation(); hub != "hub1" || gen != "g2" || rev != 1 {
+		t.Fatalf("generation = (%q, %q, %d), want (hub1, g2, 1)", hub, gen, rev)
+	}
+}
+
+// The peer list and the inbound block filter read Members and Claims. They
+// must see exactly what the hub published — name, direct/disabled flags, the
+// claim's origin and allow list — and must not be able to mutate the router's
+// table through the returned slices.
+func TestNetviewRouterMembersClaims(t *testing.T) {
+	r := NewNetviewRouter()
+	r.Apply(netviewMessage{V: 1, Hub: "hub1", Gen: "g1", Rev: 1,
+		Members: []memberEntry{
+			{IP: "10.10.100.1", Key: "hub", Name: "Home hub"},
+			{IP: "10.10.100.5", Key: "peerB", Name: "laptop", Direct: true},
+			{IP: "10.10.100.6", Key: "peerC", Disabled: true},
+		},
+		Claims: []claimEntry{
+			{Prefix: "192.168.50.0/24", Origin: "peerB", Allow: []string{"peerC"}},
+			{Prefix: "192.168.0.0/16", Origin: "peerD"},
+		},
+	})
+
+	members := r.Members()
+	if len(members) != 3 {
+		t.Fatalf("members = %d, want 3", len(members))
+	}
+	if members[1].Name != "laptop" || !members[1].Direct || members[2].Disabled != true {
+		t.Fatalf("member fields not preserved: %+v", members)
+	}
+
+	claims := r.Claims()
+	if len(claims) != 2 {
+		t.Fatalf("claims = %d, want 2", len(claims))
+	}
+	// The router preserves the hub's order; sorting is the lookup table's
+	// job, not the published view's.
+	if claims[0].Prefix != "192.168.50.0/24" || claims[1].Prefix != "192.168.0.0/16" {
+		t.Fatalf("claim order not preserved: %+v", claims)
+	}
+	if claims[0].Origin != "peerB" || !slices.Equal(claims[0].Allow, []string{"peerC"}) {
+		t.Fatalf("claim fields not preserved: %+v", claims[0])
+	}
+
+	// A caller owns its copy.
+	claims[0].Allow[0] = "peerZ"
+	members[0].Name = "changed"
+	again := r.Claims()
+	if !slices.Equal(again[0].Allow, []string{"peerC"}) {
+		t.Fatalf("Claims returned a slice sharing the router's table: %+v", again[0])
+	}
+	if r.Members()[0].Name != "Home hub" {
+		t.Fatalf("Members returned a slice sharing the router's table: %+v", r.Members()[0])
+	}
+}
+
+func TestNetviewMemberSyncOnlyAccepted(t *testing.T) {
+	r := NewNetviewRouter()
+	syncs := 0
+	var synced []string
+	cfg := ControlChannelConfig{
+		Router:     r,
+		RouteSync:  func(prefixes []string) { synced = prefixes },
+		MemberSync: func() { syncs++ },
+	}
+
+	deliverNetview(cfg, netviewMessage{V: 1, Hub: "hub", Gen: "g1", Rev: 1,
+		Claims: []claimEntry{{Prefix: "192.168.50.0/24", Origin: "peerB"}}})
+	if syncs != 1 {
+		t.Fatalf("MemberSync ran %d times after an accepted netview, want 1", syncs)
+	}
+	if len(synced) != 1 {
+		t.Fatalf("RouteSync saw %v, want the accepted prefix", synced)
+	}
+
+	deliverNetview(cfg, netviewMessage{V: 1, Hub: "hub", Gen: "g1", Rev: 1})
+	if syncs != 1 {
+		t.Fatalf("MemberSync ran for a rejected netview: %d", syncs)
+	}
+	if len(synced) != 1 {
+		t.Fatalf("RouteSync ran for a rejected netview: %v", synced)
+	}
+
+	deliverNetview(cfg, netviewMessage{V: 1, Hub: "hub", Gen: "g2", Rev: 1})
+	if syncs != 2 {
+		t.Fatalf("MemberSync did not run for a new generation: %d", syncs)
+	}
+}
+
 func TestNetviewRouterKeepsIPv6ToItsOwnFamily(t *testing.T) {
 	// IPv4-first must not become IPv4-only-capturing: a v4 claim never
 	// answers for an IPv6 destination, so one keeps whatever fate it has

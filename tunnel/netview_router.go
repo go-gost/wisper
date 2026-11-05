@@ -40,6 +40,13 @@ type NetviewRouter struct {
 	// different hub id is a restarted hub and is accepted at any rev; from
 	// the same hub only a strictly newer rev is.
 	hub string
+	// gen is the hub process generation the installed netview came from. A
+	// restarted hub that kept its id (the normal case: the id is the peer key)
+	// starts a new generation at rev 1, so the rev comparison alone would
+	// reject every push from it. A changed Gen resets rev exactly as a changed
+	// hub id does; empty Gen keeps the old hub-only rule, which is what an
+	// older hub sends.
+	gen string
 	rev uint64
 	// gateway is the address the hub publishes for itself in the netview's
 	// members: on a spoke every approved LAN is behind the hub, so it is the
@@ -50,6 +57,31 @@ type NetviewRouter struct {
 	// routes are the approved claims, sorted longest-prefix-first at Apply so
 	// GetRoute's first match is the longest match.
 	routes []netviewRoute
+	// members and claims are the accepted snapshot in the form the entrypoint
+	// needs outside this package: the peer list, the inbound block filter and
+	// the mesh membership all read them. They are copies, never the message's
+	// own slices, so a caller cannot reach the router's table.
+	members []NetviewMember
+	claims  []NetviewClaim
+}
+
+// NetviewMember is one member of the hub's device network as the hub published
+// it: its tun IP, peer key, display name, whether it can take a direct link,
+// and whether the hub has switched it off.
+type NetviewMember struct {
+	IP       string
+	Key      string
+	Name     string
+	Direct   bool
+	Disabled bool
+}
+
+// NetviewClaim is one LAN prefix the hub approved for a spoke, with the peers
+// allowed to reach it (empty means every member) and the key that claimed it.
+type NetviewClaim struct {
+	Prefix string
+	Origin string
+	Allow  []string
 }
 
 // netviewRoute is one approved prefix, with the net.IPNet form built once:
@@ -66,24 +98,30 @@ func NewNetviewRouter() *NetviewRouter {
 	return &NetviewRouter{}
 }
 
-// Apply installs a netview. A Rev that is not newer is ignored; a new Hub
-// id resets the rev and is accepted.
+// Apply installs a netview and reports whether it was accepted. A Rev that is
+// not newer is ignored; a new Hub id or generation resets the rev. The returned
+// bool is what keeps a stale push from reaching the kernel sync or the member
+// callback: both act on the router's current table, and running them for a
+// rejected snapshot would report a state the router never installed.
 //
 // An accepted netview replaces the whole table unconditionally: the message
 // is a full snapshot, so a route absent from it has been withdrawn. A claim
 // that does not parse is skipped rather than failing the netview — one bad
 // entry must not throw away the rest of the hub's view.
-func (r *NetviewRouter) Apply(n netviewMessage) {
+func (r *NetviewRouter) Apply(n netviewMessage) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// A netview without a hub id cannot be versioned against anything, so it
 	// must never be able to wipe the installed table.
 	if n.Hub == "" {
-		return
+		return false
 	}
-	if n.Hub == r.hub && n.Rev <= r.rev {
-		return // a stale or duplicate push from the same hub
+	// A new hub id, or a new generation of the same hub, is a restarted
+	// process whose rev starts over: accept it at any rev. Empty Gen is an
+	// older hub and falls back to the hub-only rule.
+	if n.Hub == r.hub && n.Gen == r.gen && n.Rev <= r.rev {
+		return false // a stale or duplicate push from the same hub run
 	}
 
 	routes := make([]netviewRoute, 0, len(n.Claims))
@@ -119,7 +157,63 @@ func (r *NetviewRouter) Apply(n netviewMessage) {
 		}
 	}
 
-	r.hub, r.rev, r.gateway, r.routes = n.Hub, n.Rev, gateway, routes
+	members := make([]NetviewMember, 0, len(n.Members))
+	for _, m := range n.Members {
+		members = append(members, NetviewMember{
+			IP:       m.IP,
+			Key:      m.Key,
+			Name:     m.Name,
+			Direct:   m.Direct,
+			Disabled: m.Disabled,
+		})
+	}
+	claims := make([]NetviewClaim, 0, len(n.Claims))
+	for _, c := range n.Claims {
+		claims = append(claims, NetviewClaim{
+			Prefix: c.Prefix,
+			Origin: c.Origin,
+			Allow:  slices.Clone(c.Allow),
+		})
+	}
+
+	r.hub, r.gen, r.rev = n.Hub, n.Gen, n.Rev
+	r.gateway, r.routes = gateway, routes
+	r.members, r.claims = members, claims
+	return true
+}
+
+// Members returns the accepted netview's members as a copy. The peer list and
+// the inbound block filter both read this, and neither may be able to mutate
+// the router's table.
+func (r *NetviewRouter) Members() []NetviewMember {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.members)
+}
+
+// Claims returns the accepted netview's approved prefixes as a copy, in the
+// hub's longest-prefix-first order. Allow is cloned too: a caller that edits a
+// row must not change the peer's permission by side effect.
+func (r *NetviewRouter) Claims() []NetviewClaim {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]NetviewClaim, 0, len(r.claims))
+	for _, c := range r.claims {
+		out = append(out, NetviewClaim{
+			Prefix: c.Prefix,
+			Origin: c.Origin,
+			Allow:  slices.Clone(c.Allow),
+		})
+	}
+	return out
+}
+
+// Generation reports the installed hub id, generation and rev. An empty hub
+// means no netview has been accepted yet.
+func (r *NetviewRouter) Generation() (hub, gen string, rev uint64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.hub, r.gen, r.rev
 }
 
 // Prefixes lists the installed claims as sorted CIDRs, for the readers that
@@ -216,7 +310,12 @@ type ControlChannelConfig struct {
 	// logged by the sync itself, never returned here, because a route that
 	// could not be installed must not cost the spoke its tunnel.
 	RouteSync func(prefixes []string)
-	Log       logger.Logger
+	// MemberSync runs after every netview the router accepts, once the table
+	// is the accepted one. It is where the entrypoint rebuilds the peer list
+	// and the inbound block policy from Router.Members/Claims; it is not run
+	// for a rejected snapshot, whose rows the router did not install.
+	MemberSync func()
+	Log        logger.Logger
 }
 
 // controlLogger fills in a missing log with the process default, or a
@@ -382,9 +481,14 @@ func deliverNetview(cfg ControlChannelConfig, n netviewMessage) {
 	if cfg.Router == nil {
 		return
 	}
-	cfg.Router.Apply(n)
+	if !cfg.Router.Apply(n) {
+		return
+	}
 	if cfg.RouteSync != nil {
 		cfg.RouteSync(cfg.Router.Prefixes())
+	}
+	if cfg.MemberSync != nil {
+		cfg.MemberSync()
 	}
 }
 
