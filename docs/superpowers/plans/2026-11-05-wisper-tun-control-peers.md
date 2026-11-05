@@ -467,17 +467,17 @@ git -C /root/code/go-gost/wisper commit -m "feat(web): add tun entrypoint peer l
 
 **Files:** none expected; fix only failures caused by this plan.
 
-- [ ] **Step 1: Tunnel package tests**
+- [x] **Step 1: Tunnel package tests**
 
 Run: `cd /root/code/go-gost/wisper && GOWORK=off go test ./tunnel -count=1`
 Expected: PASS.
 
-- [ ] **Step 2: All wisper Go tests (per package)**
+- [x] **Step 2: All wisper Go tests (per package)**
 
 Run: `cd /root/code/go-gost/wisper && GOWORK=off go test -p 1 ./... -count=1`
 Expected: PASS. Report any unrelated failure; do not patch it to fit.
 
-- [ ] **Step 3: Build/vet and Android compile**
+- [x] **Step 3: Build/vet and Android compile**
 
 ```bash
 cd /root/code/go-gost/wisper
@@ -487,16 +487,16 @@ GOWORK=off GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build ./tunnel/... ./api/.
 ```
 Expected: PASS. The full cgo/APK build is a Plan 3/e2e gate; this catches Android build tags in the touched packages.
 
-- [ ] **Step 4: Web build**
+- [x] **Step 4: Web build**
 
 Run the Task 7 tsc/vite commands. Expected: PASS.
 
-- [ ] **Step 5: No x/p2p changes**
+- [x] **Step 5: No x/p2p changes**
 
 Run: `git -C /root/code/go-gost/x status --short` and `git -C /root/code/go-gost/p2p status --short`.
 Expected: no changes from this plan. If x/p2p are dirty, stop and report.
 
-- [ ] **Step 6: Commit any final test fixes**
+- [x] **Step 6: Commit any final test fixes**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel api config web-src web/assets
@@ -504,9 +504,9 @@ git -C /root/code/go-gost/wisper commit -m "test(tun): verify control plane, loc
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 21a60da (verification only; no code change)
+- Files changed: plan record only; Vite rebuild produced identical asset hashes.
+- Tests: `GOWORK=off go test ./tunnel -count=1` PASS; `GOWORK=off go test -p 1 ./... -count=1` PASS (root, api, config, event, runner/task, tunnel, entrypoint; no unrelated failures); `GOWORK=off go build ./...` PASS; `GOWORK=off go vet ./...` PASS; `GOWORK=off GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build ./tunnel/... ./api/...` PASS; `npx tsc --noEmit` PASS; `npx vite build` PASS.
+- Review findings/fixes: no regressions found. `x/` is clean of code changes but has four pre-existing untracked docs (`docs/issues/921-connect-ip-upstream.md`, `docs/plans/2026-10-21-x-e2e-coverage-audit.md`, `docs/superpowers/plans/2026-10-27-tls-ech-plan.md`, `docs/superpowers/specs/2026-10-27-tls-ech-design.md`); they were not created or touched by this plan. `p2p/` and `wisper/` are clean.
+- Deferred/limitations: full cgo/APK and the real device/direct-link e2e belong to Plan 3; this gate only compiles the touched Android packages.
