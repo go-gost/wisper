@@ -181,6 +181,9 @@ type tunnelOptionsResp struct {
 	// implementation: auto (default), kernel, or userspace.
 	ShareLAN  string `json:"share_lan,omitempty"`
 	ShareMode string `json:"share_mode,omitempty"`
+	// BlockedPeers is a tun spoke's local inbound block list. It is its own
+	// list, not the hub's allowlist; omitted when empty.
+	BlockedPeers []string `json:"blocked_peers,omitempty"`
 	// LanAllow is the hub-side policy for the LANs a spoke may claim:
 	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
 	// A spoke with no row claims nothing at all. LanRoutes is the hub's own
@@ -391,27 +394,28 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		CreatedAt:  opts.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 		Error:      errMsg,
 		Options: tunnelOptionsResp{
-			Prefix:      opts.Prefix,
-			Hostname:    opts.Hostname,
-			Username:    opts.Username,
-			BasicAuth:   opts.Username != "",
-			EnableTLS:   opts.EnableTLS,
-			RewriteHost: opts.RewriteHost,
-			FileUpload:  opts.FileUpload,
-			Keepalive:   opts.Keepalive,
-			TTL:         opts.TTL,
-			RecordMode:  opts.RecordMode,
-			Peer:        opts.Peer,
-			Protocol:    opts.Protocol,
-			Peers:       peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled, opts.PeerIPs, nil),
-			PeerIPs:     opts.PeerIPs,
-			Net:         opts.Net,
-			MTU:         opts.MTU,
-			DeviceName:  opts.DeviceName,
-			Routes:      opts.Routes,
-			DNS:         opts.DNS,
-			ShareLAN:    opts.ShareLAN,
-			ShareMode:   tunnel.NormalizeShareMode(opts.ShareMode),
+			Prefix:       opts.Prefix,
+			Hostname:     opts.Hostname,
+			Username:     opts.Username,
+			BasicAuth:    opts.Username != "",
+			EnableTLS:    opts.EnableTLS,
+			RewriteHost:  opts.RewriteHost,
+			FileUpload:   opts.FileUpload,
+			Keepalive:    opts.Keepalive,
+			TTL:          opts.TTL,
+			RecordMode:   opts.RecordMode,
+			Peer:         opts.Peer,
+			Protocol:     opts.Protocol,
+			Peers:        peersJSON(opts.Peers, opts.PeerAliases, opts.PeerDisabled, opts.PeerIPs, nil),
+			PeerIPs:      opts.PeerIPs,
+			Net:          opts.Net,
+			MTU:          opts.MTU,
+			DeviceName:   opts.DeviceName,
+			Routes:       opts.Routes,
+			DNS:          opts.DNS,
+			ShareLAN:     opts.ShareLAN,
+			ShareMode:    tunnel.NormalizeShareMode(opts.ShareMode),
+			BlockedPeers: opts.BlockedPeers,
 			// The policy echoed as a plain string, whatever the request's pointer
 			// form was: a client saving it back mid-edit sends "" — the empty
 			// value it reads — which is a clear, while the pointer form above says

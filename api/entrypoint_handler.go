@@ -42,6 +42,10 @@ type entrypointCreateRequest struct {
 	// ShareMode pins the sharing implementation (auto/kernel/userspace).
 	// Empty leaves the default (auto).
 	ShareMode string `json:"share_mode,omitempty"`
+	// BlockedPeers is the spoke's local inbound block list. It is a pointer
+	// so an omitted field is distinguishable from an explicit clear: absent
+	// on an update keeps the old list, [] clears it.
+	BlockedPeers *[]string `json:"blocked_peers,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
@@ -60,7 +64,15 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.DNSOption(r.DNS),
 		tunnel.ShareLANOption(r.ShareLAN),
 		tunnel.ShareModeOption(r.ShareMode),
+		tunnel.BlockedPeersOption(derefStrings(r.BlockedPeers)...),
 	}
+}
+
+func derefStrings(p *[]string) []string {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // validateTunNet rejects a device address the tun listener would otherwise
@@ -249,6 +261,16 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Capture what an omitted field means before Close discards the old run.
+	// BlockedPeers is the one field this request may leave alone: an update
+	// form that never mentions it must not silently clear the operator's
+	// local block.
+	oldOpts := old.Options()
+	if req.BlockedPeers == nil {
+		blocked := append([]string(nil), oldOpts.BlockedPeers...)
+		req.BlockedPeers = &blocked
+	}
+
 	// Every entrypoint type binds its own local address (and a p2p one also
 	// claims a provider name on the shared host), so the old one has to let go
 	// before the replacement can start.
@@ -257,7 +279,7 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	// Create replacement with same ID first (before deleting old).
 	opts := append([]tunnel.Option{
 		tunnel.IDOption(id),
-		tunnel.CreatedAtOption(old.Options().CreatedAt),
+		tunnel.CreatedAtOption(oldOpts.CreatedAt),
 	}, req.toOptions()...)
 
 	ep := entrypoint.NewByType(epType, opts...)

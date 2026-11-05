@@ -141,6 +141,8 @@ func NewHandler(webHandler http.Handler, debugPprof bool) http.Handler {
 	mux.HandleFunc("POST /api/entrypoints/{id}/start", handleStartEntrypoint)
 	mux.HandleFunc("POST /api/entrypoints/{id}/stop", handleStopEntrypoint)
 	mux.HandleFunc("POST /api/entrypoints/{id}/stats/reset", handleResetEntrypointStats)
+	mux.HandleFunc("GET /api/entrypoints/{id}/peers", handleEntrypointPeers)
+	mux.HandleFunc("PUT /api/entrypoints/{id}/peers", handleUpdateEntrypointPeers)
 
 	// Stats, config, and version
 	mux.HandleFunc("GET /api/stats", handleGetStats)
