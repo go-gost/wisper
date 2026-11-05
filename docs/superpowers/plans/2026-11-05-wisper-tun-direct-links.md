@@ -290,7 +290,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): install the mesh runtime 
   it after the explicit route disappears.
 - `Refresh` is also called by `SetBlockedPeers`; no entrypoint restart.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestDirectManagerDialsOnDemand`: one allowed member; `DirectNeeded` triggers
   one Punch + Dial; `AddDialedLink` receives the conn; a second signal while
@@ -307,11 +307,11 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): install the mesh runtime 
 - `TestDirectManagerIdleNoRedial`: `MeshCloseIdle`/`Dedup`/`Membership` do not
   schedule a redial.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 `GOWORK=off go test ./tunnel/entrypoint -run 'TestDirectManager' -count=1`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Use a `directHost` interface (`PunchContext`, `Dial`) and a `dialHub` closure
 so tests need no relay. All callbacks may run on the device reader or link
@@ -319,12 +319,12 @@ reader: never block them; schedule dials on a bounded worker or a per-peer
 goroutine with a context. Close cancels every goroutine and waits for the hub
 loop and device supervisor.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 The Step 2 command; then `GOWORK=off go test ./tunnel/entrypoint -count=1` and
 `-race` on the direct tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/entrypoint/direct.go tunnel/entrypoint/direct_test.go tunnel/entrypoint/tun.go
@@ -332,12 +332,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): dial direct member links 
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / ae20764
+- Files changed: `tunnel/entrypoint/direct.go`, `tunnel/entrypoint/direct_test.go`, `tunnel/entrypoint/tun.go`
+- Tests: `TestDirectManager` PASS; `-race` on `TestDirect|TestDeviceIPs` PASS; full entrypoint suite PASS; `go vet ./tunnel/...` PASS.
+- Review findings/fixes: the direct manager now builds the mesh member table from netview + blocked, claims only free keys through `MeshRoute.Reconcile`, and drops links that became blocked/disabled/preempted. `onNeeded` coalesces one dial, punches then dials the shared host, and polls `MeshStatus` for first readiness with a configurable 10s timeout. Failure closes set 1s/5s/30s/5m backoff; idle/dedup/membership/blocked/shutdown do not. A per-runtime `backoffSteps` slice removed a race with the test's global timing table, and `refreshMu` serializes netview/block/preemption reconciles. The hub redial loop still owns the hub close callback.
+- Deferred/limitations: the explicit-p2p preemption case is covered at the route layer (Task 2) but has no direct-manager test because `p2pHost.register` is unexported in the entrypoint test package; `TestDirectManagerIdleNoRedial` was not separately named (the callback switch is the behavior). There is no periodic reconcile after an explicit p2p route is removed; the next netview, block save, or a future host notification reclaims it. `go.mod` still carries the sibling `replace` noted in Task 3.
 
 ---
 
