@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/go-gost/core v0.6.1
 	github.com/go-gost/p2p v0.15.4
-	github.com/go-gost/x v0.28.0
+	github.com/go-gost/x v0.29.0
 	github.com/google/uuid v1.6.0
 	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54
 	github.com/xjasonlyu/tun2socks/v2 v2.6.0
@@ -95,3 +95,5 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
+
+replace github.com/go-gost/x => ../x

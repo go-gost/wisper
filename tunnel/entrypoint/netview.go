@@ -67,7 +67,7 @@ var startNetview = StartNetview
 //
 // onMembers, when supplied, runs after each netview the router accepts. The
 // entrypoint uses it to rebuild the local block policy from the new membership.
-func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLAN, deviceNet string, provider any, log logger.Logger, onMembers ...func()) {
+func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLAN, deviceNet string, provider any, log logger.Logger, direct bool, onMembers ...func()) {
 	// Registered before the channel runs, but the listener's lookup is by
 	// name at query time, so there is no ordering constraint against the
 	// listener's Init.
@@ -104,6 +104,7 @@ func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLA
 		Router:     router,
 		RouteSync:  sync.Reflect,
 		MemberSync: memberSync,
+		Direct:     direct,
 		Log:        log,
 	})
 }

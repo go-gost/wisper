@@ -60,6 +60,12 @@ type tunEntryPoint struct {
 	// the same shape as the hub's shareCleanup.
 	shareCleanup func()
 
+	// directRun is the mesh data path. Nil on the default single-hub path.
+	// deviceLn is the tun listener that feeds RunDevice; its accepted conns
+	// are not served by a gost service in the direct path.
+	directRun *directRuntime
+	deviceLn  listener.Listener
+
 	// cancelControl stops the LAN-routing control channel this run started.
 	// Close owns it, not the request context the run was started with: the
 	// channel outlives the API handler that clicked Start, and a run that
@@ -471,9 +477,10 @@ func (s *tunEntryPoint) startControlChannel(ctx context.Context, host *endpoint.
 	ctx, cancel := context.WithCancel(ctx)
 	s.mu.Lock()
 	s.cancelControl = cancel
+	direct := s.opts.Direct
 	s.mu.Unlock()
 
-	startNetview(ctx, host, s.peer, s.opts.ShareLAN, s.opts.Net, s.provider, log, s.refreshPeerPolicy)
+	startNetview(ctx, host, s.peer, s.opts.ShareLAN, s.opts.Net, s.provider, log, direct, s.refreshPeerPolicy)
 }
 
 func (s *tunEntryPoint) Run() error { return s.RunContext(context.Background()) }
@@ -524,6 +531,16 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	started := false
 	defer func() {
 		if !started {
+			s.mu.Lock()
+			direct, deviceLn := s.directRun, s.deviceLn
+			s.directRun, s.deviceLn = nil, nil
+			s.mu.Unlock()
+			if direct != nil {
+				_ = direct.Close()
+			}
+			if deviceLn != nil {
+				_ = deviceLn.Close()
+			}
 			registry.P2PRegistry().Unregister(s.provider)
 			tunnel.ReleaseP2PHost()
 			tunnel.ReleaseTunDevice(s.opts.ID)
@@ -618,24 +635,36 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 		// unchanged until an operator blocks a peer.
 		ln = &filterListener{Listener: ln, filter: s.filter}
 
-		handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
-		// The chain (and no forwarder hop) is the client-mode switch: the
-		// device's packets go out through the chain node, which is the peer.
-		h := tunhandler.NewHandler(
-			handler.RouterOption(xchain.NewRouter(
-				chain.ChainRouterOption(ch),
-				chain.LoggerRouterOption(handlerLogger),
-			)),
-			handler.LoggerOption(handlerLogger),
-		)
-		if err = h.Init(mdx.NewMetadata(svcCfg.Handler.Metadata)); err != nil {
-			return
-		}
+		if s.opts.Direct {
+			meshSvc, directRun, derr := s.startDirectRuntime(host, ch, pStats, ln, log)
+			if derr != nil {
+				_ = ln.Close()
+				return derr
+			}
+			forward = meshSvc
+			s.mu.Lock()
+			s.directRun, s.deviceLn = directRun, ln
+			s.mu.Unlock()
+		} else {
+			handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
+			// The chain (and no forwarder hop) is the client-mode switch: the
+			// device's packets go out through the chain node, which is the peer.
+			h := tunhandler.NewHandler(
+				handler.RouterOption(xchain.NewRouter(
+					chain.ChainRouterOption(ch),
+					chain.LoggerRouterOption(handlerLogger),
+				)),
+				handler.LoggerOption(handlerLogger),
+			)
+			if err = h.Init(mdx.NewMetadata(svcCfg.Handler.Metadata)); err != nil {
+				return
+			}
 
-		forward = xservice.NewService(s.opts.Name, ln, h,
-			xservice.LoggerOption(log),
-			xservice.StatsOption(pStats),
-		)
+			forward = xservice.NewService(s.opts.Name, ln, h,
+				xservice.LoggerOption(log),
+				xservice.StatsOption(pStats),
+			)
+		}
 	}
 
 	s.mu.Lock()
@@ -652,6 +681,16 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 
 	if closed {
 		_ = forward.Close()
+		s.mu.Lock()
+		direct, deviceLn := s.directRun, s.deviceLn
+		s.directRun, s.deviceLn = nil, nil
+		s.mu.Unlock()
+		if direct != nil {
+			_ = direct.Close()
+		}
+		if deviceLn != nil {
+			_ = deviceLn.Close()
+		}
 		return ErrEntryPointClosed // the deferred rollback releases the rest
 	}
 
@@ -722,6 +761,8 @@ func (s *tunEntryPoint) Close() error {
 		s.mu.Lock()
 		forward, acquired := s.forward, s.acquired
 		s.forward, s.acquired = nil, false
+		direct, deviceLn := s.directRun, s.deviceLn
+		s.directRun, s.deviceLn = nil, nil
 		// The control channel goes with the run that started it. This is the
 		// moment that matters most for a replaced entrypoint: its successor
 		// claims what the new share_lan says, and a channel that kept running
@@ -734,8 +775,14 @@ func (s *tunEntryPoint) Close() error {
 		if cancel != nil {
 			cancel()
 		}
+		if direct != nil {
+			_ = direct.Close()
+		}
 		if forward != nil {
 			err = forward.Close()
+		}
+		if deviceLn != nil {
+			_ = deviceLn.Close()
 		}
 		// The NAT rules go here: the service is stopped, so nothing still
 		// needs them, and the field is cleared as it runs so a repeat cannot
