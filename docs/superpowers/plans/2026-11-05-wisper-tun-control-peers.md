@@ -196,27 +196,27 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): expose netview members an
 - `SetBlockedPeers` normalizes/dedupes, updates options, calls `filter.SetPolicy(netviewRouter().Members(), netviewRouter().Claims(), keys)`, and is safe while stopped.
 - Config Load/Save/Restart carries `BlockedPeers`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestTunOptionsBlockedPeersRoundTrip`: option → `Options()`; config Save/Load → same; Restart preserves.
 - `TestTunPeerListRows`: fake netview members/claims; blocked/disabled; assert hub first, states, LANs, stale blocked row.
 - `TestTunSetBlockedPeersInPlace`: running/stopped; keys deduped; no panic with nil filter.
 - `TestEntryPointUpdatePreservesBlockedPeers` (API-level helper): absent field carries current; explicit empty clears.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /root/code/go-gost/wisper && GOWORK=off go test ./tunnel/entrypoint -run 'TestTunOptionsBlocked|TestTunPeerList|TestTunSetBlocked|TestEntryPointUpdatePreserves' -count=1`
 Expected: FAIL — field/methods undefined.
 
-- [ ] **Step 3: Implement options/config/state**
+- [x] **Step 3: Implement options/config/state**
 
 Add the field in the four copy paths (`LoadConfig`, `SaveConfig`, `RestartRunning`, create/update) and in `tunnel.TunnelOptions`. Keep `blockedPeers` normalized (trim, drop empty, dedupe, preserve first occurrence). `PeerList` reads the process-wide `netviewRouter()`; this plan assumes the existing one-tun-entrypoint-per-process deployment shape.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run Step 2. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/tunnel.go config/config.go tunnel/entrypoint
@@ -224,12 +224,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): add local blocked peers a
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / f5fa3c7
+- Files changed: `tunnel/tunnel.go`, `config/config.go`, `tunnel/peerlist.go`, `tunnel/peerfilter.go`, `tunnel/entrypoint/entrypoint.go`, `tunnel/entrypoint/tun.go`, `tunnel/entrypoint/peerlist_test.go`
+- Tests: `GOWORK=off go test ./tunnel/entrypoint -run 'TestTunOptionsBlocked|TestTunPeerList|TestTunSetBlocked' -count=1` PASS; `GOWORK=off go test -race ./tunnel/entrypoint -run 'TestTunOptionsBlocked|TestTunPeerList|TestTunSetBlocked' -count=1` PASS; full `GOWORK=off go test ./tunnel/... -count=1` PASS; `GOWORK=off go vet ./tunnel/...` PASS.
+- Review findings/fixes: `Options()` now copies `BlockedPeers` under `s.mu` because it is the one field mutated after construction; `PeerFilter` is a policy container in this task (packet checks land in Task 4) and `SetBlockedPeers` is nil-filter safe; `PeerList` skips a duplicate hub member row and keeps stale blocked keys last; `SetBlockedPeers` never restarts the service. No `Options()` caller holds `s.mu`, so the new lock cannot self-deadlock.
+- Deferred/limitations: `TestEntryPointUpdatePreservesBlockedPeers` needs the API handler and moves to Task 6; the filter is not yet wired to the device path or netview updates (Tasks 4/5); `PeerList` direct/transport/traffic fields remain zero until Plan 3.
 
 ---
 
