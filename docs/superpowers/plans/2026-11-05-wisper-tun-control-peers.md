@@ -367,7 +367,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): apply local peer block to
 - `tunnelOptionsResp.BlockedPeers []string`.
 - Full entrypoint PUT preserves omitted fields; the peers PUT does not restart the entrypoint.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestEntrypointPeersGET`: seed a tun entrypoint with netview members/claims; GET returns hub + rows; non-tun 400.
 - `TestEntrypointPeersPUT`: block B; filter/policy and response update; no restart (test seam counts starts); unblock; persist.
@@ -375,20 +375,20 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): apply local peer block to
 - `TestEntrypointFullPutPreservesBlockedPeers`: omit field → preserved; explicit [] → cleared.
 - Existing API tests pass unchanged.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /root/code/go-gost/wisper && GOWORK=off go test ./api -run 'TestEntrypointPeers|TestEntrypointFullPutPreserves' -count=1`
 Expected: FAIL — route/handlers undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Register the two routes in `api/server.go`. Add the request/response types. Type-assert the running entrypoint to `tunnel.PeerListReporter`/`tunnel.BlockedPeersSetter`; if stopped, `SetBlockedPeers` still updates options. Save config after a successful PUT. Echo the list via the reporter. Keep the full PUT’s `BlockedPeers` pointer semantics.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run Step 2. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add api
@@ -396,12 +396,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(api): expose tun entrypoint pee
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 0c9faec
+- Files changed: `api/server.go`, `api/entrypoint_handler.go`, `api/tunnel_handler.go`, `api/entrypoint_peers.go`, `api/entrypoint_peers_test.go`
+- Tests: `GOWORK=off go test ./api -run 'TestEntrypointPeers|TestEntrypointFullPutPreserves' -count=1 -timeout 120s` PASS; full `GOWORK=off go test ./api -count=1 -timeout 300s` PASS; `GOWORK=off go vet ./api ./tunnel/...` PASS.
+- Review findings/fixes: the GET/PUT test uses a fake `tun` entrypoint implementing the two interfaces rather than seeding the process-wide netview router (unexported message type); the full-PUT tests use a TCP entrypoint so they do not create a tun device. The PUT rejects duplicate keys to match the allowlist API and the plan's duplicate-400 case; `SetBlockedPeers` still dedupes direct callers. Full PUT captures `oldOpts` before `Close` so an omitted `blocked_peers` survives; explicit `[]` clears. Peers PUT never restarts the object.
+- Deferred/limitations: the API test does not assert a running real entrypoint's filter bytes after PUT (the fake covers the interface wiring; Task 4 covers filter semantics); `blocked_peers` is echoed on every entrypoint type's options, though only tun uses it.
 
 ---
 
