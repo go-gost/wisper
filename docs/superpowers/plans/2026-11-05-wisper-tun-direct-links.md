@@ -412,7 +412,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): show direct link state in
 
 **Files:** no production changes expected; fix only failures caused by this plan.
 
-- [ ] **Step 1: Unit/race suites**
+- [x] **Step 1: Unit/race suites**
 
 ```bash
 cd /root/code/go-gost/wisper
@@ -420,7 +420,7 @@ GOWORK=off go test -p 1 ./... -count=1
 GOWORK=off go test -race ./tunnel ./tunnel/entrypoint -count=1
 ```
 
-- [ ] **Step 2: Build/vet/Android/web**
+- [x] **Step 2: Build/vet/Android/web**
 
 ```bash
 GOWORK=off go build ./...
@@ -446,13 +446,13 @@ If the repository has no relay-backed harness for this, mark the integration
 case opt-in and record the missing coverage explicitly; do not claim an e2e that
 was not run.
 
-- [ ] **Step 4: No x/p2p changes**
+- [x] **Step 4: No x/p2p changes**
 
 `git -C /root/code/go-gost/x status --short` and
 `git -C /root/code/go-gost/p2p status --short`. Report pre-existing untracked
 files; do not touch them.
 
-- [ ] **Step 5: Commit final test fixes**
+- [x] **Step 5: Commit final test fixes**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel api config web-src web/assets
@@ -460,9 +460,9 @@ git -C /root/code/go-gost/wisper commit -m "test(tun): verify direct spoke links
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete for the unit/regression gate; the three-node relay e2e was not run.
+- Repo/commit: wisper / pending this commit (plan + go.mod/go.sum); x commit `c92ee1c`, tag `v0.29.0`
+- Files changed: `go.mod`, `go.sum`, plan record. Production code was already committed in Tasks 1–5.
+- Tests: `GOWORK=off go test -p 1 ./... -count=1` PASS (root, api, config, event, runner/task, tunnel, entrypoint); `GOWORK=off go test -race ./tunnel ./tunnel/entrypoint -count=1` PASS; `go build ./...` PASS; `go vet ./...` PASS; Android arm64 `go build ./tunnel/... ./api/...` PASS; `npx tsc --noEmit` PASS; `npx vite build` PASS.
+- Review findings/fixes: the temporary sibling `replace github.com/go-gost/x => ../x` was removed. wisper now requires `github.com/go-gost/x v0.29.0`, and `go.sum` carries that module's hash; the local x tag `v0.29.0` was created at `c92ee1c` and used to populate the module. `go mod tidy` also retired stale p2p 0.15.2/0.15.3 and x 0.28.0 sum lines.
+- Deferred/limitations: **no three-node relay e2e was run**: this checkout has no relay-backed harness for A/B packet forwarding, and the test must not be claimed as passing. The direct-path integration list (ping both ways, block/unblock, fallback/reconnect, explicit-route preemption, old-hub compatibility, userspace share, device replacement) remains the release gate. x `v0.29.0` is a **local** tag; it must be pushed/published before a clean CI build can fetch the new module. `x/` has four pre-existing untracked docs; `p2p/` is clean; neither was touched.
