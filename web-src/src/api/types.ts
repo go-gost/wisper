@@ -301,6 +301,8 @@ export interface EntrypointOptions {
   /** This spoke's local inbound block list. It does not change the hub's
    *  allowlist; the block is enforced on this device. */
   blocked_peers?: string[];
+  /** Opt-in spoke-to-spoke mesh path; the hub link remains the fallback. */
+  direct?: boolean;
 }
 
 /** One row of a tun spoke's local peer view. */
@@ -399,6 +401,9 @@ export interface EntrypointCreateRequest {
   /** Local inbound block list for a tun spoke. Omitted means "leave the
    *  existing list alone" on an update; [] is the explicit clear. */
   blocked_peers?: string[];
+  /** Opt-in mesh data path for a tun spoke. Omitted on an update keeps the
+   *  existing value; false turns it off. */
+  direct?: boolean;
 }
 
 // ─── Stats Snapshot ──────────────────────────────────────────────────────────

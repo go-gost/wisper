@@ -184,6 +184,9 @@ type tunnelOptionsResp struct {
 	// BlockedPeers is a tun spoke's local inbound block list. It is its own
 	// list, not the hub's allowlist; omitted when empty.
 	BlockedPeers []string `json:"blocked_peers,omitempty"`
+	// Direct enables the mesh data path for a tun spoke; false is the old
+	// single-hub client path.
+	Direct bool `json:"direct,omitempty"`
 	// LanAllow is the hub-side policy for the LANs a spoke may claim:
 	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
 	// A spoke with no row claims nothing at all. LanRoutes is the hub's own
@@ -416,6 +419,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			ShareLAN:     opts.ShareLAN,
 			ShareMode:    tunnel.NormalizeShareMode(opts.ShareMode),
 			BlockedPeers: opts.BlockedPeers,
+			Direct:       opts.Direct,
 			// The policy echoed as a plain string, whatever the request's pointer
 			// form was: a client saving it back mid-edit sends "" — the empty
 			// value it reads — which is a clear, while the pointer form above says

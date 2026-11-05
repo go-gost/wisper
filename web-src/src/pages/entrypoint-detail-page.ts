@@ -65,6 +65,8 @@ export class EntrypointDetailPage extends LitElement {
   // spoke's half of the hub's share_lan. Same fields, same defaults.
   @state() private _shareLAN = '';
   @state() private _shareMode = 'auto';
+  /** Opt-in mesh data path; the hub link remains the fallback. */
+  @state() private _direct = false;
 
   private _unsubs: (() => void)[] = [];
 
@@ -144,6 +146,7 @@ export class EntrypointDetailPage extends LitElement {
     this._dns = '';
     this._shareLAN = '';
     this._shareMode = 'auto';
+    this._direct = false;
   }
 
   private _populateForm(ep: Entrypoint) {
@@ -164,6 +167,7 @@ export class EntrypointDetailPage extends LitElement {
     this._dns = ep.options?.dns ?? '';
     this._shareLAN = ep.options?.share_lan ?? '';
     this._shareMode = ep.options?.share_mode || 'auto';
+    this._direct = ep.options?.direct === true;
   }
 
   /** _renderTransport is the peer's path: one word, plus a tappable ⓘ whose
@@ -340,6 +344,9 @@ export class EntrypointDetailPage extends LitElement {
         // tunnel, and nothing else reads these two.
         share_lan: this.entrypointType === 'tun' ? this._shareLAN.trim() || undefined : undefined,
         share_mode: this.entrypointType === 'tun' ? this._shareMode || undefined : undefined,
+        // Only a tun spoke has a mesh path. Omitted on an edit would preserve
+        // the old value, but the switch is explicit, so both states are sent.
+        direct: this.entrypointType === 'tun' ? this._direct : undefined,
       };
 
       if (this.mode === 'create') {
@@ -961,6 +968,10 @@ export class EntrypointDetailPage extends LitElement {
                     ${ep.options?.share_lan
                       ? html`<div class="info-row"><span class="info-label">${t('fieldShareLAN')}</span><span class="info-value text">${ep.options.share_lan}</span></div>`
                       : ''}
+                    <div class="info-row">
+                      <span class="info-label">${t('fieldDirect')}</span>
+                      <span class="info-value text">${ep.options?.direct ? t('directOn') : t('directOff')}</span>
+                    </div>
                     ${ep.lan_routes?.length
                       ? html`<div class="info-row"><span class="info-label">${t('fieldLANRoutes')}</span><span class="info-value text">${ep.lan_routes.join(', ')}</span></div>`
                       : ''}
@@ -1194,6 +1205,14 @@ export class EntrypointDetailPage extends LitElement {
                       </span>
                     </div>
                     <div class="p2p-hint">${t('fieldShareModeHint')}</div>
+                    <div class="switch-row">
+                      <span class="switch-label">${t('fieldDirect')}</span>
+                      <div class="switch ${this._direct ? 'on' : ''}"
+                        @click=${() => { this._direct = !this._direct; }}>
+                        <div class="switch-knob"></div>
+                      </div>
+                    </div>
+                    <div class="p2p-hint">${t('fieldDirectHint')}</div>
                   `
                   : html`
                 <div class="form-group">

@@ -307,7 +307,7 @@ func TestKeepClaimFresh(t *testing.T) {
 	// field: the mechanism is the whole of what is under test.
 	go func() {
 		defer close(done)
-		keepClaimFresh(stop, hub, claims, testLogger(), 5*time.Millisecond)
+		keepClaimFresh(stop, hub, claims, true, testLogger(), 5*time.Millisecond)
 	}()
 
 	// The whole claim, more than once: every tick says the same thing, which
@@ -319,6 +319,9 @@ func TestKeepClaimFresh(t *testing.T) {
 		}
 		if claim.Type != ctrlTypeClaim || len(claim.Add) != 1 || claim.Add[0] != "192.168.50.0/24" {
 			t.Fatalf("refresh %d re-asserted %+v, want the whole claim", i, claim)
+		}
+		if !claim.Direct {
+			t.Fatalf("refresh %d dropped the direct capability: %+v", i, claim)
 		}
 	}
 

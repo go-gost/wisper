@@ -315,7 +315,11 @@ type ControlChannelConfig struct {
 	// and the inbound block policy from Router.Members/Claims; it is not run
 	// for a rejected snapshot, whose rows the router did not install.
 	MemberSync func()
-	Log        logger.Logger
+	// Direct tells the hub this spoke can serve direct links. It is kept false
+	// until the mesh runtime is actually installed; a capability advertised
+	// without a listener would make peers dial a spoke that cannot answer.
+	Direct bool
+	Log    logger.Logger
 }
 
 // controlLogger fills in a missing log with the process default, or a
@@ -345,7 +349,7 @@ func controlLogger(log logger.Logger) logger.Logger {
 //
 // A write that fails means the stream is gone: it closes the conn, which is
 // what wakes the read loop this session is parked in.
-func keepClaimFresh(stop <-chan struct{}, conn net.Conn, claims []string, log logger.Logger, interval time.Duration) {
+func keepClaimFresh(stop <-chan struct{}, conn net.Conn, claims []string, direct bool, log logger.Logger, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -353,9 +357,10 @@ func keepClaimFresh(stop <-chan struct{}, conn net.Conn, claims []string, log lo
 		select {
 		case <-ticker.C:
 			if err := writeMessage(conn, claimMessage{
-				Type: ctrlTypeClaim,
-				V:    ctrlVersion,
-				Add:  claims,
+				Type:   ctrlTypeClaim,
+				V:      ctrlVersion,
+				Add:    claims,
+				Direct: direct,
 			}); err != nil {
 				// Warn, not debug: a refresh that cannot be written means the
 				// hub is about to withdraw every LAN this spoke holds, which
@@ -541,16 +546,17 @@ var controlSession = func(ctx context.Context, cfg ControlChannelConfig) error {
 	// The whole claim, once per successful connect: the hub reads it as the
 	// spoke's current intent, and a repeat after a reconnect refreshes it.
 	if err := writeMessage(conn, claimMessage{
-		Type: ctrlTypeClaim,
-		V:    ctrlVersion,
-		Add:  cfg.ShareLAN,
+		Type:   ctrlTypeClaim,
+		V:      ctrlVersion,
+		Add:    cfg.ShareLAN,
+		Direct: cfg.Direct,
 	}); err != nil {
 		return err
 	}
 	// And then again on a timer, for as long as this session lives: a claim is
 	// live only while its owner says so. Closing the conn is what unblocks the
 	// read loop below, so the session ends the way an unreachable hub does.
-	go keepClaimFresh(stop, conn, cfg.ShareLAN, cfg.Log, claimRefreshInterval)
+	go keepClaimFresh(stop, conn, cfg.ShareLAN, cfg.Direct, cfg.Log, claimRefreshInterval)
 
 	for {
 		// Exactly one of n and the claim is non-zero (ctrl.go's contract);

@@ -323,6 +323,7 @@ func restartRunning(match func(EntryPoint) bool) {
 			ShareLAN:      p.opts.ShareLAN,
 			ShareMode:     p.opts.ShareMode,
 			BlockedPeers:  p.opts.BlockedPeers,
+			Direct:        p.opts.Direct,
 			CreatedAt:     p.opts.CreatedAt,
 			StatsBaseline: p.statsBaseline,
 		})
@@ -374,6 +375,7 @@ func LoadConfig() {
 			ShareLAN:      cfg.ShareLAN,
 			ShareMode:     cfg.ShareMode,
 			BlockedPeers:  cfg.BlockedPeers,
+			Direct:        cfg.Direct,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -430,6 +432,7 @@ func SaveConfig() error {
 			ShareLAN:      opts.ShareLAN,
 			ShareMode:     opts.ShareMode,
 			BlockedPeers:  opts.BlockedPeers,
+			Direct:        opts.Direct,
 			Favorite:      ep.IsFavorite(),
 			Closed:        ep.IsClosed(),
 			CreatedAt:     opts.CreatedAt,

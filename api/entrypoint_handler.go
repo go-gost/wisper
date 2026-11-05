@@ -46,6 +46,9 @@ type entrypointCreateRequest struct {
 	// so an omitted field is distinguishable from an explicit clear: absent
 	// on an update keeps the old list, [] clears it.
 	BlockedPeers *[]string `json:"blocked_peers,omitempty"`
+	// Direct enables the mesh data path. A pointer for the same reason: absent
+	// on an update keeps the old value, explicit false turns it off.
+	Direct *bool `json:"direct,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
@@ -65,6 +68,7 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.ShareLANOption(r.ShareLAN),
 		tunnel.ShareModeOption(r.ShareMode),
 		tunnel.BlockedPeersOption(derefStrings(r.BlockedPeers)...),
+		tunnel.DirectOption(derefBool(r.Direct)),
 	}
 }
 
@@ -73,6 +77,10 @@ func derefStrings(p *[]string) []string {
 		return nil
 	}
 	return *p
+}
+
+func derefBool(p *bool) bool {
+	return p != nil && *p
 }
 
 // validateTunNet rejects a device address the tun listener would otherwise
@@ -269,6 +277,10 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	if req.BlockedPeers == nil {
 		blocked := append([]string(nil), oldOpts.BlockedPeers...)
 		req.BlockedPeers = &blocked
+	}
+	if req.Direct == nil {
+		direct := oldOpts.Direct
+		req.Direct = &direct
 	}
 
 	// Every entrypoint type binds its own local address (and a p2p one also

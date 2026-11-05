@@ -407,6 +407,11 @@ type Tunnel struct {
 	// drops its traffic in both directions.
 	BlockedPeers []string `yaml:"blocked_peers,omitempty" json:"blocked_peers,omitempty"`
 
+	// Direct enables a tun spoke's mesh data path. False keeps the existing
+	// single-hub client path; true keeps the hub as fallback while member tun
+	// traffic may use on-demand direct links.
+	Direct bool `yaml:"direct,omitempty" json:"direct,omitempty"`
+
 	// Net is a tun device's address: a CIDR, or several comma-separated. It is
 	// what the device advertises (and, for a spoke, what it registers with the
 	// hub's tun server).

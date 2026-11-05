@@ -116,6 +116,10 @@ type Options struct {
 	// member; this device simply refuses to exchange traffic with it. Empty
 	// means no local block.
 	BlockedPeers []string
+	// Direct enables this spoke's mesh data path: the hub link remains the
+	// fallback, while member tun traffic may use on-demand direct p2p links.
+	// False is the old single-hub path, byte for byte.
+	Direct bool
 	// Net is a tun device's address: a CIDR, or several comma-separated.
 	// A hub tunnel and a spoke entrypoint both carry it.
 	Net string
@@ -299,6 +303,15 @@ func PeerIPsOption(peerIPs map[string]string) Option {
 func BlockedPeersOption(peers ...string) Option {
 	return func(opts *Options) {
 		opts.BlockedPeers = peers
+	}
+}
+
+// DirectOption enables the mesh data path for a tun spoke. It is opt-in and
+// defaults to false; only a spoke whose hub and peers also advertise the
+// capability will ever establish a direct link.
+func DirectOption(direct bool) Option {
+	return func(opts *Options) {
+		opts.Direct = direct
 	}
 }
 
@@ -867,6 +880,7 @@ func TunnelOptions(opts Options) []Option {
 		PeerDisabledOption(opts.PeerDisabled),
 		PeerIPsOption(opts.PeerIPs),
 		BlockedPeersOption(opts.BlockedPeers...),
+		DirectOption(opts.Direct),
 		NetOption(opts.Net),
 		MTUOption(opts.MTU),
 		DeviceNameOption(opts.DeviceName),

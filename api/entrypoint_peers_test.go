@@ -213,3 +213,46 @@ func TestEntrypointPeersEndpointIsOnlyTun(t *testing.T) {
 		t.Fatalf("p2p peers = %d: %v", resp.StatusCode, body)
 	}
 }
+
+func TestEntrypointFullPutPreservesDirect(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body map[string]any
+		want bool
+	}{
+		{
+			name: "omitted preserves",
+			body: map[string]any{"type": "tcp", "name": "updated", "endpoint": "127.0.0.1:0"},
+			want: true,
+		},
+		{
+			name: "explicit false clears",
+			body: map[string]any{"type": "tcp", "name": "updated", "endpoint": "127.0.0.1:0", "direct": false},
+			want: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := setupTestServer(t)
+			defer srv.Close()
+
+			const id = "ep-direct-put"
+			old := entrypoint.NewTCPEntryPoint(
+				tunnel.IDOption(id),
+				tunnel.NameOption("old"),
+				tunnel.EndpointOption("127.0.0.1:0"),
+				tunnel.DirectOption(true),
+			)
+			entrypoint.Add(old)
+			t.Cleanup(func() { entrypoint.Delete(id) })
+
+			resp, body := putJSON(t, srv.URL+"/api/entrypoints/"+id, tc.body)
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("PUT = %d: %v", resp.StatusCode, body)
+			}
+			opts, _ := body["options"].(map[string]any)
+			if got := opts["direct"] == true; got != tc.want {
+				t.Fatalf("direct = %v, want %v", opts["direct"], tc.want)
+			}
+		})
+	}
+}
