@@ -542,12 +542,12 @@ git -C /root/code/go-gost/x commit -m "fix(tun): survive device replacement and 
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: x / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: x / 0fd98cb (`fix(tun): survive device replacement and link goroutine panics`)
+- Files changed: `x/handler/tun/mesh.go`, `x/handler/tun/mesh_link.go`, `x/handler/tun/mesh_test.go`, `x/handler/tun/mesh_link_test.go`
+- Tests: `GOWORK=off go test ./handler/tun -run 'TestMeshDeviceReplacement|TestMeshLateDevice|TestMeshConcurrentDevice|TestMeshLinkPanic|TestMeshRunDevicePanic' -count=1` → PASS (RED verified: the panic test aborted the process before recovery); `CGO_ENABLED=1 GOWORK=off go test -race ...` → PASS; `GOWORK=off go test ./handler/tun -count=1` → ok 28.887s
+- Review findings/fixes: Link goroutines recover and close with `MeshCloseUnhealthy`; `RunDevice` recovers a panicking device read and returns an error after clearing the device; `Handle` recovers a panic on the stream. Device replacement preserves links and membership; late `writeDevice` after `Close` returns `ErrTun` without touching a nil device.
+- Deferred/limitations: Full x regression gate is Task 7.
 
 ---
 
