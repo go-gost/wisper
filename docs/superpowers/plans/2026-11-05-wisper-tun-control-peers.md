@@ -311,27 +311,27 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): enforce local peer block 
 - A nil/empty policy is the original behavior, no drop/counter.
 - `tunEntryPoint.init` puts the filter pointer in the `tun-share` connector metadata only when `ShareMode` resolves to userspace (or always; nil/empty is inert).
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestShareShimBlocksInboundLAN`: a blocked peer's packet to a shared LAN is dropped before the stack; allowed peer passes.
 - `TestShareShimBlocksOutbound`: stack reply/outbound to a blocked peer is dropped.
 - `TestShareShimNilPolicyUnchanged`: existing share tests pass with nil policy; no drops.
 - `TestConnectorReadsBlockPolicy`: metadata pointer survives `Init` and `Connect`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /root/code/go-gost/wisper && GOWORK=off go test ./tunnel -run 'TestShareShim' -count=1`
 Expected: FAIL — signature/metadata not present.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add the policy parameter and checks at the three write/read paths. Keep `Dropped()` semantics: policy drops increment the same dropped counter, or a separate `blocked` counter; the UI only needs a non-zero signal. Do not close the shim on a policy drop.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run Step 2. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/shareconnector.go tunnel/share_spoke.go tunnel/share*_test.go
@@ -339,12 +339,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): apply local peer block to
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 0c14a10
+- Files changed: `tunnel/shareconnector.go`, `tunnel/share_spoke.go`, `tunnel/share_spoke_test.go`, `tunnel/shareconnector_test.go`, `tunnel/entrypoint/tun.go`, `tunnel/sharesim_block_test.go`
+- Tests: `GOWORK=off go test ./tunnel -run 'TestShareShim|TestConnectorReadsBlockPolicy' -count=1 -timeout 30s` PASS; full `GOWORK=off go test ./tunnel/... -count=1 -timeout 240s` PASS; `GOWORK=off go vet ./tunnel/...` PASS.
+- Review findings/fixes: the test first deadlocked because a synchronous `net.Pipe` write ran after the read deadline; the allowed-path write now runs in a goroutine alongside the read. Policy drops increment both `ChainShareShim.Dropped` (the existing UI badge) and `PeerFilter.BlockedPackets`; they do not close the shim. All existing share tests run with `nil` and confirm the old path.
+- Deferred/limitations: kernel-NAT sharing still relies on the host firewall and is intentionally not filtered at the shim (there is no shim on that path); the block is enforced at the device filter, which covers kernel-share packets. `TestShareShimNilPolicyUnchanged` is covered by the existing suite rather than a separate named test.
 
 ---
 
