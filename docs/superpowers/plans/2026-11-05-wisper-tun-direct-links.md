@@ -211,7 +211,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): give mesh routes second p
 - `PeerList` remains the Plan 2 view while no mesh status exists; Task 5 joins
   live mesh status.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestDirectRuntimeBuildsMeshService`: with a fake device listener and a
   test-chain dialer, the service is the mesh service and the device supervisor
@@ -224,11 +224,11 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): give mesh routes second p
   old `tun` handler service.
 - Existing `direct=false` tests pass unchanged.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 `GOWORK=off go test ./tunnel/entrypoint -run 'TestDirect' -count=1`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 The hub chain must be the same `s.config.Chains[0]` used today. Do not replace
 it with `host.Dial`; the userspace `tun-share` connector is what keeps LAN
@@ -237,11 +237,11 @@ has a gost service of its own on the direct path. Keep the listener's stats
 object shared with the mesh service so the existing stats task reports the
 device's total bytes once.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 The Step 2 command; then `GOWORK=off go test ./tunnel/entrypoint -count=1`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/entrypoint
@@ -249,12 +249,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): install the mesh runtime 
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 4d8e0e8
+- Files changed: `tunnel/entrypoint/direct.go`, `tunnel/entrypoint/direct_test.go`, `tunnel/entrypoint/tun.go`, `tunnel/entrypoint/netview.go`, `tunnel/entrypoint/control_channel_test.go`, `go.mod`; x tagged locally `v0.29.0`
+- Tests: `GOWORK=off go test ./tunnel/entrypoint -run 'TestDirect|TestDeviceIPs' -count=1` PASS; `-race` PASS; full entrypoint PASS; `go vet ./tunnel/...` PASS. The hub redial test was made deterministic by waiting for the second `SetHubLink` rather than only the dial return.
+- Review findings/fixes: the direct runtime owns the mesh handler, second-priority route, device supervisor and hub loop; the hub loop dials the existing chain so `tun-share`/`record_mode` stay in the path. Device replacement is the supervisor's next `Accept`; the same mesh instance keeps links. `Close` orders control cancel → runtime close → mesh service close → device listener close, and the rollback path closes a partially started runtime. `superviseDevice` receives the run logger instead of a global. The x module was tagged `v0.29.0` locally and the wisper `go.mod` currently carries a sibling-path `replace` so this checkout can build; that replace is a release-time item.
+- Deferred/limitations: `TestDirectRuntimeBuildsMeshService` and `TestDirectPathDoesNotInstallOldHandler` were not implemented as named integration tests; the supervisor/runtime pieces and the full entrypoint suite cover the wiring, but the old-handler-not-constructed assertion is deferred. `go.mod`'s `replace github.com/go-gost/x => ../x` must be removed after x `v0.29.0` is published. No direct member dials yet (Task 4); the mesh route starts empty, so only the hub link is exercised.
 
 ---
 
