@@ -239,3 +239,17 @@ func TestShareConnectorNewShimPerConnect(t *testing.T) {
 		t.Fatalf("first stack closes = %d, want still exactly 1", got)
 	}
 }
+
+func TestConnectorReadsBlockPolicy(t *testing.T) {
+	filter := NewPeerFilter()
+	c := NewShareConnector().(*shareConnector)
+	if err := c.Init(mdx.NewMetadata(map[string]any{
+		"lans":         "192.168.50.0/24",
+		"block_policy": filter,
+	})); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if c.policy != filter {
+		t.Fatal("the connector did not retain the metadata block policy")
+	}
+}

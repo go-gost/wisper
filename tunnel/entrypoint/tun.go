@@ -429,8 +429,9 @@ func (s *tunEntryPoint) init() error {
 			node.Connector = &xconfig.ConnectorConfig{
 				Type: "tun-share",
 				Metadata: map[string]any{
-					"lans": tunnel.ShareLANSpec(lans),
-					"mtu":  s.opts.MTU,
+					"lans":         tunnel.ShareLANSpec(lans),
+					"mtu":          s.opts.MTU,
+					"block_policy": s.filter,
 				},
 			}
 		}

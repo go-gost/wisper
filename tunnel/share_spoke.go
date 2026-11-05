@@ -67,8 +67,9 @@ func ShareLANSpec(lans []*net.IPNet) string {
 // deadline; conn.Close is the definitive release, because it closes the
 // chain itself.
 type ChainShareShim struct {
-	lans  []*net.IPNet
-	stack ShareStackBackend
+	lans   []*net.IPNet
+	stack  ShareStackBackend
+	policy *PeerFilter
 
 	wrapOnce sync.Once
 
@@ -94,12 +95,15 @@ type ChainShareShim struct {
 	dropped atomic.Uint64
 }
 
-// NewChainShareShim builds the shim; Wrap binds it to the chain conn.
-func NewChainShareShim(lans []*net.IPNet, stack ShareStackBackend) *ChainShareShim {
+// NewChainShareShim builds the shim; Wrap binds it to the chain conn. A nil
+// policy is the old behaviour: every packet is classified and forwarded with
+// no local block.
+func NewChainShareShim(lans []*net.IPNet, stack ShareStackBackend, policy *PeerFilter) *ChainShareShim {
 	return &ChainShareShim{
-		lans:  lans,
-		stack: stack,
-		done:  make(chan struct{}),
+		lans:   lans,
+		stack:  stack,
+		policy: policy,
+		done:   make(chan struct{}),
 	}
 }
 
@@ -218,6 +222,14 @@ func (c *chainShareConn) Read(b []byte) (int, error) {
 		if n == 0 {
 			continue
 		}
+		// A hub-to-spoke packet from a locally blocked peer must not reach
+		// the userspace stack: the block is directional at the wire, and the
+		// stack would otherwise answer a peer this device refuses.
+		if c.s.policy.BlockedSrc(c.buf[:n]) {
+			c.s.dropped.Add(1)
+			c.s.policy.countBlocked()
+			continue
+		}
 		switch shareClassify(c.buf[:n], c.s.lans) {
 		case shareToStack:
 			// The chain may reuse its read buffer and the stack consumes
@@ -242,6 +254,13 @@ func (c *chainShareConn) Write(pkt []byte) (int, error) {
 		return 0, c.s.stoppedErr()
 	default:
 	}
+	// A packet addressed to a locally blocked peer is refused here, before
+	// it can leave the spoke; it is not an error, so the caller moves on.
+	if c.s.policy.BlockedDst(pkt) {
+		c.s.dropped.Add(1)
+		c.s.policy.countBlocked()
+		return len(pkt), nil
+	}
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
 	return c.chain.Write(pkt)
@@ -258,6 +277,14 @@ func (c *chainShareConn) pumpStack() {
 	for {
 		select {
 		case pkt := <-out:
+			// A stack reply addressed to a blocked peer is the same refusal
+			// as a device write: drop it before the chain, keep the pump
+			// alive.
+			if c.s.policy.BlockedDst(pkt) {
+				c.s.dropped.Add(1)
+				c.s.policy.countBlocked()
+				continue
+			}
 			c.wmu.Lock()
 			_, err := c.chain.Write(pkt)
 			c.wmu.Unlock()

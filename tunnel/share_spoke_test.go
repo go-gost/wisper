@@ -168,7 +168,7 @@ func TestSpokeShareFallsBackToUserspace(t *testing.T) {
 	// Drive the shim: chain carries a LAN TCP (into the stack), an ICMP
 	// (dropped), and a virtual packet (through to the caller's Read).
 	st := newSpokeStack()
-	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st)
+	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st, nil)
 	local, chain := net.Pipe()
 	conn := shim.Wrap(chain)
 	defer conn.Close()
@@ -260,7 +260,7 @@ func TestSpokeShareFallsBackToUserspace(t *testing.T) {
 // the same conn comes back, so no second pump starts on the chain.
 func TestSpokeShareCloseClosesStackOnce(t *testing.T) {
 	st := newSpokeStack()
-	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st, nil)
 	local, chain := net.Pipe()
 	defer local.Close()
 
@@ -292,7 +292,7 @@ func TestSpokeShareCloseClosesStackOnce(t *testing.T) {
 // stack is closed exactly once with it.
 func TestSpokeSharePumpDeathSurfaces(t *testing.T) {
 	st := newSpokeStack()
-	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st)
+	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st, nil)
 	local, chain := net.Pipe()
 	conn := shim.Wrap(chain)
 	defer conn.Close()
@@ -347,7 +347,7 @@ func TestSpokeSharePumpDeathSurfaces(t *testing.T) {
 func TestSpokeShareWrapCloseRace(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		st := newSpokeStack()
-		shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+		shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st, nil)
 		local, chain := net.Pipe()
 
 		start := make(chan struct{})
@@ -396,7 +396,7 @@ func TestSpokeShareWrapCloseRace(t *testing.T) {
 // and the stack still closes exactly once.
 func TestSpokeShareWrapPumpDeathRace(t *testing.T) {
 	st := newSpokeStack()
-	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st)
+	shim := NewChainShareShim([]*net.IPNet{mustIPNet(t, "192.168.50.0/24")}, st, nil)
 	local, chain := net.Pipe()
 	local.Close() // the chain is already dead when the pump first writes
 
@@ -442,7 +442,7 @@ func TestSpokeShareWrapPumpDeathRace(t *testing.T) {
 // wake it, and the reader must see the shim's cause, not the poke.
 func TestSpokeShareCloseUnblocksRead(t *testing.T) {
 	st := newSpokeStack()
-	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st, nil)
 	local, chain := net.Pipe()
 	defer local.Close()
 	conn := shim.Wrap(chain)
@@ -479,7 +479,7 @@ func TestSpokeShareCloseUnblocksRead(t *testing.T) {
 // not race either (chain is read by shutdown only under the shared lock).
 func TestSpokeShareWrapAfterClose(t *testing.T) {
 	st := newSpokeStack()
-	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st)
+	shim := NewChainShareShim(mustShareLans(t, "192.168.1.0/24"), st, nil)
 	local, chain := net.Pipe()
 	defer local.Close()
 

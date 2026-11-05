@@ -37,6 +37,10 @@ type shareConnector struct {
 	options connector.Options
 	lans    []*net.IPNet
 	mtu     int
+	// policy is the local block filter the entrypoint shares with the device
+	// path. Nil is inert, which is what a config without a block and an older
+	// caller who never set the metadata both mean.
+	policy *PeerFilter
 	// newStack builds the stack a connection's shim routes into. It is a
 	// seam only for tests: production always builds a gvisor stack, one per
 	// connection.
@@ -63,6 +67,9 @@ func (c *shareConnector) Init(md md.Metadata) error {
 	if v, ok := md.Get("mtu").(int); ok {
 		c.mtu = v
 	}
+	if v, ok := md.Get("block_policy").(*PeerFilter); ok {
+		c.policy = v
+	}
 	return nil
 }
 
@@ -79,6 +86,6 @@ func (c *shareConnector) Connect(ctx context.Context, conn net.Conn, network, ad
 	if conn == nil {
 		return nil, fmt.Errorf("tun-share: connect %s/%s: no chain conn to wrap", network, address)
 	}
-	shim := NewChainShareShim(c.lans, c.newStack(c.mtu))
+	shim := NewChainShareShim(c.lans, c.newStack(c.mtu), c.policy)
 	return shim.Wrap(conn), nil
 }
