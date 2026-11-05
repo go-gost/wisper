@@ -52,7 +52,7 @@ fields, netview members, block/peer list, merged).
   the mesh runtime. This prevents an intermediate build from advertising a
   capability it cannot serve.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestDirectOptionRoundTrip`: option → `Options()`; config save/load and
   `TunnelOptions` carry it; true survives a replacement; false is omitted.
@@ -60,22 +60,22 @@ fields, netview members, block/peer list, merged).
   clears.
 - Existing API/web tests pass.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 `GOWORK=off go test ./tunnel/entrypoint ./api -run 'TestDirect|TestEntrypointFullPutPreservesDirect' -count=1`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Follow the `blocked_peers` pointer pattern. Add the field to every copy path:
 `LoadConfig`, `SaveConfig`, `restartRunning`, `Restart` (via `Options`), API
 create/update, and `TunnelOptions`. The detail form sends `direct` only for a
 tun entrypoint. Rebuild the web assets.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 `GOWORK=off go test ./tunnel/entrypoint ./api -run 'TestDirect|TestEntrypointFullPutPreservesDirect' -count=1`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel config api web-src web/assets
@@ -83,12 +83,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): add the opt-in direct-lin
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 63f9651
+- Files changed: `tunnel/tunnel.go`, `config/config.go`, `tunnel/netview_router.go`, `tunnel/entrypoint/entrypoint.go`, `tunnel/entrypoint/direct_option_test.go`, `tunnel/netview_router_test.go`, `api/entrypoint_handler.go`, `api/tunnel_handler.go`, `api/entrypoint_peers_test.go`, `web-src/src/api/types.ts`, `web-src/src/i18n/en.ts`, `web-src/src/i18n/zh.ts`, `web-src/src/pages/entrypoint-detail-page.ts`, `web/index.html`, `web/assets/*`
+- Tests: targeted `TestDirectOption|TestEntrypointFullPutPreservesDirect|TestKeepClaimFresh` PASS; full `GOWORK=off go test ./tunnel/... -count=1` PASS; `npx tsc --noEmit` PASS; `npx vite build` PASS; `go vet ./tunnel/... ./api` PASS.
+- Review findings/fixes: `direct` is a `*bool` on the request so an omitted full PUT preserves the old value and explicit `false` clears it; the control claim now carries `Direct` through both the first claim and the refresh, but `StartNetview` leaves the config field false until Task 3 installs the mesh listener. The web form always sends the tun switch's explicit state, so editing other fields cannot silently change direct.
+- Deferred/limitations: a saved `direct=true` does not advertise the capability yet (the control config stays false until Task 3); the runtime and direct links are Tasks 3/4. Full API suite is deferred to Task 6.
 
 ---
 
