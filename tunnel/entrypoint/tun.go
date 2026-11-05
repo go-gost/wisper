@@ -291,6 +291,23 @@ func (s *tunEntryPoint) PeerList() []tunnel.EntryPeer {
 	return out
 }
 
+// filterListener wraps a tun listener's accepted conns with the local block
+// policy. The listener is unchanged; only the conn the handler reads and
+// writes is guarded, which is what keeps the policy out of the device and the
+// chain's own path.
+type filterListener struct {
+	listener.Listener
+	filter *tunnel.PeerFilter
+}
+
+func (l *filterListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return l.filter.Wrap(conn), nil
+}
+
 // init builds the service description: a tun listener over a tun handler in
 // client mode (the chain, with no forwarder, is what selects client mode).
 //
@@ -455,7 +472,7 @@ func (s *tunEntryPoint) startControlChannel(ctx context.Context, host *endpoint.
 	s.cancelControl = cancel
 	s.mu.Unlock()
 
-	startNetview(ctx, host, s.peer, s.opts.ShareLAN, s.opts.Net, s.provider, log)
+	startNetview(ctx, host, s.peer, s.opts.ShareLAN, s.opts.Net, s.provider, log, s.refreshPeerPolicy)
 }
 
 func (s *tunEntryPoint) Run() error { return s.RunContext(context.Background()) }
@@ -484,6 +501,11 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	if err = s.init(); err != nil {
 		return
 	}
+
+	// A policy from a previous run (or a block saved while stopped) must be
+	// in force before the first packet; a netview that arrived on an earlier
+	// control channel is still the current membership.
+	s.refreshPeerPolicy()
 
 	// The identity is process-wide: take a reference on the shared host. A
 	// failed relay connection is not fatal: the engine retries in the
@@ -590,6 +612,10 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 			ln.Close()
 			return
 		}
+		// Every accepted device conn is guarded by the local block policy.
+		// Empty is a pass-through, so the single-hub path is byte-for-byte
+		// unchanged until an operator blocks a peer.
+		ln = &filterListener{Listener: ln, filter: s.filter}
 
 		handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
 		// The chain (and no forwarder hop) is the client-mode switch: the

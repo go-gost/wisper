@@ -36,7 +36,7 @@ func TestCloseStopsTheControlChannel(t *testing.T) {
 	orig := startNetview
 	defer func() { startNetview = orig }()
 	var gotCtx context.Context
-	startNetview = func(ctx context.Context, _ *endpoint.Endpoint, _, _, _ string, _ any, _ logger.Logger) {
+	startNetview = func(ctx context.Context, _ *endpoint.Endpoint, _, _, _ string, _ any, _ logger.Logger, _ ...func()) {
 		gotCtx = ctx
 	}
 

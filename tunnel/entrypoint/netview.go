@@ -64,7 +64,10 @@ var startNetview = StartNetview
 // Never fatal, by construction: a channel that cannot open (or a share_lan
 // that does not parse, which claims nothing) is a spoke that behaves exactly
 // as it does today — it reaches every member and has no LAN routing.
-func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLAN, deviceNet string, provider any, log logger.Logger) {
+//
+// onMembers, when supplied, runs after each netview the router accepts. The
+// entrypoint uses it to rebuild the local block policy from the new membership.
+func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLAN, deviceNet string, provider any, log logger.Logger, onMembers ...func()) {
 	// Registered before the channel runs, but the listener's lookup is by
 	// name at query time, so there is no ordering constraint against the
 	// listener's Init.
@@ -89,14 +92,19 @@ func StartNetview(ctx context.Context, host *endpoint.Endpoint, hubPeer, shareLA
 	// logs its own failure and the spoke tunnels on.
 	sync := newNetviewSync(parseDeviceNets(deviceNet), nil, log)
 
+	var memberSync func()
+	if len(onMembers) > 0 {
+		memberSync = onMembers[0]
+	}
 	go tunnel.RunControlChannel(ctx, tunnel.ControlChannelConfig{
-		Host:      host,
-		HubPeer:   hubPeer,
-		ShareLAN:  claims,
-		Provider:  provider,
-		Router:    router,
-		RouteSync: sync.Reflect,
-		Log:       log,
+		Host:       host,
+		HubPeer:    hubPeer,
+		ShareLAN:   claims,
+		Provider:   provider,
+		Router:     router,
+		RouteSync:  sync.Reflect,
+		MemberSync: memberSync,
+		Log:        log,
 	})
 }
 
