@@ -1041,6 +1041,28 @@ export class EntrypointDetailPage extends LitElement {
                 : ''}
             </div>
 
+            ${this.mode === 'view' && this._entrypoint && this.entrypointType === 'tun'
+              ? html`
+                <div class="section">
+                  <div class="card" style="padding:0;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
+                      @click=${() => this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/peers`)}>
+                      <span style="color:var(--accent);">${icon('users')}</span>
+                      <div style="flex:1;">
+                        <div style="font-size:var(--font-sm);font-weight:600;">${t('entrypointPeersTitle')}</div>
+                        <div style="font-size:var(--font-sm);color:var(--text-muted);">
+                          ${this._entrypoint.options?.blocked_peers?.length
+                            ? t('entrypointPeersBlockedCount', { n: this._entrypoint.options.blocked_peers.length })
+                            : t('entrypointPeersDesc')}
+                        </div>
+                      </div>
+                      <span style="color:var(--text-muted);">&rarr;</span>
+                    </div>
+                  </div>
+                </div>
+              `
+              : nothing}
+
             ${this.mode === 'view' && this._entrypoint
               ? html`
                 <div class="section">

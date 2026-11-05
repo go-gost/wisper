@@ -298,6 +298,31 @@ export interface EntrypointOptions {
   share_lan?: string;
   /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
   share_mode?: string;
+  /** This spoke's local inbound block list. It does not change the hub's
+   *  allowlist; the block is enforced on this device. */
+  blocked_peers?: string[];
+}
+
+/** One row of a tun spoke's local peer view. */
+export interface EntryPeer {
+  key: string;
+  name?: string;
+  ips?: string[];
+  lans?: string[];
+  /** hub / blocked / disabled / direct-off / direct / connecting. */
+  state: string;
+  blocked?: boolean;
+  direct?: boolean;
+  disabled?: boolean;
+  transport?: string;
+  dialed_locally?: boolean;
+  rtt_ms?: number;
+  input_bytes?: number;
+  output_bytes?: number;
+}
+
+export interface EntrypointPeersResponse {
+  peers: EntryPeer[];
 }
 
 export interface Entrypoint {
@@ -371,6 +396,9 @@ export interface EntrypointCreateRequest {
   share_lan?: string;
   /** Sharing backend: 'auto' (default), 'kernel', or 'userspace'. */
   share_mode?: string;
+  /** Local inbound block list for a tun spoke. Omitted means "leave the
+   *  existing list alone" on an update; [] is the explicit clear. */
+  blocked_peers?: string[];
 }
 
 // ─── Stats Snapshot ──────────────────────────────────────────────────────────

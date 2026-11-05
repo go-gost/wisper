@@ -3,6 +3,7 @@ import type {
   AppSettingsUpdate,
   Entrypoint,
   EntrypointCreateRequest,
+  EntrypointPeersResponse,
   PendingPeer,
   StatsSnapshot,
   Tunnel,
@@ -160,6 +161,16 @@ export class GoBackend {
 
   stopEntrypoint(id: string): Promise<void> {
     return this.request<void>('POST', `/api/entrypoints/${id}/stop`);
+  }
+
+  listEntrypointPeers(id: string): Promise<EntrypointPeersResponse> {
+    return this.request<EntrypointPeersResponse>('GET', `/api/entrypoints/${id}/peers`);
+  }
+
+  /** Update the local block list. `undefined` leaves it untouched; [] clears. */
+  updateEntrypointPeers(id: string, blocked?: string[]): Promise<EntrypointPeersResponse> {
+    const body = blocked === undefined ? {} : { blocked };
+    return this.request<EntrypointPeersResponse>('PUT', `/api/entrypoints/${id}/peers`, body);
   }
 
   // ─── Stats ──────────────────────────────────────────────────────────────

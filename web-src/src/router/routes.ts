@@ -9,6 +9,7 @@ const tunnelTypeSelectPage = () => import('../pages/tunnel-type-select-page');
 const tunnelDetailPage = () => import('../pages/tunnel-detail-page');
 const entrypointTypeSelectPage = () => import('../pages/entrypoint-type-select-page');
 const entrypointDetailPage = () => import('../pages/entrypoint-detail-page');
+const entrypointPeersPage = () => import('../pages/entrypoint-peers-page');
 const settingsPage = () => import('../pages/settings-page');
 const inspectorPage = () => import('../pages/inspector-page');
 const tunnelPeersPage = () => import('../pages/tunnel-peers-page');
@@ -70,6 +71,18 @@ export function createRouter(host: ReactiveControllerHost & HTMLElement) {
           ></entrypoint-detail-page>`,
         enter: async () => {
           await entrypointDetailPage();
+          return true;
+        },
+      },
+      {
+        path: '/entrypoint/:type/:id/peers',
+        render: (params: { type?: string; id?: string }) =>
+          html`<entrypoint-peers-page
+            .entrypointType=${params.type ?? ''}
+            .entrypointId=${params.id ?? ''}
+          ></entrypoint-peers-page>`,
+        enter: async () => {
+          await entrypointPeersPage();
           return true;
         },
       },
