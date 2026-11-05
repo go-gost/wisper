@@ -594,9 +594,9 @@ git -C /root/code/go-gost/x commit -m "test(tun): verify mesh handler no-regress
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: x / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete (verification only; no x source commit)
+- Repo/commit: x / 0fd98cb (HEAD; Task 7 added no code)
+- Files changed: none
+- Tests: `GOWORK=off go test ./handler/tun -count=1` → ok 29.182s; `GOWORK=off go test -p 1 ./... -count=1` → PASS on rerun (first run had one `connector/http2 TestEstablishedTunnelOutlivesConnectContext` timeout under full-suite load; the package passes alone, the rerun passes, and the test is untouched → classified pre-existing full-suite flake, not a regression); `GOWORK=off go build ./...` → PASS; `GOWORK=off go vet ./...` → PASS; `CGO_ENABLED=1 GOWORK=off go test -race ./handler/tun -run 'TestMesh' -count=1` → PASS
+- Review findings/fixes: `git diff --stat 16784e5^..HEAD -- handler/tun` shows only the four new mesh files; existing `handler.go`, `p2phandler.go`, `p2p.go`, `server.go`, `client.go` are untouched.
+- Deferred/limitations: full x suite flake observed once in `connector/http2`; no code change made. The next plans (wisper control/ACL/peer list, direct dataplane/e2e) remain.
