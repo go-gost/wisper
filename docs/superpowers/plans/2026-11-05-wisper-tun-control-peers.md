@@ -258,7 +258,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): add local blocked peers a
 - `tunEntryPoint.Run` wraps the tun listener's accepted conns with the filter for the existing single-hub path; the filter is created before `init` so userspace-share metadata can reference it (Task 5).
 - `tunEntryPoint.startControlChannel` passes a `MemberSync` closure that calls `s.refreshFilter()` (router members/claims + blocked list) so a netview update changes the policy.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestPeerFilterBlocksTunIP`: member B 10.0.0.2 blocked; inbound src B dropped; outbound dst B dropped; C passes.
 - `TestPeerFilterBlocksLANPrefix`: claim `192.168.50.0/24 origin b` blocked; src/dst inside dropped; a more specific allowed owner is not blocked.
@@ -267,20 +267,20 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): add local blocked peers a
 - `TestPeerFilterBlockedSrcDst` for the share shim helpers.
 - `TestTunRunWrapsDevice`: with a test seam, assert the accepted device conn is the filter wrapper; empty policy still passes.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /root/code/go-gost/wisper && GOWORK=off go test ./tunnel -run 'TestPeerFilter' -count=1`
 Expected: FAIL — types undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Use a small raw packet parser (IPv4 header at offsets 12/16, IPv6 at 8/24; require minimum lengths). Store policy in an atomic pointer; blocked keys normalized. The wrapper must not parse when the immutable blocked set is empty. Do not add a new dependency; `net`, `netip`, `sync/atomic` suffice.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run Step 2. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/peerfilter.go tunnel/peerfilter_test.go tunnel/entrypoint
@@ -288,12 +288,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): enforce local peer block 
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / aa8065c
+- Files changed: `tunnel/peerfilter.go`, `tunnel/peerfilter_test.go`, `tunnel/entrypoint/tun.go`, `tunnel/entrypoint/netview.go`, `tunnel/entrypoint/filter_test.go`, `tunnel/entrypoint/control_channel_test.go`
+- Tests: `GOWORK=off go test ./tunnel -run 'TestPeerFilter' -count=1` PASS; `GOWORK=off go test ./tunnel/entrypoint -run 'TestFilterListener|TestCloseStopsTheControlChannel' -count=1` PASS; full `GOWORK=off go test ./tunnel/... -count=1` PASS; `GOWORK=off go vet ./tunnel/...` PASS.
+- Review findings/fixes: the wrapper's Read drops blocked **destinations** (device → peer) and Write drops blocked **sources** (peer → device), matching the direction of the tun handler; exact member ownership beats a broader blocked LAN claim, while longest-prefix ownership lets a more specific allowed claim pass; malformed packets are passed; an empty policy still installs the wrapper so a later block applies to the already-accepted device, but it never parses. `startNetview` gained an optional `onMembers` callback (variadic) so the existing call shape stayed valid; the test stand-in was updated.
+- Deferred/limitations: `TestTunRunWrapsDevice` was implemented as `TestFilterListenerAcceptsWrappedConn` (the listener seam) rather than a full Run with a real device; `filterListener` is only on the existing single-hub path — the userspace share path is Task 5, and the Plan 3 mesh path will reuse `PeerFilter` separately.
 
 ---
 
