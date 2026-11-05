@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -989,5 +990,111 @@ func TestP2PHostSigIncludesTransportAndAdvanced(t *testing.T) {
 	}
 	if p2pHostSig(base) == p2pHostSig(smux) {
 		t.Fatal("smux change did not change the host signature")
+	}
+}
+
+func TestMeshRouteClaimsOnlyFreeKeys(t *testing.T) {
+	const keyA, keyB, keyC = "mesh-key-a", "mesh-key-b", "mesh-key-c"
+	explicit, err := p2pHost.register([]string{keyC})
+	if err != nil {
+		t.Fatalf("explicit register: %v", err)
+	}
+	t.Cleanup(func() { p2pHost.unregister(explicit) })
+
+	mesh, err := RegisterMeshRoute([]string{keyA, keyB, keyC})
+	if err != nil {
+		t.Fatalf("RegisterMeshRoute: %v", err)
+	}
+	t.Cleanup(func() { _ = mesh.Close() })
+
+	got := mesh.Peers()
+	slices.Sort(got)
+	if !slices.Equal(got, []string{keyA, keyB}) {
+		t.Fatalf("mesh peers = %v, want [%s %s] (C is explicitly held)", got, keyA, keyB)
+	}
+
+	inbound, far := peerPipe(keyA)
+	defer far.Close()
+	p2pHost.dispatch(inbound)
+	conn, err := mesh.Accept()
+	if err != nil {
+		t.Fatalf("mesh Accept: %v", err)
+	}
+	_ = conn.Close()
+}
+
+func TestExplicitRoutePreemptsMesh(t *testing.T) {
+	const key = "mesh-preempt-key"
+	mesh, err := RegisterMeshRoute([]string{key})
+	if err != nil {
+		t.Fatalf("RegisterMeshRoute: %v", err)
+	}
+	t.Cleanup(func() { _ = mesh.Close() })
+	preempts := 0
+	mesh.SetPreempt(func() { preempts++ })
+
+	explicit, err := p2pHost.register([]string{key})
+	if err != nil {
+		t.Fatalf("explicit register: %v", err)
+	}
+	t.Cleanup(func() { p2pHost.unregister(explicit) })
+
+	if got := mesh.Peers(); len(got) != 0 {
+		t.Fatalf("mesh kept a preempted key: %v", got)
+	}
+	if preempts != 1 {
+		t.Fatalf("preempt callback ran %d times, want 1", preempts)
+	}
+
+	inbound, far := peerPipe(key)
+	defer far.Close()
+	p2pHost.dispatch(inbound)
+	conn, err := explicit.Accept()
+	if err != nil {
+		t.Fatalf("explicit Accept: %v", err)
+	}
+	_ = conn.Close()
+}
+
+func TestMeshReclaimsAfterExplicitRemoved(t *testing.T) {
+	const key = "mesh-reclaim-key"
+	mesh, err := RegisterMeshRoute([]string{key})
+	if err != nil {
+		t.Fatalf("RegisterMeshRoute: %v", err)
+	}
+	t.Cleanup(func() { _ = mesh.Close() })
+
+	explicit, err := p2pHost.register([]string{key})
+	if err != nil {
+		t.Fatalf("explicit register: %v", err)
+	}
+	p2pHost.unregister(explicit)
+
+	claimed, err := mesh.Reconcile([]string{key})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if !slices.Equal(claimed, []string{key}) {
+		t.Fatalf("reclaimed = %v, want [%s]", claimed, key)
+	}
+}
+
+func TestMeshKnownKeyIsNotPending(t *testing.T) {
+	const known, unknown = "mesh-known-key", "mesh-unknown-key"
+	mesh, err := RegisterMeshRoute([]string{known})
+	if err != nil {
+		t.Fatalf("RegisterMeshRoute: %v", err)
+	}
+	t.Cleanup(func() { _ = mesh.Close() })
+	t.Cleanup(func() { p2pHost.dismissPending(unknown) })
+
+	p2pHost.notePending(known)
+	if got := p2pHost.pendingSnapshot(); len(got) != 0 {
+		t.Fatalf("mesh-known key appeared as pending: %+v", got)
+	}
+	p2pHost.notePending(unknown)
+	got := p2pHost.pendingSnapshot()
+	if len(got) != 1 || got[0].Key != unknown {
+		t.Fatalf("unknown key pending = %+v, want %s", got, unknown)
 	}
 }

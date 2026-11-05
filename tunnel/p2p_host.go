@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-gost/core/listener"
 	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/metadata"
 	"github.com/go-gost/core/observer/stats"
@@ -72,18 +73,24 @@ func P2PHostKeyPath() string {
 // p2pHostManager owns the process-wide host: refcounted lifetime, the inbound
 // accept loop, and the peer-key → tunnel routes.
 type p2pHostManager struct {
-	mu      sync.Mutex
-	host    *endpoint.Endpoint
-	ln      net.Listener
-	routes  map[string]*peerListener
-	pending map[string]*pendingPeer
-	refs    int
+	mu         sync.Mutex
+	host       *endpoint.Endpoint
+	ln         net.Listener
+	routes     map[string]*peerListener
+	meshRoutes map[string]*MeshRoute
+	meshKnown  map[string]struct{}
+	pending    map[string]*pendingPeer
+	refs       int
 	// sig is the settings signature the host was built with; a change rebuilds
 	// it (see p2pHostSig).
 	sig string
 }
 
-var p2pHost = &p2pHostManager{routes: make(map[string]*peerListener)}
+var p2pHost = &p2pHostManager{
+	routes:     make(map[string]*peerListener),
+	meshRoutes: make(map[string]*MeshRoute),
+	meshKnown:  make(map[string]struct{}),
+}
 
 // AcquireP2PHost returns the process-wide p2p host, starting it on first use
 // (key + relay + accept loop), and takes a reference on it. Every
@@ -453,6 +460,11 @@ func (m *p2pHostManager) teardownLocked() {
 		pl.close()
 		delete(m.routes, k)
 	}
+	for k, mr := range m.meshRoutes {
+		mr.ln.close()
+		delete(m.meshRoutes, k)
+	}
+	m.meshKnown = make(map[string]struct{})
 }
 
 // release drops one reference; the last one stops the host and every route.
@@ -533,6 +545,13 @@ func (m *p2pHostManager) notePending(key string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// A mesh member's knock is not a request to join a p2p tunnel: the key is
+	// already known to the shared host, and showing it as pending would send
+	// the operator to the wrong page.
+	if _, known := m.meshKnown[key]; known {
+		return
+	}
+
 	now := time.Now()
 	if m.pending == nil {
 		m.pending = make(map[string]*pendingPeer)
@@ -605,6 +624,164 @@ func (m *p2pHostManager) dismissPending(key string) bool {
 	return true
 }
 
+// MeshRoute is the spoke's low-priority inbound route. It claims only member
+// keys no explicit p2p tunnel holds; when an explicit tunnel later claims one,
+// the mesh route gives it up rather than making the explicit registration
+// fail. It satisfies listener.Listener so the mesh service can serve it.
+type MeshRoute struct {
+	owner     *p2pHostManager
+	ln        *peerListener
+	onPreempt func()
+}
+
+var _ listener.Listener = (*MeshRoute)(nil)
+var _ net.Listener = (*MeshRoute)(nil)
+
+// RegisterMeshRoute creates an empty mesh route. Reconcile fills its claims;
+// an empty route accepts nothing and is a valid starting state while the
+// first netview has not arrived.
+func RegisterMeshRoute(peers []string) (*MeshRoute, error) {
+	r := &MeshRoute{
+		owner: p2pHost,
+		ln:    newPeerListener(nil),
+	}
+	if _, err := r.Reconcile(peers); err != nil {
+		_ = r.ln.Close()
+		return nil, err
+	}
+	return r, nil
+}
+
+// SetPreempt installs the callback run when an explicit p2p tunnel takes a key
+// this route held. The callback runs outside the host lock; the route has
+// already dropped the key, so the manager can drop its direct link and fall
+// back to the hub.
+func (r *MeshRoute) SetPreempt(fn func()) {
+	if r == nil {
+		return
+	}
+	r.owner.mu.Lock()
+	r.onPreempt = fn
+	r.owner.mu.Unlock()
+}
+
+func (r *MeshRoute) preempt() {
+	if r == nil || r.owner == nil {
+		return
+	}
+	r.owner.mu.Lock()
+	fn := r.onPreempt
+	r.owner.mu.Unlock()
+	if fn != nil {
+		fn()
+	}
+}
+
+// Reconcile replaces the route's claims with the wanted keys that no explicit
+// p2p tunnel holds. It returns the keys actually claimed, so the direct
+// manager can tell which members may use a direct inbound stream.
+func (r *MeshRoute) Reconcile(peers []string) ([]string, error) {
+	if r == nil || r.owner == nil {
+		return nil, net.ErrClosed
+	}
+	return r.owner.reconcileMesh(r, peers), nil
+}
+
+// Peers returns the keys this route currently claims.
+func (r *MeshRoute) Peers() []string {
+	if r == nil || r.ln == nil {
+		return nil
+	}
+	r.ln.mu.Lock()
+	defer r.ln.mu.Unlock()
+	return append([]string(nil), r.ln.peers...)
+}
+
+// Init implements listener.Listener; a mesh route has no metadata.
+func (r *MeshRoute) Init(md metadata.Metadata) error { return nil }
+
+func (r *MeshRoute) Accept() (net.Conn, error) { return r.ln.Accept() }
+func (r *MeshRoute) Addr() net.Addr            { return r.ln.Addr() }
+
+// Close removes this route's claims and closes its accept queue. The shared
+// host stays up for every other route.
+func (r *MeshRoute) Close() error {
+	if r == nil || r.owner == nil {
+		return nil
+	}
+	r.owner.unregisterMesh(r)
+	return r.ln.Close()
+}
+
+// reconcileMesh removes the route's old claims, then claims the wanted keys
+// that neither an explicit route nor another mesh route holds. meshKnown
+// keeps every wanted key, including a preempted one, so a member's direct
+// knock never shows up in the p2p pending list.
+func (m *p2pHostManager) reconcileMesh(r *MeshRoute, peers []string) []string {
+	m.mu.Lock()
+	if m.meshRoutes == nil {
+		m.meshRoutes = make(map[string]*MeshRoute)
+	}
+	if m.meshKnown == nil {
+		m.meshKnown = make(map[string]struct{})
+	}
+	want := make(map[string]struct{}, len(peers))
+	claimed := make([]string, 0, len(peers))
+	for _, p := range peers {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, dup := want[p]; dup {
+			continue
+		}
+		want[p] = struct{}{}
+	}
+	// Drop the keys this route used to own that are no longer wanted.
+	for p, cur := range m.meshRoutes {
+		if cur != r {
+			continue
+		}
+		if _, keep := want[p]; !keep {
+			delete(m.meshRoutes, p)
+		}
+	}
+	for p := range want {
+		m.meshKnown[p] = struct{}{}
+		if _, explicit := m.routes[p]; explicit {
+			continue
+		}
+		if cur, ok := m.meshRoutes[p]; ok && cur != r {
+			continue
+		}
+		m.meshRoutes[p] = r
+		claimed = append(claimed, p)
+	}
+	r.ln.setPeers(claimed)
+	m.mu.Unlock()
+	return claimed
+}
+
+// unregisterMesh drops every claim still owned by r; a stale close cannot
+// remove a successor's route.
+func (m *p2pHostManager) unregisterMesh(r *MeshRoute) {
+	m.mu.Lock()
+	owned := make(map[string]struct{})
+	for p, cur := range m.meshRoutes {
+		if cur == r {
+			delete(m.meshRoutes, p)
+			owned[p] = struct{}{}
+		}
+	}
+	for p := range owned {
+		if _, explicit := m.routes[p]; !explicit {
+			delete(m.meshKnown, p)
+		}
+	}
+	m.mu.Unlock()
+	r.ln.setPeers(nil)
+}
+
 // register routes inbound streams from every peer in the list to the returned
 // listener. It is all-or-nothing: a peer key already claimed by another tunnel
 // (or listed twice) rolls back the peers this call added and fails naming the
@@ -623,14 +800,24 @@ func (m *p2pHostManager) register(peers []string) (net.Listener, error) {
 // routes) untouched, so a rejected allowlist cannot half-apply.
 func (m *p2pHostManager) reconcile(ln *peerListener, peers []string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	want := make(map[string]struct{}, len(peers))
 	for _, p := range peers {
 		if cur, ok := m.routes[p]; ok && cur != ln {
+			m.mu.Unlock()
 			return fmt.Errorf("peer %s is already used by another p2p tunnel", p)
 		}
 		want[p] = struct{}{}
+	}
+
+	// An explicit p2p tunnel always wins. Drop the key from any mesh route
+	// first, then remember to tell those routes once the lock is released.
+	affected := make(map[*MeshRoute]struct{})
+	for p := range want {
+		if mr := m.meshRoutes[p]; mr != nil {
+			delete(m.meshRoutes, p)
+			affected[mr] = struct{}{}
+		}
 	}
 	for p := range want {
 		m.routes[p] = ln
@@ -643,7 +830,24 @@ func (m *p2pHostManager) reconcile(ln *peerListener, peers []string) error {
 			delete(m.routes, p)
 		}
 	}
+	// Update the affected mesh listeners while the manager lock still makes
+	// the map authoritative; otherwise a concurrent Reconcile could put a
+	// preempted key back into the listener after this function removed it.
+	for mr := range affected {
+		keep := make([]string, 0)
+		for p, cur := range m.meshRoutes {
+			if cur == mr {
+				keep = append(keep, p)
+			}
+		}
+		mr.ln.setPeers(keep)
+	}
+	m.mu.Unlock()
+
 	ln.setPeers(peers)
+	for mr := range affected {
+		mr.preempt()
+	}
 	return nil
 }
 
@@ -695,13 +899,20 @@ func (m *p2pHostManager) dispatch(conn net.Conn) {
 	peer := peerOf(conn)
 	m.mu.Lock()
 	pl := m.routes[peer]
+	mr := m.meshRoutes[peer]
 	m.mu.Unlock()
-	if pl == nil {
+	if pl == nil && mr == nil {
 		slog.Warn("p2p inbound stream from unregistered peer: closed", "peer", peer)
 		// The key is the whole of what a knock tells us: a p2p stream carries
 		// no destination, so which tunnel it wanted is unknowable here.
 		m.notePending(peer)
 		_ = conn.Close()
+		return
+	}
+	if pl == nil {
+		// Mesh routes carry raw tun datagrams; there is no control channel to
+		// demux, and reading one would consume the first device packet.
+		mr.ln.deliver(conn)
 		return
 	}
 	// A route whose tunnel serves a control channel demuxes its byte streams
