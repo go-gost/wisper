@@ -3,12 +3,14 @@ package entrypoint
 import (
 	"bytes"
 	"context"
+	"net"
 	"os"
 	"slices"
 	"testing"
 
 	cfg "github.com/go-gost/wisper/config"
 	tp "github.com/go-gost/wisper/tunnel"
+	tunhandler "github.com/go-gost/x/handler/tun"
 )
 
 func TestTunOptionsBlockedPeersRoundTrip(t *testing.T) {
@@ -145,5 +147,49 @@ func TestTunSetBlockedPeersInPlace(t *testing.T) {
 	}
 	if got := te.Options().BlockedPeers; len(got) != 0 {
 		t.Fatalf("BlockedPeers after clear = %v, want empty", got)
+	}
+}
+
+func TestTunPeerListJoinsMeshStatus(t *testing.T) {
+	const hub = "hub-key"
+	ep := NewTunEntryPoint(
+		tp.IDOption("ep-peer-list-direct"),
+		tp.PeerOption(hub),
+		tp.NetOption("10.10.0.2/24"),
+	)
+	t.Cleanup(func() { _ = ep.Close() })
+	te := ep.(*tunEntryPoint)
+	te.peerView = func() ([]tp.NetviewMember, []tp.NetviewClaim) {
+		return []tp.NetviewMember{
+			{IP: "10.10.100.1", Key: hub, Name: "hub"},
+			{IP: "10.10.100.5", Key: "peerB", Name: "laptop", Direct: true},
+		}, []tp.NetviewClaim{{Prefix: "192.168.50.0/24", Origin: "peerB"}}
+	}
+	te.directRun = &directRuntime{mesh: &fakeMesh{
+		members: []tunhandler.MeshMember{{Key: "peerB", IP: net.ParseIP("10.10.100.5"), Direct: true}},
+		dialed:  map[string]bool{"peerB": true},
+	}}
+
+	rows := te.PeerList()
+	if len(rows) != 2 {
+		t.Fatalf("PeerList = %+v, want hub + direct peer", rows)
+	}
+	if rows[0].Key != hub || rows[0].State != "hub" {
+		t.Fatalf("hub row = %+v", rows[0])
+	}
+	if rows[1].Key != "peerB" || rows[1].State != "direct" || !rows[1].Direct {
+		t.Fatalf("direct row = %+v", rows[1])
+	}
+	if !slices.Equal(rows[1].LANs, []string{"192.168.50.0/24"}) {
+		t.Fatalf("LANs = %v", rows[1].LANs)
+	}
+
+	// A blocked peer that is no longer in the mesh view stays unblockable.
+	if err := te.SetBlockedPeers(context.Background(), []string{"peerGone"}); err != nil {
+		t.Fatalf("SetBlockedPeers: %v", err)
+	}
+	rows = te.PeerList()
+	if last := rows[len(rows)-1]; last.Key != "peerGone" || last.State != "blocked" {
+		t.Fatalf("stale blocked row = %+v", last)
 	}
 }

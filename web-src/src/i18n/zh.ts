@@ -252,6 +252,8 @@ const zh: Record<string, string> = {
   entrypointPeersUnblock: '取消阻止',
   entrypointPeersIPs: 'IP',
   entrypointPeersLANs: '局域网',
+  entrypointPeersTransport: '路径',
+  entrypointPeersTraffic: '↑ {in} · ↓ {out}',
   entrypointPeersDisabledHint: 'hub 已停用该成员，其路由已被撤回。',
   entrypointPeersStateHub: 'Hub',
   entrypointPeersStateBlocked: '已阻止',

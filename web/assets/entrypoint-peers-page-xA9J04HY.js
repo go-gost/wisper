@@ -1,8 +1,8 @@
-import{a as h,G as y,c as e,A as d,b as s,i as f,t as u}from"./index-CEUsOWja.js";import{m as x,n as v,r as c}from"./format-dBntRaRm.js";import{i as g}from"./app-scaffold-DLIWzTpn.js";var m=Object.defineProperty,_=Object.getOwnPropertyDescriptor,l=(t,n,o,r)=>{for(var i=r>1?void 0:r?_(n,o):n,p=t.length-1,b;p>=0;p--)(b=t[p])&&(i=(r?b(n,o,i):b(i))||i);return r&&i&&m(n,o,i),i};let a=class extends h{constructor(){super(...arguments),this.entrypointType="",this.entrypointId="",this._peers=[],this._error="",this._savingKey="",this._snackbar="",this._backend=new y,this._poll=0}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>void this._load(),5e3)}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,super.disconnectedCallback()}async _load(){try{const t=await this._backend.listEntrypointPeers(this.entrypointId);this._peers=t.peers??[],this._error=""}catch(t){this._error=t instanceof Error?t.message:""}}async _toggle(t){if(t.state==="hub"||this._savingKey)return;const n=this._peers.filter(r=>r.blocked).map(r=>r.key),o=t.blocked?n.filter(r=>r!==t.key):[...n,t.key];this._savingKey=t.key,this._error="";try{const r=await this._backend.updateEntrypointPeers(this.entrypointId,o);this._peers=r.peers??[],this._showSnackbar(e("saved"))}catch(r){this._error=r instanceof Error?r.message:""}finally{this._savingKey=""}}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar=""},2500)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_stateLabel(t){switch(t.state){case"hub":return e("entrypointPeersStateHub");case"blocked":return e("entrypointPeersStateBlocked");case"disabled":return e("entrypointPeersStateDisabled");case"direct-off":return e("entrypointPeersStateDirectOff");case"direct":return e("entrypointPeersStateDirect");case"connecting":return e("entrypointPeersStateConnecting");default:return t.state}}_renderPeer(t){const n=t.state!=="hub",o=t.name||e("peersNoAlias");return s`
+import{a as h,G as f,c as e,A as a,b as s,i as u,t as _}from"./index-B9ZfoANV.js";import{m as x,a as v,n as y,r as p}from"./format-C9gh-nLS.js";import{i as g}from"./app-scaffold-BnifUiD_.js";var m=Object.defineProperty,k=Object.getOwnPropertyDescriptor,l=(t,n,i,r)=>{for(var d=r>1?void 0:r?k(n,i):n,c=t.length-1,b;c>=0;c--)(b=t[c])&&(d=(r?b(n,i,d):b(d))||d);return r&&d&&m(n,i,d),d};let o=class extends h{constructor(){super(...arguments),this.entrypointType="",this.entrypointId="",this._peers=[],this._error="",this._savingKey="",this._snackbar="",this._backend=new f,this._poll=0}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>void this._load(),5e3)}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,super.disconnectedCallback()}async _load(){try{const t=await this._backend.listEntrypointPeers(this.entrypointId);this._peers=t.peers??[],this._error=""}catch(t){this._error=t instanceof Error?t.message:""}}async _toggle(t){if(t.state==="hub"||this._savingKey)return;const n=this._peers.filter(r=>r.blocked).map(r=>r.key),i=t.blocked?n.filter(r=>r!==t.key):[...n,t.key];this._savingKey=t.key,this._error="";try{const r=await this._backend.updateEntrypointPeers(this.entrypointId,i);this._peers=r.peers??[],this._showSnackbar(e("saved"))}catch(r){this._error=r instanceof Error?r.message:""}finally{this._savingKey=""}}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar=""},2500)}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_stateLabel(t){switch(t.state){case"hub":return e("entrypointPeersStateHub");case"blocked":return e("entrypointPeersStateBlocked");case"disabled":return e("entrypointPeersStateDisabled");case"direct-off":return e("entrypointPeersStateDirectOff");case"direct":return e("entrypointPeersStateDirect");case"connecting":return e("entrypointPeersStateConnecting");default:return t.state}}_renderPeer(t){const n=t.state!=="hub",i=t.name||e("peersNoAlias");return s`
       <div class="peer-row">
         <div class="row-line">
           <div class="peer-main">
-            <div class="peer-name">${o}</div>
+            <div class="peer-name">${i}</div>
             <div class="peer-key">${x(t.key)}</div>
           </div>
           <span class="state ${t.state}">${this._stateLabel(t)}</span>
@@ -11,14 +11,16 @@ import{a as h,G as y,c as e,A as d,b as s,i as f,t as u}from"./index-CEUsOWja.js
                 ?disabled=${this._savingKey!==""}
                 @click=${()=>this._toggle(t)}>
                 ${t.blocked?e("entrypointPeersUnblock"):e("entrypointPeersBlock")}
-              </button>`:d}
+              </button>`:a}
         </div>
-        ${t.ips?.length||t.lans?.length?s`
+        ${t.ips?.length||t.lans?.length||t.transport||t.input_bytes||t.output_bytes?s`
             <div class="meta">
-              ${t.ips?.length?s`<span>${e("entrypointPeersIPs")} ${t.ips.join(", ")}</span>`:d}
-              ${t.lans?.length?s`<span>${e("entrypointPeersLANs")} ${t.lans.join(", ")}</span>`:d}
-            </div>`:d}
-        ${t.disabled?s`<div class="meta warn">${e("entrypointPeersDisabledHint")}</div>`:d}
+              ${t.ips?.length?s`<span>${e("entrypointPeersIPs")} ${t.ips.join(", ")}</span>`:a}
+              ${t.lans?.length?s`<span>${e("entrypointPeersLANs")} ${t.lans.join(", ")}</span>`:a}
+              ${t.transport?s`<span>${e("entrypointPeersTransport")} ${t.transport}</span>`:a}
+              ${t.input_bytes||t.output_bytes?s`<span>${e("entrypointPeersTraffic",{in:v(t.input_bytes??0),out:v(t.output_bytes??0)})}</span>`:a}
+            </div>`:a}
+        ${t.disabled?s`<div class="meta warn">${e("entrypointPeersDisabledHint")}</div>`:a}
       </div>
     `}render(){return s`
       <app-scaffold>
@@ -35,12 +37,12 @@ import{a as h,G as y,c as e,A as d,b as s,i as f,t as u}from"./index-CEUsOWja.js
           </div>
           <div class="hint">${e("entrypointPeersHint")}</div>
           <div class="hint">${e("entrypointPeersLocalHint")}</div>
-          ${this._error?s`<div class="error">${this._error}</div>`:d}
+          ${this._error?s`<div class="error">${this._error}</div>`:a}
         </div>
 
-        ${this._snackbar?s`<div class="toast">${this._snackbar}</div>`:d}
+        ${this._snackbar?s`<div class="toast">${this._snackbar}</div>`:a}
       </app-scaffold>
-    `}};a.styles=f`
+    `}};o.styles=u`
     .back-btn {
       background: none;
       border: none;
@@ -176,4 +178,4 @@ import{a as h,G as y,c as e,A as d,b as s,i as f,t as u}from"./index-CEUsOWja.js
       font-size: var(--font-sm);
       z-index: 100;
     }
-  `;l([v()],a.prototype,"entrypointType",2);l([v()],a.prototype,"entrypointId",2);l([c()],a.prototype,"_peers",2);l([c()],a.prototype,"_error",2);l([c()],a.prototype,"_savingKey",2);l([c()],a.prototype,"_snackbar",2);a=l([u("entrypoint-peers-page")],a);export{a as EntrypointPeersPage};
+  `;l([y()],o.prototype,"entrypointType",2);l([y()],o.prototype,"entrypointId",2);l([p()],o.prototype,"_peers",2);l([p()],o.prototype,"_error",2);l([p()],o.prototype,"_savingKey",2);l([p()],o.prototype,"_snackbar",2);o=l([_("entrypoint-peers-page")],o);export{o as EntrypointPeersPage};

@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
-import { maskKey } from '../utils/format';
+import { formatBytes, maskKey } from '../utils/format';
 import { GoBackend } from '../api/backend';
 import type { EntryPeer } from '../api/types';
 import '../components/app-scaffold';
@@ -121,11 +121,18 @@ export class EntrypointPeersPage extends LitElement {
               </button>`
             : nothing}
         </div>
-        ${peer.ips?.length || peer.lans?.length
+        ${peer.ips?.length || peer.lans?.length || peer.transport || peer.input_bytes || peer.output_bytes
           ? html`
             <div class="meta">
               ${peer.ips?.length ? html`<span>${t('entrypointPeersIPs')} ${peer.ips.join(', ')}</span>` : nothing}
               ${peer.lans?.length ? html`<span>${t('entrypointPeersLANs')} ${peer.lans.join(', ')}</span>` : nothing}
+              ${peer.transport ? html`<span>${t('entrypointPeersTransport')} ${peer.transport}</span>` : nothing}
+              ${peer.input_bytes || peer.output_bytes
+                ? html`<span>${t('entrypointPeersTraffic', {
+                  in: formatBytes(peer.input_bytes ?? 0),
+                  out: formatBytes(peer.output_bytes ?? 0),
+                })}</span>`
+                : nothing}
             </div>`
           : nothing}
         ${peer.disabled ? html`<div class="meta warn">${t('entrypointPeersDisabledHint')}</div>` : nothing}

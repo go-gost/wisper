@@ -253,6 +253,15 @@ func (s *tunEntryPoint) PeerList() []tunnel.EntryPeer {
 		}
 	}
 
+	s.mu.RLock()
+	direct := s.directRun
+	s.mu.RUnlock()
+	if direct != nil {
+		if rows, ok := meshPeerList(hub, members, claims, blockedKeys, direct.mesh.MeshStatus()); ok {
+			return rows
+		}
+	}
+
 	out := make([]tunnel.EntryPeer, 0, len(members)+1)
 	if hub != "" {
 		out = append(out, tunnel.EntryPeer{Key: hub, Name: "Hub", State: "hub"})
@@ -301,6 +310,88 @@ func (s *tunEntryPoint) PeerList() []tunnel.EntryPeer {
 		out = append(out, tunnel.EntryPeer{Key: key, State: "blocked", Blocked: true})
 	}
 	return out
+}
+
+// meshPeerList is the direct-path view. The mesh handler owns the live state
+// and byte counters; the netview owns names, addresses and LAN claims; the
+// shared host supplies the underlay word for each connected peer.
+func meshPeerList(
+	hub string,
+	members []tunnel.NetviewMember,
+	claims []tunnel.NetviewClaim,
+	blockedKeys []string,
+	status []tunhandler.MeshPeerStatus,
+) ([]tunnel.EntryPeer, bool) {
+	if len(status) == 0 {
+		return nil, false
+	}
+	blocked := make(map[string]bool, len(blockedKeys))
+	for _, key := range blockedKeys {
+		blocked[key] = true
+	}
+	lans := make(map[string][]string, len(claims))
+	for _, c := range claims {
+		if c.Origin != "" {
+			lans[c.Origin] = append(lans[c.Origin], c.Prefix)
+		}
+	}
+	net := make(map[string]tunnel.NetviewMember, len(members))
+	for _, m := range members {
+		net[m.Key] = m
+	}
+	transports := tunnel.P2PHostStatus().PeerTransports
+
+	out := make([]tunnel.EntryPeer, 0, len(status))
+	seen := make(map[string]bool, len(status))
+	hasHub := false
+	for _, st := range status {
+		if st.Key == hub {
+			hasHub = true
+			break
+		}
+	}
+	if hub != "" && !hasHub {
+		out = append(out, tunnel.EntryPeer{Key: hub, Name: "Hub", State: "hub"})
+		seen[hub] = true
+	}
+	for _, st := range status {
+		if st.Key == "" {
+			continue
+		}
+		m := net[st.Key]
+		row := tunnel.EntryPeer{
+			Key:           st.Key,
+			Name:          st.Name,
+			IPs:           append([]string(nil), st.IPs...),
+			LANs:          lans[st.Key],
+			State:         st.State,
+			Blocked:       blocked[st.Key],
+			Direct:        m.Direct || st.State == "direct" || st.State == "connecting",
+			Disabled:      m.Disabled || st.State == "disabled",
+			Transport:     transports[st.Key],
+			DialedLocally: st.DialedLocally,
+			InputBytes:    st.BytesIn,
+			OutputBytes:   st.BytesOut,
+		}
+		if st.Key == hub {
+			row.Name = "Hub"
+			row.State = "hub"
+			row.Direct = false
+			row.Blocked = false
+		}
+		seen[st.Key] = true
+		out = append(out, row)
+	}
+
+	// A blocked key that has left the netview is still unblockable; keep it
+	// after the live rows, as the hub-only view does.
+	for _, key := range blockedKeys {
+		if key == "" || key == hub || seen[key] {
+			continue
+		}
+		out = append(out, tunnel.EntryPeer{Key: key, State: "blocked", Blocked: true})
+	}
+	return out, true
 }
 
 // filterListener wraps a tun listener's accepted conns with the local block

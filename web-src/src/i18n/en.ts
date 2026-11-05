@@ -261,6 +261,8 @@ const en: Record<string, string> = {
   entrypointPeersUnblock: 'Unblock',
   entrypointPeersIPs: 'IP',
   entrypointPeersLANs: 'LAN',
+  entrypointPeersTransport: 'Path',
+  entrypointPeersTraffic: '↑ {in} · ↓ {out}',
   entrypointPeersDisabledHint: 'The hub has switched this member off; its route is withdrawn.',
   entrypointPeersStateHub: 'Hub',
   entrypointPeersStateBlocked: 'Blocked',
