@@ -1484,6 +1484,12 @@ func TestUpdateRunningEntrypoint(t *testing.T) {
 	if opts, _ := updated["options"].(map[string]any); opts["peer"] != "k2" {
 		t.Errorf("peer after update = %v, want the submitted k2", opts["peer"])
 	}
+	if got, _ := updated["id"].(string); got != id {
+		t.Fatalf("updated id = %q, want the path id %q", got, id)
+	}
+	if entrypoint.Get(id) == nil {
+		t.Fatal("the replacement is not reachable by the path id")
+	}
 }
 
 // TestPendingPeersEndpoint: the handler contract. The recording path itself

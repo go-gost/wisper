@@ -288,9 +288,14 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	// before the replacement can start.
 	old.Close()
 
+	// The path owns the identity. The body ID is optional, and an update that
+	// omits it must not create a replacement with an empty/new ID: the old
+	// entrypoint is already closed, and a new ID would make the UI's detail URL
+	// point at nothing.
+	req.ID = id
+
 	// Create replacement with same ID first (before deleting old).
 	opts := append([]tunnel.Option{
-		tunnel.IDOption(id),
 		tunnel.CreatedAtOption(oldOpts.CreatedAt),
 	}, req.toOptions()...)
 
