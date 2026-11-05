@@ -353,12 +353,12 @@ git -C /root/code/go-gost/x commit -m "feat(tun): route mesh device packets with
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: x / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: x / e9626b1 (`feat(tun): route mesh device packets with hub fallback`)
+- Files changed: `x/handler/tun/mesh.go`, `x/handler/tun/mesh_test.go`
+- Tests: `GOWORK=off go test ./handler/tun -run 'TestMeshDispatch|TestMeshDirectNeeded|TestMeshBlocked|TestMeshNoHub|TestMeshLocal|TestMeshEmpty|TestMeshNil|TestMeshQueueFull|TestMeshBackpressure|TestMeshRunDevice' -count=1` → PASS (RED verified against the Task 2 `mesh.go`: `links`/`hub`/`dispatch` undefined); `CGO_ENABLED=1 GOWORK=off go test -race ./handler/tun -run 'TestMeshDispatch|TestMeshQueueFull|TestMeshBackpressure|TestMeshRunDevice' -count=1` → PASS; `GOWORK=off go test ./handler/tun -count=1` → ok 28.448s
+- Review findings/fixes: Added `SetDirectNeeded`/`SetLinkClosed` to the interface in this task (earlier than the plan's Task 5) because dispatch owns the direct-needed callback and the tests exercise nil callbacks. Added counters for foreign/registration cases now so Task 4 can increment them without changing the struct again. `Close` now tears down links/device so tests that attach links do not leak.
+- Deferred/limitations: Link readiness/dedupe/status are Task 5; install paths and inbound validation are Task 4.
 
 ---
 
