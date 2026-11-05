@@ -600,3 +600,20 @@ git -C /root/code/go-gost/x commit -m "test(tun): verify mesh handler no-regress
 - Tests: `GOWORK=off go test ./handler/tun -count=1` → ok 29.182s; `GOWORK=off go test -p 1 ./... -count=1` → PASS on rerun (first run had one `connector/http2 TestEstablishedTunnelOutlivesConnectContext` timeout under full-suite load; the package passes alone, the rerun passes, and the test is untouched → classified pre-existing full-suite flake, not a regression); `GOWORK=off go build ./...` → PASS; `GOWORK=off go vet ./...` → PASS; `CGO_ENABLED=1 GOWORK=off go test -race ./handler/tun -run 'TestMesh' -count=1` → PASS
 - Review findings/fixes: `git diff --stat 16784e5^..HEAD -- handler/tun` shows only the four new mesh files; existing `handler.go`, `p2phandler.go`, `p2p.go`, `server.go`, `client.go` are untouched.
 - Deferred/limitations: full x suite flake observed once in `connector/http2`; no code change made. The next plans (wisper control/ACL/peer list, direct dataplane/e2e) remain.
+
+## Final review fix pass (2026-11-05)
+
+**Commit:** x / c92ee1c (`fix(tun): keep mesh links across device gaps and close races`)
+
+**Fixed findings:**
+
+- **Critical: device-gap teardown.** Inbound hub/direct packets during a device replacement gap were returned as link errors, so the link reader closed the peer. `deliverToDevice` now drops the packet, counts `DeviceDrop`, logs at debug, and leaves the link alive; new tests cover direct and hub links across a gap.
+- **Important: first inbound frame readiness.** The already-read first frame now increments `bytesIn` and calls `markInbound` before dispatch; a test asserts ready/lastInbound/bytes.
+- **Important: address-change teardown.** `SetMembers` compares the old and new per-key IP sets and closes a changed member's link with `membership`; a test covers it.
+- **Important: install after Close.** `SetHubLink`, `AddDialedLink`, `Handle`, `RunDevice`, and `installLink` now reject/close when the handler is closed; tests cover each install path.
+- **Important: observability.** Added exported `MeshCounters()` (doctor surface) and device-drop debug logging; `AddDialedLink` now returns without starting a dedup loser.
+- **Minor, fixed in the same pass because they were in the same code paths:** deep-copy member/local IPs, 1s watchdog interval, `isTunFrame` validation for every data frame, stale interface comment, and membership re-check inside `installLink`.
+
+**Tests:** `GOWORK=off go test ./handler/tun -run TestMesh -count=1` → PASS; `CGO_ENABLED=1 GOWORK=off go test -race ./handler/tun -run TestMesh -count=1` → PASS; `GOWORK=off go test ./handler/tun -count=1` → PASS; `GOWORK=off go test -p 1 ./... -count=1` → PASS; `go build ./...`/`go vet ./...` → PASS.
+
+**Deferred minors (not fixed):** no dedicated IPv6 inbound-registration test (IPv6 dispatch is covered); hub-link replacement test; `LateDeviceWriteAfterClose` exercises `writeDevice` directly rather than through a link reader; per-peer blocked-byte accounting belongs to Plan 2's filter.
