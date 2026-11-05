@@ -875,3 +875,44 @@ func TestControlHubUnregisterStopsItsReader(t *testing.T) {
 		t.Fatalf("after unregister the slot answered %+v, want the new stream's netview", got)
 	}
 }
+
+func TestControlHubCapabilityAndMeta(t *testing.T) {
+	ch := newControlHub("hub", nil, nil, testLogger())
+	defer ch.Close()
+
+	ch.SetMembers([]memberEntry{
+		{IP: "10.0.0.2", Key: "b"},
+		{IP: "10.0.0.3", Key: "c"},
+	})
+	rev := ch.Snapshot().Rev
+	ch.SetCapability("b", true)
+	ch.SetPeerMeta(map[string]string{"b": "B"}, []string{"c"})
+
+	snap := ch.Snapshot()
+	if snap.Rev <= rev {
+		t.Fatalf("rev = %d, want > %d after capability/meta", snap.Rev, rev)
+	}
+	byKey := make(map[string]memberEntry, len(snap.Members))
+	for _, m := range snap.Members {
+		byKey[m.Key] = m
+	}
+	if got := byKey["b"]; got.Name != "B" || !got.Direct || got.Disabled {
+		t.Fatalf("b member = %+v, want name B, direct, enabled", got)
+	}
+	if got := byKey["c"]; !got.Disabled {
+		t.Fatalf("c member = %+v, want disabled", got)
+	}
+}
+
+func TestControlHubGenIsPerRun(t *testing.T) {
+	a := newControlHub("hub", nil, nil, testLogger())
+	b := newControlHub("hub", nil, nil, testLogger())
+	defer a.Close()
+	defer b.Close()
+	if a.gen == "" || b.gen == "" {
+		t.Fatal("empty generation")
+	}
+	if a.gen == b.gen {
+		t.Fatalf("two runs share generation %q", a.gen)
+	}
+}

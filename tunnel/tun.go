@@ -633,6 +633,9 @@ func (s *tunTunnel) Run() (err error) {
 	}
 	if sink, ok := h.(prefixSink); ok {
 		ch = newControlHub(s.opts.ID, allow, sink, log.WithFields(map[string]any{"kind": "control"}))
+		// Aliases/disabled are display+capability metadata; the membership below
+		// stays the RIB's rows unchanged.
+		ch.SetPeerMeta(s.opts.PeerAliases, s.opts.PeerDisabled)
 		// The membership first: it is what a claim may not swallow, and what
 		// an injected route's "via" resolves against.
 		ch.SetMembers(authz.Members())
@@ -793,6 +796,11 @@ func (s *tunTunnel) SetPeers(ctx context.Context, peers []string, aliases map[st
 	s.opts.PeerAliases = normalized
 	s.opts.PeerDisabled = off
 	s.mu.Unlock()
+
+	if ch := s.controlHub(); ch != nil {
+		ch.SetPeerMeta(normalized, off)
+		ch.SetMembers(s.authz.Members())
+	}
 
 	// A spoke removed here loses its control channel too: a dropped peer's
 	// inbound streams are closed by the route's own reconcile, and its slot in

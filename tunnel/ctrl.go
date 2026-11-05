@@ -41,14 +41,18 @@ type netviewMessage struct {
 	Type    string        `json:"type"` // "netview"
 	V       int           `json:"v"`    // 1
 	Hub     string        `json:"hub"`
+	Gen     string        `json:"gen,omitempty"`
 	Rev     uint64        `json:"rev"`
 	Members []memberEntry `json:"members"`
 	Claims  []claimEntry  `json:"claims"`
 }
 
 type memberEntry struct {
-	IP  string `json:"ip"`  // the member's tun address, "10.10.100.5"
-	Key string `json:"key"` // its peer key
+	IP       string `json:"ip"`  // the member's tun address, "10.10.100.5"
+	Key      string `json:"key"` // its peer key
+	Name     string `json:"name,omitempty"`
+	Direct   bool   `json:"direct,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 
 type claimEntry struct {
@@ -58,10 +62,11 @@ type claimEntry struct {
 }
 
 type claimMessage struct {
-	Type string   `json:"type"` // "claim"
-	V    int      `json:"v"`    // 1
-	Add  []string `json:"add"`
-	Drop []string `json:"drop"`
+	Type   string   `json:"type"` // "claim"
+	V      int      `json:"v"`    // 1
+	Add    []string `json:"add"`
+	Drop   []string `json:"drop"`
+	Direct bool     `json:"direct,omitempty"`
 }
 
 // writeMessage frames one message: 4-byte big-endian length then the JSON.

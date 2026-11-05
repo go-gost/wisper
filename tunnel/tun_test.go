@@ -1276,3 +1276,45 @@ func waitConns(t *testing.T, what string, conns func() (uint64, uint64), wantCur
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+func TestTunSetPeersRefreshesMeta(t *testing.T) {
+	ln, err := p2pHost.register([]string{"k1"})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	pl := ln.(*peerListener)
+	tun := &tunTunnel{
+		opts:   Options{Peers: []string{"k1"}, Net: "10.10.0.1/24"},
+		ln:     pl,
+		cclose: make(chan struct{}),
+	}
+	authz := newSpokeAuthorizer("hub", map[string]string{
+		"k1": "10.10.0.2", "k2": "10.10.0.3",
+	}, testLogger())
+	ch := newControlHub("hub", nil, nil, testLogger())
+	tun.authz, tun.ctrl = authz, ch
+	defer func() {
+		ch.Close()
+		p2pHost.unregister(pl)
+	}()
+
+	if err := tun.SetPeers(context.Background(), []string{"k1", "k2"},
+		map[string]string{"k2": "spoke2"}, []string{"k1"}); err != nil {
+		t.Fatalf("SetPeers: %v", err)
+	}
+
+	snap := ch.Snapshot()
+	byKey := make(map[string]memberEntry, len(snap.Members))
+	for _, m := range snap.Members {
+		byKey[m.Key] = m
+	}
+	if got := byKey["k2"]; got.Name != "spoke2" {
+		t.Fatalf("k2 alias = %q, want spoke2", got.Name)
+	}
+	if got := byKey["k1"]; !got.Disabled {
+		t.Fatalf("k1 = %+v, want disabled metadata and still a member", got)
+	}
+	if len(snap.Members) != 2 {
+		t.Fatalf("members = %+v, want k1 and k2 kept for LAN semantics", snap.Members)
+	}
+}

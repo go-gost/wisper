@@ -20,6 +20,7 @@ import (
 	"github.com/go-gost/core/observer/stats"
 	tunhandler "github.com/go-gost/x/handler/tun"
 	xstats "github.com/go-gost/x/observer/stats"
+	"github.com/google/uuid"
 
 	"github.com/go-gost/wisper/event"
 )
@@ -63,11 +64,19 @@ type prefixSink interface {
 // exactly as it does today.
 type controlHub struct {
 	hubID string
+	gen   string
 	rib   *rib
 	sink  prefixSink
 	log   logger.Logger
 
 	mu sync.Mutex
+	// baseMembers is the hub's assignment as authz reports it; members on the
+	// wire are this plus capability/alias/disabled metadata, none of which may
+	// change the LAN-routing membership semantics.
+	baseMembers []memberEntry
+	caps        map[string]bool
+	aliases     map[string]string
+	disabled    map[string]bool
 	// peers holds one entry per spoke that has a control stream or is
 	// expected to open one. The entry carries the stream's conn, so
 	// publishing writes to it, and the rev it last received, so a fresh
@@ -171,10 +180,14 @@ func newControlHub(hubID string, allow map[string][]netip.Prefix, sink prefixSin
 	now := time.Now
 	ch := &controlHub{
 		hubID:     hubID,
+		gen:       uuid.NewString(),
 		sink:      sink,
 		log:       log,
 		peers:     make(map[string]*controlPeer),
 		installed: make(map[netip.Prefix]string),
+		caps:      make(map[string]bool),
+		aliases:   make(map[string]string),
+		disabled:  make(map[string]bool),
 		done:      make(chan struct{}),
 		now:       now,
 	}
@@ -267,9 +280,105 @@ func (ch *controlHub) Unregister(peer string) {
 // SetMembers replaces the membership the RIB reasons about: the members a
 // claim may not swallow, and the addresses an injected route's "via" resolves
 // against. A membership that changed advances the rev, so this publishes.
+//
+// Capability/alias/disabled metadata is merged in, not used to filter the
+// assignment: the LAN RIB's covers-member and via semantics must keep seeing
+// the same rows they saw before these fields existed.
 func (ch *controlHub) SetMembers(members []memberEntry) {
-	ch.rib.SetMembers(members)
+	ch.mu.Lock()
+	ch.baseMembers = append([]memberEntry(nil), members...)
+	merged := ch.mergedMembersLocked()
+	ch.mu.Unlock()
+
+	ch.rib.SetMembers(merged)
 	ch.publish()
+}
+
+// SetCapability records a spoke's direct-mode capability and republishes when
+// it changes. It is fed by the spoke's claim; a peer with no membership row
+// can still be recorded, so a claim that arrives before its assignment takes
+// effect is not lost.
+func (ch *controlHub) SetCapability(peer string, direct bool) {
+	peer = strings.TrimSpace(peer)
+	if peer == "" {
+		return
+	}
+
+	ch.mu.Lock()
+	if ch.caps[peer] == direct {
+		ch.mu.Unlock()
+		return
+	}
+	ch.caps[peer] = direct
+	merged := ch.mergedMembersLocked()
+	ch.mu.Unlock()
+
+	ch.rib.SetMembers(merged)
+	ch.publish()
+}
+
+// SetPeerMeta replaces the display aliases and disabled set. Both are merged
+// into the wire membership; neither removes a member from the RIB's view.
+func (ch *controlHub) SetPeerMeta(aliases map[string]string, disabled []string) {
+	nextAliases := make(map[string]string, len(aliases))
+	for k, v := range aliases {
+		if k = strings.TrimSpace(k); k != "" {
+			nextAliases[k] = v
+		}
+	}
+	nextDisabled := make(map[string]bool, len(disabled))
+	for _, k := range disabled {
+		if k = strings.TrimSpace(k); k != "" {
+			nextDisabled[k] = true
+		}
+	}
+
+	ch.mu.Lock()
+	if mapsEqualString(nextAliases, ch.aliases) && mapsEqualBool(nextDisabled, ch.disabled) {
+		ch.mu.Unlock()
+		return
+	}
+	ch.aliases, ch.disabled = nextAliases, nextDisabled
+	merged := ch.mergedMembersLocked()
+	ch.mu.Unlock()
+
+	ch.rib.SetMembers(merged)
+	ch.publish()
+}
+
+func (ch *controlHub) mergedMembersLocked() []memberEntry {
+	out := make([]memberEntry, len(ch.baseMembers))
+	for i, m := range ch.baseMembers {
+		m.Name = ch.aliases[m.Key]
+		m.Direct = ch.caps[m.Key]
+		m.Disabled = ch.disabled[m.Key]
+		out[i] = m
+	}
+	return out
+}
+
+func mapsEqualString(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+func mapsEqualBool(a, b map[string]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // SetStaticRoutes injects the hub's own routes from its config, before any
@@ -295,7 +404,11 @@ func (ch *controlHub) SetStaticRoutes(specs []string) error {
 // Snapshot is the winners as a spoke may see them, for the hub's own
 // reporting (the doctor's routes view) — the same content every netview
 // carries.
-func (ch *controlHub) Snapshot() claimSet { return ch.rib.Snapshot() }
+func (ch *controlHub) Snapshot() claimSet {
+	snap := ch.rib.Snapshot()
+	snap.Gen = ch.gen
+	return snap
+}
 
 // LanRefusal is one claim the hub turned down: the CIDR the spoke asked for,
 // the spoke that asked, which of the RIB's reasons said no, the sentence the
@@ -605,6 +718,7 @@ func (ch *controlHub) applyClaim(peer string, m claimMessage) {
 // that knows it revoked something, and an empty claim that only said "nothing
 // new" would leave the old route installed and still routing.
 func (ch *controlHub) applyClaimSet(peer string, m claimMessage) {
+	ch.SetCapability(peer, m.Direct)
 	ch.apply(peer, m, true)
 }
 
@@ -631,6 +745,7 @@ func (ch *controlHub) apply(peer string, m claimMessage, replace bool) {
 // per-rev, so a settle that changed nothing touches nothing.
 func (ch *controlHub) publish() {
 	snap := ch.rib.Snapshot()
+	snap.Gen = ch.gen
 
 	ch.mu.Lock()
 	install := snap.Rev != ch.publishedRev
@@ -723,6 +838,7 @@ func (s claimSet) message() netviewMessage {
 		Type:    ctrlTypeNetview,
 		V:       ctrlVersion,
 		Hub:     s.Hub,
+		Gen:     s.Gen,
 		Rev:     s.Rev,
 		Members: s.Members,
 		Claims:  s.Claims,

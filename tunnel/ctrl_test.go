@@ -3,6 +3,7 @@ package tunnel
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"testing"
 )
 
@@ -49,5 +50,37 @@ func TestReadMessageRefusesBadInput(t *testing.T) {
 	binary.BigEndian.PutUint32(hdr[:], uint32(len(body)))
 	if _, _, err := readMessage(bytes.NewReader(append(hdr[:], body...))); err == nil {
 		t.Fatal("an unknown type must be refused")
+	}
+}
+
+func TestControlMemberFieldsJSON(t *testing.T) {
+	msg := netviewMessage{
+		Type: ctrlTypeNetview, V: ctrlVersion, Hub: "hub", Gen: "gen-1", Rev: 7,
+		Members: []memberEntry{{IP: "10.0.0.2", Key: "b", Name: "B", Direct: true, Disabled: true}},
+		Claims:  []claimEntry{{Prefix: "192.168.50.0/24", Origin: "b"}},
+	}
+	body, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var got netviewMessage
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Gen != "gen-1" || len(got.Members) != 1 || got.Members[0].Name != "B" ||
+		!got.Members[0].Direct || !got.Members[0].Disabled {
+		t.Fatalf("round trip = %+v", got)
+	}
+	claim := claimMessage{Type: ctrlTypeClaim, V: ctrlVersion, Add: []string{"a"}, Direct: true}
+	body, err = json.Marshal(claim)
+	if err != nil {
+		t.Fatalf("marshal claim: %v", err)
+	}
+	var gotClaim claimMessage
+	if err := json.Unmarshal(body, &gotClaim); err != nil {
+		t.Fatalf("unmarshal claim: %v", err)
+	}
+	if !gotClaim.Direct {
+		t.Fatal("claim direct flag did not round trip")
 	}
 }

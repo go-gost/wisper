@@ -92,6 +92,7 @@ type lanClaim struct {
 // address that is no longer anybody's.
 type claimSet struct {
 	Hub     string
+	Gen     string
 	Rev     uint64
 	Claims  []claimEntry
 	Members []memberEntry // from Task 1
