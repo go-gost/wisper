@@ -159,13 +159,7 @@ func (r *NetviewRouter) Apply(n netviewMessage) bool {
 
 	members := make([]NetviewMember, 0, len(n.Members))
 	for _, m := range n.Members {
-		members = append(members, NetviewMember{
-			IP:       m.IP,
-			Key:      m.Key,
-			Name:     m.Name,
-			Direct:   m.Direct,
-			Disabled: m.Disabled,
-		})
+		members = append(members, NetviewMember(m))
 	}
 	claims := make([]NetviewClaim, 0, len(n.Claims))
 	for _, c := range n.Claims {
