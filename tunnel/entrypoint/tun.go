@@ -210,14 +210,20 @@ func (s *tunEntryPoint) SetBlockedPeers(_ context.Context, keys []string) error 
 // arrives from the hub, a block is saved by the operator — and either one
 // invalidates the policy.
 func (s *tunEntryPoint) refreshPeerPolicy() {
-	if s.filter == nil || s.peerView == nil {
+	if s.peerView == nil {
 		return
 	}
 	members, claims := s.peerView()
 	s.mu.RLock()
 	blocked := append([]string(nil), s.opts.BlockedPeers...)
+	direct := s.directRun
 	s.mu.RUnlock()
-	s.filter.SetPolicy(members, claims, blocked)
+	if s.filter != nil {
+		s.filter.SetPolicy(members, claims, blocked)
+	}
+	if direct != nil {
+		direct.Refresh(members, claims, blocked)
+	}
 }
 
 // PeerList is this spoke's local view: the hub first, then every member the
@@ -645,6 +651,9 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 			s.mu.Lock()
 			s.directRun, s.deviceLn = directRun, ln
 			s.mu.Unlock()
+			// Populate the mesh member table from a netview that may already
+			// be current (a device rebuild keeps the previous membership).
+			s.refreshPeerPolicy()
 		} else {
 			handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tun"})
 			// The chain (and no forwarder hop) is the client-mode switch: the

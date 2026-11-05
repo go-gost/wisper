@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -29,54 +30,268 @@ import (
 // userspace share, the tun-share connector. Direct links (Task 4) are the only
 // connections that use the shared host directly, because they never carry LAN
 // traffic.
+// directHost is the part of the shared p2p endpoint the direct manager needs.
+// Keeping it an interface lets the dial/backoff logic run without a relay.
+type directHost interface {
+	PunchContext(ctx context.Context, peer string) error
+	Dial(ctx context.Context, network, peer string) (net.Conn, error)
+}
+
+// These are vars so a test can shorten the ready wait and the backoff without
+// waiting the production five minutes.
+var (
+	directReadyTimeout = 10 * time.Second
+	directBackoffSteps = []time.Duration{time.Second, 5 * time.Second, 30 * time.Second, 5 * time.Minute}
+)
+
 type directRuntime struct {
-	host    *endpoint.Endpoint
-	mesh    tunhandler.MeshHandler
-	route   *tunnel.MeshRoute
-	hubKey  string
-	dialHub func(context.Context) (net.Conn, error)
-	log     logger.Logger
+	host     directHost
+	mesh     tunhandler.MeshHandler
+	route    *tunnel.MeshRoute
+	localKey string
+	hubKey   string
+	dialHub  func(context.Context) (net.Conn, error)
+	log      logger.Logger
 
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	refreshMu    sync.Mutex
+	mu           sync.Mutex
+	allowed      map[string]bool
+	inflight     map[string]bool
+	backoff      map[string]time.Time
+	steps        map[string]int
+	backoffSteps []time.Duration
+	members      []tunnel.NetviewMember
+	blocked      []string
 
 	hubLost chan struct{}
 	once    sync.Once
 }
 
 func newDirectRuntime(
-	host *endpoint.Endpoint,
+	host directHost,
 	mesh tunhandler.MeshHandler,
 	route *tunnel.MeshRoute,
-	hubKey string,
+	localKey, hubKey string,
 	dialHub func(context.Context) (net.Conn, error),
 	log logger.Logger,
 ) *directRuntime {
 	return &directRuntime{
-		host:    host,
-		mesh:    mesh,
-		route:   route,
-		hubKey:  hubKey,
-		dialHub: dialHub,
-		log:     log,
-		hubLost: make(chan struct{}, 1),
+		host:         host,
+		mesh:         mesh,
+		route:        route,
+		localKey:     localKey,
+		hubKey:       hubKey,
+		dialHub:      dialHub,
+		log:          log,
+		allowed:      make(map[string]bool),
+		inflight:     make(map[string]bool),
+		backoff:      make(map[string]time.Time),
+		steps:        make(map[string]int),
+		backoffSteps: append([]time.Duration(nil), directBackoffSteps...),
+		hubLost:      make(chan struct{}, 1),
 	}
 }
 
 func (d *directRuntime) start() {
 	d.ctx, d.cancel = context.WithCancel(context.Background())
-	d.mesh.SetLinkClosed(func(peer string, reason tunhandler.MeshCloseReason) {
-		if peer != d.hubKey || reason == tunhandler.MeshCloseShutdown {
+	d.mesh.SetDirectNeeded(d.onNeeded)
+	d.mesh.SetLinkClosed(d.onClosed)
+	d.route.SetPreempt(d.refreshLast)
+	if d.dialHub != nil {
+		d.wg.Add(1)
+		go d.hubLoop()
+	}
+}
+
+// Refresh rebuilds the mesh membership from the accepted netview and the
+// local block list. The route decides which members may accept inbound direct
+// streams; the mesh handler marks everyone else direct-off so its status and
+// routing agree with that decision.
+func (d *directRuntime) Refresh(members []tunnel.NetviewMember, claims []tunnel.NetviewClaim, blocked []string) {
+	if d == nil {
+		return
+	}
+	d.refreshMu.Lock()
+	defer d.refreshMu.Unlock()
+	_ = claims // direct links carry member tun IPs only, never LAN prefixes
+
+	blockedSet := make(map[string]bool, len(blocked))
+	for _, key := range blocked {
+		blockedSet[key] = true
+	}
+
+	wanted := make([]string, 0, len(members))
+	candidates := make([]tunhandler.MeshMember, 0, len(members))
+	for _, m := range members {
+		if m.Key == "" || m.Key == d.hubKey || m.Key == d.localKey {
+			continue
+		}
+		addr, err := netip.ParseAddr(strings.TrimSpace(m.IP))
+		if err != nil {
+			continue
+		}
+		blocked := blockedSet[m.Key]
+		direct := m.Direct && !m.Disabled && !blocked
+		candidates = append(candidates, tunhandler.MeshMember{
+			IP:       net.IP(addr.AsSlice()),
+			Key:      m.Key,
+			Name:     m.Name,
+			Direct:   direct,
+			Blocked:  blocked,
+			Disabled: m.Disabled,
+		})
+		if direct {
+			wanted = append(wanted, m.Key)
+		}
+	}
+
+	claimed, _ := d.route.Reconcile(wanted)
+	claimedSet := make(map[string]bool, len(claimed))
+	for _, key := range claimed {
+		claimedSet[key] = true
+	}
+	for i := range candidates {
+		if candidates[i].Direct && !claimedSet[candidates[i].Key] {
+			candidates[i].Direct = false
+		}
+	}
+	d.mesh.SetMembers(candidates)
+
+	d.mu.Lock()
+	old := d.allowed
+	d.allowed = claimedSet
+	d.members = append([]tunnel.NetviewMember(nil), members...)
+	d.blocked = append([]string(nil), blocked...)
+	d.mu.Unlock()
+
+	for key := range old {
+		if !claimedSet[key] {
+			d.mesh.DropLink(key)
+		}
+	}
+}
+
+func (d *directRuntime) refreshLast() {
+	d.mu.Lock()
+	members := append([]tunnel.NetviewMember(nil), d.members...)
+	blocked := append([]string(nil), d.blocked...)
+	d.mu.Unlock()
+	d.Refresh(members, nil, blocked)
+}
+
+func (d *directRuntime) onNeeded(peer string) {
+	d.mu.Lock()
+	if !d.allowed[peer] || d.inflight[peer] {
+		d.mu.Unlock()
+		return
+	}
+	if until, ok := d.backoff[peer]; ok && time.Now().Before(until) {
+		d.mu.Unlock()
+		return
+	}
+	d.inflight[peer] = true
+	d.mu.Unlock()
+
+	d.wg.Add(1)
+	go d.dial(peer)
+}
+
+func (d *directRuntime) dial(peer string) {
+	defer d.wg.Done()
+	if d.host == nil {
+		d.fail(peer)
+		return
+	}
+	_ = d.host.PunchContext(d.ctx, peer)
+	conn, err := d.host.Dial(d.ctx, "ip", peer)
+	if err != nil {
+		d.fail(peer)
+		return
+	}
+	d.mesh.AddDialedLink(peer, conn)
+
+	// AddDialedLink does not report readiness. Poll the handler's view until
+	// the first inbound frame proves the stream, then clear the failure
+	// backoff; a link that never becomes ready is dropped and retried.
+	timer := time.NewTimer(directReadyTimeout)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer timer.Stop()
+	defer ticker.Stop()
+	for {
+		select {
+		case <-d.ctx.Done():
+			return
+		case <-timer.C:
+			d.mesh.DropLink(peer)
+			d.fail(peer)
+			return
+		case <-ticker.C:
+			if d.stateOf(peer) == "direct" {
+				d.mu.Lock()
+				delete(d.inflight, peer)
+				delete(d.backoff, peer)
+				delete(d.steps, peer)
+				d.mu.Unlock()
+				return
+			}
+		}
+	}
+}
+
+func (d *directRuntime) stateOf(peer string) string {
+	for _, s := range d.mesh.MeshStatus() {
+		if s.Key == peer {
+			return s.State
+		}
+	}
+	return ""
+}
+
+func (d *directRuntime) onClosed(peer string, reason tunhandler.MeshCloseReason) {
+	if peer == d.hubKey {
+		if reason == tunhandler.MeshCloseShutdown {
 			return
 		}
 		select {
 		case d.hubLost <- struct{}{}:
 		default:
 		}
-	})
-	d.wg.Add(1)
-	go d.hubLoop()
+		return
+	}
+
+	d.mu.Lock()
+	delete(d.inflight, peer)
+	d.mu.Unlock()
+
+	switch reason {
+	case tunhandler.MeshCloseRemote, tunhandler.MeshCloseUnhealthy,
+		tunhandler.MeshCloseWrite, tunhandler.MeshCloseDial:
+		d.fail(peer)
+	case tunhandler.MeshCloseIdle, tunhandler.MeshCloseDedup,
+		tunhandler.MeshCloseMembership, tunhandler.MeshCloseBlocked,
+		tunhandler.MeshCloseShutdown:
+		// No redial: the next packet triggers onNeeded, or the member is no
+		// longer eligible at all.
+	}
+}
+
+func (d *directRuntime) fail(peer string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.inflight, peer)
+	step := d.steps[peer]
+	if step >= len(d.backoffSteps) {
+		step = len(d.backoffSteps) - 1
+	}
+	if step < 0 {
+		step = 0
+	}
+	d.steps[peer] = step + 1
+	d.backoff[peer] = time.Now().Add(d.backoffSteps[step])
 }
 
 func (d *directRuntime) hubLoop() {
@@ -139,8 +354,10 @@ func (d *directRuntime) Close() error {
 			d.cancel()
 		}
 		d.wg.Wait()
+		d.refreshMu.Lock()
 		_ = d.mesh.Close()
 		_ = d.route.Close()
+		d.refreshMu.Unlock()
 	})
 	return nil
 }
@@ -207,7 +424,7 @@ func (s *tunEntryPoint) startDirectRuntime(
 		}
 		return rt.Dial(ctx, "ip", s.peer)
 	}
-	runtime := newDirectRuntime(host, mesh, route, s.peer, dialHub, log)
+	runtime := newDirectRuntime(host, mesh, route, host.PublicKey(), s.peer, dialHub, log)
 
 	svc := xservice.NewService(s.opts.Name, route, mesh,
 		xservice.LoggerOption(log),
