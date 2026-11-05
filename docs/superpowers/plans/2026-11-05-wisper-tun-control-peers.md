@@ -123,27 +123,27 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): plumb direct, alias, disa
 - `ControlChannelConfig.MemberSync func()` is called after an accepted netview.
 - `deliverNetview` calls `Apply`; only on true runs `RouteSync` and `MemberSync`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 - `TestNetviewRouterGenResetsRev`: apply hub/gen A rev 5, then hub/gen B rev 1; accepted. Same gen rev 4 after 5 rejected.
 - `TestNetviewRouterMembersClaims`: apply members/claims; assert `Members()`/`Claims()` copies and claim order; mutate the returned slices and re-read.
 - `TestNetviewMemberSyncOnlyAccepted`: callback counter increments on accepted netviews, not stale.
 - Existing LAN route tests pass unchanged.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd /root/code/go-gost/wisper && GOWORK=off go test ./tunnel -run 'TestNetviewRouter|TestNetviewMemberSync' -count=1`
 Expected: FAIL — methods/types undefined.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Keep the existing route install behavior; add fields `gen`, `members`, `claims`. A netview without `Hub` remains rejected. `Members()`/`Claims()` deep-copy strings/slices. Do not call `MemberSync` for a rejected netview.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run Step 2. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add tunnel/netview_router.go tunnel/ctrl.go tunnel/*_test.go
@@ -151,12 +151,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(tun): expose netview members an
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / e166ecf
+- Files changed: `tunnel/netview_router.go`, `tunnel/netview_router_test.go`
+- Tests: `GOWORK=off go test ./tunnel -run 'TestNetviewRouter|TestNetviewMemberSync' -count=1` PASS; full `GOWORK=off go test ./tunnel -count=1` PASS; `GOWORK=off go vet ./tunnel` PASS.
+- Review findings/fixes: `Apply` now returns bool and only accepted snapshots reach `RouteSync`/`MemberSync`; generation reset matches the hub's per-run Gen while empty Gen keeps the old hub-only rule; `Members`/`Claims` are deep copies and keep the hub's claim order. The tests were written with the implementation in one pass, so the Step 2 expected compile failure was not separately captured; the absence of that evidence is noted rather than claimed.
+- Deferred/limitations: `MemberSync` is wired into `ControlChannelConfig` but no entrypoint supplies it yet (Task 3/4); `Generation` is exported for the peer list/API, not used outside the router yet.
 
 ---
 
