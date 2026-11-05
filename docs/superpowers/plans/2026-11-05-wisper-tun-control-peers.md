@@ -424,7 +424,7 @@ git -C /root/code/go-gost/wisper commit -m "feat(api): expose tun entrypoint pee
 - Page rows: hub first (read-only), member rows (alias/key/IPs/LANs/state/direct-off/blocked), stale blocked rows (unblock). One `Block` switch per row; a hint that it is local and does not change hub membership; refresh on a 5s poll and after a save.
 - i18n: all new copy through `t()`; en/zh key sets identical; keep technical terms (TUN, P2P, DERP, RTT, ID, IP) untranslated.
 
-- [ ] **Step 1: Write failing type/build tests**
+- [x] **Step 1: Write failing type/build tests**
 
 Add a small page test or at least the type imports; run:
 ```bash
@@ -433,11 +433,11 @@ npx tsc --noEmit
 ```
 Expected: FAIL — missing types/methods/page.
 
-- [ ] **Step 2: Implement types, backend, page, route, card, i18n**
+- [x] **Step 2: Implement types, backend, page, route, card, i18n**
 
 Follow `tunnel-peers-page.ts` for row structure but do not add/edit allowlist rows. The spoke page has no add/remove/alias/IP edit. Use short-key masking with the existing `maskKey`.
 
-- [ ] **Step 3: Build and verify**
+- [x] **Step 3: Build and verify**
 
 ```bash
 cd /root/code/go-gost/wisper/web-src
@@ -446,7 +446,7 @@ npx vite build
 ```
 Expected: PASS; `web/assets` refreshed. If the repo’s web-e2e suite has a navigation test, add the new route assertion.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git -C /root/code/go-gost/wisper add web-src web/assets
@@ -454,12 +454,12 @@ git -C /root/code/go-gost/wisper commit -m "feat(web): add tun entrypoint peer l
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: wisper / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: wisper / 98ac1a9
+- Files changed: `web-src/src/api/types.ts`, `web-src/src/api/backend.ts`, `web-src/src/pages/entrypoint-peers-page.ts`, `web-src/src/pages/entrypoint-detail-page.ts`, `web-src/src/router/routes.ts`, `web-src/src/i18n/en.ts`, `web-src/src/i18n/zh.ts`, `web/index.html`, `web/assets/*`
+- Tests: `cd web-src && npx tsc --noEmit` PASS; `npx vite build` PASS. Both locales carry every new key (counted identically with grep). There is no web-e2e suite in this repo, so no navigation assertion was added.
+- Review findings/fixes: the page reads the dedicated peers API rather than the entrypoint store, because the store's 5s stats poll does not carry peer rows; it polls the same 5s cadence and keeps the last view on a transient fetch failure. The detail card is only rendered for a tun entrypoint in view mode; its count comes from `options.blocked_peers`, while the page's rows come from the live peer view. A block is sent as the complete set of currently blocked keys, so each toggle is one atomic replacement and no add/remove endpoint is needed.
+- Deferred/limitations: no unit test harness exists for Lit pages; the page relies on typecheck/build. Traffic/RTT columns are defined in the type and API but not rendered yet, because Plan 2 has no direct-link data to fill them (Plan 3).
 
 ---
 
