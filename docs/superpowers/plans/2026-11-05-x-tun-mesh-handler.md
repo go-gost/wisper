@@ -486,12 +486,12 @@ git -C /root/code/go-gost/x commit -m "feat(tun): dedupe mesh links and tear dow
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: x / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: x / dacd3ac (`feat(tun): dedupe mesh links and tear down on membership changes`)
+- Files changed: `x/handler/tun/mesh.go`, `x/handler/tun/mesh_test.go`
+- Tests: `GOWORK=off go test ./handler/tun -run 'TestMeshDedupe|TestMeshMembership|TestMeshBlockedMember|TestMeshStatusAfter|TestMeshHubLinkClose|TestMeshShutdown' -count=1` → PASS (RED verified against the Task 4 `mesh.go`: `installLink` undefined); `CGO_ENABLED=1 GOWORK=off go test -race ...` → PASS; `GOWORK=off go test ./handler/tun -count=1` → ok 28.788s
+- Review findings/fixes: `removeLink` keeps its internal `(link, reason, hub)` shape rather than the plan's two-arg form, because the hub link lives outside the direct-link map; it still reports `dedup` for a loser that was never installed so the manager sees the lost attempt exactly once. `SetMembers` closes links outside the lock. `MeshStatus` snapshots members/links under the lock and reads atomics after, and exposes hub/direct bytes and `DialedLocally`.
+- Deferred/limitations: Device replacement, late writes, concurrent device writes, and panic recovery are Task 6.
 
 ---
 
