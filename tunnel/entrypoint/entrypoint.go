@@ -322,6 +322,7 @@ func restartRunning(match func(EntryPoint) bool) {
 			DNS:           p.opts.DNS,
 			ShareLAN:      p.opts.ShareLAN,
 			ShareMode:     p.opts.ShareMode,
+			BlockedPeers:  p.opts.BlockedPeers,
 			CreatedAt:     p.opts.CreatedAt,
 			StatsBaseline: p.statsBaseline,
 		})
@@ -372,6 +373,7 @@ func LoadConfig() {
 			DNS:           cfg.DNS,
 			ShareLAN:      cfg.ShareLAN,
 			ShareMode:     cfg.ShareMode,
+			BlockedPeers:  cfg.BlockedPeers,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -427,6 +429,7 @@ func SaveConfig() error {
 			DNS:           opts.DNS,
 			ShareLAN:      opts.ShareLAN,
 			ShareMode:     opts.ShareMode,
+			BlockedPeers:  opts.BlockedPeers,
 			Favorite:      ep.IsFavorite(),
 			Closed:        ep.IsClosed(),
 			CreatedAt:     opts.CreatedAt,

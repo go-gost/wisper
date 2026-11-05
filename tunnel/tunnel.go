@@ -110,6 +110,12 @@ type Options struct {
 	// owns, and without it every claim is refused. A p2p tunnel has no device, so
 	// it carries nothing here.
 	PeerIPs map[string]string
+	// BlockedPeers is a tun spoke's local inbound block list: peer keys whose
+	// packets are dropped in both directions. It is local to this spoke and
+	// independent of the hub's allowlist — the hub still sees the peer as a
+	// member; this device simply refuses to exchange traffic with it. Empty
+	// means no local block.
+	BlockedPeers []string
 	// Net is a tun device's address: a CIDR, or several comma-separated.
 	// A hub tunnel and a spoke entrypoint both carry it.
 	Net string
@@ -284,6 +290,15 @@ func PeerDisabledOption(disabled []string) Option {
 func PeerIPsOption(peerIPs map[string]string) Option {
 	return func(opts *Options) {
 		opts.PeerIPs = peerIPs
+	}
+}
+
+// BlockedPeersOption sets a tun spoke's local inbound block list (peer keys).
+// The list is normalized by the entrypoint: blank entries and duplicates are
+// dropped, first occurrence wins.
+func BlockedPeersOption(peers ...string) Option {
+	return func(opts *Options) {
+		opts.BlockedPeers = peers
 	}
 }
 
@@ -851,6 +866,7 @@ func TunnelOptions(opts Options) []Option {
 		PeerAliasesOption(opts.PeerAliases),
 		PeerDisabledOption(opts.PeerDisabled),
 		PeerIPsOption(opts.PeerIPs),
+		BlockedPeersOption(opts.BlockedPeers...),
 		NetOption(opts.Net),
 		MTUOption(opts.MTU),
 		DeviceNameOption(opts.DeviceName),

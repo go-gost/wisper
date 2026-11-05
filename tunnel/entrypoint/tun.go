@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -71,11 +72,24 @@ type tunEntryPoint struct {
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
 
+	// filter is this spoke's local inbound block policy. It is created before
+	// the first run so the device path and the userspace share shim can share
+	// one policy, and it is updated in place by SetBlockedPeers and by each
+	// accepted netview. Empty is a pass-through.
+	filter *tunnel.PeerFilter
+	// peerView is the netview snapshot the peer list and the filter read.
+	// Production reads the process-wide router; tests replace it so they do
+	// not have to drive a control channel to publish members.
+	peerView func() ([]tunnel.NetviewMember, []tunnel.NetviewClaim)
+
 	cclose    chan struct{}
 	closeOnce sync.Once
 	err       error
 	mu        sync.RWMutex
 }
+
+var _ tunnel.PeerListReporter = (*tunEntryPoint)(nil)
+var _ tunnel.BlockedPeersSetter = (*tunEntryPoint)(nil)
 
 // The spoke's two host-touching share steps are package vars so a test can
 // reason about the wiring without a host: probing the kernel reads and writes
@@ -108,12 +122,18 @@ func NewTunEntryPoint(opts ...tunnel.Option) EntryPoint {
 	if options.CreatedAt.IsZero() {
 		options.CreatedAt = time.Now()
 	}
+	options.BlockedPeers = normalizeBlockedPeers(options.BlockedPeers)
 
 	return &tunEntryPoint{
 		opts:     options,
 		peer:     options.Peer,
 		provider: "tun-ep-" + options.ID,
-		cclose:   make(chan struct{}),
+		filter:   tunnel.NewPeerFilter(),
+		peerView: func() ([]tunnel.NetviewMember, []tunnel.NetviewClaim) {
+			r := netviewRouter()
+			return r.Members(), r.Claims()
+		},
+		cclose: make(chan struct{}),
 	}
 }
 
@@ -129,9 +149,147 @@ func (s *tunEntryPoint) Endpoint() string { return s.peer }
 // the device address is what identifies it (and what the other side sees).
 func (s *tunEntryPoint) Entrypoint() string { return s.opts.Net }
 
-func (s *tunEntryPoint) Options() tunnel.Options { return s.opts }
-func (s *tunEntryPoint) Favorite(b bool)         { s.favorite.Store(b) }
-func (s *tunEntryPoint) IsFavorite() bool        { return s.favorite.Load() }
+// Options returns the entrypoint's configuration. BlockedPeers is the one
+// field that changes after construction, so it is copied under the lock; the
+// rest is immutable after New.
+func (s *tunEntryPoint) Options() tunnel.Options {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	opts := s.opts
+	opts.BlockedPeers = append([]string(nil), s.opts.BlockedPeers...)
+	return opts
+}
+
+func (s *tunEntryPoint) Favorite(b bool)  { s.favorite.Store(b) }
+func (s *tunEntryPoint) IsFavorite() bool { return s.favorite.Load() }
+
+// normalizeBlockedPeers trims, drops blanks and deduplicates a block list,
+// preserving the first occurrence. Nil and empty are the same policy: no
+// block, which is also what an omitted config field means.
+func normalizeBlockedPeers(keys []string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, len(keys))
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, key)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// SetBlockedPeers replaces this spoke's local inbound block list in place.
+// The running service keeps its device and its links: the block is a filter
+// policy, not a configuration change, so applying it must not restart the
+// tunnel. A stopped entrypoint only stores the list for its next run.
+func (s *tunEntryPoint) SetBlockedPeers(_ context.Context, keys []string) error {
+	keys = normalizeBlockedPeers(keys)
+	s.mu.Lock()
+	s.opts.BlockedPeers = keys
+	s.mu.Unlock()
+	s.refreshPeerPolicy()
+	return nil
+}
+
+// refreshPeerPolicy rebuilds the filter from the latest netview and the
+// current local block list. Both inputs can change independently — a netview
+// arrives from the hub, a block is saved by the operator — and either one
+// invalidates the policy.
+func (s *tunEntryPoint) refreshPeerPolicy() {
+	if s.filter == nil || s.peerView == nil {
+		return
+	}
+	members, claims := s.peerView()
+	s.mu.RLock()
+	blocked := append([]string(nil), s.opts.BlockedPeers...)
+	s.mu.RUnlock()
+	s.filter.SetPolicy(members, claims, blocked)
+}
+
+// PeerList is this spoke's local view: the hub first, then every member the
+// hub published (sorted by key), then any blocked key that is no longer a
+// member. The stale rows matter: a key that left the netview must stay
+// unblockable from the page, so the operator can still clear its block.
+func (s *tunEntryPoint) PeerList() []tunnel.EntryPeer {
+	s.mu.RLock()
+	hub := s.peer
+	blockedKeys := append([]string(nil), s.opts.BlockedPeers...)
+	s.mu.RUnlock()
+
+	var members []tunnel.NetviewMember
+	var claims []tunnel.NetviewClaim
+	if s.peerView != nil {
+		members, claims = s.peerView()
+	}
+
+	blocked := make(map[string]bool, len(blockedKeys))
+	for _, key := range blockedKeys {
+		blocked[key] = true
+	}
+	lans := make(map[string][]string, len(claims))
+	for _, c := range claims {
+		if c.Origin != "" {
+			lans[c.Origin] = append(lans[c.Origin], c.Prefix)
+		}
+	}
+
+	out := make([]tunnel.EntryPeer, 0, len(members)+1)
+	if hub != "" {
+		out = append(out, tunnel.EntryPeer{Key: hub, Name: "Hub", State: "hub"})
+	}
+
+	sort.Slice(members, func(i, j int) bool { return members[i].Key < members[j].Key })
+	seen := make(map[string]bool, len(members))
+	for _, m := range members {
+		if m.Key == "" || m.Key == hub {
+			continue
+		}
+		seen[m.Key] = true
+		state := "hub"
+		switch {
+		case blocked[m.Key]:
+			state = "blocked"
+		case m.Disabled:
+			state = "disabled"
+		case m.Direct:
+			state = "direct-off"
+		}
+		var ips []string
+		if strings.TrimSpace(m.IP) != "" {
+			ips = []string{strings.TrimSpace(m.IP)}
+		}
+		out = append(out, tunnel.EntryPeer{
+			Key:      m.Key,
+			Name:     m.Name,
+			IPs:      ips,
+			LANs:     lans[m.Key],
+			State:    state,
+			Blocked:  blocked[m.Key],
+			Direct:   m.Direct,
+			Disabled: m.Disabled,
+		})
+	}
+
+	var stale []string
+	for _, key := range blockedKeys {
+		if key != "" && key != hub && !seen[key] {
+			stale = append(stale, key)
+		}
+	}
+	sort.Strings(stale)
+	for _, key := range stale {
+		out = append(out, tunnel.EntryPeer{Key: key, State: "blocked", Blocked: true})
+	}
+	return out
+}
 
 // init builds the service description: a tun listener over a tun handler in
 // client mode (the chain, with no forwarder, is what selects client mode).

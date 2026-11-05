@@ -402,6 +402,11 @@ type Tunnel struct {
 	// every registration is refused.
 	PeerIPs map[string]string `yaml:"peer_ips,omitempty" json:"peer_ips,omitempty"`
 
+	// BlockedPeers is a tun spoke's local inbound block list (peer keys). It is
+	// independent of the hub's allowlist: the peer stays a member, this device
+	// drops its traffic in both directions.
+	BlockedPeers []string `yaml:"blocked_peers,omitempty" json:"blocked_peers,omitempty"`
+
 	// Net is a tun device's address: a CIDR, or several comma-separated. It is
 	// what the device advertises (and, for a spoke, what it registers with the
 	// hub's tun server).
