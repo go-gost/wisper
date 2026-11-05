@@ -426,12 +426,12 @@ git -C /root/code/go-gost/x commit -m "feat(tun): install mesh links and validat
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: x / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: x / 51ec54c (`feat(tun): install mesh links and validate inbound frames`)
+- Files changed: `x/handler/tun/mesh.go`, `x/handler/tun/mesh_test.go`, `x/handler/tun/mesh_link_test.go`
+- Tests: `GOWORK=off go test ./handler/tun -run 'TestMeshAddDialed|TestMeshHandle|TestMeshHubFrame|TestMeshInvalidRegistration' -count=1` → PASS (RED verified: methods undefined); `CGO_ENABLED=1 GOWORK=off go test -race ./handler/tun -run 'TestMeshAddDialed|TestMeshHandle|TestMeshHubFrame|TestMeshInvalidRegistration' -count=1` → PASS; `GOWORK=off go test ./handler/tun -count=1` → ok 28.877s
+- Review findings/fixes: `MemberEntry`/`MeshMember` is one row per address, so `SetMembers` now aggregates `memberIPs[key]` and `meshValidRegistration` compares the peer's whole IP set (signature changed from a single `MeshMember` to `[]net.IP`; without this a multi-address member would fail its own registration). `Handle` bounds the first frame with `meshFirstInboundTimeout`. The test `meshConn` now shares a close signal between both ends so closing the peer unblocks the link's `Read` (the first version left `Handle` waiting forever).
+- Deferred/limitations: Dedupe preference and link status bytes are Task 5; device replacement/panic recovery is Task 6.
 
 ---
 
