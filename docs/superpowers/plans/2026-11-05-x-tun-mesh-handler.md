@@ -269,12 +269,12 @@ git -C /root/code/go-gost/x commit -m "feat(tun): add mesh link queues, keepaliv
 ```
 
 **Implementation record**
-- Date/status: pending
-- Repo/commit: x / —
-- Files changed: —
-- Tests: —
-- Review findings/fixes: —
-- Deferred/limitations: —
+- Date/status: 2026-11-05 / complete
+- Repo/commit: x / f494eda (`feat(tun): add mesh link queues, keepalive, and liveness`)
+- Files changed: `x/handler/tun/mesh_link.go`, `x/handler/tun/mesh_link_test.go`
+- Tests: `GOWORK=off go test ./handler/tun -run 'TestMeshLink' -count=1` → PASS; `CGO_ENABLED=1 GOWORK=off go test -race ./handler/tun -run 'TestMeshLink' -count=1` → PASS; `GOWORK=off go test ./handler/tun -count=1` → ok 28.394s
+- Review findings/fixes: Added `wmu`/`writeFrame` so the keepalive sender and the queue writer cannot interleave datagrams (the plan's field list did not name the lock; without it, registration and data writes can splice on a p2p stream). Added `meshWatchdogInterval` so tests can run liveness without a 100 ms-per-tick production loop. Test `meshConn` uses a `done` channel and does not close the underlying datagram queues, avoiding send-on-closed panics while still unblocking `Read`.
+- Deferred/limitations: Panic recovery around the link goroutines is Task 6; device installation and frame handling are Tasks 3–4.
 
 ---
 
