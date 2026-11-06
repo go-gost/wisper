@@ -23,9 +23,12 @@ type EntryPeer struct {
 
 	Transport     string
 	DialedLocally bool
-	RTTMs         int64
-	InputBytes    uint64
-	OutputBytes   uint64
+	// RTTMs is the live transport's measured round trip in milliseconds: KCP's
+	// session SRTT or QUIC's connection RTT. Zero when no p2p session exists
+	// (the row reaches the peer through the hub, or is not connected).
+	RTTMs       int64
+	InputBytes  uint64
+	OutputBytes uint64
 }
 
 // PeerListReporter is implemented by a tun spoke entrypoint. The API asks for

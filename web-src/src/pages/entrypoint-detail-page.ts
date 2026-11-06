@@ -186,7 +186,7 @@ export class EntrypointDetailPage extends LitElement {
           <span class="peer-badge ${st.tone}" title=${st.hint}>
             ${icon(st.icon)}<span>${st.label}</span>
           </span>
-          ${ep.peer_kcp_live && (ep.peer_rtt_ms ?? 0) > 0
+          ${(ep.peer_rtt_live ?? ep.peer_kcp_live) && (ep.peer_rtt_ms ?? 0) > 0
             ? html`<span class="peer-rtt" title="${t('peersRTTHint')} · ${ep.peer_transport ?? ''}">${ep.peer_rtt_ms}ms</span>`
             : nothing}
           <button class="detail-btn" title=${t('p2pTransportDetail')}
@@ -204,14 +204,19 @@ export class EntrypointDetailPage extends LitElement {
               ${t('p2pTransportConnected')}${st.why ? ` · ${st.why}` : ` · ${t('p2pTransportHint')}`}
             </span>
           </div>
-          <!-- The round trip behind the inline number, in full. Only a live
-               KCP session reports it. -->
-          ${ep.peer_kcp_live
+          <!-- The round trip behind the inline number, in full. QUIC reports
+               only the RTT; the KCP-only retransmit timeout and variance stay
+               with a live KCP session so QUIC is not shown a false zero. -->
+          ${(ep.peer_rtt_live ?? ep.peer_kcp_live) && (ep.peer_rtt_ms ?? 0) > 0
             ? html`
               <div class="info-row detail-row">
-                <span class="info-label">${t('peersDiagSRTT')}</span>
-                <span class="info-value text detail-text">${ep.peer_rtt_ms ?? 0}ms</span>
+                <span class="info-label">${t('peersDiagRTT')}</span>
+                <span class="info-value text detail-text">${ep.peer_rtt_ms}ms</span>
               </div>
+            `
+            : nothing}
+          ${ep.peer_kcp_live
+            ? html`
               <div class="info-row detail-row">
                 <span class="info-label">${t('peersDiagRTO')}</span>
                 <span class="info-value text detail-text">${ep.peer_rto_ms ?? 0}ms</span>

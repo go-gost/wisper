@@ -262,6 +262,7 @@ const en: Record<string, string> = {
   entrypointPeersIPs: 'IP',
   entrypointPeersLANs: 'LAN',
   entrypointPeersTransport: 'Path',
+  entrypointPeersRTT: 'RTT {ms}ms',
   entrypointPeersTraffic: '↑ {in} · ↓ {out}',
   entrypointPeersDisabledHint: 'The hub has switched this member off; its route is withdrawn.',
   entrypointPeersStateHub: 'Hub',
@@ -326,11 +327,12 @@ const en: Record<string, string> = {
   peersDiagSession: 'Session',
   peersDiagSilence: 'Silence',
   peersDiagTrace: 'Recent rounds',
-  /** The peer's measured KCP round trip: the tooltip on the inline number.
-   *  Session-level on purpose — the pair runs one KCP session whichever underlay
-   *  is preferred, so the number is not the path named after it. */
-  peersRTTHint: 'KCP smoothed round-trip time to this peer (the pair\'s session value, not this path\'s)',
-  peersDiagSRTT: 'SRTT',
+  /** The peer's measured transport round trip: the tooltip on the inline
+   *  number. Session-level on purpose — the pair runs one KCP session (or one
+   *  QUIC connection) whichever underlay is preferred, so the number is not the
+   *  path named after it. */
+  peersRTTHint: 'Round-trip time to this peer: the KCP session SRTT or the QUIC connection RTT (the pair\'s value, not this path\'s)',
+  peersDiagRTT: 'RTT',
   peersDiagRTO: 'RTO',
   peersDiagRTTVar: 'RTT var',
   // Event history

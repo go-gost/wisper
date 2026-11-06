@@ -253,6 +253,7 @@ const zh: Record<string, string> = {
   entrypointPeersIPs: 'IP',
   entrypointPeersLANs: '局域网',
   entrypointPeersTransport: '路径',
+  entrypointPeersRTT: '延迟 {ms}ms',
   entrypointPeersTraffic: '↑ {in} · ↓ {out}',
   entrypointPeersDisabledHint: 'hub 已停用该成员，其路由已被撤回。',
   entrypointPeersStateHub: 'Hub',
@@ -311,10 +312,11 @@ const zh: Record<string, string> = {
   peersDiagSession: '会话',
   peersDiagSilence: '静默',
   peersDiagTrace: '最近记录',
-  /** 对端测得的 KCP 往返时延：内联数字上的悬停说明。会话级是刻意的——这对端无论
-   *  当前走哪条底层都只有同一个 KCP 会话，所以这个数字不是后面那条路径的。 */
-  peersRTTHint: '到该对端的 KCP 平滑往返时延（会话级数值，不是当前路径单独测得的）',
-  peersDiagSRTT: 'SRTT',
+  /** 对端测得的传输层往返时延：内联数字上的悬停说明。会话级是刻意的——这对端无论
+   *  当前走哪条底层都只有同一个 KCP 会话（或同一条 QUIC 连接），所以这个数字不是
+   *  后面那条路径的。 */
+  peersRTTHint: '到该对端的往返时延（KCP 会话 SRTT 或 QUIC 连接 RTT；会话级数值，不是当前路径单独测得的）',
+  peersDiagRTT: 'RTT',
   peersDiagRTO: 'RTO',
   peersDiagRTTVar: 'RTT var',
   // Event history

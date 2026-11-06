@@ -123,12 +123,15 @@ export class EntrypointPeersPage extends LitElement {
               </button>`
             : nothing}
         </div>
-        ${peer.ips?.length || peer.lans?.length || peer.transport || peer.input_bytes || peer.output_bytes
+        ${peer.ips?.length || peer.lans?.length || peer.transport || peer.rtt_ms || peer.input_bytes || peer.output_bytes
           ? html`
             <div class="meta">
               ${peer.ips?.length ? html`<span>${t('entrypointPeersIPs')} ${peer.ips.join(', ')}</span>` : nothing}
               ${peer.lans?.length ? html`<span>${t('entrypointPeersLANs')} ${peer.lans.join(', ')}</span>` : nothing}
               ${peer.transport ? html`<span>${t('entrypointPeersTransport')} ${peer.transport}</span>` : nothing}
+              ${peer.rtt_ms
+                ? html`<span>${t('entrypointPeersRTT', { ms: peer.rtt_ms })}</span>`
+                : nothing}
               ${peer.input_bytes || peer.output_bytes
                 ? html`<span>${t('entrypointPeersTraffic', {
                   in: formatBytes(peer.input_bytes ?? 0),

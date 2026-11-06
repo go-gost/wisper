@@ -1,4 +1,4 @@
-import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}from"./index-CdTQTsR8.js";import{n as f,r as u,h as R,m as k,c as E,a as v,b as m}from"./format-DhoiFF4n.js";import{i as d}from"./app-scaffold-_iq4zLbF.js";import{c as z}from"./clipboard-C3x8_sid.js";import{l as N,s as K}from"./lan-refusal-k9RApOgZ.js";import{a as C}from"./transport-B5UMiU-W.js";var L=Object.defineProperty,H=Object.getOwnPropertyDescriptor,b=(e,t,s,i)=>{for(var r=i>1?void 0:i?H(t,s):t,c=e.length-1,g;c>=0;c--)(g=e[c])&&(r=(i?g(t,s,r):g(r))||r);return i&&r&&L(t,s,r),r};let h=class extends y{constructor(){super(...arguments),this.peer=null,this.stat=null,this.disabled=!1,this.showKeys=!1,this.peersLAN="",this.lanRefused=[],this._expanded=!1}_renderTransport(){const e=C(this.stat?.transport);return e?n`<span class="peer-badge ${e.tone}" title=${e.hint}>
+import{i as $,a as k,A as o,b as n,c as a,t as T,G as D,s as A,g as R,B as E}from"./index-DCr0kI2s.js";import{n as f,r as u,h as z,m as P,c as C,a as m,b as w}from"./format-DuHVQLlV.js";import{i as d}from"./app-scaffold-BaJygc80.js";import{c as K}from"./clipboard-C3x8_sid.js";import{l as N,s as L}from"./lan-refusal-BUr9leIq.js";import{a as H}from"./transport-hRLQknOn.js";var S=Object.defineProperty,I=Object.getOwnPropertyDescriptor,b=(e,t,s,i)=>{for(var r=i>1?void 0:i?I(t,s):t,c=e.length-1,g;c>=0;c--)(g=e[c])&&(r=(i?g(t,s,r):g(r))||r);return i&&r&&S(t,s,r),r};let h=class extends k{constructor(){super(...arguments),this.peer=null,this.stat=null,this.disabled=!1,this.showKeys=!1,this.peersLAN="",this.lanRefused=[],this._expanded=!1}_renderTransport(){const e=H(this.stat?.transport);return e?n`<span class="peer-badge ${e.tone}" title=${e.hint}>
       ${d(e.icon)}<span>${e.label}</span>
     </span>`:o}_renderDiag(){const e=this.stat;if(!e)return o;const t=e.caps&&e.caps.length>0?e.caps.join(", "):"",s=(i,r)=>n`
       <div class="diag-row">
@@ -14,13 +14,14 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
         ${s(a("peersDiagEndpoint"),e.peer_addr||"—")}
         ${s(a("peersDiagCandidates"),String(e.candidates??0))}
         ${t?s(a("peersDiagCaps"),t):o}
-        ${s(a("peersDiagSession"),w(e.session_age_ms))}
-        ${s(a("peersDiagSilence"),w(e.last_recv_age_ms))}
-        <!-- The inline value in full: the smoothed RTT, the variance around it,
-             and the resend timeout the pair's KCP settled on. Only a live
-             session reports them. -->
-        ${e.kcp_live?n`
-              ${s(a("peersDiagSRTT"),`${e.srtt_ms??0}ms`)}
+        ${s(a("peersDiagSession"),x(e.session_age_ms))}
+        ${s(a("peersDiagSilence"),x(e.last_recv_age_ms))}
+        <!-- The inline value in full: the transport's measured round trip,
+             plus the extra KCP timing only a KCP session has. QUIC reports
+             just the RTT; its connection has no retransmit timeout or
+             variance to show. -->
+        ${_(e)&&v(e)>0?s(a("peersDiagRTT"),`${v(e)}ms`):o}
+        ${e?.kcp_live?n`
               ${s(a("peersDiagRTO"),`${e.rto_ms??0}ms`)}
               ${s(a("peersDiagRTTVar"),`${e.rttvar_ms??0}ms`)}
             `:o}
@@ -31,7 +32,7 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
                      the ring holds minutes of history, so a bare list cannot
                      say how long ago a round ran. The stamp is zipped by index
                      from trace_times, parallel to trace. -->
-                ${e.trace.map((i,r)=>n`<div class="trace-line">${i}${e.trace_times?.[r]?n`<span class="trace-time">${R(e.trace_times[r])}</span>`:o}</div>`)}
+                ${e.trace.map((i,r)=>n`<div class="trace-line">${i}${e.trace_times?.[r]?n`<span class="trace-time">${z(e.trace_times[r])}</span>`:o}</div>`)}
               </div>
             </div>`:o}
       </div>
@@ -48,9 +49,11 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
           <!-- The peer's measured round-trip time, ahead of the path badge so
                the badge keeps a fixed place: the alias above flexes, and a
                variable-width RTT to the badge's right would shift it as the
-               number changes. Only a live session has one: a peer whose KCP
-               never answered yet shows nothing rather than a zero. -->
-          ${t&&t.kcp_live&&(t.srtt_ms??0)>0?n`<span class="peer-rtt" title="${a("peersRTTHint")} · ${t.transport??""}">${t.srtt_ms}ms</span>`:o}
+               number changes. Only a live transport with a measurement has
+               one: a peer whose session never answered yet shows nothing
+               rather than a zero. The number is KCP's SRTT or QUIC's RTT,
+               whichever carries the peer. -->
+          ${t&&_(t)&&v(t)>0?n`<span class="peer-rtt" title="${a("peersRTTHint")} · ${t.transport??""}">${v(t)}ms</span>`:o}
           ${this.disabled?n`<span class="peer-badge" title=${a("peersDisabledHint")}>${a("peersDisabled")}</span>`:this._renderTransport()}
           ${s?n`<button class="icon-btn" title="${a("peersDiagDetails")}"
                 @click=${()=>{this._expanded=!this._expanded}}>
@@ -58,7 +61,7 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
               </button>`:o}
           ${this.rowActions}
         </div>
-        <div class="peer-key">${this.showKeys?e?.key:k(e?.key??"")}</div>
+        <div class="peer-key">${this.showKeys?e?.key:P(e?.key??"")}</div>
         <!-- The address the hub assigned this peer on its device network. Only a
              hub's rows hold one (a p2p tunnel has no device network), so it is
              absent — and this line with it — everywhere else. -->
@@ -90,13 +93,13 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
               ${this.lanRefusedAction?n`<div class="lan-refused-action">${this.lanRefusedAction}</div>`:o}
             </div>`:o}
         ${t?n`<div class="peer-stats">
-              <span>${E(t.current_conns)} ${a("p2pColConns")}</span>
-              <span>↓ ${v(t.output_bytes)} <span class="rate">${m(t.output_rate_bytes)}</span></span>
-              <span>↑ ${v(t.input_bytes)} <span class="rate">${m(t.input_rate_bytes)}</span></span>
+              <span>${C(t.current_conns)} ${a("p2pColConns")}</span>
+              <span>↓ ${m(t.output_bytes)} <span class="rate">${w(t.output_rate_bytes)}</span></span>
+              <span>↑ ${m(t.input_bytes)} <span class="rate">${w(t.input_rate_bytes)}</span></span>
             </div>`:n`<div class="peer-stats"><span class="muted">${a("peersNoTraffic")}</span></div>`}
         ${this._expanded&&s?this._renderDiag():o}
       </div>
-    `}};h.styles=x`
+    `}};h.styles=$`
     .peer-row {
       padding: 10px 12px;
       border-bottom: 1px solid var(--border-subtle);
@@ -306,7 +309,7 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
       width: 14px;
       height: 14px;
     }
-  `;b([f({attribute:!1})],h.prototype,"peer",2);b([f({attribute:!1})],h.prototype,"stat",2);b([f({type:Boolean})],h.prototype,"disabled",2);b([f({type:Boolean})],h.prototype,"showKeys",2);b([f()],h.prototype,"rowActions",2);b([f()],h.prototype,"peersLAN",2);b([f({attribute:!1})],h.prototype,"lanRefused",2);b([f()],h.prototype,"lanRefusedAction",2);b([u()],h.prototype,"_expanded",2);h=b([$("peer-stats-row")],h);function w(e){if(!e||e<=0)return"—";const t=Math.floor(e/1e3);if(t<60)return`${t}s`;const s=Math.floor(t/60);return s<60?`${s}m ${t%60}s`:`${Math.floor(s/60)}h ${s%60}m`}var O=Object.defineProperty,S=Object.getOwnPropertyDescriptor,p=(e,t,s,i)=>{for(var r=i>1?void 0:i?S(t,s):t,c=e.length-1,g;c>=0;c--)(g=e[c])&&(r=(i?g(t,s,r):g(r))||r);return i&&r&&O(t,s,r),r};function I(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function j(e){const t=new Map;for(const s of(e??"").split(/[\s,]+/)){const i=s.indexOf("=");if(i<0)continue;const r=s.slice(0,i);if(!r)continue;const c=s.slice(i+1);c&&t.set(r,[...t.get(r)??[],c])}return t}function _(e){const t=j(e?.options.lan_allow);return(e?.options.peers??[]).map(s=>({key:s.key,alias:s.alias??"",disabled:s.disabled===!0,ip:s.ip??"",lan:(t.get(s.key)??[]).join(", ")}))}function B(e){const t={};for(const s of e)!s.lanTouched&&!s.lan||(t[s.key]=s.lan.split(",").map(i=>i.trim()).filter(i=>i!==""));return t}let l=class extends y{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:"",disabled:!1,ip:"",lan:"",ipTouched:!1,lanTouched:!1},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._backend=new T,this._pending=[],this._unsub=null,this._toggleRow=async e=>{const t=this._rows.map((s,i)=>i===e?{...s,disabled:!s.disabled}:s);await this._save(t)},this._addPending=async e=>{await this._save([...this._rows,{key:e,alias:"",disabled:!1,ip:"",lan:""}])&&(this._pending=this._pending.filter(t=>t.key!==e))},this._dismissPending=async e=>{try{await this._backend.dismissPendingPeer(e),this._pending=this._pending.filter(t=>t.key!==e)}catch(t){const s=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${s?": "+s:""}`)}},this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim(),disabled:this._draft.disabled===!0,ip:this._draft.ip.trim(),ipTouched:this._draft.ipTouched===!0,lan:this._draft.lan.trim(),lanTouched:this._draft.lanTouched===!0};if(!I(e.key)){this._rowError=a("peersKeyInvalid");return}if(this._rows.filter((i,r)=>r!==this._editing).some(i=>i.key===e.key)){this._rowError=a("peersKeyDuplicate");return}const s=this._editing==="new"?[...this._rows,e]:this._rows.map((i,r)=>r===this._editing?e:i);await this._save(s)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,s)=>s!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=P(()=>this._load())}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=D().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=_(e),this._loadPending()}async _loadPending(){try{this._pending=(await this._backend.listPendingPeers()).peers??[]}catch{}}_startEdit(e){this._editing=e,this._draft={...this._rows[e],ipTouched:!1,lanTouched:!1},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:"",disabled:!1,ip:"",lan:"",ipTouched:!1,lanTouched:!1},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}get _isHub(){return this._tunnel?.type==="tun"}_refusedFor(e){return N(this._tunnel?.lan).filter(t=>!t.resolved&&t.peer===e)}_allowRefused(e,t){const s=this._rows[e],i=s.lan.split(",").map(r=>r.trim()).filter(r=>r!=="");for(const r of t)r.fixableByAllow&&!i.includes(r.prefix)&&i.push(r.prefix);this._editing=e,this._draft={...s,lan:i.join(", "),lanTouched:!0},this._rowError=""}_ago(e){const t=Math.max(0,(Date.now()-Date.parse(e))/1e3);return t<60?a("peersPendingJustNow"):a("peersPendingMinutes",{n:Math.floor(t/60)})}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await A(this.tunnelId,e.map(s=>({key:s.key,alias:s.alias||void 0,disabled:s.disabled||void 0,...s.ipTouched?{ip:s.ip.trim()}:{}})),this._isHub?B(e):void 0);return this._tunnel=t,this._rows=_(t),this._showSnackbar(a("saved")),!0}catch(t){const s=K(t);return this._editing!==null?this._rowError=s:this._showSnackbar(s),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderEditor(){return n`
+  `;b([f({attribute:!1})],h.prototype,"peer",2);b([f({attribute:!1})],h.prototype,"stat",2);b([f({type:Boolean})],h.prototype,"disabled",2);b([f({type:Boolean})],h.prototype,"showKeys",2);b([f()],h.prototype,"rowActions",2);b([f()],h.prototype,"peersLAN",2);b([f({attribute:!1})],h.prototype,"lanRefused",2);b([f()],h.prototype,"lanRefusedAction",2);b([u()],h.prototype,"_expanded",2);h=b([T("peer-stats-row")],h);function v(e){return e?.rtt_ms??e?.srtt_ms??0}function _(e){return e?.rtt_live??e?.kcp_live??!1}function x(e){if(!e||e<=0)return"—";const t=Math.floor(e/1e3);if(t<60)return`${t}s`;const s=Math.floor(t/60);return s<60?`${s}m ${t%60}s`:`${Math.floor(s/60)}h ${s%60}m`}var O=Object.defineProperty,j=Object.getOwnPropertyDescriptor,p=(e,t,s,i)=>{for(var r=i>1?void 0:i?j(t,s):t,c=e.length-1,g;c>=0;c--)(g=e[c])&&(r=(i?g(t,s,r):g(r))||r);return i&&r&&O(t,s,r),r};function B(e){if(!/^[A-Za-z0-9_-]{43}$/.test(e))return!1;try{const t=e+"=".repeat((4-e.length%4)%4);return atob(t.replace(/-/g,"+").replace(/_/g,"/")).length===32}catch{return!1}}function M(e){const t=new Map;for(const s of(e??"").split(/[\s,]+/)){const i=s.indexOf("=");if(i<0)continue;const r=s.slice(0,i);if(!r)continue;const c=s.slice(i+1);c&&t.set(r,[...t.get(r)??[],c])}return t}function y(e){const t=M(e?.options.lan_allow);return(e?.options.peers??[]).map(s=>({key:s.key,alias:s.alias??"",disabled:s.disabled===!0,ip:s.ip??"",lan:(t.get(s.key)??[]).join(", ")}))}function F(e){const t={};for(const s of e)!s.lanTouched&&!s.lan||(t[s.key]=s.lan.split(",").map(i=>i.trim()).filter(i=>i!==""));return t}let l=class extends k{constructor(){super(...arguments),this.tunnelType="",this.tunnelId="",this._tunnel=null,this._rows=[],this._editing=null,this._draft={key:"",alias:"",disabled:!1,ip:"",lan:"",ipTouched:!1,lanTouched:!1},this._saving=!1,this._rowError="",this._confirmDelete=null,this._showKeys=!1,this._snackbar="",this._backend=new D,this._pending=[],this._unsub=null,this._toggleRow=async e=>{const t=this._rows.map((s,i)=>i===e?{...s,disabled:!s.disabled}:s);await this._save(t)},this._addPending=async e=>{await this._save([...this._rows,{key:e,alias:"",disabled:!1,ip:"",lan:""}])&&(this._pending=this._pending.filter(t=>t.key!==e))},this._dismissPending=async e=>{try{await this._backend.dismissPendingPeer(e),this._pending=this._pending.filter(t=>t.key!==e)}catch(t){const s=t instanceof Error?t.message:"";this._showSnackbar(`${a("saveFailed")}${s?": "+s:""}`)}},this._saveRow=async()=>{const e={key:this._draft.key.trim(),alias:this._draft.alias.trim(),disabled:this._draft.disabled===!0,ip:this._draft.ip.trim(),ipTouched:this._draft.ipTouched===!0,lan:this._draft.lan.trim(),lanTouched:this._draft.lanTouched===!0};if(!B(e.key)){this._rowError=a("peersKeyInvalid");return}if(this._rows.filter((i,r)=>r!==this._editing).some(i=>i.key===e.key)){this._rowError=a("peersKeyDuplicate");return}const s=this._editing==="new"?[...this._rows,e]:this._rows.map((i,r)=>r===this._editing?e:i);await this._save(s)&&(this._editing=null,this._rowError="")},this._deleteRow=async e=>{this._confirmDelete=null,await this._save(this._rows.filter((t,s)=>s!==e))}}connectedCallback(){super.connectedCallback(),this._load(),this._unsub=A(()=>this._load())}disconnectedCallback(){super.disconnectedCallback(),this._unsub?.()}_load(){const e=R().find(t=>t.id===this.tunnelId)??null;this._tunnel=e,this._rows=y(e),this._loadPending()}async _loadPending(){try{this._pending=(await this._backend.listPendingPeers()).peers??[]}catch{}}_startEdit(e){this._editing=e,this._draft={...this._rows[e],ipTouched:!1,lanTouched:!1},this._rowError=""}_startAdd(){this._editing="new",this._draft={key:"",alias:"",disabled:!1,ip:"",lan:"",ipTouched:!1,lanTouched:!1},this._rowError=""}_cancelEdit(){this._editing=null,this._rowError=""}get _isHub(){return this._tunnel?.type==="tun"}_refusedFor(e){return N(this._tunnel?.lan).filter(t=>!t.resolved&&t.peer===e)}_allowRefused(e,t){const s=this._rows[e],i=s.lan.split(",").map(r=>r.trim()).filter(r=>r!=="");for(const r of t)r.fixableByAllow&&!i.includes(r.prefix)&&i.push(r.prefix);this._editing=e,this._draft={...s,lan:i.join(", "),lanTouched:!0},this._rowError=""}_ago(e){const t=Math.max(0,(Date.now()-Date.parse(e))/1e3);return t<60?a("peersPendingJustNow"):a("peersPendingMinutes",{n:Math.floor(t/60)})}async _save(e){if(this._saving)return!1;this._saving=!0;try{const t=await E(this.tunnelId,e.map(s=>({key:s.key,alias:s.alias||void 0,disabled:s.disabled||void 0,...s.ipTouched?{ip:s.ip.trim()}:{}})),this._isHub?F(e):void 0);return this._tunnel=t,this._rows=y(t),this._showSnackbar(a("saved")),!0}catch(t){const s=L(t);return this._editing!==null?this._rowError=s:this._showSnackbar(s),!1}finally{this._saving=!1}}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar=""},2500)}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_statFor(e){return(this._tunnel?.peer_stats??[]).find(t=>t.key===e)}_renderEditor(){return n`
       <div class="peer-row editing">
         <div class="row-line">
           <input class="form-input alias grow" .value=${this._draft.alias}
@@ -370,7 +373,7 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
                     ${this._pending.map(t=>n`
                       <div class="peer-row">
                         <div class="row-line">
-                          <span class="peer-key">${this._showKeys?t.key:k(t.key)}</span>
+                          <span class="peer-key">${this._showKeys?t.key:P(t.key)}</span>
                           <span class="peer-age">
                             ${a("peersPendingAttempts",{n:t.attempts})} · ${this._ago(t.last_seen)}
                           </span>
@@ -414,7 +417,7 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
                             @click=${()=>this._toggleRow(s)}>
                             ${d(t.disabled?"play":"stop")}
                           </button>
-                          <button class="icon-btn" title="${a("btnCopy")}" @click=${()=>z(t.key)}>
+                          <button class="icon-btn" title="${a("btnCopy")}" @click=${()=>K(t.key)}>
                             ${d("copy")}
                           </button>
                           <button class="icon-btn" title="${a("btnEdit")}" @click=${()=>this._startEdit(s)}>
@@ -461,7 +464,7 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
 
         ${this._snackbar?n`<div class="toast">${this._snackbar}</div>`:o}
       </app-scaffold>
-    `}};l.styles=x`
+    `}};l.styles=$`
     .back-btn {
       background: none;
       border: none;
@@ -727,4 +730,4 @@ import{i as x,a as y,A as o,b as n,c as a,t as $,G as T,s as P,g as D,B as A}fro
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       z-index: 100;
     }
-  `;p([f()],l.prototype,"tunnelType",2);p([f()],l.prototype,"tunnelId",2);p([u()],l.prototype,"_tunnel",2);p([u()],l.prototype,"_rows",2);p([u()],l.prototype,"_editing",2);p([u()],l.prototype,"_draft",2);p([u()],l.prototype,"_saving",2);p([u()],l.prototype,"_rowError",2);p([u()],l.prototype,"_confirmDelete",2);p([u()],l.prototype,"_showKeys",2);p([u()],l.prototype,"_snackbar",2);p([u()],l.prototype,"_pending",2);l=p([$("tunnel-peers-page")],l);export{l as TunnelPeersPage};
+  `;p([f()],l.prototype,"tunnelType",2);p([f()],l.prototype,"tunnelId",2);p([u()],l.prototype,"_tunnel",2);p([u()],l.prototype,"_rows",2);p([u()],l.prototype,"_editing",2);p([u()],l.prototype,"_draft",2);p([u()],l.prototype,"_saving",2);p([u()],l.prototype,"_rowError",2);p([u()],l.prototype,"_confirmDelete",2);p([u()],l.prototype,"_showKeys",2);p([u()],l.prototype,"_snackbar",2);p([u()],l.prototype,"_pending",2);l=p([T("tunnel-peers-page")],l);export{l as TunnelPeersPage};

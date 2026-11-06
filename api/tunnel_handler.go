@@ -34,15 +34,18 @@ type tunnelResponse struct {
 	// PeerTransport is where a p2p entrypoint's peer traffic goes right now:
 	// "direct" or "derp". Empty when it is not connected, or not a p2p object.
 	PeerTransport string `json:"peer_transport,omitempty"`
-	// The remote peer's KCP round-trip measurements, in milliseconds, for a p2p
-	// entrypoint's single peer: PeerRTTMs the smoothed RTT, PeerRtoMs the
-	// retransmit timeout the pair's KCP has settled on, PeerRttVarMs the
-	// variance around it. Absent until the peer's KCP session has actually
-	// measured a round trip — a zero would read as "instant", where an absent
-	// field says "not measured". PeerKcpLive says whether that session exists.
-	// The same three numbers a peer_stats row carries, on the face that has one
-	// peer rather than a list of them.
+	// The remote peer's measured round-trip time, in milliseconds, for a p2p
+	// object's peer: PeerRTTMs is the value the active transport measured (KCP
+	// SRTT or QUIC RTT), PeerRtoMs the retransmit timeout the pair's KCP has
+	// settled on and PeerRttVarMs the variance around it. The RTO and variance
+	// are KCP-only; QUIC leaves them absent. Absent until the transport has
+	// actually measured a round trip — a zero would read as "instant", where an
+	// absent field says "not measured". PeerRTTLive says whether the transport
+	// session exists; PeerKcpLive is the KCP-only half, kept for clients that
+	// predate QUIC. The same numbers a peer_stats row carries, on the face that
+	// has one peer rather than a list of them.
 	PeerRTTMs    int64 `json:"peer_rtt_ms,omitempty"`
+	PeerRTTLive  bool  `json:"peer_rtt_live,omitempty"`
 	PeerRtoMs    int64 `json:"peer_rto_ms,omitempty"`
 	PeerRttVarMs int64 `json:"peer_rttvar_ms,omitempty"`
 	PeerKcpLive  bool  `json:"peer_kcp_live,omitempty"`
@@ -81,6 +84,14 @@ type peerStatsJSON struct {
 	Caps          []string `json:"caps,omitempty"`
 	SessionAgeMs  int64    `json:"session_age_ms,omitempty"`
 	LastRecvAgeMs int64    `json:"last_recv_age_ms,omitempty"`
+	// The peer's measured round-trip time in milliseconds, whichever data plane
+	// carries it: KCP's session SRTT or QUIC's connection RTT. RTTLive is the
+	// display gate — absent until a live transport has actually measured a
+	// round trip, because a zero would read as "instant". RTTMs is the generic
+	// number the UI shows; the KCP-only trio below stays for KCP peers (and for
+	// an older client that still reads those fields).
+	RTTMs   int64 `json:"rtt_ms,omitempty"`
+	RTTLive bool  `json:"rtt_live,omitempty"`
 	// The peer's KCP round-trip measurements, in milliseconds: SrttMs the
 	// smoothed RTT, RtoMs the retransmit timeout the pair's KCP has settled on,
 	// RttVarMs the variance around the smoothed value. Each is absent while it
@@ -330,16 +341,11 @@ func peersJSON(peers []string, aliases map[string]string, disabled []string, pee
 	return out
 }
 
-// peerRTTFields carries the pair-KCP RTT trio out of one peer's diagnostic.
-// The single mapping point for the three JSON faces that show it: the peer
-// stats row, the identity peer diagnostics and the single-peer tunnel
-// response. A missing or dead session reads as all-zero, which the UI hides.
-func peerRTTFields(diags map[string]p2p.PeerDiagnostic, peer string) (srtt, rto, rttvar int64, live bool) {
-	if peer == "" {
-		return 0, 0, 0, false
-	}
-	k := diags[peer].RelayKCP
-	return k.SRTT, k.RTO, k.RTTVar, k.Live
+// peerRTTFields carries the pair's transport RTT out of one peer's diagnostic.
+// The mapping itself lives in tunnel.PeerRTTFor, so the API faces and the tun
+// spoke's peer list cannot disagree about which transport to read.
+func peerRTTFields(diags map[string]p2p.PeerDiagnostic, peer string) tunnel.PeerRTT {
+	return tunnel.PeerRTTFor(diags, peer)
 }
 
 // traceTimesMillis maps the p2p host's per-line punch-trace stamps to Unix
@@ -468,7 +474,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	if ps, ok := t.(tunnel.PeerStatsReporter); ok {
 		for _, p := range ps.PeerStats() {
 			d := diagnostics[p.Key]
-			srtt, rto, rttvar, live := peerRTTFields(diagnostics, p.Key)
+			rtt := peerRTTFields(diagnostics, p.Key)
 			transport := transports[p.Key]
 			if transport == "" && tunnel.P2PHostRunning() {
 				transport = "server-unreachable"
@@ -486,10 +492,12 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 				Caps:            d.Caps,
 				SessionAgeMs:    d.SessionAge.Milliseconds(),
 				LastRecvAgeMs:   d.LastRecvAge.Milliseconds(),
-				SrttMs:          srtt,
-				RtoMs:           rto,
-				RttVarMs:        rttvar,
-				KcpLive:         live,
+				RTTMs:           rtt.RTTMs,
+				RTTLive:         rtt.Live,
+				SrttMs:          rtt.KcpSRTT(),
+				RtoMs:           rtt.RTOMs,
+				RttVarMs:        rtt.RTTVarMs,
+				KcpLive:         rtt.KcpLive(),
 				Trace:           d.Trace,
 				TraceTimes:      traceTimesMillis(d.TraceTimes),
 				LAN:             peerLAN[p.Key],
@@ -515,7 +523,12 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		if resp.PeerTransport == "" && tunnel.P2PHostRunning() {
 			resp.PeerTransport = "server-unreachable"
 		}
-		resp.PeerRTTMs, resp.PeerRtoMs, resp.PeerRttVarMs, resp.PeerKcpLive = peerRTTFields(diagnostics, rttPeer)
+		rtt := peerRTTFields(diagnostics, rttPeer)
+		resp.PeerRTTMs = rtt.RTTMs
+		resp.PeerRTTLive = rtt.Live
+		resp.PeerRtoMs = rtt.RTOMs
+		resp.PeerRttVarMs = rtt.RTTVarMs
+		resp.PeerKcpLive = rtt.KcpLive()
 	}
 	// The routes table and the per-spoke column on the allowlist above are the
 	// same snapshot the peer rows were filled from: a hub cannot report one

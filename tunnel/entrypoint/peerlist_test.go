@@ -7,7 +7,9 @@ import (
 	"os"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/go-gost/p2p"
 	cfg "github.com/go-gost/wisper/config"
 	tp "github.com/go-gost/wisper/tunnel"
 	tunhandler "github.com/go-gost/x/handler/tun"
@@ -81,6 +83,13 @@ func TestTunPeerListRows(t *testing.T) {
 	if err := te.SetBlockedPeers(context.Background(), []string{"peerC", "peerGone"}); err != nil {
 		t.Fatalf("SetBlockedPeers: %v", err)
 	}
+	restoreStatus := p2pStatus
+	p2pStatus = func() p2p.Status {
+		return p2p.Status{PeerDiagnostics: map[string]p2p.PeerDiagnostic{
+			hub: {Transport: "quic", QUIC: &p2p.QUICStats{Live: true, RTT: 42 * time.Millisecond}},
+		}}
+	}
+	t.Cleanup(func() { p2pStatus = restoreStatus })
 
 	rows := te.PeerList()
 	if len(rows) != 5 {
@@ -88,6 +97,19 @@ func TestTunPeerListRows(t *testing.T) {
 	}
 	if rows[0].Key != hub || rows[0].State != "hub" || rows[0].Name != "Hub" {
 		t.Fatalf("first row = %+v, want the hub row", rows[0])
+	}
+	if rows[0].RTTMs != 42 {
+		t.Fatalf("hub RTT = %dms, want the QUIC connection's 42ms", rows[0].RTTMs)
+	}
+	// A diagnostic left behind by a dead session must not draw a latency on a
+	// row whose transport is gone.
+	p2pStatus = func() p2p.Status {
+		return p2p.Status{PeerDiagnostics: map[string]p2p.PeerDiagnostic{
+			hub: {Transport: "quic", QUIC: &p2p.QUICStats{Live: false, RTT: 42 * time.Millisecond}},
+		}}
+	}
+	if got := te.PeerList()[0].RTTMs; got != 0 {
+		t.Fatalf("dead hub session RTT = %dms, want no value", got)
 	}
 	if rows[1].Key != "peerA" || rows[1].State != "disabled" || rows[1].Name != "off" {
 		t.Fatalf("peerA row = %+v, want disabled", rows[1])
@@ -169,6 +191,14 @@ func TestTunPeerListJoinsMeshStatus(t *testing.T) {
 		members: []tunhandler.MeshMember{{Key: "peerB", IP: net.ParseIP("10.10.100.5"), Direct: true}},
 		dialed:  map[string]bool{"peerB": true},
 	}}
+	restoreStatus := p2pStatus
+	p2pStatus = func() p2p.Status {
+		return p2p.Status{PeerDiagnostics: map[string]p2p.PeerDiagnostic{
+			hub:     {Transport: "quic", QUIC: &p2p.QUICStats{Live: true, RTT: 43 * time.Millisecond}},
+			"peerB": {Transport: "quic", QUIC: &p2p.QUICStats{Live: true, RTT: 17 * time.Millisecond}},
+		}}
+	}
+	t.Cleanup(func() { p2pStatus = restoreStatus })
 
 	rows := te.PeerList()
 	if len(rows) != 2 {
@@ -177,8 +207,14 @@ func TestTunPeerListJoinsMeshStatus(t *testing.T) {
 	if rows[0].Key != hub || rows[0].State != "hub" {
 		t.Fatalf("hub row = %+v", rows[0])
 	}
+	if rows[0].RTTMs != 43 {
+		t.Fatalf("hub RTT = %dms, want the QUIC connection's 43ms", rows[0].RTTMs)
+	}
 	if rows[1].Key != "peerB" || rows[1].State != "direct" || !rows[1].Direct {
 		t.Fatalf("direct row = %+v", rows[1])
+	}
+	if rows[1].RTTMs != 17 {
+		t.Fatalf("direct peer RTT = %dms, want 17ms", rows[1].RTTMs)
 	}
 	if !slices.Equal(rows[1].LANs, []string{"192.168.50.0/24"}) {
 		t.Fatalf("LANs = %v", rows[1].LANs)

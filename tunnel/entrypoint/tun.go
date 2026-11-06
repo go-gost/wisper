@@ -262,9 +262,15 @@ func (s *tunEntryPoint) PeerList() []tunnel.EntryPeer {
 		}
 	}
 
+	host := p2pStatus()
 	out := make([]tunnel.EntryPeer, 0, len(members)+1)
 	if hub != "" {
-		out = append(out, tunnel.EntryPeer{Key: hub, Name: "Hub", State: "hub"})
+		out = append(out, tunnel.EntryPeer{
+			Key:   hub,
+			Name:  "Hub",
+			State: "hub",
+			RTTMs: liveRTT(tunnel.PeerRTTFor(host.PeerDiagnostics, hub)),
+		})
 	}
 
 	sort.Slice(members, func(i, j int) bool { return members[i].Key < members[j].Key })
@@ -296,6 +302,7 @@ func (s *tunEntryPoint) PeerList() []tunnel.EntryPeer {
 			Blocked:  blocked[m.Key],
 			Direct:   m.Direct,
 			Disabled: m.Disabled,
+			RTTMs:    liveRTT(tunnel.PeerRTTFor(host.PeerDiagnostics, m.Key)),
 		})
 	}
 
@@ -310,6 +317,21 @@ func (s *tunEntryPoint) PeerList() []tunnel.EntryPeer {
 		out = append(out, tunnel.EntryPeer{Key: key, State: "blocked", Blocked: true})
 	}
 	return out
+}
+
+// p2pStatus is the shared host's status snapshot. It is a package var so a
+// test can supply peer diagnostics without starting a host; production reads
+// the in-process p2p host.
+var p2pStatus = tunnel.P2PHostStatus
+
+// liveRTT is the peer list's display value: a measured round trip, but only
+// while the transport session is actually alive. A stale diagnostic from a dead
+// session must not leave a number on a row that says "hub" or "blocked".
+func liveRTT(r tunnel.PeerRTT) int64 {
+	if !r.Live {
+		return 0
+	}
+	return r.RTTMs
 }
 
 // meshPeerList is the direct-path view. The mesh handler owns the live state
@@ -339,7 +361,9 @@ func meshPeerList(
 	for _, m := range members {
 		net[m.Key] = m
 	}
-	transports := tunnel.P2PHostStatus().PeerTransports
+	host := p2pStatus()
+	transports := host.PeerTransports
+	diags := host.PeerDiagnostics
 
 	out := make([]tunnel.EntryPeer, 0, len(status))
 	seen := make(map[string]bool, len(status))
@@ -351,7 +375,12 @@ func meshPeerList(
 		}
 	}
 	if hub != "" && !hasHub {
-		out = append(out, tunnel.EntryPeer{Key: hub, Name: "Hub", State: "hub"})
+		out = append(out, tunnel.EntryPeer{
+			Key:   hub,
+			Name:  "Hub",
+			State: "hub",
+			RTTMs: liveRTT(tunnel.PeerRTTFor(diags, hub)),
+		})
 		seen[hub] = true
 	}
 	for _, st := range status {
@@ -370,6 +399,7 @@ func meshPeerList(
 			Disabled:      m.Disabled || st.State == "disabled",
 			Transport:     transports[st.Key],
 			DialedLocally: st.DialedLocally,
+			RTTMs:         liveRTT(tunnel.PeerRTTFor(diags, st.Key)),
 			InputBytes:    st.BytesIn,
 			OutputBytes:   st.BytesOut,
 		}

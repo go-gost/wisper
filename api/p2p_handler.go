@@ -50,12 +50,17 @@ type peerDiagnosticJSON struct {
 	Caps          []string `json:"caps,omitempty"`
 	SessionAgeMs  int64    `json:"session_age_ms,omitempty"`
 	LastRecvAgeMs int64    `json:"last_recv_age_ms,omitempty"`
-	// The peer's KCP round-trip measurements, in milliseconds, mapped from the
-	// same point the peer_stats rows use (peerRTTFields): the smoothed RTT, the
-	// retransmit timeout the pair's KCP has settled on and the variance around
-	// it. Absent until the peer's KCP session has measured a round trip — the
-	// peer holding no session, or one that has never exchanged a packet worth
-	// timing, carries none — and KcpLive reports whether that session exists.
+	// The peer's measured round-trip time, in milliseconds, from whichever data
+	// plane carries it (the same mapping point the peer_stats rows use):
+	// RTTMs is KCP's smoothed RTT or QUIC's connection RTT, and RTTLive reports
+	// whether that transport session exists. Absent until it has measured a
+	// round trip. The KCP-only trio below is kept for an older client; QUIC
+	// leaves it absent.
+	RTTMs   int64 `json:"rtt_ms,omitempty"`
+	RTTLive bool  `json:"rtt_live,omitempty"`
+	// The peer's KCP round-trip measurements, in milliseconds: the smoothed
+	// RTT, the retransmit timeout the pair's KCP has settled on and the
+	// variance around it. Absent for QUIC, which has no KCP session.
 	SrttMs   int64 `json:"srtt_ms,omitempty"`
 	RtoMs    int64 `json:"rto_ms,omitempty"`
 	RttVarMs int64 `json:"rttvar_ms,omitempty"`
@@ -72,7 +77,7 @@ func peerDiagnosticsJSON(in map[string]p2p.PeerDiagnostic) map[string]peerDiagno
 	}
 	out := make(map[string]peerDiagnosticJSON, len(in))
 	for k, d := range in {
-		srtt, rto, rttvar, live := peerRTTFields(in, k)
+		rtt := peerRTTFields(in, k)
 		out[k] = peerDiagnosticJSON{
 			Path:          d.Path,
 			Reason:        d.Reason,
@@ -84,10 +89,12 @@ func peerDiagnosticsJSON(in map[string]p2p.PeerDiagnostic) map[string]peerDiagno
 			Caps:          d.Caps,
 			SessionAgeMs:  d.SessionAge.Milliseconds(),
 			LastRecvAgeMs: d.LastRecvAge.Milliseconds(),
-			SrttMs:        srtt,
-			RtoMs:         rto,
-			RttVarMs:      rttvar,
-			KcpLive:       live,
+			RTTMs:         rtt.RTTMs,
+			RTTLive:       rtt.Live,
+			SrttMs:        rtt.KcpSRTT(),
+			RtoMs:         rtt.RTOMs,
+			RttVarMs:      rtt.RTTVarMs,
+			KcpLive:       rtt.KcpLive(),
 			Attempts:      d.Attempts,
 			Ups:           d.Ups,
 			Drops:         d.Drops,

@@ -53,8 +53,8 @@ func TestEntrypointPeersGET(t *testing.T) {
 
 	const hub = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	fake := newFakePeerEntryPoint(t, "ep-peers-get", hub, []tunnel.EntryPeer{
-		{Key: hub, Name: "Hub", State: "hub"},
-		{Key: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", Name: "laptop", State: "direct-off", Direct: true},
+		{Key: hub, Name: "Hub", State: "hub", RTTMs: 21},
+		{Key: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", Name: "laptop", State: "direct-off", Direct: true, RTTMs: 43},
 	})
 
 	resp, body := getJSON(t, srv.URL+"/api/entrypoints/"+fake.ID()+"/peers")
@@ -69,9 +69,15 @@ func TestEntrypointPeersGET(t *testing.T) {
 	if first["key"] != hub || first["state"] != "hub" {
 		t.Fatalf("first row = %v, want the hub", first)
 	}
+	if first["rtt_ms"] != float64(21) {
+		t.Fatalf("hub rtt_ms = %v, want 21", first["rtt_ms"])
+	}
 	second, _ := peers[1].(map[string]any)
 	if second["state"] != "direct-off" || second["direct"] != true {
 		t.Fatalf("second row = %v, want direct-off", second)
+	}
+	if second["rtt_ms"] != float64(43) {
+		t.Fatalf("direct row rtt_ms = %v, want 43", second["rtt_ms"])
 	}
 
 	// A non-tun entrypoint has no local device network.

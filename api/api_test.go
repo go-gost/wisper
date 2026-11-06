@@ -3172,24 +3172,35 @@ func TestDoctorShowsLanSection(t *testing.T) {
 // TestPeerRTTFieldsMapping: the one mapping point every JSON face shares.
 func TestPeerRTTFieldsMapping(t *testing.T) {
 	diags := map[string]p2p.PeerDiagnostic{
-		"live": {RelayKCP: p2p.RelayKCPStats{SRTT: 23, RTO: 200, RTTVar: 5, Live: true}},
-		"idle": {RelayKCP: p2p.RelayKCPStats{SRTT: 0, RTO: 0, RTTVar: 0, Live: false}},
+		"live":       {RelayKCP: p2p.RelayKCPStats{SRTT: 23, RTO: 200, RTTVar: 5, Live: true}},
+		"idle":       {RelayKCP: p2p.RelayKCPStats{SRTT: 0, RTO: 0, RTTVar: 0, Live: false}},
+		"quic":       {Transport: "quic", QUIC: &p2p.QUICStats{Live: true, RTT: 42 * time.Millisecond}},
+		"quic-subms": {Transport: "quic", QUIC: &p2p.QUICStats{Live: true, RTT: 300 * time.Microsecond}},
+		"quic-dead":  {Transport: "quic", QUIC: &p2p.QUICStats{Live: false, RTT: 0}},
+		"quic-nil":   {Transport: "quic"},
+		"quic-relay": {Transport: "quic", RelayKCP: p2p.RelayKCPStats{SRTT: 99, RTO: 300, RTTVar: 7, Live: true}},
 	}
 	cases := []struct {
-		name              string
-		peer              string
-		srtt, rto, rttvar int64
-		live              bool
+		name             string
+		peer             string
+		rtt, rto, rttvar int64
+		live, kcp        bool
 	}{
-		{"live session", "live", 23, 200, 5, true},
-		{"no session entry", "absent", 0, 0, 0, false},
-		{"dead session", "idle", 0, 0, 0, false},
-		{"no peer at all", "", 0, 0, 0, false},
+		{"live KCP session", "live", 23, 200, 5, true, true},
+		{"no session entry", "absent", 0, 0, 0, false, true},
+		{"dead KCP session", "idle", 0, 0, 0, false, true},
+		{"live QUIC connection", "quic", 42, 0, 0, true, false},
+		{"sub-millisecond QUIC connection", "quic-subms", 1, 0, 0, true, false},
+		{"dead QUIC connection", "quic-dead", 0, 0, 0, false, false},
+		{"QUIC without a connection", "quic-nil", 0, 0, 0, false, false},
+		{"QUIC ignores stale KCP stats", "quic-relay", 0, 0, 0, false, false},
+		{"no peer at all", "", 0, 0, 0, false, false},
 	}
 	for _, c := range cases {
-		if srtt, rto, rttvar, live := peerRTTFields(diags, c.peer); srtt != c.srtt || rto != c.rto || rttvar != c.rttvar || live != c.live {
-			t.Errorf("%s: peerRTTFields = %d/%d/%d/%v, want %d/%d/%d/%v",
-				c.name, srtt, rto, rttvar, live, c.srtt, c.rto, c.rttvar, c.live)
+		got := peerRTTFields(diags, c.peer)
+		if got.RTTMs != c.rtt || got.RTOMs != c.rto || got.RTTVarMs != c.rttvar || got.Live != c.live || got.KCP != c.kcp {
+			t.Errorf("%s: peerRTTFields = %+v, want %d/%d/%d/%v/%v",
+				c.name, got, c.rtt, c.rto, c.rttvar, c.live, c.kcp)
 		}
 	}
 }
@@ -3244,6 +3255,60 @@ func TestPeerRTTWireShape(t *testing.T) {
 		}
 	}
 
+	// A QUIC peer carries the same generic round-trip number on the row, the
+	// single-peer face and the identity diagnostics, while the KCP-only trio
+	// stays absent: QUIC has no RTO/RTTVar, and the old KCP fields must not
+	// pretend it does.
+	quic := map[string]p2p.PeerDiagnostic{
+		"q": {Transport: "quic", QUIC: &p2p.QUICStats{Live: true, RTT: 42 * time.Millisecond}},
+	}
+	quicSingle, err := json.Marshal(tunnelResponse{PeerRTTMs: 42, PeerRTTLive: true})
+	if err != nil {
+		t.Fatalf("marshal quic tunnelResponse: %v", err)
+	}
+	for _, want := range []string{`"peer_rtt_ms":42`, `"peer_rtt_live":true`} {
+		if !strings.Contains(string(quicSingle), want) {
+			t.Errorf("QUIC tunnel response missing %s: %s", want, quicSingle)
+		}
+	}
+	for _, unwanted := range []string{"peer_kcp_live", "peer_rto_ms", "peer_rttvar_ms"} {
+		if strings.Contains(string(quicSingle), unwanted) {
+			t.Errorf("QUIC tunnel response carries %s: %s", unwanted, quicSingle)
+		}
+	}
+
+	quicDiag, err := json.Marshal(peerDiagnosticsJSON(quic)["q"])
+	if err != nil {
+		t.Fatalf("marshal quic peerDiagnosticJSON: %v", err)
+	}
+	for _, want := range []string{`"rtt_ms":42`, `"rtt_live":true`} {
+		if !strings.Contains(string(quicDiag), want) {
+			t.Errorf("QUIC peer_diagnostics row missing %s: %s", want, quicDiag)
+		}
+	}
+	for _, unwanted := range []string{"srtt_ms", "rto_ms", "rttvar_ms", "kcp_live"} {
+		if strings.Contains(string(quicDiag), unwanted) {
+			t.Errorf("QUIC peer_diagnostics row carries %s: %s", unwanted, quicDiag)
+		}
+	}
+
+	// The peer_stats row carries the generic fields too, and the KCP-only ones
+	// are not synthesized for QUIC.
+	rowQ, err := json.Marshal(peerStatsJSON{RTTMs: 42, RTTLive: true})
+	if err != nil {
+		t.Fatalf("marshal quic peerStatsJSON: %v", err)
+	}
+	for _, want := range []string{`"rtt_ms":42`, `"rtt_live":true`} {
+		if !strings.Contains(string(rowQ), want) {
+			t.Errorf("QUIC peer_stats row missing %s: %s", want, rowQ)
+		}
+	}
+	for _, unwanted := range []string{"srtt_ms", "rto_ms", "rttvar_ms", "kcp_live"} {
+		if strings.Contains(string(rowQ), unwanted) {
+			t.Errorf("QUIC peer_stats row carries %s: %s", unwanted, rowQ)
+		}
+	}
+
 	// The absent-field half of the contract: an unmeasured round trip carries
 	// no field at all, because a zero would read as "instant". The UI's display
 	// gate is these tags, so their absence is part of the shape.
@@ -3251,7 +3316,7 @@ func TestPeerRTTWireShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal zero peerStatsJSON: %v", err)
 	}
-	for _, unwanted := range []string{"srtt_ms", "rto_ms", "rttvar_ms", "kcp_live"} {
+	for _, unwanted := range []string{"rtt_ms", "rtt_live", "srtt_ms", "rto_ms", "rttvar_ms", "kcp_live"} {
 		if strings.Contains(string(zero), unwanted) {
 			t.Errorf("unmeasured peer_stats row carries %s: %s", unwanted, zero)
 		}

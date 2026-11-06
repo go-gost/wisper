@@ -104,12 +104,15 @@ export class PeerStatsRow extends LitElement {
         ${caps ? row(t('peersDiagCaps'), caps) : nothing}
         ${row(t('peersDiagSession'), ageMs(s.session_age_ms))}
         ${row(t('peersDiagSilence'), ageMs(s.last_recv_age_ms))}
-        <!-- The inline value in full: the smoothed RTT, the variance around it,
-             and the resend timeout the pair's KCP settled on. Only a live
-             session reports them. -->
-        ${s.kcp_live
+        <!-- The inline value in full: the transport's measured round trip,
+             plus the extra KCP timing only a KCP session has. QUIC reports
+             just the RTT; its connection has no retransmit timeout or
+             variance to show. -->
+        ${peerRTTLive(s) && peerRTT(s) > 0
+          ? row(t('peersDiagRTT'), `${peerRTT(s)}ms`)
+          : nothing}
+        ${s?.kcp_live
           ? html`
-              ${row(t('peersDiagSRTT'), `${s.srtt_ms ?? 0}ms`)}
               ${row(t('peersDiagRTO'), `${s.rto_ms ?? 0}ms`)}
               ${row(t('peersDiagRTTVar'), `${s.rttvar_ms ?? 0}ms`)}
             `
@@ -153,10 +156,12 @@ export class PeerStatsRow extends LitElement {
           <!-- The peer's measured round-trip time, ahead of the path badge so
                the badge keeps a fixed place: the alias above flexes, and a
                variable-width RTT to the badge's right would shift it as the
-               number changes. Only a live session has one: a peer whose KCP
-               never answered yet shows nothing rather than a zero. -->
-          ${s && s.kcp_live && (s.srtt_ms ?? 0) > 0
-            ? html`<span class="peer-rtt" title="${t('peersRTTHint')} · ${s.transport ?? ''}">${s.srtt_ms}ms</span>`
+               number changes. Only a live transport with a measurement has
+               one: a peer whose session never answered yet shows nothing
+               rather than a zero. The number is KCP's SRTT or QUIC's RTT,
+               whichever carries the peer. -->
+          ${s && peerRTTLive(s) && peerRTT(s) > 0
+            ? html`<span class="peer-rtt" title="${t('peersRTTHint')} · ${s.transport ?? ''}">${peerRTT(s)}ms</span>`
             : nothing}
           ${this.disabled
             ? html`<span class="peer-badge" title=${t('peersDisabledHint')}>${t('peersDisabled')}</span>`
@@ -429,6 +434,18 @@ export class PeerStatsRow extends LitElement {
       height: 14px;
     }
   `;
+}
+
+/** peerRTT is the peer's measured round trip in milliseconds: the generic
+ *  field when the server sends one, the KCP-only field for an older server. */
+function peerRTT(s?: PeerStats | null): number {
+  return s?.rtt_ms ?? s?.srtt_ms ?? 0;
+}
+
+/** peerRTTLive says whether a transport session exists to measure; the generic
+ *  flag when present, the KCP-only flag for an older server. */
+function peerRTTLive(s?: PeerStats | null): boolean {
+  return s?.rtt_live ?? s?.kcp_live ?? false;
 }
 
 /** ageMs renders a millisecond age compactly; an em dash when unset (0). */

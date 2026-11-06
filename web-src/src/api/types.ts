@@ -138,18 +138,24 @@ export interface PeerStats {
   session_age_ms?: number;
   /** How long since the last frame from the peer. */
   last_recv_age_ms?: number;
-  /** The peer's smoothed KCP round-trip time, in milliseconds: the RTT the
-   *  pair's session has actually measured. Absent until it has measured one
-   *  (a zero would read as "instant"), which is what kcp_live gates. */
+  /** The peer's measured round-trip time, in milliseconds, whichever data
+   *  plane carries it: KCP's session SRTT or QUIC's connection RTT. Absent
+   *  until it has measured one (a zero would read as "instant"), which is what
+   *  rtt_live gates. */
+  rtt_ms?: number;
+  /** Whether the transport has a live session and a measurement can be
+   *  expected. The display gate for rtt_ms. */
+  rtt_live?: boolean;
+  /** The peer's smoothed KCP round-trip time, in milliseconds. KCP-only and
+   *  kept for older servers/clients; new UI reads rtt_ms. */
   srtt_ms?: number;
   /** The retransmit timeout that KCP has settled on for this peer, in
-   *  milliseconds — what a stall looks like from the sender's side. */
+   *  milliseconds — what a stall looks like from the sender's side. KCP-only. */
   rto_ms?: number;
-  /** The variance around the smoothed RTT, in milliseconds: how far the
-   *  individual round trips deviate from it. */
+  /** The variance around the smoothed KCP RTT, in milliseconds. KCP-only. */
   rttvar_ms?: number;
-  /** Whether the peer has a live KCP session at all. The display gate for the
-   *  three numbers above: only a live session carries a measurement. */
+  /** Whether the peer has a live KCP session at all. KCP-only; the generic
+   *  gate is rtt_live. */
   kcp_live?: boolean;
   /** The peer's recent punch history: short lines, oldest first (newest kept),
    *  capped by the p2p host's ring. */
@@ -318,6 +324,8 @@ export interface EntryPeer {
   disabled?: boolean;
   transport?: string;
   dialed_locally?: boolean;
+  /** The measured transport round trip to this peer, in milliseconds: KCP's
+   *  SRTT or QUIC's RTT. Absent when there is no live p2p session to measure. */
   rtt_ms?: number;
   input_bytes?: number;
   output_bytes?: number;
@@ -341,18 +349,22 @@ export interface Entrypoint {
   stats: ServiceStats;
   /** p2p entrypoints: where the peer's traffic goes now ('direct'/'derp'). */
   peer_transport?: string;
-  /** p2p entrypoints: the single peer's smoothed KCP round-trip time, in
-   *  milliseconds — the same number a peer_stats row carries, on the face that
-   *  has one peer rather than a list of them. Absent until the peer's session
-   *  has measured a round trip (a zero would read as "instant"), which is what
-   *  peer_kcp_live gates. */
+  /** p2p entrypoints: the single peer's measured round-trip time, in
+   *  milliseconds, whichever data plane carries it (KCP SRTT or QUIC RTT) —
+   *  the same number a peer_stats row carries, on the face that has one peer
+   *  rather than a list of them. Absent until the transport has measured a
+   *  round trip (a zero would read as "instant"), which is what peer_rtt_live
+   *  gates. */
   peer_rtt_ms?: number;
-  /** The retransmit timeout that KCP has settled on for this peer. */
+  /** Whether the peer's transport session is live: the display gate for
+   *  peer_rtt_ms. */
+  peer_rtt_live?: boolean;
+  /** The retransmit timeout that KCP has settled on for this peer. KCP-only. */
   peer_rto_ms?: number;
-  /** The variance around the peer's smoothed round-trip time. */
+  /** The variance around the peer's smoothed KCP round-trip time. KCP-only. */
   peer_rttvar_ms?: number;
-  /** Whether the peer has a live KCP session: the display gate for the three
-   *  numbers above. */
+  /** Whether the peer has a live KCP session. Kept for older servers/clients;
+   *  the generic gate is peer_rtt_live. */
   peer_kcp_live?: boolean;
   /** tun entrypoints: the LANs this spoke's hub approved and installed, which
    *  is what became of its share_lan rather than what it asked for. Absent
