@@ -111,7 +111,9 @@ export class EntrypointPeersPage extends LitElement {
             <div class="peer-name">${name}</div>
             <div class="peer-key">${maskKey(peer.key)}</div>
           </div>
-          <span class="state ${peer.state}">${this._stateLabel(peer)}</span>
+          <span class="state ${peer.state}">
+            ${peer.state === 'direct' ? icon('zap') : nothing}${this._stateLabel(peer)}
+          </span>
           ${blockable
             ? html`
               <button class="block-btn ${peer.blocked ? 'on' : ''}"
@@ -243,6 +245,17 @@ export class EntrypointPeersPage extends LitElement {
     }
     .state.disabled {
       color: var(--text-muted);
+    }
+    .state.direct {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      color: var(--green-text);
+      background: var(--green-bg);
+    }
+    .state.direct svg {
+      width: 12px;
+      height: 12px;
     }
     .block-btn {
       flex: none;
