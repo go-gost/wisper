@@ -1176,8 +1176,9 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
 - **仓库 + commit:**
   - `wisper`（`github.com/go-gost/wisper`）：`1fbdcdc` `docs: document the tungo split entrypoint and its deployment`
     （`docs/tun-integration.md` 新增「手机上按域名分流（tungo entrypoint）」一节）；`deb08c4`
-    `docs: soften the unverified DNS-fallback claim in the tungo section`（自审后的措辞修正）+ 本条
-    record 的 `docs(plan)` 提交。
+    `docs: soften the unverified DNS-fallback claim in the tungo section` 与 `6e70481`
+    `docs: state the peer-key switch order in the tungo deployment note`（自审后的两处修正：一个未经验证的
+    设备侧断言、peer key 的切换顺序）+ 本条 record 的 `docs(plan)` 提交。
   - 运维（不在仓库）：pi 的 `/etc/gost/gost.yaml`（新增 `relay-phone`）、hub 的 tunnel 列表（新增 `gw-split`）。
 - **实际改动文件:**
   - pi `/etc/gost/gost.yaml`：在 `services` 列表末尾**追加**（diff 只有 10 行 +）：
