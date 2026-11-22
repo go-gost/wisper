@@ -218,7 +218,8 @@ const tungoDefaultDNS = "192.168.100.100"
 //   - a v4 catch-all without a v6 one leaks IPv6 around the split, so the v6
 //     catch-all is appended (a named-subnet split, with neither catch-all, is
 //     left exactly as written);
-//   - an empty dns list leaves the device with no resolver.
+//   - an empty dns list would leave the device with no resolver, so the
+//     tunnel's own resolver is filled in.
 func validateTungoSplit(r *entrypointCreateRequest) error {
 	if strings.TrimSpace(r.Routes) == "" {
 		return fmt.Errorf("routes is required: a split entrypoint with no routes captures nothing, e.g. %q", catchAllV4+", "+catchAllV6)
