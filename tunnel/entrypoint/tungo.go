@@ -2,6 +2,7 @@ package entrypoint
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,11 +24,16 @@ import (
 // gateway's tproxy uses and everything unlisted leaves through the phone's own
 // network.
 type tungoEntryPoint struct {
-	opts     tunnel.Options
-	peer     string
-	provider string // p2p registry name, unique per entrypoint
-	rules    string // bypass registry name the chain hop references
-	config   *xconfig.Config
+	opts tunnel.Options
+	peer string
+	// provider is the p2p registry name, unique per entrypoint.
+	provider string
+	// rulesName is the bypass registry name the chain hop references.
+	rulesName string
+	// rules is the object registered under rulesName. init replaces it on every
+	// run, and SetRules updates it in place, so it is guarded by mu.
+	rules  *tunnel.RuleBypass
+	config *xconfig.Config
 
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
@@ -65,11 +71,11 @@ func NewTungoEntryPoint(opts ...tunnel.Option) EntryPoint {
 	}
 
 	return &tungoEntryPoint{
-		opts:     options,
-		peer:     options.Peer,
-		provider: "tungo-ep-" + options.ID,
-		rules:    "tungo-rules-" + options.ID,
-		cclose:   make(chan struct{}),
+		opts:      options,
+		peer:      options.Peer,
+		provider:  "tungo-ep-" + options.ID,
+		rulesName: "tungo-rules-" + options.ID,
+		cclose:    make(chan struct{}),
 	}
 }
 
@@ -113,11 +119,26 @@ func (s *tungoEntryPoint) init() error {
 		return errors.New("tungo entrypoint requires a peer public key")
 	}
 
-	rules := tunnel.NewRuleBypass(s.opts.Rules)
-	registry.BypassRegistry().Unregister(s.rules)
-	if err := registry.BypassRegistry().Register(s.rules, rules); err != nil {
+	// Rules are read under the same lock Options() takes: a hot edit can
+	// replace them while init runs. The clone is this init's own copy, so
+	// neither the registry object nor the config below reaches the caller's
+	// slice.
+	s.mu.RLock()
+	rules := slices.Clone(s.opts.Rules)
+	s.mu.RUnlock()
+
+	ruleBypass := tunnel.NewRuleBypass(rules)
+	registry.BypassRegistry().Unregister(s.rulesName)
+	if err := registry.BypassRegistry().Register(s.rulesName, ruleBypass); err != nil {
 		return err
 	}
+	// Keep the object, not only its name: a rebuilt entrypoint reuses the name,
+	// so a Close that unregisters must be able to tell whether this instance
+	// registered anything, and a rules edit mutates this object in place
+	// instead of re-registering.
+	s.mu.Lock()
+	s.rules = ruleBypass
+	s.mu.Unlock()
 
 	svc := &xconfig.ServiceConfig{
 		Name: s.opts.Name,
@@ -147,7 +168,7 @@ func (s *tungoEntryPoint) init() error {
 	// which is the empty route that dials direct.
 	chCfg := tunnel.ChainConfig(s.opts.ID, s.opts.Name, s.opts.RecordMode)
 	hop := chCfg.Hops[0]
-	hop.Bypasses = []string{s.rules}
+	hop.Bypasses = []string{s.rulesName}
 	node := hop.Nodes[0]
 	node.Addr = s.peer
 	node.Connector = &xconfig.ConnectorConfig{Type: "relay"}
@@ -159,9 +180,11 @@ func (s *tungoEntryPoint) init() error {
 		Chains:   []*xconfig.ChainConfig{chCfg},
 		Bypasses: []*xconfig.BypassConfig{
 			{
-				Name:      s.rules,
+				Name:      s.rulesName,
 				Whitelist: true,
-				Matchers:  s.opts.Rules,
+				// The registry object is the runtime authority; this copy only
+				// describes it, so it keeps its own slice.
+				Matchers: rules,
 			},
 		},
 	}
@@ -209,7 +232,7 @@ func (s *tungoEntryPoint) SetStatsBaseline(baseline cfg.ServiceStats) {
 func (s *tungoEntryPoint) Close() error {
 	s.closeOnce.Do(func() {
 		close(s.cclose)
-		registry.BypassRegistry().Unregister(s.rules)
+		registry.BypassRegistry().Unregister(s.rulesName)
 	})
 	return nil
 }

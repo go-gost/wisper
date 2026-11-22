@@ -241,6 +241,89 @@ func TestTungoEntryPointRulesRouteUnlistedDirect(t *testing.T) {
 	}
 }
 
+// TestTungoEntryPointRepeatInitReRegistersRules: init() runs again when the
+// config is reloaded or the rules are edited, so a second pass must replace
+// both the registry entry and the object the entrypoint keeps: a stale object
+// would keep matching the old rule list after the new one was saved, and the
+// hop resolves its bypass from the registry by name, so the name also has to
+// point at the fresh rules.
+func TestTungoEntryPointRepeatInitReRegistersRules(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	const id = "tungo-reinit"
+	const rulesName = "tungo-rules-" + id
+	const oldRule, newRule = "old.example", "new.example"
+	tungoCleanup(t, id)
+
+	ep := NewTungoEntryPoint(
+		tp.IDOption(id),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.100.250/32"),
+		tp.RoutesOption("0.0.0.0/0"),
+		tp.DNSOption("192.168.100.100"),
+		tp.RulesOption(oldRule),
+	)
+	s := ep.(*tungoEntryPoint)
+
+	if err := s.init(); err != nil {
+		t.Fatalf("first init: %v", err)
+	}
+	if s.rules == nil {
+		t.Fatal("the first init left no rules object on the entrypoint")
+	}
+	first := s.rules
+	if first.Contains(context.Background(), "tcp", oldRule+":443") {
+		t.Fatalf("the first init's rules do not list %s", oldRule)
+	}
+
+	// An edit replaces the rule list in place (SetRules at runtime, a reload
+	// here); the entrypoint must end up holding the object of the latest init.
+	newRules := []string{newRule}
+	s.mu.Lock()
+	s.opts.Rules = newRules
+	s.mu.Unlock()
+
+	if err := s.init(); err != nil {
+		t.Fatalf("second init: %v", err)
+	}
+	if s.rules == nil {
+		t.Fatal("the second init left no rules object on the entrypoint")
+	}
+	if s.rules == first {
+		t.Error("the second init kept the first init's rules object")
+	}
+
+	ctx := context.Background()
+	registered := registry.BypassRegistry().GetAll()[rulesName]
+	if registered == nil {
+		t.Fatalf("%s is not registered after the second init", rulesName)
+	}
+	if registered != s.rules {
+		t.Error("the entrypoint holds a rules object that is not the one registered")
+	}
+	if !registered.Contains(ctx, "tcp", oldRule+":443") {
+		t.Errorf("registered rules still match the old rule %s: they should match nothing but the new list", oldRule)
+	}
+	if registered.Contains(ctx, "tcp", newRule+":443") {
+		t.Errorf("registered rules do not match the new rule %s", newRule)
+	}
+	if len(s.config.Bypasses) != 1 || len(s.config.Bypasses[0].Matchers) != 1 ||
+		s.config.Bypasses[0].Matchers[0] != newRule {
+		t.Errorf("config matchers = %v, want [%s]", s.config.Bypasses, newRule)
+	}
+
+	// The config describes the rules; it does not alias the caller's slice, so
+	// an in-place edit after init cannot silently rewrite the description.
+	newRules[0] = "edited.example"
+	if got := s.config.Bypasses[0].Matchers[0]; got != newRule {
+		t.Errorf("config matcher follows the caller's slice (%q, want %q)", got, newRule)
+	}
+	if s.rules.Contains(ctx, "tcp", newRule+":443") {
+		t.Errorf("the registered rules follow the caller's slice: %s no longer matches", newRule)
+	}
+}
+
 // TestTungoEntryPointRequiresPeer: without a peer key there is no chain to
 // build, so the assembly refuses instead of producing a node nothing can be
 // dialled to — and leaves nothing registered behind.
