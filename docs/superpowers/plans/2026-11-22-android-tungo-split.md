@@ -112,8 +112,51 @@ Expected: 两条 build 都 exit 0（Android 上的重定义错误消失），测
 cd x && git add listener/tungo && git commit -m "feat(tungo): adopt an Android VpnService fd as the tun device"
 ```
 
-**Implementation record:** _完成后填写：日期/状态、仓库 + commit SHA、实际改动文件、
-执行的命令与结果、评审发现与修复、遗留项。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成。
+- **仓库 + commit:**
+  - `x`（`github.com/go-gost/x`）：`2b43135` `feat(tungo): adopt an Android VpnService fd as the tun device`
+  - `wisper`：本任务没有代码改动，只有本条记录（`docs(plan): implementation record for task 1`）。
+- **实际改动文件（均在 `x`）:**
+  - `listener/tungo/metadata.go` — `metadata` 增加 `fd func() int`，`parseMetadata` 接受
+    `int` 与 `func() int`（照 `x/listener/tun/metadata.go`）。
+  - `listener/tungo/metadata_test.go`（新增）— 三个 `TestTungoListener*` 测试。
+  - `listener/tungo/tun.go` — 抽出 `newTunDevice(ifce tun.Device) (io.ReadWriteCloser, error)`，
+    `createTunDevice` 改为 `tun.CreateTUN` + `newTunDevice`。
+  - `listener/tungo/tun_linux.go` — 首行 `//go:build linux && !android`。
+  - `listener/tungo/tun_android.go`（新增）— `readOffset=0`/`writeOffset=0`；
+    `createTun` 缺 fd 报 `tungo: no host device fd`、fd 为负报
+    `tungo: no device fd: is the host's VPN up?`，`syscall.Dup` 后
+    `tun.CreateUnmonitoredTUNFromFD` + `newTunDevice`；`ip` 取 `config.Net[0].IP`；
+    不碰 netlink/接口配置/resolvectl。
+  - `listener/tungo/listener.go` — 接口查询（原 96-99 行）失败由 `return err` 降级为
+    debug 日志，`addrs` 留空后继续；日志里的 name 改用设备自己报告的名字。
+- **执行的命令与结果:**
+  - RED：`cd x && go test ./listener/tungo/ -run TestTungoListener -v`
+    → `l.md.fd undefined`（编译失败，符合预期）。
+  - GREEN：同一条命令 → 3 个测试 PASS。
+  - `cd x && GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build ./listener/tungo` → exit 0
+    （`tun_android.go` 与 `tun_linux.go` 不再重复定义；`!linux` 的 `tun_other.go` 在
+    Android 上仍被排除，因为 `android` 满足 `linux` 标签）。
+  - `cd x && GOOS=linux go build ./listener/tungo` → exit 0；
+    `GOOS=darwin GOARCH=arm64 go build ./listener/tungo` 与
+    `GOOS=windows go build ./listener/tungo` 亦为 exit 0。
+  - `cd x && go vet ./listener/tungo`（含 `GOOS=android` 交叉 vet）→ 无输出。
+  - `cd x && go test ./listener/tungo/ -count=1 -v` → 全部 PASS；`gofmt -l listener/tungo/` 无输出。
+- **评审发现与修复（自审）:**
+  - `newTunDevice` 按 plan 保留 `error` 返回值，虽然当前实现不会失败；两处调用点都在失败时
+    关闭底层 `ifce`，与 `x/listener/tun/tun_android.go` 一致。
+  - `listener.go` 的降级让「设备已建立但接口名查不到」不再丢弃设备；Linux 上
+    `CreateTUN` 成功即意味着接口存在，实际不可达，行为等价。
+  - 测试只断言 `fd` 语义，不依赖 Android 构建，因此在 Linux 上跑通。
+- **遗留项/限制:**
+  - `createTun` 的 Android 分支本身没有单测（需要真实 fd + `CreateUnmonitoredTUNFromFD`），
+    只由编译与 Task 4 的 entrypoint 级测试覆盖。
+  - `tunDevice` 没有 `maxPacket` 溢出保护（`x/listener/tun` 有，见其
+    `ErrPacketTooLarge`）；本任务按「行为不变」不引入，Android 上设备 MTU 由 VpnService
+    决定，超长写仍可能 panic —— 属既有问题，另行处理。
+  - Android 上设备名通常查不到，`addrs` 日志为空属预期。
 
 ---
 
