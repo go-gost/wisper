@@ -24,12 +24,12 @@ internal const val TUNFD_TAG = "wisper-tunfd"
  * -1 to the Go side releases the device fd, but the system goes on routing
  * through a VPN whose interface is gone, which blackholes every app's traffic.
  * Keeping this service separate from the backend service is what lets the
- * ordinary case — no tun entrypoint running — be no VPN at all rather than a
- * stuck one.
+ * ordinary case — no device entrypoint (tun or tungo) running — be no VPN at
+ * all rather than a stuck one.
  *
- * The backend owns the decision (it is the one polling the API for running tun
- * entrypoints) and drives this service with intents; the device work lives
- * here.
+ * The backend owns the decision (it is the one polling the API for a running
+ * tun or tungo entrypoint) and drives this service with intents; the device
+ * work lives here.
  */
 class TunVpnService : VpnService() {
 

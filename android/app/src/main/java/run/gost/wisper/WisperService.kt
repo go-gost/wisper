@@ -29,7 +29,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Hosts the Go backend in the foreground, and decides whether the app needs a
- * VPN device: a tun entrypoint is the only thing that wants one, so this
+ * VPN device: a running device entrypoint — a tun or a tungo split, the two
+ * types that own the device — is the only thing that wants one, so this
  * service polls for a running one and asks [TunVpnService] for the device (or
  * for its release).
  *
@@ -49,6 +50,14 @@ class WisperService : Service() {
         // is never cut off, short enough that an abandoned arm releases.
         private const val ARM_TTL_MS = 60_000L
         private const val BACKEND_URL = "http://127.0.0.1:8900"
+
+        /**
+         * The entrypoint types that own the VPN device: a full tun tunnel, and
+         * the tungo split, which is a tun device whose flows the rules send
+         * either through the tunnel or direct. Any other type (p2p, tun hub,
+         * harness entrypoints) has no device and must never hold one up.
+         */
+        internal fun isDeviceHolderType(type: String): Boolean = type == "tun" || type == "tungo"
     }
 
     // ---------------------------------------------------------------
@@ -90,7 +99,7 @@ class WisperService : Service() {
     /**
      * Remembers the tun device config the UI is about to create, so the next
      * poll can bring the device up for it. Called from the web UI (through the
-     * Activity's bridge) before it posts a tun entrypoint.
+     * Activity's bridge) before it posts a tun or tungo entrypoint.
      */
     fun armVpn(net: String, routes: String, mtu: Int, dns: String) {
         armedOptions = JSONObject().apply {
@@ -113,9 +122,9 @@ class WisperService : Service() {
 
     /**
      * Brings the VPN up for the tun device the app is about to use — the armed
-     * config, or an existing tun entrypoint's. A user who has not permitted the
-     * VPN yet gets a nudge notification instead: establishing needs consent,
-     * which only an Activity can ask for.
+     * config, or an existing device entrypoint's (tun or tungo). A user who has
+     * not permitted the VPN yet gets a nudge notification instead: establishing
+     * needs consent, which only an Activity can ask for.
      *
      * Every failure here is logged, never thrown: this runs on the poll thread,
      * where an uncaught exception takes the whole service (and the backend with
@@ -134,7 +143,7 @@ class WisperService : Service() {
                 Log.w(TAG, "entrypoints fetch failed, skipping VPN tick")
                 return
             }
-            val running = findRunningTunEntrypoint(entrypointsBody)?.optJSONObject("options")
+            val running = findRunningDeviceEntrypoint(entrypointsBody)?.optJSONObject("options")
 
             // An arm that predates a takeover is stale: its device was taken
             // from under it, so re-establishing from it would race the app the
@@ -166,11 +175,13 @@ class WisperService : Service() {
 
             val opts = armedOptions ?: running
             if (opts == null) {
-                // Nothing wants a device. Releasing is what stops the VPN from
-                // outliving its reason — including the system's idea of it,
-                // which only a stopped VpnService clears.
+                // Nothing wants a device: neither a running tun or tungo
+                // entrypoint nor an arm still waiting for one. Releasing is
+                // what stops the VPN from outliving its reason — including
+                // the system's idea of it, which only a stopped VpnService
+                // clears.
                 if (VpnStatus.established) {
-                    Log.i(TAG, "no running tun entrypoint: releasing the VPN device")
+                    Log.i(TAG, "no running device entrypoint: releasing the VPN device")
                     TunVpnService.release(this)
                 }
                 return
@@ -510,17 +521,19 @@ class WisperService : Service() {
     // VPN establishment
     // ---------------------------------------------------------------
 
-    /** The first *running* tun entrypoint in an /api/entrypoints body, if any: the VPN exists to serve one,
-     *  so a stopped or failed entrypoint must not hold it up. A restored
-     *  entrypoint counts as running from the moment it is listed — it is
-     *  waiting for this app's device, not the other way round. */
-    private fun findRunningTunEntrypoint(body: String): JSONObject? {
+    /** The first *running* device entrypoint (tun or tungo) in an
+     *  /api/entrypoints body, if any: the VPN exists to serve one, so a stopped
+     *  or failed entrypoint — or one of a type that has no device — must not
+     *  hold it up. A restored entrypoint counts as running from the moment it
+     *  is listed: it is waiting for this app's device, not the other way
+     *  round. */
+    internal fun findRunningDeviceEntrypoint(body: String): JSONObject? {
         // The list endpoints answer a bare array — the {"entrypoints": …} shape
         // is /api/stats's, not this one's.
         val arr = JSONArray(body)
         for (i in 0 until arr.length()) {
             val ep = arr.optJSONObject(i) ?: continue
-            if (ep.optString("type") == "tun" && ep.optString("status") == "running") return ep
+            if (isDeviceHolderType(ep.optString("type")) && ep.optString("status") == "running") return ep
         }
         return null
     }

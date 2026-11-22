@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ── VPN consent ────────────────────────────────────────────────────
-    // A tun entrypoint cannot be created before its device exists, and the
+    // A device entrypoint cannot be created before its device exists, and the
     // device comes from a VpnService — so the form arms the VPN first, and the
     // consent dialog belongs to an Activity.
     private val vpnConsentLauncher: ActivityResultLauncher<Intent> =
@@ -482,9 +482,9 @@ class MainActivity : AppCompatActivity() {
 
     // ── JavaScript Bridge ──────────────────────────────────────────────
     private inner class JsBridge {
-        // Arms the VPN for a tun entrypoint the web UI is about to create: the
-        // device must exist before the entrypoint can, and only this side can
-        // create it. The values are the form's, so Java and Go configure the
+        // Arms the VPN for a device entrypoint (tun or tungo) the web UI is
+        // about to create: the device must exist before the entrypoint can, and
+        // only this side can create it. The values are the form's, so Java and Go configure the
         // same address, routes, MTU and DNS. The callback fires once the device
         // is up (or gives up), so the UI does not post into a missing device.
         @android.webkit.JavascriptInterface
