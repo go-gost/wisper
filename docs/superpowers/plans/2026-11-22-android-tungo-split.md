@@ -1306,5 +1306,19 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
   所以这段窗口只影响它自己。
 - [ ] **Step 5: 按 spec §7 的 8 条逐条验收并留证**（白名单域名 / 非白名单域名 / 内网子域名 / DNS /
   IPv6 / 互斥 / 回归 / 隧道不可用），外加本计划 §3.5 的三次「启动→有流量→停止」。
+  另外必须留证的两条（都是整分支评审补的，之前没有任何一条验收覆盖它们）：
+  - [ ] **(a) 重启 App 进程后，恢复的 `tungo` entrypoint 自己拿到设备，全程不用手动操作。**
+    做法：entrypoint 运行中 → `adb shell am force-stop run.gost.wisper` → 重新打开 App →
+    等轮询（2 s 一次）—— 预期 entrypoint 回到 running、`/api/entrypoints` 里没有 `no device fd`
+    之类的错误、隧道有流量。这条盯的是 `WisperService.findRunningDeviceEntrypoint` 只认
+    `type == "tun"` 的那个 bug（`tungo` 被漏掉时，恢复的入口点永远等不到设备）。
+  - [ ] **(b) 空闲 ≥2 分钟后 VPN 仍在、隧道没被拆掉。**
+    做法：入口点运行中，让手机静置 ≥2 分钟（不产生流量），期间不要动 UI —— 预期 VPN 通知还在、
+    `adb shell ip link | grep tun` 仍有设备、随后发出的请求仍走隧道。这条盯的是
+    `ARM_TTL_MS = 60_000` 的收尾：手臂（arm）过期后若「谁想要设备」的判定漏掉 `tungo`，
+    轮询会在 60 秒后 `TunVpnService.release()`，把正在服务的入口点的 VPN 拆掉。
+  - 注意：`CheckTunDeviceFree` 的报错文案改成了「the tun device is held by entrypoint (…)」，
+    仍然说 tun 设备（互斥是按设备实现的），**这句对用户可见**：手机上同时启两个设备型入口点时
+    看到的就是它，别当成 bug 再报一次。
 
 **Implementation record:** _完成后填写（含每条的实测命令与输出、以及回滚方式：把 pixel-9 加回 `p2p-tun` 的 peers 并重新启动旧 `tun` entrypoint）。_
