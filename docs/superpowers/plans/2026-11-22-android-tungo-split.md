@@ -1127,10 +1127,17 @@ cd x && git add handler/tungo && git commit -m "fix(tungo): guard the handler st
 ```yaml
 - name: relay-phone
   addr: 127.0.0.1:18080
+  metadata:
+    enableStats: true
   handler:
     type: relay
     chain: relay-wss
+  listener:
+    type: tcp
 ```
+
+（`x/listener` 没有 `relay` 类型：relay 协议的识别在 handler 里，监听器用 `tcp`。relay handler 同时能识别
+socks5/http，所以这一端口将来也能服务别的客户端。）
 
 推送：本地改 → `python3 -c "import yaml,sys;yaml.safe_load(open('gost.yaml'))"` 校验 →
 `docker run --rm -i -v /etc/gost:/etc/gost alpine sh -c 'cp gost.yaml gost.yaml.bak.$(date +%Y%m%d-%H%M%S)
@@ -1140,16 +1147,18 @@ Expected: 日志出现 `relay-phone` 的监听；`ss -ltn | grep 18080` 只绑 `
 - [ ] **Step 2: 在 pi 上验证 relay 腿本身**（不需要手机）
 
 ```sh
-# 用 gost 客户端经 relay 入口取一次公网地址；白名单外的域名应当从家宽直连
-gost -F relay://127.0.0.1:18080 -L tcp://127.0.0.1:18081 &
-curl -x http://127.0.0.1:18081 -sS -o /dev/null -w '%{http_code}\n' https://www.baidu.com
-curl -x http://127.0.0.1:18081 -sS -o /dev/null -w '%{http_code}\n' https://www.google.com
+# 用 gost 客户端经 relay 入口起一个本地 HTTP 代理，再各取一次
+gost -L http://127.0.0.1:18081 -F relay://127.0.0.1:18080 &
+curl -x http://127.0.0.1:18081 -sS -o /dev/null -w '%{http_code}\n' https://www.baidu.com   # 白名单外 → 家宽直连
+curl -x http://127.0.0.1:18081 -sS -o /dev/null -w '%{http_code}\n' https://www.google.com  # 白名单内 → relay-wss
 ```
 Expected: 两条都 200（第二条经 `relay-wss`）；gost 日志里能看到 `relay-phone` 的连接与链选择。
 
 - [ ] **Step 3: hub 增加 p2p tunnel（加法）**
 
 新增一个 type `p2p` 的 tunnel：`endpoint: 127.0.0.1:18080`、`peers: [pixel-9 的 key]`。
+走 API（无需重启容器，避免打断现在的隧道）：hub 的 wisper API 在 `127.0.0.1:8900`（host 网络，无认证）：
+`curl -sS -X POST http://127.0.0.1:8900/api/tunnels -H 'content-type: application/json' -d '{"name":"gw-split","type":"p2p","endpoint":"127.0.0.1:18080","peers":["<pixel-9 key>"]}'`
 Expected: `/api/tunnels` 里新 tunnel 存在且 running；现有 `p2p-tun` 的 peers **不变**。
 
 - [ ] **Step 4: 提交文档**
