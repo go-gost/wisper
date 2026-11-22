@@ -599,7 +599,81 @@ Expected: PASS
 cd wisper && git add tunnel/tungo_e2e_test.go && git commit -m "test(tunnel): relay and FUDP over the p2p link end to end"
 ```
 
-**Implementation record:** _完成后填写。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成。
+- **仓库 + commit:** `wisper` —
+  `0895c14` `test(tunnel): relay and FUDP over the p2p link end to end`（新测试 + `ChainConfig` 接缝）、
+  `1201271` `fix(tunnel): keep one logger type in the test binary`（先决修复，见下）；
+  计划文档的记录另用 `docs(plan)` 提交。不涉及 `x`，也没有改 `api/`、`config/config.go`、`web-src/`、Kotlin。
+- **实际改动的文件:**
+  - `tunnel/tungo_e2e_test.go`（新，`//go:build p2ppoc`）：三个测试 + 三个辅助件。
+    `countingListener` 包一层 tcp listener 数「服务接受了几条连接」，是「这条流到底走没走 relay」
+    的唯一证据；`startRelayService` 起 pi 那侧的替身 =
+    `xservice.NewService(name, tcp(127.0.0.1:0), handler relay)`，**不配 chain**，所以 handler 直接
+    拨请求里的地址；`startSplitLink` 串起整条链路：derper → 全局 config（relay only）→ relay 服务
+    → 近侧 host（`newDialingHost`）→ wisper p2p tunnel（`runTunnel`，endpoint = relay 服务地址，
+    allowlist = 近侧 host 的 key）→ `NewTungoEntryPoint(peer = hub key, rules = [listed])` →
+    `ChainConfig()` → 按链节点的 `metadata.p2p` 注册 provider → `ParseChain` → `xchain.NewRouter`。
+  - `tunnel/entrypoint/tungo.go`：新增 `ChainConfig() (*xconfig.ChainConfig, error)`
+    （`s.config == nil` 时先 `init()`，之后返回 `s.config.Chains[0]`），`RunContext` 的
+    `ParseChain` 改为从它取配置。这是本次唯一的实现改动：`init()` 是同包私有方法，而测试必须留在
+    `tunnel/`（复用 p2ppoc 辅助件，且验收命令就是 `./tunnel/`），所以把「组装」暴露成一个接缝，
+    Run 与测试读同一份 —— 而不是让测试照抄那 20 行组装（那样只证明测试自己的拷贝能跑）。
+  - `tunnel/lan_allow_test.go`：`init()` 的 logger 从 `xlogger.Nop()` 改成
+    `xlogger.NewLogger(OutputOption(io.Discard))`（见「评审发现」）。
+- **测试/命令与结果:**
+  - **先决阻塞（与本任务无关的既有破坏）**：HEAD 上任何 p2ppoc 运行都在 init 阶段 panic：
+    `panic: sync/atomic: store of inconsistently typed value into Value`，栈指向
+    `tunnel_test.init.0` → `p2p_poc_test.go:50`。同一个测试二进制里，`tunnel`（内部测试包，
+    `lan_allow_test.go`，commit `50c314b`）先存了 `*logger.nopLogger`，`tunnel_test`（外部测试包）
+    再存 `*logger.slogLogger`，而 `core/logger` 的默认值是 `atomic.Value`。把内部包改成存
+    `NewLogger`（同类型）后套件重新可跑。
+  - RED（接缝之前）：`cd wisper && go test -tags p2ppoc ./tunnel/ -run TestTungoChain -v -count=1`
+    → 三条全红，`tungo entrypoint *entrypoint.tungoEntryPoint does not expose the chain it assembles`
+    （16.73s / 0.29s / 0.28s）。
+  - GREEN：同命令 → `--- PASS` ×3，`ok github.com/go-gost/wisper/tunnel 0.785s`。
+  - `cd wisper && go test -tags p2ppoc ./tunnel/ -count=1` → `ok ... 83.958s`（新文件没有破坏既有
+    p2ppoc 套件，含依赖 docker/derper 的 UDP 与 probe 场景）。
+  - `cd wisper && CGO_ENABLED=1 go test ./tunnel/entrypoint/ -race -count=1` → `ok ... 43.315s`
+    （`ChainConfig` 与 `Run` 的改动在既有 entrypoint 套件下无回归、无 DATA RACE）。
+  - `cd wisper && go test ./tunnel/ -count=1` → `ok ... 41.732s`（不带 tag 的默认套件，覆盖
+    `lan_allow_test.go` 的 init 改动）。
+  - 变异验证（临时改坏「前提」，确认对应断言会红，随后还原）：把 `TestTungoChainRelaysOverP2P`
+    的清单改成 `example.com` → 红
+    （`relay service accepted 0 connections, want the listed flow to have gone through it`）；
+    把 `TestTungoChainUnlistedGoesDirect` 的清单改成 echo 地址 → 红
+    （`relay service accepted 1 connections, want an unlisted destination to stay off the tunnel`）。
+    即两个方向都由计数断言兜住，不只是「数据能往返」。
+- **评审发现与修复（自审）:**
+  - 计划本身有矛盾：「测试放在 `tunnel/`、复用 `tunnel_test` 的辅助件」与「调用 `init()`（同包）」
+    不能同时成立 —— `init()` 是 `entrypoint` 包私有，`tunnel/` 只能是 `tunnel`/`tunnel_test`。
+    取了最贴近两者意图的做法（`ChainConfig` 接缝 + 测试留在 `tunnel/`），而不是把测试挪去
+    `tunnel/entrypoint/`（那样 `go test ./tunnel/ -run TestTungoChain` 只会「no tests to run」，
+    验收命令失效）或在那里重抄一遍 derper/echo 辅助件。
+  - 规则 bypass 的 `t.Cleanup` 注册在断言之前：`len(hop.Bypasses) != 1` 之类的 `Fatalf` 若先发生，
+    名字会漏在进程里留给后面的测试。provider 由 `registerProvider` 自带清理，p2p tunnel 与 key 由
+    `runTunnel` 清理，derper/host/relay 服务/router 各自 `t.Cleanup`；LIFO 顺序保证 router 先关、
+    名字后撤。
+  - 无 `time.Sleep`、无固定端口（tcp/udp 都绑 `127.0.0.1:0`，derper 用 `freePort`），断言靠因果顺序
+    而不是轮询：计数在往返成功时必然已经发生（流必须先到 relay 才能拿到 echo）；「未列」那条不需要
+    等待，因为正确实现只做一次选择，而「先直连又偷偷摸到 relay」会让计数变 1。
+  - 输出沿用本套件既有约定（`clogger.Default()` 是 Debug），`-v` 下会有 x 的 JSON 调试行；
+    不是本文件引入的噪声。
+  - 三处空白/显式导入（`x/connector/relay`、`x/dialer/tcp`、`x/handler/relay`、`x/listener/tcp`）
+    是本文件自洽所需；没有改动 `x/`。
+- **遗留项/限制:**
+  - `ChainConfig` 是**为接缝而存在**的导出方法（外层类型未导出，包外只能靠接口断言拿到），Run 也改用它，
+    所以不是死代码；但它确实给公开方法面加了一条。若评审更希望「测试进 entrypoint 包」，代价是复制
+    ~120 行 derper/echo 辅助件，并且验收命令要跟着改。
+  - 远侧是**替身**：无 chain 的 relay 服务。证明的是「手机侧组装 + p2p 流 + relay 协议 + FUDP 帧化」；
+    pi 真实的 `relay-wss` 链与它的 hop bypasses（`bypass-gfw`/`bypass-local`）不在本测试内。
+  - FUDP 只验证小载荷（DNS 形状）。relay 的 UDP 数据面是「流上 2 字节长度前缀 + `xnet.Pipe` 把一次
+    Read 写成一次 Write」，大报文会被拆/并；这不是本任务引入的行为，也未覆盖。
+  - 失败策略（spec §8.1：隧道不可用时 fail-closed 还是静默直连）、观测、以及 p2p 断链时的表现都未覆盖
+    （留给 Task 7）。
+  - 套件依赖 docker 或缓存里的 derper 二进制（`derperBin`）；缺失时 `startDerper` skip，本文件的三个
+    测试随之 skip —— 这是既有的 p2ppoc 约定。
 
 ---
 
