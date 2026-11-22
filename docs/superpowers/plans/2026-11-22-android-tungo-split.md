@@ -334,11 +334,13 @@ cd wisper && git add tunnel/entrypoint/tungo.go tunnel/entrypoint/tungo_test.go 
 - **日期/状态:** 2026-11-22 — 已完成（本任务只做类型与配置组装；Run/Close 的生命周期是 Task 4）。
 - **仓库 + commit:**
   - `wisper`（`github.com/go-gost/wisper`）：`a64cfc7` `feat(entrypoint): add the tungo entrypoint type and its rule-whitelisted chain`
-    （代码 + 测试）；本条记录为随后的 `docs(plan)` 提交。
+    （代码 + 测试）；`e7345c1` `refactor(entrypoint): keep the tungo rules object on the entrypoint`
+    （评审修复轮：存下规则对象、克隆镜像里 `Matchers`、`init()` 的读取加锁、补重复 init 的测试）；
+    本条记录为随后的 `docs(plan)` 提交。
   - `x`：本任务没有改动（README 里说的 `x/config`、`chain_parser`、`registry` 都按现状读取）。
 - **实际改动文件:**
   - `tunnel/entrypoint/tungo.go`（新增）— `tungoEntryPoint`：`opts`/`peer`/`provider`
-    （`tungo-ep-<ID>`）/`rules`（`tungo-rules-<ID>`）/`config` + favorite/stats/cclose 那一套
+    （`tungo-ep-<ID>`）/`rulesName`（`tungo-rules-<ID>`）/`rules`（注册的 `*tunnel.RuleBypass`）/`config` + favorite/stats/cclose 那一套
     （与 `p2p.go`、`tun.go` 同形）。`NewTungoEntryPoint`：ID 为空取 uuid、`MTU<=0` 取
     `tunnel.DefaultTunMTU`（1300，与 tun entrypoint 一致）、Name 默认 `tungo-ep-<ID前8位>`、
     CreatedAt 补当前时间。`ID/Type/Name/Endpoint(=peer key)/Entrypoint(=Net)/Options/Favorite/
@@ -346,15 +348,16 @@ cd wisper && git add tunnel/entrypoint/tungo.go tunnel/entrypoint/tungo_test.go 
     所以 `createEntryPoint` 的 `SetStats`/`SetStatsBaseline` 可用。
   - `tunnel/entrypoint/tungo.go` 的 `init()`：先校验 peer（为空直接报
     `tungo entrypoint requires a peer public key`，不注册任何东西），再
-    `registry.BypassRegistry().Unregister(s.rules)` + `Register(s.rules, tunnel.NewRuleBypass(opts.Rules))`，
+    `registry.BypassRegistry().Unregister(s.rulesName)` + `Register(s.rulesName, ruleBypass)`,
+    并把 `ruleBypass` 存进 `s.rules`（`s.mu` 保护下读取 `opts.Rules` 的克隆），
     然后组装 `x/config.Config`：
     `Services[0] = {Name, Addr: ":0", Handler{Type:"tungo", Chain: name},
     Listener{Type:"tungo", Metadata{name,mtu,net,routes,dns}}}`（**无** Forwarder、**无**
     `svc.Bypass`/`svc.Bypasses`、**无** resolver/hosts）；链由
     `tunnel.ChainConfig(id, name, recordMode)` 生成后把 hop-0 改成
-    `Bypasses: ["tungo-rules-<id>"]`、其唯一 node 改成
+    `Bypasses: [s.rulesName]`、其唯一 node 改成
     `{Addr: peer, Connector: relay, Dialer: tcp, Metadata: {"p2p": "tungo-ep-<id>"}}`；
-    `Bypasses[0] = {Name: "tungo-rules-<id>", Whitelist: true, Matchers: opts.Rules}`
+    `Bypasses[0] = {Name: s.rulesName, Whitelist: true, Matchers: <opts.Rules 的克隆>}`
     作为自描述副本（运行期权威仍是注册表里的 `*tunnel.RuleBypass`）。
   - `tunnel/entrypoint/tungo.go` 的 `Close()`：幂等，关 `cclose` 并 unregister 规则 bypass
     （设备 claim、host 引用与 service 随 Task 4 到来）。
@@ -366,7 +369,7 @@ cd wisper && git add tunnel/entrypoint/tungo.go tunnel/entrypoint/tungo_test.go 
 - **执行的命令与结果:**
   - RED：`cd wisper && go test ./tunnel/entrypoint/ -run TestTungoEntryPoint -v`
     → 编译失败：`undefined: NewTungoEntryPoint`、`undefined: TungoEntryPoint`（符合预期）。
-  - GREEN：同一条命令 → 3 个测试（+3 子测试）全部 PASS。
+  - GREEN：同一条命令 → 3 个测试（+3 子测试）全部 PASS；修复轮后为 4 个测试（+4 子测试）。
   - 变异验证（证明断言的力度）：把 `hop.Bypasses = []string{s.rules}` 临时删掉后
     `-run TestTungoEntryPointRulesRouteUnlistedDirect` → `unlisted_address` 子测试报
     `Route("1.2.3.4:443") has 1 nodes, want 0`；恢复后全绿。
@@ -395,8 +398,12 @@ cd wisper && git add tunnel/entrypoint/tungo.go tunnel/entrypoint/tungo_test.go 
     基线都是 Task 4 的内容。类型为了实现 `tunnel.Tunnel` 接口无法省略这些方法。
   - **`restoreAsync` 仍只认 `tun`**、`CheckTunDeviceFree` 的措辞仍只讲 tun——按分工留给
     Task 4（设备互斥泛化）与 Task 6（API/UI）。
-  - **规则热更新接缝尚未接上**：Task 6 需要拿到 `*tunnel.RuleBypass` 才能 `SetRules`，
-    本任务没有把它存成字段（YAGNI），那时补 `rulesBypass` 字段并让 `init` 复用它即可。
+  - **规则热更新接缝已就位**：`s.rules` 是注册的那个 `*tunnel.RuleBypass`，Task 6 直接
+    `s.rules.SetRules(...)` 即可原地更新。注意 `init()` 是「先克隆 `opts.Rules`、后写
+    `s.rules`」两段临界区，Task 6 的热更新若正好落在中间会被 init 覆盖 —— 接缝时应把两段
+    合成一段，或在 init 里复用既有对象而不是新建。
+  - **`Close()` 仍按名字无条件注销**：只有 Task 4 用 `s.rules` 与注册表里的对象做身份比较，
+    才能保证「失败的 init 之后 Close 不会误撤掉后任实例的注册」。
   - `NewByType(TungoEntryPoint)` 生成的 entrypoint 在 Task 6 的 API 校验之前若被直接
     `Start`，会得到上面的「未实现」错误而不是半启动——这是刻意的失败方式。
   - 健康/观测（v1 不实现包级 liveness）与 `relay` 的 FUDP 端到端都还没验证（Task 5）。
