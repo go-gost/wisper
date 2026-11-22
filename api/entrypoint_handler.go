@@ -195,18 +195,19 @@ func validateTungoEntryPoint(r *entrypointCreateRequest) error {
 	return nil
 }
 
-// The two catch-alls a split's device needs. A device that captures only IPv4
-// sends every IPv6 flow around the tunnel — the one leak this tool cannot have —
-// so the v4 catch-all never travels without the v6 one.
+// The two catch-alls a split's device needs. A device that captures only one
+// address family sends every flow of the other one around the tunnel — the one
+// leak this tool cannot have — so neither catch-all travels without the other.
 const (
 	catchAllV4 = "0.0.0.0/0"
 	catchAllV6 = "::/0"
 )
 
 // tungoDefaultDNS is the resolver a split hands its device when the form leaves
-// dns empty: the address the hub's dns service answers on (the device routes
-// 192.168.100.0/24 into the tunnel, see the design's §5.1). No resolver means
-// every app's queries go around the tunnel on the phone's own network.
+// dns empty: the address the hub's dns service answers on (the design's §5.1).
+// It is only handed out when the routes actually reach it: a resolver the device
+// cannot route to is worse than none, because blank dns means "no override, use
+// the phone's own resolver".
 const tungoDefaultDNS = "192.168.100.100"
 
 // validateTungoSplit refuses the device that cannot work and normalises the one
@@ -215,26 +216,29 @@ const tungoDefaultDNS = "192.168.100.100"
 //
 //   - no routes at all captures nothing: every flow leaves on the phone's own
 //     network while the entrypoint still looks healthy, so it is refused;
-//   - a v4 catch-all without a v6 one leaks IPv6 around the split, so the v6
-//     catch-all is appended (a named-subnet split, with neither catch-all, is
-//     left exactly as written);
-//   - an empty dns list would leave the device with no resolver, so the
-//     tunnel's own resolver is filled in.
+//   - a catch-all without the other family's one leaks that family around the
+//     split, so the missing catch-all is appended (a named-subnet split, with
+//     neither catch-all, is left exactly as written);
+//   - an empty dns list is filled in with the tunnel's own resolver, but only
+//     when the routes cover it: a narrow split keeps its dns empty and lets the
+//     phone resolve, rather than handing the device an unreachable server. The
+//     route list is never widened to make the default fit — that would send
+//     traffic into the tunnel the operator deliberately kept out.
 func validateTungoSplit(r *entrypointCreateRequest) error {
 	if strings.TrimSpace(r.Routes) == "" {
 		return fmt.Errorf("routes is required: a split entrypoint with no routes captures nothing, e.g. %q", catchAllV4+", "+catchAllV6)
 	}
-	r.Routes = withV6CatchAll(r.Routes)
-	if strings.TrimSpace(r.DNS) == "" {
+	r.Routes = withCatchAlls(r.Routes)
+	if strings.TrimSpace(r.DNS) == "" && routesReach(r.Routes, tungoDefaultDNS) {
 		r.DNS = tungoDefaultDNS
 	}
 	return nil
 }
 
-// withV6CatchAll appends ::/0 when the route list carries the IPv4 catch-all and
-// no IPv6 one. Anything else — a named subnet, both catch-alls, a v6-only list —
-// is returned unchanged: those are the operator's own choices, not a leak.
-func withV6CatchAll(routes string) string {
+// withCatchAlls appends the catch-all of the family the list is missing when the
+// other one is present. Anything else — a named subnet, both catch-alls — is
+// returned unchanged: those are the operator's own choices, not a leak.
+func withCatchAlls(routes string) string {
 	var hasV4, hasV6 bool
 	for _, s := range strings.Split(routes, ",") {
 		fields := strings.Fields(strings.TrimSpace(s))
@@ -248,10 +252,40 @@ func withV6CatchAll(routes string) string {
 			hasV6 = true
 		}
 	}
-	if !hasV4 || hasV6 {
-		return routes
+	switch {
+	case hasV4 && !hasV6:
+		return routes + ", " + catchAllV6
+	case hasV6 && !hasV4:
+		return routes + ", " + catchAllV4
 	}
-	return routes + ", " + catchAllV6
+	return routes
+}
+
+// routesReach reports whether one of the comma-separated route entries covers
+// addr. A route is a "cidr [gw]" pair; only the CIDR counts, and a prefix of one
+// family never covers an address of the other, however the two compare as bytes.
+func routesReach(routes, addr string) bool {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return false
+	}
+	for _, s := range strings.Split(routes, ",") {
+		fields := strings.Fields(strings.TrimSpace(s))
+		if len(fields) == 0 {
+			continue
+		}
+		_, n, err := net.ParseCIDR(fields[0])
+		if err != nil {
+			continue
+		}
+		if (n.IP.To4() == nil) != (ip.To4() == nil) {
+			continue
+		}
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // validateTunEntryPoint checks what a tun spoke cannot do without: a device

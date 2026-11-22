@@ -1311,6 +1311,158 @@ func TestEntrypointCreateTungoSafeDevice(t *testing.T) {
 	})
 }
 
+// TestEntrypointCreateTungoResolverAndCatchAlls: the two normalisations of a
+// split's device must not fight each other or the operator. The tunnel's
+// resolver is only worth handing out when the routes reach it — a named-subnet
+// split that never routes 192.168.100.0/24 would otherwise get a resolver it
+// cannot query, worse than the blank "use the phone's" it wrote — and the
+// catch-alls are symmetric: either family alone is the leak the pair closes.
+func TestEntrypointCreateTungoResolverAndCatchAlls(t *testing.T) {
+	const peer = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+
+	t.Run("a narrow split keeps its empty dns", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+		useGostLogger(t)
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+			"routes": "192.168.50.0/24", "device_name": refusedDeviceName,
+		})
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("create with a narrow route list = %d: %v, want 201", resp.StatusCode, body)
+		}
+		id, _ := body["id"].(string)
+		defer entrypoint.Delete(id)
+		requireStartRefused(t, id)
+
+		opts := entrypointOptions(t, body)
+		routes, _ := opts["routes"].(string)
+		if routes != "192.168.50.0/24" {
+			t.Errorf("routes = %q, want the operator's own list: widening it to reach the resolver would capture traffic they kept out", routes)
+		}
+		// The stored value has to be self-consistent: either the resolver is
+		// blank, or the /24 it lives on is routed.
+		dns, _ := opts["dns"].(string)
+		if dns != "" && !routeListReaches(routes, dns) {
+			t.Errorf("dns = %q with routes %q: the device cannot route its resolver, which is worse than no override", dns, routes)
+		}
+		if dns != "" {
+			t.Errorf("dns = %q, want it left blank when the routes do not cover %q", dns, tungoDefaultDNS)
+		}
+
+		for _, ep := range config.Get().EntryPoints {
+			if ep.ID != id {
+				continue
+			}
+			if ep.Routes != "192.168.50.0/24" || ep.DNS != "" {
+				t.Errorf("saved routes/dns = %q/%q, want %q/\"\" as answered", ep.Routes, ep.DNS, "192.168.50.0/24")
+			}
+		}
+	})
+
+	t.Run("an explicit resolver is never rewritten", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+		useGostLogger(t)
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+			"routes": "192.168.50.0/24", "dns": "10.0.0.53", "device_name": refusedDeviceName,
+		})
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("create with an explicit resolver = %d: %v, want 201", resp.StatusCode, body)
+		}
+		id, _ := body["id"].(string)
+		defer entrypoint.Delete(id)
+		requireStartRefused(t, id)
+
+		opts := entrypointOptions(t, body)
+		if got, _ := opts["routes"].(string); got != "192.168.50.0/24" {
+			t.Errorf("routes = %q, want the explicit resolver to leave the route list alone", got)
+		}
+		if got, _ := opts["dns"].(string); got != "10.0.0.53" {
+			t.Errorf("dns = %q, want the operator's own resolver: the defaulting rule must never touch it", got)
+		}
+	})
+
+	t.Run("v6 catch-all gains the v4 one", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+		useGostLogger(t)
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+			"routes": "::/0", "device_name": refusedDeviceName,
+		})
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("create with the v6 catch-all = %d: %v, want 201", resp.StatusCode, body)
+		}
+		id, _ := body["id"].(string)
+		defer entrypoint.Delete(id)
+		requireStartRefused(t, id)
+
+		opts := entrypointOptions(t, body)
+		if got, _ := opts["routes"].(string); got != "::/0, 0.0.0.0/0" {
+			t.Errorf("routes = %q, want the v4 catch-all appended: %q alone lets every IPv4 flow around the split", got, "::/0")
+		}
+		// The pair now covers the resolver's net, so the normalised list is what
+		// the default is judged against.
+		if got, _ := opts["dns"].(string); got != tungoDefaultDNS {
+			t.Errorf("dns = %q, want the tunnel's resolver once the appended v4 catch-all reaches it", got)
+		}
+	})
+
+	t.Run("a tun spoke keeps a v6-only list", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+		useGostLogger(t)
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tun", "name": "spoke", "net": "10.20.0.2/24", "peer": peer,
+			"routes": "::/0", "device_name": refusedDeviceName,
+		})
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("create tun entrypoint with the v6 catch-all = %d: %v, want 201", resp.StatusCode, body)
+		}
+		id, _ := body["id"].(string)
+		defer entrypoint.Delete(id)
+		requireStartRefused(t, id)
+
+		opts := entrypointOptions(t, body)
+		if got, _ := opts["routes"].(string); got != "::/0" {
+			t.Errorf("tun routes = %q, want the catch-all normalisation to stay tungo-only", got)
+		}
+		if got, _ := opts["dns"].(string); got != "" {
+			t.Errorf("tun dns = %q, want it left unset: the split's resolver defaulting is not a tun spoke's", got)
+		}
+	})
+}
+
+// routeListReaches is the test's own reading of routesReach: it checks the
+// property the API promises (the resolver is routable), not the helper's
+// implementation.
+func routeListReaches(routes, addr string) bool {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return false
+	}
+	for _, s := range strings.Split(routes, ",") {
+		fields := strings.Fields(strings.TrimSpace(s))
+		if len(fields) == 0 {
+			continue
+		}
+		_, n, err := net.ParseCIDR(fields[0])
+		if err != nil || (n.IP.To4() == nil) != (ip.To4() == nil) {
+			continue
+		}
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 // TestEntrypointUpdateKeepsRulesWithoutRestart: the rule list is a live object
 // the chain resolves by name, so an edit that changes nothing else is applied to
 // it in place. Rebuilding the entrypoint instead would take the VPN device down
