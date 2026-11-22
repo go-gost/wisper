@@ -892,7 +892,95 @@ Expected: 三条都成功，`web/assets` 出现新的哈希产物
 cd wisper && git add web-src web/assets && git commit -m "feat(web): edit the tungo entrypoint and its rules"
 ```
 
-**Implementation record:** _完成后填写。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成。详情页与首页都能创建、编辑 tungo entrypoint，`rules` 以换行文本
+  往返（保存时 `split('\n')` → trim → 去空，空文本域传 `[]`）。
+- **仓库 + commit:** `wisper`（`github.com/go-gost/wisper`）：`a379334`
+  `feat(web): edit the tungo entrypoint and its rules`（`web-src`、`web-e2e` 的新 spec、
+  重建后的 `web/assets` + `web/index.html`）；本条记录为随后的 `docs(plan)` 提交。
+  不涉及 `x`、Go 代码或 Kotlin 桥。
+- **实际改动文件:**
+  - `web-src/src/api/types.ts` — `EntrypointType` 加 `'tungo'`；`ENTRYPOINT_TYPES` 加一项
+    （picker 是唯一能新建入口的路径，不加就永远创建不出来）；`EntrypointOptions.rules?`、
+    `EntrypointCreateRequest.rules?`（注释写明「每次保存整份发送，`[]` 是显式清空」）。
+  - `web-src/src/pages/entrypoint-type-select-page.ts` — `TYPE_COLORS` 加 tungo（绿色，与 tun 的青色区分）。
+  - `web-src/src/utils/type-icons.ts` + `utils/icons.ts` — tungo 用新加的 `branch` 图标
+    （一分二：清单内进隧道、其余直出），避免与 `tun` 的 `network` 撞图。
+  - `web-src/src/utils/vpn.ts` — `tunDeviceHolder` 从「运行中的 tun」扩成「运行中的设备型入口
+    （tun 或 tungo）」。Android 只有一个 VpnService 设备，只认 tun 会让 tungo 抢走 tun 的设备。
+  - `web-src/src/pages/entrypoint-detail-page.ts` —
+    - 新增 `_usesDevice` getter（`'tun' || 'tungo'`）承载「设备字段 + peer + armVpn」这一组，
+      对应任务书的 302/313/343-347/945-961；`_handleStart` 的 armVpn 也走它。
+    - `_rules` state：`_resetForm` 清空，`_populateForm` 用 `(options.rules ?? []).join('\n')`。
+    - 保存体新增 `rules`（仅 tungo，整份发送，trim + 去空）。
+    - 文本域（仅 tungo）：`<textarea class="form-input" rows="6">`，放在 DNS 之后、LAN 共享之前；
+      新增 `textarea.form-input` 样式（等宽、可纵向拉伸、最小高度）。
+    - 视图模式：`fieldNet` 标签、MTU/设备名/routes/dns/peer/transport 对 tungo 生效；
+      `share_lan`、`direct`、`lan_routes` 与两条 hub liveness 横幅**保持仅 tun**；
+      tungo 增加 `fieldRules` 行（空清单显示 `—`，因为「全部直连」是可用状态而不是未配置）。
+    - `tunNetMatchesHub` 提示仅 tun 保留（tungo 的地址不由任何 hub 分配）；DNS 占位符按类型区分
+      （tun `10.10.0.1`，tungo `192.168.100.100`，即计划里固定的家庭网关）。
+    - 设备型入口的顶部提示换成按类型选 `tunPeerHint` / 新 `tungoPeerHint`；管理员权限提示两者共用。
+  - `web-src/src/pages/home-page.ts:723-741` — `_handleStart` 的设备判定含 `'tungo'`，
+    armVpn 用该入口自己的 `net/routes/mtu/dns`（字段名与 tun 相同，无需另取）。
+  - `web-src/src/i18n/en.ts`、`zh.ts` — 新增 `typeTungo`、`typeTungoDesc`、`typeTungoEntryDesc`、
+    `tungoPeerHint`、`fieldRules`、`fieldRulesHint`；两套 key 数量一致（412/412，脚本核对无单边）。
+    顺带修正 `p2pKeyResetWarning`：重置身份后 tungo 入口点也会重启（Task 4 的 `1a87d0f`），原文只提
+    tun。
+  - `web-e2e/tests/entrypoint-tungo-form.spec.ts`（新增）— 4 个 ui-test（见下）。
+  - `web/assets/*`、`web/index.html` — `make web` 重建（18 个哈希产物替换，CSS 未变，
+    `index.html` 只换了入口脚本名）。
+- **测试/命令与结果:**
+  - RED：`cd wisper && scripts/ui-test.sh tests/entrypoint-tungo-form.spec.ts`
+    → 3 failed（当时的 3 条）：
+    `the tungo entrypoint form shows the device fields…` 在
+    `input[placeholder="10.10.0.2/24"]` 上 `element(s) not found`（tungo 落到 p2p/其他分支，
+    没有设备字段也没有 rules）；`…saves its rules as a trimmed list` 等不到
+    `Base64 public key` 输入框；`…renders its saved rules…` 找不到 `Split rules` 行。
+    即「按 `'tun'` 判定的分支不覆盖 tungo」。
+  - GREEN（本文件）：同一命令 → 4 passed。
+  - `cd wisper && make typecheck` → 无输出（exit 0）。
+  - `cd wisper && make ui-test` → **35 passed / 4 failed**，4 条失败与 tungo 无关且**改动前就有**
+    （把 `web-src` stash 掉、用 HEAD 源码重建 `web` 后跑同样三条 spec，得到完全相同的 4 条失败）：
+    `entrypoint-tun-form` 的「peer key under the device address」（断言 MTU 占位符 `1420`，
+    表单早已是 `1300`）与「keeps LAN sharing last」（`.switch-row` 在 tun 表单本就有两个，
+    Playwright strict mode 报歧义）；`home-navigation` / `tunnel-detail` 的
+    「…carries the encryption badge」（`.secure` 徽标已不在 `tunnel-card` 上）。
+    新增的 4 条 tungo 断言全部 PASS，其余 31 条 PASS。
+  - `cd wisper && make web` → `✓ built in 673ms`，`web/assets` 出现新哈希产物（见上）。
+  - 重建可复现性：改动前跑过一次 `make web`，产出的哈希文件名与仓库里的已跟踪产物**完全一致**
+    （`git status web` 无输出），所以提交里的产物差异只来自本任务的源码改动。
+  - i18n 一致性脚本：`en` 412 keys / `zh` 412 keys，互差为空、无重复 key。
+- **评审发现与修复（自审）:**
+  - 任务书只点了 4 行改动位置，但**只加类型判定是创建不出来的**: `EntrypointType` 不含
+    `'tungo'` 时详情页的 `=== 'tungo'` 连 TS 都编不过，而 picker（`ENTRYPOINT_TYPES`）里没有卡片
+    就永远拿不到 `/entrypoint/tungo/new` 的入口。所以补了 `api/types.ts`、picker 配色、图标表与
+    `icons.ts` 的 `branch` 字形；这些都在同一处「类型即入口」的链上。
+  - `tunDeviceHolder` 必须一起扩：它守的是「Android 只有一个 VpnService 设备」。只改
+    `_handleSave`/`_handleStart` 的 `'tun'` 判定会漏掉「tun 在跑、再 arm 一个 tungo」这条把设备
+    抢走的路径。
+  - 任务书要求「不要给用户『保存即生效并重启』的暗示」：详情页本来就没有这类提示，新增的
+    `fieldRulesHint`/`tungoPeerHint` 只描述分流语义，未提保存/重启；也没有借用 peers 页的
+    `peersRestartHint`。
+  - 空清单的展示：视图模式显示 `—` 而不是隐藏该行——空清单是「全部直连」，是个可用状态；
+    隐藏会让「我来过这里、确实清空了」无从判断。
+  - `fieldRoutesHint` 是 tun 的文案（「留空则默认走本机 net 所在网段（含 hub 及其他 peer）」），
+    对 tungo 略偏；仍复用，因为它的主体（逗号分隔、`0.0.0.0/0` 表示全部）对两者都成立，
+    而计划里 tungo 的固定值就是 `0.0.0.0/0, ::/0`。`tunNetMatchesHub` 则对 tungo 是错的
+    （没有 tun hub 分配地址），已收窄到 tun。
+  - `textarea` 用 `.value=${...}` 绑定而非 `value=` 属性，poll 时重填不会打断输入焦点；
+    同时保证 `?edit` 首次渲染就带上已保存的清单。
+- **遗留项/限制:**
+  - `make ui-test` 仍非全绿：4 条既有失败（上面点名）与本任务无关，未修——它们分别属于
+    tun 表单测试的过期占位符、tun 表单的歧义 locator、以及 `tunnel-card` 的加密徽标测试漂移，
+    修它们会改动与 tungo 无关的断言，留待单独处理。
+  - tungo 不显示「本地对端（blocked_peers）」卡片：`blocked_peers` 只接了 tun spoke
+    （Task 6a 未给 tungo 接这条），页面按 tun-only 保留。
+  - View 模式的 `rules` 以 `, ` 连接显示（长清单会折行）；没有逐条可编辑的列表控件，编辑只有文本域。
+  - 设备真正建立仍只有 Android 真机/root 覆盖；ui-test 的保存用例改为拦截 `POST /api/entrypoints`
+    校验请求体（桌面无权限建设备，且不想污染夹具），设备创建本身由 Task 7 真机验收。
+
 
 ---
 
