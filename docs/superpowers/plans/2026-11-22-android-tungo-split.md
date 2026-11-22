@@ -329,7 +329,77 @@ cd wisper && git add tunnel/entrypoint/tungo.go tunnel/entrypoint/tungo_test.go 
   && git commit -m "feat(entrypoint): add the tungo entrypoint type and its rule-whitelisted chain"
 ```
 
-**Implementation record:** _完成后填写。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成（本任务只做类型与配置组装；Run/Close 的生命周期是 Task 4）。
+- **仓库 + commit:**
+  - `wisper`（`github.com/go-gost/wisper`）：`a64cfc7` `feat(entrypoint): add the tungo entrypoint type and its rule-whitelisted chain`
+    （代码 + 测试）；本条记录为随后的 `docs(plan)` 提交。
+  - `x`：本任务没有改动（README 里说的 `x/config`、`chain_parser`、`registry` 都按现状读取）。
+- **实际改动文件:**
+  - `tunnel/entrypoint/tungo.go`（新增）— `tungoEntryPoint`：`opts`/`peer`/`provider`
+    （`tungo-ep-<ID>`）/`rules`（`tungo-rules-<ID>`）/`config` + favorite/stats/cclose 那一套
+    （与 `p2p.go`、`tun.go` 同形）。`NewTungoEntryPoint`：ID 为空取 uuid、`MTU<=0` 取
+    `tunnel.DefaultTunMTU`（1300，与 tun entrypoint 一致）、Name 默认 `tungo-ep-<ID前8位>`、
+    CreatedAt 补当前时间。`ID/Type/Name/Endpoint(=peer key)/Entrypoint(=Net)/Options/Favorite/
+    IsFavorite/Stats/SetStats/StatsBaseline/SetStatsBaseline/IsClosed/Err/setErr` 全部就位，
+    所以 `createEntryPoint` 的 `SetStats`/`SetStatsBaseline` 可用。
+  - `tunnel/entrypoint/tungo.go` 的 `init()`：先校验 peer（为空直接报
+    `tungo entrypoint requires a peer public key`，不注册任何东西），再
+    `registry.BypassRegistry().Unregister(s.rules)` + `Register(s.rules, tunnel.NewRuleBypass(opts.Rules))`，
+    然后组装 `x/config.Config`：
+    `Services[0] = {Name, Addr: ":0", Handler{Type:"tungo", Chain: name},
+    Listener{Type:"tungo", Metadata{name,mtu,net,routes,dns}}}`（**无** Forwarder、**无**
+    `svc.Bypass`/`svc.Bypasses`、**无** resolver/hosts）；链由
+    `tunnel.ChainConfig(id, name, recordMode)` 生成后把 hop-0 改成
+    `Bypasses: ["tungo-rules-<id>"]`、其唯一 node 改成
+    `{Addr: peer, Connector: relay, Dialer: tcp, Metadata: {"p2p": "tungo-ep-<id>"}}`；
+    `Bypasses[0] = {Name: "tungo-rules-<id>", Whitelist: true, Matchers: opts.Rules}`
+    作为自描述副本（运行期权威仍是注册表里的 `*tunnel.RuleBypass`）。
+  - `tunnel/entrypoint/tungo.go` 的 `Close()`：幂等，关 `cclose` 并 unregister 规则 bypass
+    （设备 claim、host 引用与 service 随 Task 4 到来）。
+  - `tunnel/entrypoint/entrypoint.go` — `TungoEntryPoint = "tungo"` 常量（带语义注释）与
+    `NewByType` 的 `case TungoEntryPoint: return NewTungoEntryPoint(options...)`。
+  - `tunnel/entrypoint/tungo_test.go`（新增）— `tungoCleanup` 辅助（`t.Cleanup` 清理
+    `tungo-rules-*` 与 `tungo-ep-*`）+ 三个测试 + 一个 `stubTunnel`
+    （`xp2p.Tunnel` 的空实现，只让链能 parse/route，不碰网络）。
+- **执行的命令与结果:**
+  - RED：`cd wisper && go test ./tunnel/entrypoint/ -run TestTungoEntryPoint -v`
+    → 编译失败：`undefined: NewTungoEntryPoint`、`undefined: TungoEntryPoint`（符合预期）。
+  - GREEN：同一条命令 → 3 个测试（+3 子测试）全部 PASS。
+  - 变异验证（证明断言的力度）：把 `hop.Bypasses = []string{s.rules}` 临时删掉后
+    `-run TestTungoEntryPointRulesRouteUnlistedDirect` → `unlisted_address` 子测试报
+    `Route("1.2.3.4:443") has 1 nodes, want 0`；恢复后全绿。
+  - `cd wisper && CGO_ENABLED=1 go test ./tunnel/entrypoint/ -run TestTungoEntryPoint -race -count=2`
+    → PASS，无 DATA RACE。
+  - `cd wisper && go test ./tunnel/entrypoint/ -count=1` → `ok ... 20.330s`（整包回归）。
+  - `cd wisper && go vet ./tunnel/entrypoint/` → 无输出；`gofmt -l tunnel/entrypoint/` → 无输出；
+    `go build ./...` → exit 0。
+- **评审发现与修复（自审）:**
+  - `config.HandlerConfig` 没有 `Bypass` 字段：service 级 bypass 只能落在
+    `ServiceConfig.Bypass/Bypasses`，断言据此改为对这两个字段的「必须为空」检查。
+  - 规则 bypass 必须在 `ParseChain` 之前注册（`x/config/parsing/bypass.List` 只查注册表，
+    `config.Bypasses` 里的条目永远不会被解析），因此注册放在 `init()` 里、
+    并在注册前 `Unregister` 掉上一次运行留下的同名条目（照 `p2p.go` 的 provider 写法）。
+  - 服务上刻意不配 resolver/hosts：`x/chain/router.go` 会先 resolve，域名规则就再也看不到
+    域名（spec §3.8）。测试用「resolver/hosts 必须为空」把它钉住。
+  - 测试不依赖真实配置目录（`t.Setenv("XDG_CONFIG_HOME", t.TempDir())`，并
+    `cfg.Set(&cfg.Config{})` 让 `tunnel.ChainConfig` 有 Settings 可读），注册表条目全部
+    由 `tungoCleanup` 的 `t.Cleanup` 收走，`-count=2` 通过说明没有跨测试泄漏。
+  - `Options()` 克隆 `Rules`（这是唯一可被原地修改的字段），其余保持不可变；
+    `Endpoint()` 返回 peer key、`Entrypoint()` 返回设备地址（`Net`），与 tun entrypoint 一致。
+- **遗留项/限制:**
+  - **`Run()` 目前是明确的未实现桩**（返回 `tungo entrypoint: the run lifecycle is not
+    implemented yet`），`Status()` 返回 nil，`Close()` 只回收规则 bypass：设备 claim、
+    `AcquireP2PHost`、provider 注册、Android `WaitTunFD`、`xservice.NewService` 与 stats
+    基线都是 Task 4 的内容。类型为了实现 `tunnel.Tunnel` 接口无法省略这些方法。
+  - **`restoreAsync` 仍只认 `tun`**、`CheckTunDeviceFree` 的措辞仍只讲 tun——按分工留给
+    Task 4（设备互斥泛化）与 Task 6（API/UI）。
+  - **规则热更新接缝尚未接上**：Task 6 需要拿到 `*tunnel.RuleBypass` 才能 `SetRules`，
+    本任务没有把它存成字段（YAGNI），那时补 `rulesBypass` 字段并让 `init` 复用它即可。
+  - `NewByType(TungoEntryPoint)` 生成的 entrypoint 在 Task 6 的 API 校验之前若被直接
+    `Start`，会得到上面的「未实现」错误而不是半启动——这是刻意的失败方式。
+  - 健康/观测（v1 不实现包级 liveness）与 `relay` 的 FUDP 端到端都还没验证（Task 5）。
 
 ---
 
