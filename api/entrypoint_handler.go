@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"reflect"
 	"strings"
+	"time"
 
 	"github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
@@ -21,7 +23,8 @@ type entrypointCreateRequest struct {
 	Endpoint  string `json:"endpoint"`
 	Keepalive bool   `json:"keepalive,omitempty"`
 	TTL       int    `json:"ttl,omitempty"`
-	// Peer is the remote peer's base64 public key (p2p and tun entrypoints).
+	// Peer is the remote peer's base64 public key (p2p, tun and tungo
+	// entrypoints).
 	Peer string `json:"peer,omitempty"`
 	// Protocol is a p2p entrypoint's inner protocol: "tcp" (default) or "udp".
 	Protocol string `json:"protocol,omitempty"`
@@ -49,6 +52,11 @@ type entrypointCreateRequest struct {
 	// Direct enables the mesh data path. A pointer for the same reason: absent
 	// on an update keeps the old value, explicit false turns it off.
 	Direct *bool `json:"direct,omitempty"`
+	// Rules is a tungo entrypoint's split list: the destinations that go through
+	// the tunnel, everything else dialled directly. A pointer for the same reason
+	// as BlockedPeers: absent on an update keeps the saved list, [] clears it (and
+	// an empty list is a working split — everything direct).
+	Rules *[]string `json:"rules,omitempty"`
 }
 
 func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
@@ -69,6 +77,7 @@ func (r *entrypointCreateRequest) toOptions() []tunnel.Option {
 		tunnel.ShareModeOption(r.ShareMode),
 		tunnel.BlockedPeersOption(derefStrings(r.BlockedPeers)...),
 		tunnel.DirectOption(derefBool(r.Direct)),
+		tunnel.RulesOption(derefStrings(r.Rules)...),
 	}
 }
 
@@ -142,14 +151,18 @@ func validateEntryPointRequest(epType string, req *entrypointCreateRequest) erro
 	switch epType {
 	case entrypoint.TunEntryPoint:
 		return validateTunEntryPoint(req)
+	case entrypoint.TungoEntryPoint:
+		return validateTungoEntryPoint(req)
 	}
 	return nil
 }
 
-// validateTunEntryPoint checks what a spoke cannot do without: a device address
-// and the hub's public key (a bad key would leave the chain node dialing
-// nothing, with no error on the way out).
-func validateTunEntryPoint(r *entrypointCreateRequest) error {
+// validateTungoEntryPoint checks what a split spoke cannot do without: a device
+// address, the hub's public key (a bad key would leave the chain node dialing
+// nothing, with no error on the way out) and the device fields it shares with a
+// tun spoke, which the listener skips silently when they do not parse. The rule
+// list may be empty: that is a working split that sends everything direct.
+func validateTungoEntryPoint(r *entrypointCreateRequest) error {
 	if err := validateTunNet(r.Net); err != nil {
 		return err
 	}
@@ -161,6 +174,16 @@ func validateTunEntryPoint(r *entrypointCreateRequest) error {
 	}
 	if !tunnel.ValidPeerKey(r.Peer) {
 		return fmt.Errorf("peer must be the hub's base64 public key")
+	}
+	return nil
+}
+
+// validateTunEntryPoint checks what a tun spoke cannot do without: a device
+// address and the hub's public key, plus the one device field of its own —
+// share_lan, the LAN it hands its hub.
+func validateTunEntryPoint(r *entrypointCreateRequest) error {
+	if err := validateTungoEntryPoint(r); err != nil {
+		return err
 	}
 	// A malformed share_lan is refused here rather than at Run, as for a tun
 	// hub (see validateTunTunnel): the create would otherwise answer 201 and
@@ -270,9 +293,9 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Capture what an omitted field means before Close discards the old run.
-	// BlockedPeers is the one field this request may leave alone: an update
-	// form that never mentions it must not silently clear the operator's
-	// local block.
+	// BlockedPeers and Rules are the fields this request may leave alone: an
+	// update form that never mentions one must not silently clear the operator's
+	// local block, or turn a split into "everything direct".
 	oldOpts := old.Options()
 	if req.BlockedPeers == nil {
 		blocked := append([]string(nil), oldOpts.BlockedPeers...)
@@ -282,19 +305,21 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		direct := oldOpts.Direct
 		req.Direct = &direct
 	}
-
-	// Every entrypoint type binds its own local address (and a p2p one also
-	// claims a provider name on the shared host), so the old one has to let go
-	// before the replacement can start.
-	old.Close()
+	if req.Rules == nil {
+		rules := append([]string(nil), oldOpts.Rules...)
+		req.Rules = &rules
+	}
 
 	// The path owns the identity. The body ID is optional, and an update that
-	// omits it must not create a replacement with an empty/new ID: the old
-	// entrypoint is already closed, and a new ID would make the UI's detail URL
-	// point at nothing.
+	// omits it must not create a replacement with an empty/new ID: a new ID would
+	// make the UI's detail URL point at nothing.
 	req.ID = id
 
-	// Create replacement with same ID first (before deleting old).
+	// The replacement is built before the old entrypoint lets go, so a request
+	// the runtime cannot honor leaves the running one alone. It is also what the
+	// hot path below compares against: the constructor is what applies the
+	// defaults (name, MTU), so "nothing else changed" is exact rather than a
+	// guess at which fields the form restated.
 	opts := append([]tunnel.Option{
 		tunnel.CreatedAtOption(oldOpts.CreatedAt),
 	}, req.toOptions()...)
@@ -304,6 +329,26 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown entrypoint type: %s", epType))
 		return
 	}
+
+	// A split list is a live object the chain resolves by name, so an edit that
+	// changes nothing else is applied in place. Rebuilding instead would take the
+	// VPN device down and back up — dropping every flow on it, and restarting
+	// what the counters are measured against — for a change the running split can
+	// take on its own.
+	if rs, ok := old.(entrypoint.RuleSetter); ok && rulesOnlyUpdate(old, epType, oldOpts, ep) {
+		rs.SetRules(derefStrings(req.Rules))
+		event.Record(id, event.LevelInfo, "updated")
+		if err := entrypoint.SaveConfig(); err != nil {
+			slog.Error("save config", "err", err)
+		}
+		writeJSON(w, http.StatusOK, toTunnelResponse(old))
+		return
+	}
+
+	// Every entrypoint type binds its own local address (and a p2p one also
+	// claims a provider name on the shared host), so the old one has to let go
+	// before the replacement can start.
+	old.Close()
 
 	ep.SetStats(old.Stats())
 	ep.SetStatsBaseline(old.StatsBaseline())
@@ -328,6 +373,38 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, toTunnelResponse(ep))
+}
+
+// rulesOnlyUpdate reports whether this update asks a running, healthy
+// entrypoint of the same type for nothing but a new rule list — the edit that is
+// applied in place instead of rebuilding the run. A request that changes the
+// type is a rebuild whatever else it restates, and a stopped or failing
+// entrypoint is rebuilt as it always was: saving one is also the way to make it
+// start again.
+func rulesOnlyUpdate(old entrypoint.EntryPoint, epType string, oldOpts tunnel.Options, next entrypoint.EntryPoint) bool {
+	if epType != old.Type() || old.IsClosed() || old.Err() != nil || tunnel.IsServiceFailed(old) {
+		return false
+	}
+	return sameRunOptions(oldOpts, next.Options())
+}
+
+// sameRunOptions reports whether two option sets describe the same run, which is
+// what lets a rules-only edit be applied to a live entrypoint instead of
+// rebuilding it. The rule list is left out on purpose — it is the field the edit
+// is allowed to change — as are the identity, the creation time and the counters:
+// those belong to the object, not to the request. ShareMode is compared as its
+// normalized value, because the response already maps an unset mode to "auto"
+// and a client that saves back what it read means the same thing. Everything else
+// is compared as a whole, so a field added later cannot leak in as "unchanged":
+// it forces the rebuild path until someone decides otherwise.
+func sameRunOptions(a, b tunnel.Options) bool {
+	for _, o := range []*tunnel.Options{&a, &b} {
+		o.ID, o.CreatedAt = "", time.Time{}
+		o.Rules = nil
+		o.ShareMode = tunnel.NormalizeShareMode(o.ShareMode)
+		o.Stats, o.StatsBaseline = config.ServiceStats{}, config.ServiceStats{}
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 func handleDeleteEntrypoint(w http.ResponseWriter, r *http.Request) {

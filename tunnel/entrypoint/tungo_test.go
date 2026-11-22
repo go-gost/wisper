@@ -1,11 +1,17 @@
 package entrypoint
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"os"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-gost/core/bypass"
 	"github.com/go-gost/core/listener"
@@ -790,6 +796,151 @@ func TestTungoStaleCloseKeepsSuccessorRules(t *testing.T) {
 		t.Error("the registry no longer holds the successor's rules")
 	}
 	_ = next.Close()
+}
+
+// TestTungoSetRulesWhileInitKeepsTheEdit: a rule edit and init() both write the
+// rule object and the options it is built from. If they are two separate
+// critical sections, an edit landing between them is overwritten by init's own
+// snapshot — the split reverts to the old list until the next restart, with
+// nothing to say so, and the API's answer already said the edit was applied.
+// Either order has to end with the edit in force: the list a running split uses
+// is the last one saved.
+func TestTungoSetRulesWhileInitKeepsTheEdit(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	const id = "tungo-set-rules-init"
+	const rulesName = "tungo-rules-" + id
+	const newRule = "new.example"
+	tungoCleanup(t, id)
+
+	// A long starting list widens the window an edit has to land in: building a
+	// bypass for it is what the two-section version would do between its snapshot
+	// and its assignment, with the edit free to land in the middle.
+	oldRules := make([]string, 2000)
+	for i := range oldRules {
+		oldRules[i] = fmt.Sprintf("old%d.example", i)
+	}
+	oldRule := oldRules[0]
+
+	// One round only has a small window to hit, so many are tried: no ordering
+	// may lose the edit, and a round that does is a round this fails.
+	for round := 0; round < 20; round++ {
+		ep := NewTungoEntryPoint(
+			tp.IDOption(id),
+			tp.PeerOption(testPeerKey),
+			tp.NetOption("10.10.100.250/32"),
+			tp.RulesOption(oldRules...),
+		)
+		s := ep.(*tungoEntryPoint)
+
+		var wg sync.WaitGroup
+		errCh := make(chan error, 1)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			errCh <- s.init()
+		}()
+		// The edit is given a head start of a few microseconds: init only holds
+		// the window for the time it takes to build a rule set for the long list
+		// above, so a simultaneous start would usually have the edit done before
+		// init even reads the old list — which is the easy case. Both orders are
+		// valid, and this one is the one that used to lose the edit.
+		time.Sleep(20 * time.Microsecond)
+		go func() {
+			defer wg.Done()
+			s.SetRules([]string{newRule})
+		}()
+		wg.Wait()
+		if err := <-errCh; err != nil {
+			t.Fatalf("round %d: init: %v", round, err)
+		}
+
+		if got := s.Options().Rules; !slices.Equal(got, []string{newRule}) {
+			t.Fatalf("round %d: options after the edit = %v, want [%s] — the edit was lost", round, got, newRule)
+		}
+		registered := registry.BypassRegistry().GetAll()[rulesName]
+		if registered == nil {
+			t.Fatalf("round %d: %s is not registered after init", round, rulesName)
+		}
+		if registered != bypass.Bypass(s.rules) {
+			t.Fatalf("round %d: the entrypoint holds a rules object that is not the one registered", round)
+		}
+		ctx := context.Background()
+		if registered.Contains(ctx, "tcp", newRule+":443") {
+			t.Fatalf("round %d: the running split does not tunnel the edited rule %s", round, newRule)
+		}
+		if !registered.Contains(ctx, "tcp", oldRule+":443") {
+			t.Fatalf("round %d: the running split still tunnels the replaced rule %s", round, oldRule)
+		}
+		if len(s.config.Bypasses) != 1 || !slices.Equal(s.config.Bypasses[0].Matchers, []string{newRule}) {
+			t.Fatalf("round %d: config matchers = %v, want [%s] — the description of the split follows the edit",
+				round, s.config.Bypasses, newRule)
+		}
+	}
+}
+
+// TestTungoRulesRoundTrip: the rule list is part of the entrypoint's saved
+// configuration, so a restart — or a reload after the process was down — reads
+// it back. A field that survives only in memory comes back empty, which is a
+// split that sends every flow direct and reports nothing wrong.
+func TestTungoRulesRoundTrip(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	const id = "tungo-rules-roundtrip"
+	tungoCleanup(t, id)
+	for i := Count() - 1; i >= 0; i-- {
+		Delete(GetIndex(i).ID())
+	}
+	t.Cleanup(func() {
+		for i := Count() - 1; i >= 0; i-- {
+			Delete(GetIndex(i).ID())
+		}
+	})
+
+	rules := []string{"example.com", "home.pi", "192.168.100.0/24"}
+	ep := NewTungoEntryPoint(
+		tp.IDOption(id),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.100.250/32"),
+		tp.RulesOption(rules...),
+	)
+	Add(ep)
+	if err := ep.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if err := SaveConfig(); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+	saved := cfg.Get().EntryPoints
+	if len(saved) != 1 {
+		t.Fatalf("saved %d entrypoints, want 1", len(saved))
+	}
+	if !slices.Equal(saved[0].Rules, rules) {
+		t.Fatalf("persisted Rules = %v, want %v", saved[0].Rules, rules)
+	}
+	raw, err := os.ReadFile("wisper.yaml")
+	if err != nil {
+		t.Fatalf("read back the config: %v", err)
+	}
+	if !bytes.Contains(raw, []byte("rules:")) {
+		t.Fatalf("wisper.yaml carries no rules key:\n%s", raw)
+	}
+
+	// Load it the way a restart does. The saved entrypoint is stopped, so the
+	// load rebuilds the object without starting a device.
+	Delete(id)
+	LoadConfig()
+	loaded := Get(id)
+	if loaded == nil {
+		t.Fatal("LoadConfig restored no entrypoint")
+	}
+	if !slices.Equal(loaded.Options().Rules, rules) {
+		t.Fatalf("loaded Rules = %v, want %v", loaded.Options().Rules, rules)
+	}
 }
 
 // stubTunnel is a p2p provider that never opens a stream: the chain only has

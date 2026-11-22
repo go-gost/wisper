@@ -157,44 +157,6 @@ func (s *tungoEntryPoint) init() error {
 		return errors.New("tungo entrypoint requires a peer public key")
 	}
 
-	// Rules are read under the same lock Options() takes: a hot edit can
-	// replace them while init runs. The clone is this init's own copy, so
-	// neither the registry object nor the config below reaches the caller's
-	// slice.
-	s.mu.RLock()
-	rules := slices.Clone(s.opts.Rules)
-	s.mu.RUnlock()
-
-	ruleBypass := tunnel.NewRuleBypass(rules)
-	registry.BypassRegistry().Unregister(s.rulesName)
-	if err := registry.BypassRegistry().Register(s.rulesName, ruleBypass); err != nil {
-		// The Unregister above took whatever this name held — this entrypoint's
-		// previous object, if it had one — so nothing is registered now: keeping
-		// the pointer would let a later Close unregister a name this init did
-		// not fill.
-		s.mu.Lock()
-		s.rules = nil
-		s.mu.Unlock()
-		return err
-	}
-	s.mu.Lock()
-	s.rules = ruleBypass
-	s.mu.Unlock()
-
-	// A Close can land between the Register above and the assignment: it
-	// snapshotted no rules, and closeOnce means it never looks again, so this
-	// init is the only one left to take the entry back. The identity test is the
-	// one Close uses — a successor that reuses the name keeps its own rules.
-	if s.IsClosed() {
-		if registry.BypassRegistry().GetAll()[s.rulesName] == ruleBypass {
-			registry.BypassRegistry().Unregister(s.rulesName)
-		}
-		s.mu.Lock()
-		s.rules = nil
-		s.mu.Unlock()
-		return ErrEntryPointClosed
-	}
-
 	svc := &xconfig.ServiceConfig{
 		Name: s.opts.Name,
 		// The tungo listener binds no socket: the address only labels the service.
@@ -241,6 +203,42 @@ func (s *tungoEntryPoint) init() error {
 	node.Dialer = &xconfig.DialerConfig{Type: "tcp"}
 	node.Metadata = map[string]any{"p2p": s.provider}
 
+	// The rules, the object that holds them and the config that describes them
+	// are written in one critical section, and only after everything that does
+	// not depend on them is assembled. Two sections would leave a window a hot
+	// edit (SetRules) could land in, where this init's snapshot — taken before
+	// the edit — would be assigned over it: the split would answer API calls with
+	// the new list and route with the old one until the next restart.
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// The clone is this init's own copy: neither the registry object nor the
+	// config below reaches the caller's slice.
+	rules := slices.Clone(s.opts.Rules)
+	ruleBypass := tunnel.NewRuleBypass(rules)
+	registry.BypassRegistry().Unregister(s.rulesName)
+	if err := registry.BypassRegistry().Register(s.rulesName, ruleBypass); err != nil {
+		// The Unregister above took whatever this name held — this entrypoint's
+		// previous object, if it had one — so nothing is registered now: keeping
+		// the pointer would let a later Close unregister a name this init did
+		// not fill.
+		s.rules = nil
+		return err
+	}
+	s.rules = ruleBypass
+
+	// A Close can have landed before this section: it snapshotted no rules (or a
+	// previous object), and closeOnce means it never looks again, so this init is
+	// the only one left to take the entry back. The identity test is the one
+	// Close uses — a successor that reuses the name keeps its own rules.
+	if s.IsClosed() {
+		if registry.BypassRegistry().GetAll()[s.rulesName] == ruleBypass {
+			registry.BypassRegistry().Unregister(s.rulesName)
+		}
+		s.rules = nil
+		return ErrEntryPointClosed
+	}
+
 	s.config = &xconfig.Config{
 		Services: []*xconfig.ServiceConfig{svc},
 		Chains:   []*xconfig.ChainConfig{chCfg},
@@ -257,6 +255,33 @@ func (s *tungoEntryPoint) init() error {
 	return nil
 }
 
+// SetRules replaces the split list in place. It is what an API rules edit uses:
+// the run keeps its device, its counters and the flows already on the wire, and
+// only the next destination decision changes.
+//
+// The edit and init's own writes are serialized by the same lock, so an edit can
+// never be overwritten by an init that read the list before it: the rules a
+// running split uses are the last ones saved.
+func (s *tungoEntryPoint) SetRules(rules []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.opts.Rules = slices.Clone(rules)
+	if s.rules != nil {
+		s.rules.SetRules(s.opts.Rules)
+	}
+	// The config only describes the split, but it is what the saved file would
+	// say if this process were asked again — a description that keeps the old
+	// list would be the only copy of it left after a restart.
+	if s.config != nil {
+		for _, bp := range s.config.Bypasses {
+			if bp.Name == s.rulesName {
+				bp.Matchers = slices.Clone(rules)
+			}
+		}
+	}
+}
+
 // ChainConfig returns the chain this entrypoint's flows are dialled through —
 // the config init assembles — and assembles it on first use, so a caller that
 // is not Run can reach the same wiring without taking the device. The chain is
@@ -269,12 +294,22 @@ func (s *tungoEntryPoint) init() error {
 // in the global registry: the caller owns that registration and must take it
 // down itself (Close does, on the Run path) — nothing else will.
 func (s *tungoEntryPoint) ChainConfig() (*xconfig.ChainConfig, error) {
-	if s.config == nil {
+	// The assembled config is guarded like the rules it describes: SetRules
+	// updates that description in place, so init's write and this read have to be
+	// ordered the same way.
+	s.mu.RLock()
+	cfg := s.config
+	s.mu.RUnlock()
+
+	if cfg == nil {
 		if err := s.init(); err != nil {
 			return nil, err
 		}
+		s.mu.RLock()
+		cfg = s.config
+		s.mu.RUnlock()
 	}
-	return s.config.Chains[0], nil
+	return cfg.Chains[0], nil
 }
 
 func (s *tungoEntryPoint) Run() error { return s.RunContext(context.Background()) }

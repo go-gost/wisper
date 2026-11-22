@@ -431,6 +431,13 @@ type Tunnel struct {
 	// DNS is the device's DNS servers, comma-separated.
 	DNS string `yaml:",omitempty" json:"dns,omitempty"`
 
+	// Rules is a tungo entrypoint's split list: the destinations that go
+	// through the tunnel, while everything else is dialled directly. It is a
+	// whitelist, so an empty list sends all traffic direct. An edit is applied
+	// to the running entrypoint in place — editing the list does not rebuild the
+	// entrypoint, so the device is not taken down.
+	Rules []string `yaml:"rules,omitempty" json:"rules,omitempty"`
+
 	// ShareLAN lists the hub-side LAN subnets a tun hub shares with its
 	// spokes, comma-separated CIDRs. Empty disables sharing.
 	ShareLAN string `yaml:"share_lan,omitempty" json:"share_lan,omitempty"`

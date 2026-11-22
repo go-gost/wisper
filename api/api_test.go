@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +22,9 @@ import (
 	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
 	"github.com/go-gost/wisper/tunnel/entrypoint"
+	xconfig "github.com/go-gost/x/config"
 	xlogger "github.com/go-gost/x/logger"
+	"github.com/go-gost/x/registry"
 )
 
 // directOff pins the p2p hosts in these tests to the relay: they cover API
@@ -927,10 +931,7 @@ func TestCreateTunEntrypointShareFields(t *testing.T) {
 	// A create starts the entrypoint, and Run's tun listener builds its router
 	// through the gost default logger, which is nil here (wisper sets it at
 	// startup) — without a real one the start panics before the answer.
-	if oldLog := clogger.Default(); oldLog != nil {
-		t.Cleanup(func() { clogger.SetDefault(oldLog) })
-	}
-	clogger.SetDefault(xlogger.NewLogger(xlogger.LevelOption(clogger.ErrorLevel)))
+	useGostLogger(t)
 
 	resp, created := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
 		"type": "tun", "name": "ep1", "net": "10.20.0.2/24",
@@ -977,6 +978,264 @@ func TestCreateTunEntrypointRejectsBadShareLAN(t *testing.T) {
 	}
 	if n := entrypoint.Count(); n != 0 {
 		t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
+	}
+}
+
+// refusedDeviceName is a device name the kernel will not create (longer than an
+// interface name may be). A create starts its entrypoint, and a tungo start that
+// got a device would serve a real tun interface on the machine running the test;
+// these cases cover the API's round trip of the fields, not the device, so the
+// start is kept off it.
+const refusedDeviceName = "wisper-test-device-name"
+
+// useGostLogger gives the start path a gost default logger: creating a device
+// entrypoint runs the entrypoint inline, and x's components read
+// core/logger.Default(), which is nil in a test binary (wisper sets it at
+// startup). Without one the start panics before the handler answers.
+func useGostLogger(t *testing.T) {
+	t.Helper()
+	if oldLog := clogger.Default(); oldLog != nil {
+		t.Cleanup(func() { clogger.SetDefault(oldLog) })
+	}
+	clogger.SetDefault(xlogger.NewLogger(xlogger.LevelOption(clogger.ErrorLevel)))
+}
+
+// entrypointRules reads options.rules out of a tunnel or entrypoint response.
+func entrypointRules(t *testing.T, body map[string]any) []string {
+	t.Helper()
+	opts, ok := body["options"].(map[string]any)
+	if !ok {
+		t.Fatalf("response has no options object: %v", body)
+	}
+	raw, _ := opts["rules"].([]any)
+	rules := make([]string, 0, len(raw))
+	for _, v := range raw {
+		rules = append(rules, v.(string))
+	}
+	return rules
+}
+
+// TestEntrypointCreateTungoWithRules: a tungo entrypoint is only useful with the
+// list that decides what goes through the tunnel, so the create request has to
+// carry it and the API has to hand it back: a field dropped on either leg
+// creates a split that sends every flow direct, which is the one failure the
+// split cannot report.
+func TestEntrypointCreateTungoWithRules(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+	useGostLogger(t)
+
+	const peer = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+	want := []string{"example.com", "home.pi", "192.168.100.0/24"}
+
+	resp, created := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+		"type": "tungo", "name": "phone", "net": "10.20.0.250/32",
+		"peer": peer, "rules": want, "device_name": refusedDeviceName,
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create tungo entrypoint = %d: %v, want 201", resp.StatusCode, created)
+	}
+	if created["type"] != "tungo" {
+		t.Errorf("created type = %v, want tungo", created["type"])
+	}
+	id, _ := created["id"].(string)
+	defer entrypoint.Delete(id)
+
+	if got := entrypointRules(t, created); !slices.Equal(got, want) {
+		t.Errorf("create response rules = %v, want %v", got, want)
+	}
+
+	resp, got := getJSON(t, srv.URL+"/api/entrypoints/"+id)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get entrypoint = %d: %v", resp.StatusCode, got)
+	}
+	if rules := entrypointRules(t, got); !slices.Equal(rules, want) {
+		t.Errorf("read back rules = %v, want %v", rules, want)
+	}
+
+	// The list is what the entrypoint persists: a restart re-reads the config
+	// file, so rules kept only in memory come back empty.
+	for _, ep := range config.Get().EntryPoints {
+		if ep.ID != id {
+			continue
+		}
+		if !slices.Equal(ep.Rules, want) {
+			t.Errorf("saved rules = %v, want %v", ep.Rules, want)
+		}
+	}
+}
+
+// TestEntrypointCreateTungoRequiresNetAndPeer: a split spoke without a device
+// address has no device to split, and without the hub's key its chain node dials
+// nothing — both are refused before an object exists, naming the missing field.
+func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) {
+	const peer = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+
+	for _, tc := range []struct {
+		name  string
+		body  map[string]any
+		wants string
+	}{
+		{
+			name:  "no net",
+			body:  map[string]any{"type": "tungo", "name": "phone", "peer": peer},
+			wants: "net",
+		},
+		{
+			name:  "bad net",
+			body:  map[string]any{"type": "tungo", "name": "phone", "net": "10.20.0.250", "peer": peer},
+			wants: "net",
+		},
+		{
+			name:  "no peer",
+			body:  map[string]any{"type": "tungo", "name": "phone", "net": "10.20.0.250/32"},
+			wants: "peer",
+		},
+		{
+			name:  "peer is not a key",
+			body:  map[string]any{"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": "hub.example.com:443"},
+			wants: "peer",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := setupTestServer(t)
+			defer srv.Close()
+
+			resp, body := postJSON(t, srv.URL+"/api/entrypoints", tc.body)
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("create = %d: %v, want 400", resp.StatusCode, body)
+			}
+			if msg, _ := body["error"].(string); !strings.Contains(msg, tc.wants) {
+				t.Errorf("error = %q, want it to name %q", msg, tc.wants)
+			}
+			if n := entrypoint.Count(); n != 0 {
+				t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
+			}
+		})
+	}
+
+	// An empty rule list is a valid split — everything direct — so it is not a
+	// validation error: the rules are the operator's to leave empty.
+	srv := setupTestServer(t)
+	defer srv.Close()
+	useGostLogger(t)
+	resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+		"device_name": refusedDeviceName,
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create without rules = %d: %v, want 201", resp.StatusCode, body)
+	}
+	if id, _ := body["id"].(string); id != "" {
+		defer entrypoint.Delete(id)
+	}
+	if rules := entrypointRules(t, body); len(rules) != 0 {
+		t.Errorf("rules = %v, want an empty list", rules)
+	}
+}
+
+// TestEntrypointUpdateKeepsRulesWithoutRestart: the rule list is a live object
+// the chain resolves by name, so an edit that changes nothing else is applied to
+// it in place. Rebuilding the entrypoint instead would take the VPN device down
+// and back up — dropping every flow and resetting what the counters are measured
+// against — for a change the running split can take on its own.
+func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+
+	const id = "ep-tungo-rules-put"
+	const peer = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+	const rulesName = "tungo-rules-" + id
+
+	ep := entrypoint.NewTungoEntryPoint(
+		tunnel.IDOption(id),
+		tunnel.NameOption("phone"),
+		tunnel.NetOption("10.20.0.250/32"),
+		tunnel.PeerOption(peer),
+		tunnel.RulesOption("example.com", "192.168.100.0/24"),
+	)
+	// The hop resolves its rule bypass from the registry by name, so the rules
+	// have to be registered for the edit to be observable at all: this is what
+	// Run does before its first flow.
+	if _, err := ep.(interface {
+		ChainConfig() (*xconfig.ChainConfig, error)
+	}).ChainConfig(); err != nil {
+		t.Fatalf("assemble the split chain: %v", err)
+	}
+	entrypoint.Add(ep)
+	t.Cleanup(func() { entrypoint.Delete(id) })
+
+	runStats := config.ServiceStats{InputBytes: 483513, OutputBytes: 3454414, TotalConns: 4}
+	ep.SetStats(runStats)
+	ep.SetStatsBaseline(config.ServiceStats{TotalConns: 2})
+
+	ctx := context.Background()
+	listed := func(addr string) bool {
+		bp := registry.BypassRegistry().GetAll()[rulesName]
+		if bp == nil {
+			t.Fatalf("%s is not registered: the edit has nowhere to land", rulesName)
+		}
+		// A whitelist bypass reports true for destinations that skip the tunnel.
+		return !bp.Contains(ctx, "tcp", addr)
+	}
+
+	// A rule-only edit: everything else is what the entrypoint already is.
+	resp, body := putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
+		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+		"rules": []string{"example.com"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update rules = %d: %v, want 200", resp.StatusCode, body)
+	}
+	if got := entrypoint.Get(id); got != ep {
+		t.Fatal("the rule edit replaced the entrypoint: a rebuilt run takes the VPN device down with it")
+	}
+	if got := ep.Stats(); got != runStats {
+		t.Errorf("stats after the edit = %+v, want the run's own %+v", got, runStats)
+	}
+	if got := ep.StatsBaseline(); got.TotalConns != 2 {
+		t.Errorf("stats baseline after the edit = %+v, want 2 conns", got)
+	}
+	if got := entrypointRules(t, body); !slices.Equal(got, []string{"example.com"}) {
+		t.Errorf("response rules = %v, want the edited list", got)
+	}
+	if !listed("example.com:443") {
+		t.Error("a listed destination is no longer tunnelled: the edit did not reach the running split")
+	}
+	if listed("192.168.100.100:53") {
+		t.Error("a dropped rule still claims the tunnel: the old list is in force")
+	}
+
+	// Absent rules say nothing about them: the saved list carries over.
+	resp, body = putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
+		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update without rules = %d: %v, want 200", resp.StatusCode, body)
+	}
+	if got := entrypointRules(t, body); !slices.Equal(got, []string{"example.com"}) {
+		t.Errorf("rules after an update that omits them = %v, want the saved list", got)
+	}
+	if got := entrypoint.Get(id); got != ep {
+		t.Error("an update that omits the rules replaced the entrypoint")
+	}
+
+	// Explicitly empty is a clear: everything direct, and still no rebuild.
+	resp, body = putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
+		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+		"rules": []string{},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear rules = %d: %v, want 200", resp.StatusCode, body)
+	}
+	if got := entrypointRules(t, body); len(got) != 0 {
+		t.Errorf("rules after clearing = %v, want none", got)
+	}
+	if listed("example.com:443") {
+		t.Error("a cleared list still tunnels a destination")
+	}
+	if got := entrypoint.Get(id); got != ep {
+		t.Error("clearing the rules replaced the entrypoint")
 	}
 }
 

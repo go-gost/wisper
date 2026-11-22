@@ -870,7 +870,9 @@ func SaveConfig() error {
 
 // TunnelOptions returns the functional options carrying every shared field of
 // opts. The type-specific constructors take it as their starting set, so a new
-// shared field is threaded everywhere from one place.
+// shared field is threaded everywhere from one place — including the entrypoint
+// rebuild paths (restartRunning, handleStartEntrypoint, Restart), which is what
+// keeps a field added to one of them from being silently dropped by the others.
 func TunnelOptions(opts Options) []Option {
 	return []Option{
 		IDOption(opts.ID),
@@ -904,6 +906,7 @@ func TunnelOptions(opts Options) []Option {
 		ShareModeOption(opts.ShareMode),
 		LanAllowOption(opts.LanAllow),
 		LanRoutesOption(opts.LanRoutes...),
+		RulesOption(opts.Rules...),
 	}
 }
 

@@ -36,6 +36,16 @@ var (
 // EntryPoint is an alias for tunnel.Tunnel used by entrypoint types.
 type EntryPoint = tunnel.Tunnel
 
+// RuleSetter is an entrypoint whose split list can be replaced while it runs.
+// The rules are a bypass object the chain resolves by name, so an edit changes
+// the next destination decision and nothing else: no chain, no service and no
+// device is rebuilt. The API uses it to apply a rules-only edit in place — a
+// rebuilt device entrypoint would take the VPN down with it, dropping every flow
+// on it for a change the running split can take on its own.
+type RuleSetter interface {
+	SetRules(rules []string)
+}
+
 // restore starts one restored entrypoint, and closes it if it cannot start —
 // the same fate a config load has always given a broken entrypoint. ctx carries
 // the action id (Background on the config-load path, where no click exists) so
@@ -315,6 +325,9 @@ func restartRunning(match func(EntryPoint) bool) {
 
 	// Phase 2: start new entrypoints with the updated config.
 	for _, p := range pending {
+		// This literal is what a restart re-reads, so a field a run uses that is
+		// missing here is silently lost — for a tungo entrypoint's rules the split
+		// comes back as "everything direct", with no error and no event to say so.
 		newEP := createEntryPoint(entryPoints.list[p.index].Type(), tunnel.Options{
 			ID:            p.opts.ID,
 			Name:          p.opts.Name,
@@ -338,6 +351,7 @@ func restartRunning(match func(EntryPoint) bool) {
 			ShareMode:     p.opts.ShareMode,
 			BlockedPeers:  p.opts.BlockedPeers,
 			Direct:        p.opts.Direct,
+			Rules:         p.opts.Rules,
 			CreatedAt:     p.opts.CreatedAt,
 			StatsBaseline: p.statsBaseline,
 		})
@@ -390,6 +404,7 @@ func LoadConfig() {
 			ShareMode:     cfg.ShareMode,
 			BlockedPeers:  cfg.BlockedPeers,
 			Direct:        cfg.Direct,
+			Rules:         cfg.Rules,
 			CreatedAt:     cfg.CreatedAt,
 			Stats:         cfg.Stats,
 			StatsBaseline: cfg.StatsBaseline,
@@ -447,6 +462,7 @@ func SaveConfig() error {
 			ShareMode:     opts.ShareMode,
 			BlockedPeers:  opts.BlockedPeers,
 			Direct:        opts.Direct,
+			Rules:         opts.Rules,
 			Favorite:      ep.IsFavorite(),
 			Closed:        ep.IsClosed(),
 			CreatedAt:     opts.CreatedAt,

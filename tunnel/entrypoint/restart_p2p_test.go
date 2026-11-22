@@ -83,6 +83,37 @@ func TestRestartP2PRunningSkipsOtherEntrypoints(t *testing.T) {
 	}
 }
 
+// TestRestartP2PRunningKeepsTungoRules: a key reset rebuilds the tungo
+// entrypoint onto the new p2p identity, and that rebuild goes through the same
+// tunnel.Options literal as every other restart. The rule list has to survive it:
+// a split rebuilt without its rules comes back running with an empty list, which
+// sends every flow direct — a tunnel that tunnels nothing, with no error
+// anywhere to say so.
+func TestRestartP2PRunningKeepsTungoRules(t *testing.T) {
+	tungoRunConfig(t)
+	t.Chdir(t.TempDir())
+	useDeviceListener(t, loopbackDeviceListener(t))
+	for i := Count() - 1; i >= 0; i-- {
+		Delete(GetIndex(i).ID())
+	}
+	t.Cleanup(func() {
+		for i := Count() - 1; i >= 0; i-- {
+			Delete(GetIndex(i).ID())
+		}
+	})
+
+	const id = "tungo-restart-p2p-rules"
+	rules := []string{"example.com", "home.pi", "192.168.100.0/24"}
+	old := runningTungoWithRules(t, id, rules)
+
+	RestartP2PRunning()
+
+	if next := Get(id); next == nil || next == old {
+		t.Fatalf("tungo entrypoint was not restarted: %v", next)
+	}
+	requireTungoRules(t, id, rules)
+}
+
 // TestRestartP2PRunningRestartsTungo: a tungo entrypoint rides the same shared
 // host as p2p and tun (its chain node dials through the host's p2p provider), so
 // an identity reset has to restart it too. The provider holds the host that was

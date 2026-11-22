@@ -198,6 +198,11 @@ type tunnelOptionsResp struct {
 	// Direct enables the mesh data path for a tun spoke; false is the old
 	// single-hub client path.
 	Direct bool `json:"direct,omitempty"`
+	// Rules is a tungo entrypoint's split list: the destinations that go through
+	// the tunnel, everything else dialled directly. An empty or absent list is a
+	// working split — every destination direct — so it is not an error to read
+	// one back empty.
+	Rules []string `json:"rules,omitempty"`
 	// LanAllow is the hub-side policy for the LANs a spoke may claim:
 	// "key=cidr" rows, each naming the supernets that spoke may claim inside.
 	// A spoke with no row claims nothing at all. LanRoutes is the hub's own
@@ -426,6 +431,7 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			ShareMode:    tunnel.NormalizeShareMode(opts.ShareMode),
 			BlockedPeers: opts.BlockedPeers,
 			Direct:       opts.Direct,
+			Rules:        opts.Rules,
 			// The policy echoed as a plain string, whatever the request's pointer
 			// form was: a client saving it back mid-edit sends "" — the empty
 			// value it reads — which is a clear, while the pointer form above says
