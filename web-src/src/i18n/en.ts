@@ -109,6 +109,7 @@ const en: Record<string, string> = {
     'A refused claim is approved by adding its prefix to that peer\'s LAN row on the peers page. The peer re-asserts every ~20 seconds, so the approval takes effect without a restart.',
   fieldRoutes: 'Routes',
   fieldRoutesHint: 'Subnets to send through the device, comma-separated: 192.168.50.0/24, or 0.0.0.0/0 for everything. Empty defaults to the local net subnet (hub and other peers included).',
+  fieldTungoRoutesHint: 'Subnets to route into the device, comma-separated: 192.168.100.0/24, or 0.0.0.0/0 for everything. What the device carries is then decided by the split rules below: listed destinations ride the tunnel, the rest leave directly.',
   fieldDNS: 'DNS',
   switchRewriteHost: 'Rewrite Host',
   switchEnableTLS: 'Enable TLS',
@@ -141,7 +142,6 @@ const en: Record<string, string> = {
   typeTunDesc: 'Host a tun device and route between the peers that reach it over p2p — no port, no public URL',
   typeTunEntryDesc: 'Join the virtual network of a peer (tun device)',
   typeTungo: 'TUN Split',
-  typeTungoDesc: 'Own a tun device that splits by destination: listed flows to the peer, the rest straight out',
   typeTungoEntryDesc: 'Join a peer\'s network for the listed destinations only, and dial everything else directly',
 
   // Notifications

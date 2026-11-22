@@ -48,14 +48,11 @@ export class TunnelCard extends LitElement {
   /** Error message — displayed in an inline banner when non-empty. */
   @property() error = '';
 
-  /** Whether this object is end-to-end encrypted — a static, type-based fact
-   *  (a p2p or tun tunnel, or a p2p/tun entrypoint: p2p encryption is
-   *  mandatory, so it is a fact about the wire and not about which side of it
-   *  this object sits). Draws a lock badge. */
-  @property({ type: Boolean }) secure = false;
-
-  /** The peer's KCP smoothed RTT in milliseconds, for p2p/tun objects. Shown
-   *  in place of the (now redundant) encryption lock badge. */
+  /** The peer's KCP smoothed RTT in milliseconds, for p2p/tun objects. It took
+   *  the room the "end-to-end encrypted" lock badge used to have (f0419ed):
+   *  p2p encryption is mandatory — a session that does not settle encrypted is
+   *  refused, never built as plaintext — so a per-card badge said nothing about
+   *  the card it sat on. */
   @property({ type: Number }) rtt = 0;
 
   static styles = css`
@@ -163,15 +160,6 @@ export class TunnelCard extends LitElement {
     }
     .transport.warn {
       color: var(--amber);
-    }
-    .secure {
-      display: inline-flex;
-      align-items: center;
-      color: var(--green-text);
-    }
-    .secure svg {
-      width: 12px;
-      height: 12px;
     }
     .peer-rtt {
       font-size: var(--font-xs);

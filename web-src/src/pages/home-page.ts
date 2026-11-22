@@ -188,12 +188,13 @@ export class HomePage extends LitElement {
     return item.kind === 'entrypoint' ? transportView(item.data.peer_transport) : null;
   }
 
-  /** _secure is the static "end-to-end encrypted" badge. It is a statement
-   *  about the wire, not about which side of it this object sits: a tun peer's
-   *  traffic travels the same p2p link as its hub's, and p2p encryption is
-   *  mandatory — a session that does not settle encrypted is refused, never
-   *  built as plaintext. So a tun hub is as encrypted as a p2p tunnel, and a
-   *  tun entrypoint as a p2p one. */
+  /** _rtt is the entrypoint row's round-trip time in milliseconds — the one
+   *  live number a device entrypoint has, and the reason the "end-to-end
+   *  encrypted" lock badge is gone (f0419ed): p2p encryption is mandatory — a
+   *  session that does not settle encrypted is refused, never built as
+   *  plaintext — so a per-item badge said nothing about that item. A tunnel's
+   *  peers may each be on a different path, so their RTTs belong on its own
+   *  page, not on a summary row. */
   private _rtt(item: Item): number {
     return item.kind === 'entrypoint' ? (item.data.peer_rtt_ms ?? 0) : 0;
   }

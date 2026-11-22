@@ -300,10 +300,3 @@ test('a hub with no peers says so where the fix is, in the empty-state voice', a
 
   await page.screenshot({ path: 'test-results/tun-hub-no-peers.png', fullPage: true });
 });
-
-test('a tun hub card carries the encryption badge', async ({ page }) => {
-  await page.goto('/');
-  const card = page.locator('tunnel-card').filter({ hasText: 'Hub' });
-  // The same wire a p2p tunnel's badge asserts, so the same lock.
-  await expect(card.locator('.secure')).toHaveAttribute('title', 'End-to-end encrypted');
-});

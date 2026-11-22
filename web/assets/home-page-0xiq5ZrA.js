@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-dsnkuDXJ.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
-import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s as P,h as D,j as z,k as I,l as L,m as R,n as F,_ as C,o as j}from"./index-dsnkuDXJ.js";import{n as l,f as B,a as E,b as S,c as N,r as b}from"./format-JAXIYG19.js";import{i as h}from"./app-scaffold-Dfhq2w1K.js";import{t as A}from"./type-icons-DvFgXXJ2.js";import{c as O}from"./clipboard-C3x8_sid.js";import{t as U}from"./transport-BobM2JNi.js";import{t as H,a as X}from"./vpn-3qz9vY6z.js";import{r as Y}from"./qr-B9waFAF2.js";var M=Object.defineProperty,Q=Object.getOwnPropertyDescriptor,m=(t,e,n,a)=>{for(var o=a>1?void 0:a?Q(e,n):e,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(e,n,o):i(o))||o);return a&&o&&M(e,n,o),o};let g=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return s`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BDEqcJz4.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
+import{i as f,a as x,b as s,t as y,A as _,c as n,g as $,d as w,e as k,f as T,s as P,h as D,j as z,k as I,l as L,m as R,n as F,_ as C,o as j}from"./index-BDEqcJz4.js";import{n as l,f as N,a as E,b as S,c as B,r as b}from"./format-oE0bS0nc.js";import{i as h}from"./app-scaffold-CcPDrmuv.js";import{t as A}from"./type-icons-DvFgXXJ2.js";import{c as O}from"./clipboard-C3x8_sid.js";import{t as U}from"./transport-_FF9B43b.js";import{t as H,a as X}from"./vpn-Bd83d5tm.js";import{r as Y}from"./qr-B9waFAF2.js";var M=Object.defineProperty,Q=Object.getOwnPropertyDescriptor,m=(t,e,r,a)=>{for(var o=a>1?void 0:a?Q(e,r):e,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(e,r,o):i(o))||o);return a&&o&&M(e,r,o),o};let g=class extends x{constructor(){super(...arguments),this.tabs=[],this.activeIndex=0}_handleClick(t){t!==this.activeIndex&&(this.activeIndex=t,this.dispatchEvent(new CustomEvent("tab-change",{detail:{index:t},bubbles:!0,composed:!0})))}render(){return s`
       <div class="pill-group">
         ${this.tabs.map((t,e)=>s`
             <button class=${e===this.activeIndex?"active":""} @click=${()=>this._handleClick(e)}>
@@ -43,7 +43,7 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
       font-weight: 600;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
-  `;m([l({type:Array})],g.prototype,"tabs",2);m([l({type:Number})],g.prototype,"activeIndex",2);g=m([y("nav-tabs")],g);var V=Object.defineProperty,W=Object.getOwnPropertyDescriptor,p=(t,e,n,a)=>{for(var o=a>1?void 0:a?W(e,n):e,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(e,n,o):i(o))||o);return a&&o&&V(e,n,o),o};let d=class extends x{constructor(){super(...arguments),this.name="",this.typeIcon="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.transport=null,this.createdAt="",this.expanded=!1,this.compact=!0,this.error="",this.secure=!1,this.rtt=0}_onRowClick(){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return s`
+  `;m([l({type:Array})],g.prototype,"tabs",2);m([l({type:Number})],g.prototype,"activeIndex",2);g=m([y("nav-tabs")],g);var V=Object.defineProperty,W=Object.getOwnPropertyDescriptor,p=(t,e,r,a)=>{for(var o=a>1?void 0:a?W(e,r):e,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(e,r,o):i(o))||o);return a&&o&&V(e,r,o),o};let d=class extends x{constructor(){super(...arguments),this.name="",this.typeIcon="",this.meta="",this.status="stopped",this.endpoint="",this.currentConns=0,this.totalConns=0,this.requestRate=0,this.inputBytes=0,this.outputBytes=0,this.inputRate=0,this.outputRate=0,this.transport=null,this.createdAt="",this.expanded=!1,this.compact=!0,this.error="",this.rtt=0}_onRowClick(){this.dispatchEvent(new CustomEvent("card-click",{bubbles:!0,composed:!0}))}_onChevronClick(t){t.stopPropagation(),this.dispatchEvent(new CustomEvent("chevron-click",{bubbles:!0,composed:!0}))}render(){const t=this.status==="stopped";return s`
       <div class="row ${t?"stopped":""}" @click=${this._onRowClick}>
         <span class="dot ${this.status}"></span>
 
@@ -55,11 +55,11 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
 
         <div class="right-col">
           <div class="right-top">
-            ${this.rtt>0?s`<span class="peer-rtt" title=${r("peersRTTHint")}>${this.rtt}ms</span>`:_}
+            ${this.rtt>0?s`<span class="peer-rtt" title=${n("peersRTTHint")}>${this.rtt}ms</span>`:_}
             ${this.transport?s`<span class="transport ${this.transport.tone}" title=${this.transport.hint}>
                   ${h(this.transport.icon)}
                 </span>`:_}
-            ${this.createdAt?s`<span class="created-at">${B(this.createdAt)}</span>`:""}
+            ${this.createdAt?s`<span class="created-at">${N(this.createdAt)}</span>`:""}
           </div>
           ${this.status==="running"?s`
             <div class="traffic">
@@ -187,15 +187,6 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
     .transport.warn {
       color: var(--amber);
     }
-    .secure {
-      display: inline-flex;
-      align-items: center;
-      color: var(--green-text);
-    }
-    .secure svg {
-      width: 12px;
-      height: 12px;
-    }
     .peer-rtt {
       font-size: var(--font-xs);
       color: var(--text-muted);
@@ -269,25 +260,25 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
       font-size: var(--font-sm);
       color: var(--red-text);
     }
-  `;p([l()],d.prototype,"name",2);p([l()],d.prototype,"typeIcon",2);p([l()],d.prototype,"meta",2);p([l()],d.prototype,"status",2);p([l()],d.prototype,"endpoint",2);p([l({type:Number})],d.prototype,"currentConns",2);p([l({type:Number})],d.prototype,"totalConns",2);p([l({type:Number})],d.prototype,"requestRate",2);p([l({type:Number})],d.prototype,"inputBytes",2);p([l({type:Number})],d.prototype,"outputBytes",2);p([l({type:Number})],d.prototype,"inputRate",2);p([l({type:Number})],d.prototype,"outputRate",2);p([l({attribute:!1})],d.prototype,"transport",2);p([l()],d.prototype,"createdAt",2);p([l({type:Boolean})],d.prototype,"expanded",2);p([l({type:Boolean})],d.prototype,"compact",2);p([l()],d.prototype,"error",2);p([l({type:Boolean})],d.prototype,"secure",2);p([l({type:Number})],d.prototype,"rtt",2);d=p([y("tunnel-card")],d);var K=Object.defineProperty,G=Object.getOwnPropertyDescriptor,v=(t,e,n,a)=>{for(var o=a>1?void 0:a?G(e,n):e,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(e,n,o):i(o))||o);return a&&o&&K(e,n,o),o};let q=0;const J=2;let u=class extends x{constructor(){super(...arguments),this._activeTab=q,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._swipeStartX=0,this._swipeStartY=0,this._swipeTracking=!1,this._snackbar="",this._deleteTarget=null,this._qrUrl=""}connectedCallback(){super.connectedCallback(),this._tunnels=$(),this._entrypoints=w(),this._tunnelsLoading=k(),this._entrypointsLoading=T(),this._unsubs.push(P(()=>{this._tunnels=$(),this._tunnelsLoading=k(),this.requestUpdate()}),D(()=>{this._entrypoints=w(),this._entrypointsLoading=T(),this.requestUpdate()}),z(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}_setTab(t){t===this._activeTab||t<0||t>=J||(q=t,this._activeTab=t,this._expandedId=null)}_onTouchStart(t){if(t.touches.length!==1){this._swipeTracking=!1;return}const e=t.touches[0];this._swipeStartX=e.clientX,this._swipeStartY=e.clientY,this._swipeTracking=!0}_onTouchEnd(t){if(!this._swipeTracking)return;this._swipeTracking=!1;const e=t.changedTouches[0];if(!e)return;const n=e.clientX-this._swipeStartX,a=e.clientY-this._swipeStartY;Math.abs(n)<60||Math.abs(n)<Math.abs(a)*1.5||this._setTab(n<0?this._activeTab+1:this._activeTab-1)}get _filteredTunnels(){return[...this.showFavorites?this._tunnels.filter(e=>e.favorite):this._tunnels].sort((e,n)=>new Date(n.created_at).getTime()-new Date(e.created_at).getTime())}get _filteredEntrypoints(){return[...this.showFavorites?this._entrypoints.filter(e=>e.favorite):this._entrypoints].sort((e,n)=>new Date(n.created_at).getTime()-new Date(e.created_at).getTime())}get _items(){return this._activeTab===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this._activeTab===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return r("statusRunning");case"stopped":return r("statusStopped");case"error":return r("statusError")}}_metaLine(t){return t.data.status==="running"?`${N(t.data.stats.current_conns)} ${r("conns")}`:this._statusLabel(t.data.status)}_transport(t){return t.kind==="entrypoint"?U(t.data.peer_transport):null}_rtt(t){return t.kind==="entrypoint"?t.data.peer_rtt_ms??0:0}_typeIcon(t){return A(t.data.type)}_renderEmptyState(){const t=this._activeTab===0,e=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return s`
+  `;p([l()],d.prototype,"name",2);p([l()],d.prototype,"typeIcon",2);p([l()],d.prototype,"meta",2);p([l()],d.prototype,"status",2);p([l()],d.prototype,"endpoint",2);p([l({type:Number})],d.prototype,"currentConns",2);p([l({type:Number})],d.prototype,"totalConns",2);p([l({type:Number})],d.prototype,"requestRate",2);p([l({type:Number})],d.prototype,"inputBytes",2);p([l({type:Number})],d.prototype,"outputBytes",2);p([l({type:Number})],d.prototype,"inputRate",2);p([l({type:Number})],d.prototype,"outputRate",2);p([l({attribute:!1})],d.prototype,"transport",2);p([l()],d.prototype,"createdAt",2);p([l({type:Boolean})],d.prototype,"expanded",2);p([l({type:Boolean})],d.prototype,"compact",2);p([l()],d.prototype,"error",2);p([l({type:Number})],d.prototype,"rtt",2);d=p([y("tunnel-card")],d);var K=Object.defineProperty,G=Object.getOwnPropertyDescriptor,v=(t,e,r,a)=>{for(var o=a>1?void 0:a?G(e,r):e,c=t.length-1,i;c>=0;c--)(i=t[c])&&(o=(a?i(e,r,o):i(o))||o);return a&&o&&K(e,r,o),o};let q=0;const J=2;let u=class extends x{constructor(){super(...arguments),this._activeTab=q,this.showFavorites=!1,this._tunnels=[],this._entrypoints=[],this._tunnelsLoading=!1,this._entrypointsLoading=!1,this._expandedId=null,this._unsubs=[],this._swipeStartX=0,this._swipeStartY=0,this._swipeTracking=!1,this._snackbar="",this._deleteTarget=null,this._qrUrl=""}connectedCallback(){super.connectedCallback(),this._tunnels=$(),this._entrypoints=w(),this._tunnelsLoading=k(),this._entrypointsLoading=T(),this._unsubs.push(P(()=>{this._tunnels=$(),this._tunnelsLoading=k(),this.requestUpdate()}),D(()=>{this._entrypoints=w(),this._entrypointsLoading=T(),this.requestUpdate()}),z(()=>this.requestUpdate()))}disconnectedCallback(){super.disconnectedCallback();for(const t of this._unsubs)t();this._unsubs=[]}_navigate(t){window.history.pushState({},"",t),window.dispatchEvent(new PopStateEvent("popstate"))}_toggleFavorites(){this.showFavorites=!this.showFavorites,this._expandedId=null}_toggleExpand(t){this._expandedId=this._expandedId===t?null:t}_setTab(t){t===this._activeTab||t<0||t>=J||(q=t,this._activeTab=t,this._expandedId=null)}_onTouchStart(t){if(t.touches.length!==1){this._swipeTracking=!1;return}const e=t.touches[0];this._swipeStartX=e.clientX,this._swipeStartY=e.clientY,this._swipeTracking=!0}_onTouchEnd(t){if(!this._swipeTracking)return;this._swipeTracking=!1;const e=t.changedTouches[0];if(!e)return;const r=e.clientX-this._swipeStartX,a=e.clientY-this._swipeStartY;Math.abs(r)<60||Math.abs(r)<Math.abs(a)*1.5||this._setTab(r<0?this._activeTab+1:this._activeTab-1)}get _filteredTunnels(){return[...this.showFavorites?this._tunnels.filter(e=>e.favorite):this._tunnels].sort((e,r)=>new Date(r.created_at).getTime()-new Date(e.created_at).getTime())}get _filteredEntrypoints(){return[...this.showFavorites?this._entrypoints.filter(e=>e.favorite):this._entrypoints].sort((e,r)=>new Date(r.created_at).getTime()-new Date(e.created_at).getTime())}get _items(){return this._activeTab===0?this._filteredTunnels.map(t=>({kind:"tunnel",data:t})):this._filteredEntrypoints.map(t=>({kind:"entrypoint",data:t}))}_isLoading(){return this._activeTab===0?this._tunnelsLoading:this._entrypointsLoading}_statusLabel(t){switch(t){case"running":return n("statusRunning");case"stopped":return n("statusStopped");case"error":return n("statusError")}}_metaLine(t){return t.data.status==="running"?`${B(t.data.stats.current_conns)} ${n("conns")}`:this._statusLabel(t.data.status)}_transport(t){return t.kind==="entrypoint"?U(t.data.peer_transport):null}_rtt(t){return t.kind==="entrypoint"?t.data.peer_rtt_ms??0:0}_typeIcon(t){return A(t.data.type)}_renderEmptyState(){const t=this._activeTab===0,e=t?this._tunnels.length===0:this._entrypoints.length===0;if(this.showFavorites)return s`
         <div class="empty">
           <div class="empty-icon-wrap">${h("star")}</div>
-          <div class="empty-title">${r("homeNoFavorites")}</div>
-          <div class="empty-desc">${t?r("homeNoFavTunnelHint"):r("homeNoFavEntryHint")}</div>
+          <div class="empty-title">${n("homeNoFavorites")}</div>
+          <div class="empty-desc">${t?n("homeNoFavTunnelHint"):n("homeNoFavEntryHint")}</div>
           <button class="empty-sub-link" @click=${this._toggleFavorites}>
-            ${t?r("homeShowAllTunnels"):r("homeShowAllEntrypoints")}
+            ${t?n("homeShowAllTunnels"):n("homeShowAllEntrypoints")}
           </button>
         </div>
-      `;if(e){const n=t?"/tunnel/new":"/entrypoint/new";return s`
+      `;if(e){const r=t?"/tunnel/new":"/entrypoint/new";return s`
         <div class="empty">
           <div class="empty-icon-wrap">${h(t?"link":"broadcast")}</div>
-          <div class="empty-title">${t?r("homeEmptyTunnels"):r("homeEmptyEntrypoints")}</div>
-          <div class="empty-desc">${t?r("homeEmptyTunnelDesc"):r("homeEmptyEntryDesc")}</div>
-          <button class="empty-action" @click=${()=>this._navigate(n)}>
-            ${t?r("tunnelNewTitle"):r("entrypointNewTitle")}
+          <div class="empty-title">${t?n("homeEmptyTunnels"):n("homeEmptyEntrypoints")}</div>
+          <div class="empty-desc">${t?n("homeEmptyTunnelDesc"):n("homeEmptyEntryDesc")}</div>
+          <button class="empty-action" @click=${()=>this._navigate(r)}>
+            ${t?n("tunnelNewTitle"):n("entrypointNewTitle")}
           </button>
         </div>
-      `}return s``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){if(t.kind==="entrypoint"&&(t.data.type==="tun"||t.data.type==="tungo")){const e=H(t.data.id);if(e){this._showSnackbar(`${r("tunDeviceBusy")}: ${e.name}`);return}const n=t.data.options;if(!await X(n?.net??"",n?.routes??"",n?.mtu??0,n?.dns??"")){this._showSnackbar(r("vpnNotReady"));return}}try{t.kind==="tunnel"?await I(t.data.id):await L(t.data.id),this._showSnackbar(r("started"))}catch{this._showSnackbar(r("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await R(t.data.id):await F(t.data.id),this._showSnackbar(r("stopped"))}catch{this._showSnackbar(r("stopFailed"))}}_confirmDelete(t,e,n){this._deleteTarget={kind:t,id:e,name:n}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:e}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await C(()=>import("./index-dsnkuDXJ.js").then(n=>n.F),__vite__mapDeps([0,1])).then(n=>n.remove(e)):await C(()=>import("./index-dsnkuDXJ.js").then(n=>n.H),__vite__mapDeps([0,1])).then(n=>n.remove(e)),this._expandedId=null,this._showSnackbar(r("deleted"))}catch{this._showSnackbar(r("deleteFailed"))}}_openQrDialog(t){this._qrUrl=t}_closeQrDialog(){this._qrUrl=""}updated(t){if(t.has("_qrUrl")&&this._qrUrl){const e=this.renderRoot.querySelector("#qrCanvas");Y(e,this._qrUrl)}}render(){const t=this._items,e=this._isLoading(),n=this._activeTab===0?"/tunnel/new":"/entrypoint/new";return s`
+      `}return s``}_showSnackbar(t){this._snackbar=t,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleStart(t){if(t.kind==="entrypoint"&&(t.data.type==="tun"||t.data.type==="tungo")){const e=H(t.data.id);if(e){this._showSnackbar(`${n("tunDeviceBusy")}: ${e.name}`);return}const r=t.data.options;if(!await X(r?.net??"",r?.routes??"",r?.mtu??0,r?.dns??"")){this._showSnackbar(n("vpnNotReady"));return}}try{t.kind==="tunnel"?await I(t.data.id):await L(t.data.id),this._showSnackbar(n("started"))}catch{this._showSnackbar(n("startFailed"))}}async _handleStop(t){try{t.kind==="tunnel"?await R(t.data.id):await F(t.data.id),this._showSnackbar(n("stopped"))}catch{this._showSnackbar(n("stopFailed"))}}_confirmDelete(t,e,r){this._deleteTarget={kind:t,id:e,name:r}}async _handleDelete(){if(!this._deleteTarget)return;const{kind:t,id:e}=this._deleteTarget;this._deleteTarget=null;try{t==="tunnel"?await C(()=>import("./index-BDEqcJz4.js").then(r=>r.F),__vite__mapDeps([0,1])).then(r=>r.remove(e)):await C(()=>import("./index-BDEqcJz4.js").then(r=>r.H),__vite__mapDeps([0,1])).then(r=>r.remove(e)),this._expandedId=null,this._showSnackbar(n("deleted"))}catch{this._showSnackbar(n("deleteFailed"))}}_openQrDialog(t){this._qrUrl=t}_closeQrDialog(){this._qrUrl=""}updated(t){if(t.has("_qrUrl")&&this._qrUrl){const e=this.renderRoot.querySelector("#qrCanvas");Y(e,this._qrUrl)}}render(){const t=this._items,e=this._isLoading(),r=this._activeTab===0?"/tunnel/new":"/entrypoint/new";return s`
       <app-scaffold
         @touchstart=${this._onTouchStart}
         @touchend=${this._onTouchEnd}
@@ -297,7 +288,7 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
           <div class="app-icon">
             <img src="/logo.png" alt="Wisper" />
           </div>
-          <span class="appbar-title">${r("appName")}</span>
+          <span class="appbar-title">${n("appName")}</span>
           <span class="header-spacer"></span>
           <button class="icon-btn" @click=${()=>this._navigate("/settings")}>
             ${h("settings")}
@@ -306,7 +297,7 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
 
         <!-- Tabs -->
         <nav-tabs
-          .tabs=${[r("homeTabTunnel"),r("homeTabEntrypoint")]}
+          .tabs=${[n("homeTabTunnel"),n("homeTabEntrypoint")]}
           .activeIndex=${this._activeTab}
           @tab-change=${a=>this._setTab(a.detail.index)}
         ></nav-tabs>
@@ -346,7 +337,7 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
                                 <span class="dlabel">${a.kind==="tunnel"?"Entrypoint":"Endpoint"}</span>
                                 <span class="dval">
                                   <a class="dval-link dval-mono" href="${a.data.entrypoint.startsWith("http")?a.data.entrypoint:"https://"+a.data.entrypoint}" target="_blank" rel="noopener">${a.data.entrypoint}</a>
-                                  <button class="copy-btn-mini" @click=${async i=>{i.stopPropagation(),await O(a.data.entrypoint),this._showSnackbar(r("copiedToClipboard"))}}>
+                                  <button class="copy-btn-mini" @click=${async i=>{i.stopPropagation(),await O(a.data.entrypoint),this._showSnackbar(n("copiedToClipboard"))}}>
                                     ${h("copy")}
                                   </button>
                                 </span>
@@ -356,24 +347,24 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
                                 <span class="dval"><span class="dval-mono">${a.data.endpoint}</span></span>
                               </div>
                               ${a.kind==="tunnel"&&a.data.options?.hostname?s`<div class="detail-row">
-                                  <span class="dlabel">${r("switchRewriteHost")}</span>
+                                  <span class="dlabel">${n("switchRewriteHost")}</span>
                                   <span class="dval"><span class="dval-mono">${a.data.options.hostname}</span></span>
                                 </div>`:""}
-                              ${a.data.error?s`<div class="detail-row error"><span class="dlabel">${r("eventsLevelError")}</span><span class="dval error-text"><span class="dval-mono">${a.data.error}</span></span></div>`:""}
+                              ${a.data.error?s`<div class="detail-row error"><span class="dlabel">${n("eventsLevelError")}</span><span class="dval error-text"><span class="dval-mono">${a.data.error}</span></span></div>`:""}
                             </div>
                             <div class="expand-actions">
                               ${a.data.status==="running"?s`
-                                  <button class="action-btn stop" title="${r("btnStop")}" @click=${i=>{i.stopPropagation(),this._handleStop(a)}}>${h("stop")}</button>
+                                  <button class="action-btn stop" title="${n("btnStop")}" @click=${i=>{i.stopPropagation(),this._handleStop(a)}}>${h("stop")}</button>
                                 `:s`
-                                  <button class="action-btn start" title="${r("btnStart")}" @click=${i=>{i.stopPropagation(),this._handleStart(a)}}>${h("play")}</button>
+                                  <button class="action-btn start" title="${n("btnStart")}" @click=${i=>{i.stopPropagation(),this._handleStart(a)}}>${h("play")}</button>
                                 `}
-                              <button class="action-btn" title="${r("btnEdit")}" @click=${i=>{i.stopPropagation(),this._navigate(o+"?edit")}}>${h("edit")}</button>
-                              <button class="action-btn danger" title="${r("btnDelete")}" @click=${i=>{i.stopPropagation(),this._confirmDelete(a.kind,a.data.id,a.data.name)}}>${h("trash")}</button>
-                              ${a.data.entrypoint?s`<button class="action-btn qr" title="${r("qrCode")}" style="margin-left:auto;"
+                              <button class="action-btn" title="${n("btnEdit")}" @click=${i=>{i.stopPropagation(),this._navigate(o+"?edit")}}>${h("edit")}</button>
+                              <button class="action-btn danger" title="${n("btnDelete")}" @click=${i=>{i.stopPropagation(),this._confirmDelete(a.kind,a.data.id,a.data.name)}}>${h("trash")}</button>
+                              ${a.data.entrypoint?s`<button class="action-btn qr" title="${n("qrCode")}" style="margin-left:auto;"
                                     @click=${i=>{i.stopPropagation(),this._openQrDialog(a.data.entrypoint)}}>
                                     ${h("qr")}
                                   </button>`:""}
-                              ${a.kind==="tunnel"&&(a.data.type==="http"||a.data.type==="file")&&j().inspector_url?s`<button class="action-btn inspect" title="${r("inspectorEntryTitle")}"
+                              ${a.kind==="tunnel"&&(a.data.type==="http"||a.data.type==="file")&&j().inspector_url?s`<button class="action-btn inspect" title="${n("inspectorEntryTitle")}"
                                     style="${a.data.entrypoint?"":"margin-left:auto;"}"
                                     @click=${i=>{i.stopPropagation(),this._navigate(`/tunnel/${a.data.type}/${a.data.id}/inspector`)}}>
                                     ${h("search")}
@@ -388,7 +379,7 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
 
         <!-- FAB -->
         <div slot="fab">
-          <button class="fab" @click=${()=>this._navigate(n)}>
+          <button class="fab" @click=${()=>this._navigate(r)}>
             ${h("plus")}
           </button>
         </div>
@@ -399,14 +390,14 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
       ${this._qrUrl?s`
           <div class="dialog-overlay" @click=${()=>this._closeQrDialog()}>
             <div class="dialog-box" @click=${a=>a.stopPropagation()}>
-              <div class="dialog-title">${r("qrCode")}</div>
+              <div class="dialog-title">${n("qrCode")}</div>
               <div class="qr-body">
                 <canvas id="qrCanvas"></canvas>
                 <div class="qr-url">${this._qrUrl}</div>
               </div>
               <div class="dialog-actions">
                 <button class="dialog-btn cancel" @click=${()=>this._closeQrDialog()}>
-                  ${r("btnClose")}
+                  ${n("btnClose")}
                 </button>
               </div>
             </div>
@@ -416,14 +407,14 @@ import{i as f,a as x,b as s,t as y,A as _,c as r,g as $,d as w,e as k,f as T,s a
       ${this._deleteTarget?s`
           <div class="dialog-overlay" @click=${()=>{this._deleteTarget=null}}>
             <div class="dialog-box" @click=${a=>a.stopPropagation()}>
-              <div class="dialog-title">${r("deleteConfirmTitle")}</div>
-              <div class="dialog-message">${r("deleteConfirmMessage")}</div>
+              <div class="dialog-title">${n("deleteConfirmTitle")}</div>
+              <div class="dialog-message">${n("deleteConfirmMessage")}</div>
               <div class="dialog-actions">
                 <button class="dialog-btn cancel" @click=${()=>{this._deleteTarget=null}}>
-                  ${r("btnCancel")}
+                  ${n("btnCancel")}
                 </button>
                 <button class="dialog-btn danger" @click=${this._handleDelete}>
-                  ${r("btnDelete")}
+                  ${n("btnDelete")}
                 </button>
               </div>
             </div>

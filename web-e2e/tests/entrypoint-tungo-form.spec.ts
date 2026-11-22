@@ -19,6 +19,12 @@ test('the tungo entrypoint form shows the device fields, the peer and its rules'
   await expect(page.locator('input[placeholder="0.0.0.0/0"]')).toBeVisible();
   await expect(page.locator('input[placeholder="192.168.100.100"]')).toBeVisible();
 
+  // The routes hint is the split's own: no hub subnet to fall back to, and the
+  // rules below decide what the device carries.
+  await expect(
+    page.locator('.p2p-hint').filter({ hasText: 'decided by the split rules below' }),
+  ).toBeVisible();
+
   // The hub it dials, marked required: without a key there is nobody to reach.
   const peer = page.locator('input[placeholder="Base64 public key"]');
   await expect(peer).toBeVisible();
@@ -118,11 +124,34 @@ test('the tungo form saves its rules as a trimmed list', async ({ page }) => {
   expect(sent[0].type).toBe('tungo');
   // A device entrypoint binds no socket: the device address is the net field.
   expect(sent[0].endpoint).toBe('');
+  // The address is not optional on the wire: the host refuses a split without
+  // it (validateTungoEntryPoint), so a save that drops `net` must not stay
+  // green here.
+  expect(sent[0].net).toBe('10.10.100.250/32');
+  // Sent on every save, and present even when empty — that presence is what
+  // lets an empty box mean "clear the list" instead of "keep the old one".
+  expect(Object.keys(sent[0])).toContain('rules');
   expect(sent[0].rules).toEqual(['example.com', '192.168.100.0/24']);
 
   await save('');
   await expect.poll(() => sent.length).toBe(2);
+  expect(sent[1].net).toBe('10.10.100.250/32');
+  expect(Object.keys(sent[1])).toContain('rules');
   expect(sent[1].rules).toEqual([]);
+
+  // A tun spoke sends no rules at all: the field belongs to the split, not to
+  // every device entrypoint.
+  await page.goto('/entrypoint/tun/new');
+  await page.locator('input[placeholder="My Entrypoint"]').fill('Spoke');
+  await page
+    .locator('input[placeholder="Base64 public key"]')
+    .fill('dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA');
+  await page.locator('input[placeholder="10.10.0.2/24"]').fill('10.10.0.2/24');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => sent.length).toBe(3);
+  expect(sent[2].type).toBe('tun');
+  expect(sent[2].net).toBe('10.10.0.2/24');
+  expect('rules' in sent[2]).toBe(false);
 });
 
 /**

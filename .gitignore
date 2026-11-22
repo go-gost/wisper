@@ -45,6 +45,11 @@ android/keystore.properties
 # Playwright MCP browser state
 .playwright-mcp/
 
+# Local agent settings (Claude Code writes these wherever it was run — one
+# landed inside the vendored web-src/node_modules and got committed). The `**/`
+# prefix is what covers those vendored copies as well as the repo root.
+**/.claude/settings.local.json
+
 # Generated API spec / config dump
 api/wisper.yaml
 tunnel/entrypoint/wisper.yaml

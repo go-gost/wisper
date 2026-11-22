@@ -106,6 +106,7 @@ const zh: Record<string, string> = {
   lanRejectedHint: '被拒的声明需要在对端页该 peer 的 LAN 允许行中填上前缀才能通过。对端约每 20 秒重新声明一次，批准后无需重启即可生效。',
   fieldRoutes: '路由',
   fieldRoutesHint: '走该设备的网段，逗号分隔：192.168.50.0/24；0.0.0.0/0 表示全部流量。留空则默认走本机 net 所在网段（含 hub 及其他 peer）。',
+  fieldTungoRoutesHint: '路由到该设备的网段，逗号分隔：192.168.100.0/24；0.0.0.0/0 表示全部流量。进入设备后由下方的分流规则决定去向：清单内的目标走隧道，其余直连。',
   fieldDNS: 'DNS',
   switchRewriteHost: '重写主机头',
   switchEnableTLS: '启用 TLS',
@@ -138,7 +139,6 @@ const zh: Record<string, string> = {
   typeTunDesc: '本机持有 tun 设备，为经 p2p 接入的对端转发——无端口、无公网地址',
   typeTunEntryDesc: '加入对端搭建的虚拟网络（tun 设备）',
   typeTungo: 'TUN 分流',
-  typeTungoDesc: '本机持有 tun 设备并按目标分流：清单内的流量送到对端，其余直接走本机网络',
   typeTungoEntryDesc: '只把清单内的目标送入对端网络，其余目标直接走本机网络',
 
   // Notifications

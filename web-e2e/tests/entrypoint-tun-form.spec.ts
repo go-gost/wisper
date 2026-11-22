@@ -47,7 +47,8 @@ test('the tun entrypoint form asks for the peer key under the device address', a
 
   const device = page.locator('input[placeholder="10.10.0.2/24"]');
   const peer = page.locator('input[placeholder="Base64 public key"]');
-  const mtu = page.locator('input[placeholder="1420"]');
+  // 1300 is the default MTU the form renders (a730e43 lowered it from 1420).
+  const mtu = page.locator('input[placeholder="1300"]');
   await expect(device).toBeVisible();
   await expect(peer).toBeVisible();
 
@@ -79,7 +80,10 @@ test('the tun entrypoint form keeps LAN sharing last', async ({ page }) => {
   const y = async (selector: string) => (await page.locator(selector).boundingBox())!.y;
   const dns = await y('input[placeholder="10.10.0.1"]');
   const shareLAN = await y('input[placeholder="192.168.1.0/24"]');
-  const shareMode = await y('.switch-row');
+  // The form has two switch rows (sharing backend and direct links), so this
+  // names the one it means rather than taking the first two as a strict-mode
+  // violation.
+  const shareMode = await y('.switch-row:has-text("Sharing Backend")');
   const shareHint = await y('.p2p-hint:has-text("kernel NAT")');
 
   expect(shareLAN).toBeGreaterThan(dns);

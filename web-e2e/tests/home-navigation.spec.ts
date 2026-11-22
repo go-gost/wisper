@@ -43,12 +43,18 @@ test('back from the entrypoint editor returns to the entrypoint', async ({ page 
   await expect(page).toHaveURL(/\/entrypoint\/tcp\/e2e-entrypoint$/);
 });
 
-/** The static e2e-encryption badge: the p2p tunnel card carries a lock, the
- *  plain tcp entrypoint does not. A screenshot for a human (or an agent). */
-test('the p2p tunnel card carries the encryption badge', async ({ page }) => {
+/** The static e2e-encryption badge is gone, and this pins that.
+ *
+ *  b406bcd put a lock on every p2p/tun card; f0419ed removed it — p2p
+ *  encryption is mandatory (a session that does not settle encrypted is
+ *  refused, never built as plaintext), so the badge said nothing about the item
+ *  it sat on, and the room went to the entrypoint's RTT instead. This test both
+ *  guards the removal and writes a screenshot for a human (or an agent). */
+test('the p2p tunnel card carries no encryption badge', async ({ page }) => {
   await page.goto('/');
   const card = page.locator('tunnel-card').filter({ hasText: 'Private' });
-  await expect(card.locator('.secure')).toHaveAttribute('title', 'End-to-end encrypted');
+  await expect(card).toBeVisible();
+  await expect(card.locator('.secure')).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/home-list.png', fullPage: true });
 });

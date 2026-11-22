@@ -1227,7 +1227,10 @@ export class EntrypointDetailPage extends LitElement {
                       <label class="form-label">${t('fieldRoutes')}</label>
                       <input class="form-input" .value=${this._routes} placeholder="0.0.0.0/0"
                         @input=${(e: Event) => { this._routes = (e.target as HTMLInputElement).value; }}>
-                      <div class="p2p-hint">${t('fieldRoutesHint')}</div>
+                      <!-- A split has no hub subnet to fall back to: what it
+                           carries is decided by the rules below, not by the
+                           net it was assigned. -->
+                      <div class="p2p-hint">${t(this.entrypointType === 'tungo' ? 'fieldTungoRoutesHint' : 'fieldRoutesHint')}</div>
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t('fieldDNS')}</label>
