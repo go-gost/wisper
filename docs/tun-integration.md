@@ -290,11 +290,13 @@ hub 上加一个 `p2p` tunnel，把这条流交给 pi 的 relay 服务：
 {"name": "gw-split", "type": "p2p", "endpoint": "127.0.0.1:18080"}
 ```
 
-**一个 peer key 只能属于一个 p2p tunnel**，hub 里两个 tunnel 的 allowlist 同时出现同一个 key 会被
-拒绝（`peer … is already used by another p2p tunnel`，整个保存回滚）。所以手机切换时，「把 pixel-9
-加进新 tunnel」与「从 `p2p-tun` 的 peers 里移除」必须**一起**做：先加会 500，先移除会断掉手机上
-现在这条隧道。在切换之前，新 tunnel 可以先建好但**留空 allowlist**（空 = 不接受任何 peer，但状态
-是 running）。
+**一个 peer key 只能属于一个 tunnel**：tun hub 与 p2p tunnel 共用 hub 里同一张 peer 路由表
+（`tunnel/tun.go` 与 `tunnel/p2p.go` 都走 `p2pHost.register`），所以两个 tunnel 的 allowlist 同时出现
+同一个 key 会被拒绝（`peer … is already used by another p2p tunnel`，整个保存回滚）。手机切换时这两件事
+只能**背靠背**做：先 `PUT …/p2p-tun/peers` 去掉它，紧接着 `PUT …/gw-split/peers` 加上它（反过来的第一次
+请求会 500）。中间那几秒手机上没有任何隧道 —— 此时旧 `tun` 入口点已停、新 `tungo` 入口点本来就还连不上，
+所以只影响它自己。在那之前，新 tunnel 可以**留空 allowlist** 先建好（空 = 不接受任何 peer，但状态是
+running），这样切换时只剩两次 peers 保存。
 
 ### 编辑与保存：保存不再等于重启
 
