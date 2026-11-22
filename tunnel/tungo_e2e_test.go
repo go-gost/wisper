@@ -15,6 +15,7 @@ package tunnel_test
 
 import (
 	"context"
+	"io"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -32,6 +33,7 @@ import (
 	_ "github.com/go-gost/x/dialer/tcp"      // the chain node's dialer: the request rides a p2p tcp stream
 	relayhandler "github.com/go-gost/x/handler/relay"
 	tcplistener "github.com/go-gost/x/listener/tcp"
+	xlogger "github.com/go-gost/x/logger"
 	mdx "github.com/go-gost/x/metadata"
 	"github.com/go-gost/x/registry"
 	xservice "github.com/go-gost/x/service"
@@ -40,6 +42,12 @@ import (
 	wtunnel "github.com/go-gost/wisper/tunnel"
 	wep "github.com/go-gost/wisper/tunnel/entrypoint"
 )
+
+// quiet is this test's own sink. The suite sets a Debug default logger, and the
+// chain parser, the router and the relay service all log through whatever they
+// are handed, so a passing run would print x's debug JSON. Discarding it keeps
+// -v to the PASS lines, which is the only output these tests should make.
+var quiet = xlogger.NewLogger(xlogger.OutputOption(io.Discard))
 
 // countingListener is a listener that counts the connections its service
 // accepted: the service is the only place that tells "the flow went through
@@ -65,7 +73,7 @@ func (l *countingListener) count() int64 { return l.accepted.Load() }
 func startRelayService(t *testing.T) (string, *countingListener) {
 	t.Helper()
 
-	log := clogger.Default().WithFields(map[string]any{
+	log := quiet.WithFields(map[string]any{
 		"kind":    "service",
 		"service": "tungo-e2e-relay",
 	})
@@ -110,6 +118,14 @@ func startSplitLink(t *testing.T, id, keyHex, listed string) (*xchain.Router, *c
 	// The hosts' keys resolve through os.UserConfigDir(); keep the test out of
 	// the real ~/.config/wisper/p2p/.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	// wisper's p2p tunnel builds its own service router through the process
+	// default logger, which the suite leaves at Debug: swap the quiet one in for
+	// the link's lifetime so a passing run prints only its PASS lines. First
+	// registered, so it is restored last — after every teardown log.
+	prevLog := clogger.Default()
+	clogger.SetDefault(quiet)
+	t.Cleanup(func() { clogger.SetDefault(prevLog) })
 
 	derp := startDerper(t) // p2p_udp_poc_test.go (same package + tag)
 
@@ -168,14 +184,14 @@ func startSplitLink(t *testing.T, id, keyHex, listed string) (*xchain.Router, *c
 	// here the near-side host plays that part.
 	registerProvider(t, provider, phone)
 
-	ch, err := chain_parser.ParseChain(chainCfg, clogger.Default())
+	ch, err := chain_parser.ParseChain(chainCfg, quiet)
 	if err != nil {
 		t.Fatalf("parse the tungo chain: %v", err)
 	}
 
 	router := xchain.NewRouter(
 		chain.ChainRouterOption(ch),
-		chain.LoggerRouterOption(clogger.Default()),
+		chain.LoggerRouterOption(quiet),
 	)
 	t.Cleanup(func() { _ = router.Close() })
 
@@ -199,8 +215,8 @@ func TestTungoChainRelaysOverP2P(t *testing.T) {
 	defer conn.Close()
 	mustEcho(t, conn, []byte("hello-tungo-tcp")) // p2p_e2e_test.go
 
-	if got := relay.count(); got < 1 {
-		t.Errorf("relay service accepted %d connections, want the listed flow to have gone through it", got)
+	if got := relay.count(); got != 1 {
+		t.Errorf("relay service accepted %d connections, want exactly the one relayed flow", got)
 	}
 }
 
@@ -238,8 +254,8 @@ func TestTungoChainRelaysUDPOverP2P(t *testing.T) {
 		t.Fatalf("datagram = %q, want %q", buf[:n], msg)
 	}
 
-	if got := relay.count(); got < 1 {
-		t.Errorf("relay service accepted %d connections, want the listed datagram to have gone through it", got)
+	if got := relay.count(); got != 1 {
+		t.Errorf("relay service accepted %d connections, want exactly the one relayed datagram", got)
 	}
 }
 

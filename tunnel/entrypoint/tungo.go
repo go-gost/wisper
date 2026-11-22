@@ -264,6 +264,10 @@ func (s *tungoEntryPoint) init() error {
 // on its hop. Anything that has to dial it (Run's parser, or a test carrying
 // traffic over the peer) reads this one assembly instead of rebuilding a copy
 // that would prove nothing about the product.
+//
+// On a fresh entrypoint this runs init, which registers the hop's rules bypass
+// in the global registry: the caller owns that registration and must take it
+// down itself (Close does, on the Run path) — nothing else will.
 func (s *tungoEntryPoint) ChainConfig() (*xconfig.ChainConfig, error) {
 	if s.config == nil {
 		if err := s.init(); err != nil {
@@ -362,11 +366,9 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 	var forward service.Service
 	{
 		var ch chain.Chainer
-		var chainCfg *xconfig.ChainConfig
-		if chainCfg, err = s.ChainConfig(); err != nil {
-			log.Error(err)
-			return
-		}
+		// init above already assembled this, so ChainConfig cannot fail here; the
+		// seam is read rather than rebuilt so a test dials the chain Run parses.
+		chainCfg, _ := s.ChainConfig()
 		ch, err = chain_parser.ParseChain(chainCfg, log)
 		if err != nil {
 			log.Error(err)
