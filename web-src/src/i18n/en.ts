@@ -140,6 +140,9 @@ const en: Record<string, string> = {
   typeTun: 'TUN',
   typeTunDesc: 'Host a tun device and route between the peers that reach it over p2p — no port, no public URL',
   typeTunEntryDesc: 'Join the virtual network of a peer (tun device)',
+  typeTungo: 'TUN Split',
+  typeTungoDesc: 'Own a tun device that splits by destination: listed flows to the peer, the rest straight out',
+  typeTungoEntryDesc: 'Join a peer\'s network for the listed destinations only, and dial everything else directly',
 
   // Notifications
   copiedToClipboard: 'Copied to clipboard',
@@ -240,6 +243,11 @@ const en: Record<string, string> = {
     'A tun device needs administrator rights — Linux/macOS: root or CAP_NET_ADMIN, Windows: Administrator.',
   tunPeerHint:
     'This device joins the hub\'s network: its traffic exits through the p2p tunnel to the hub key, and the hub decides what is reachable.',
+  tungoPeerHint:
+    'This device splits its own traffic: a destination on the rules list exits through the p2p tunnel to the hub key, and everything else is dialled directly on this device\'s own network.',
+  fieldRules: 'Split rules',
+  fieldRulesHint:
+    'One destination per line: a domain, an IP or a CIDR (e.g. 192.168.100.0/24). Listed destinations go through the hub; everything else is dialled directly. An empty list is a working split — all traffic goes direct.',
   hubNoReflowTitle: 'No return traffic from the hub',
   hubNoReflowHint:
     'Uplink only, no downlink for about a minute. Check: is the hub running, is this address on the hub allowlist, does the token match; tap to see the event history.',
@@ -358,7 +366,7 @@ const en: Record<string, string> = {
   p2pTestFailed: 'Unreachable',
   p2pKeyReset: 'Reset key',
   p2pKeyResetTitle: 'Reset P2P identity?',
-  p2pKeyResetWarning: 'A new key replaces the current one, and every running p2p tunnel, tun hub, p2p entrypoint and tun entrypoint restarts. Any peer that dials this host by the old key, and any allowlist that contains it, must be updated — peers using the old key lose access immediately.',
+  p2pKeyResetWarning: 'A new key replaces the current one, and every running p2p tunnel, tun hub, p2p entrypoint, tun entrypoint and tungo entrypoint restarts. Any peer that dials this host by the old key, and any allowlist that contains it, must be updated — peers using the old key lose access immediately.',
   p2pKeyResetDone: 'New key generated',
   p2pKeyResetting: 'Resetting…',
   p2pKeyResetFailed: 'Reset failed',

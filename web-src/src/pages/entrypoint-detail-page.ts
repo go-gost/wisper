@@ -60,6 +60,9 @@ export class EntrypointDetailPage extends LitElement {
   @state() private _deviceName = '';
   @state() private _routes = '';
   @state() private _dns = '';
+  /** A tungo entrypoint's split list, as the text box holds it: one destination
+   *  per line. Converted to the API's array on save and back on load. */
+  @state() private _rules = '';
   // LAN sharing: the subnets of this node's own LAN that the hub may approve
   // for its peers (empty disables), and the backend that runs them — the
   // spoke's half of the hub's share_lan. Same fields, same defaults.
@@ -144,6 +147,7 @@ export class EntrypointDetailPage extends LitElement {
     this._deviceName = '';
     this._routes = '';
     this._dns = '';
+    this._rules = '';
     this._shareLAN = '';
     this._shareMode = 'auto';
     this._direct = false;
@@ -165,6 +169,7 @@ export class EntrypointDetailPage extends LitElement {
     this._deviceName = ep.options?.device_name ?? '';
     this._routes = ep.options?.routes ?? '';
     this._dns = ep.options?.dns ?? '';
+    this._rules = (ep.options?.rules ?? []).join('\n');
     this._shareLAN = ep.options?.share_lan ?? '';
     this._shareMode = ep.options?.share_mode || 'auto';
     this._direct = ep.options?.direct === true;
@@ -289,28 +294,34 @@ export class EntrypointDetailPage extends LitElement {
     }, 2500);
   }
 
+  /** Whether this entrypoint owns a tun device — a tun spoke, or a tungo split
+   *  that owns one for the same reason. Everything about creating, arming,
+   *  editing and displaying that device is shared by the two; what differs is
+   *  where the traffic goes, which is the tun hub's business (share fields) or
+   *  the split list's. */
+  private get _usesDevice(): boolean {
+    return this.entrypointType === 'tun' || this.entrypointType === 'tungo';
+  }
+
   private async _handleSave() {
     if (!this._name.trim()) {
       this._showSnackbar(t('requiredField'));
       return;
     }
 
-    // Both p2p and tun entrypoints dial their hub by key: without one there is
-    // nobody to reach, and Listen() refuses it ("requires a peer public key").
-    // Refuse it here, before a tun arm creates a device for a dead tunnel.
-    if (
-      (this.entrypointType === 'p2p' || this.entrypointType === 'tun') &&
-      !this._peer.trim()
-    ) {
+    // Every p2p, tun and tungo entrypoint dials its hub by key: without one
+    // there is nobody to reach, and Listen() refuses it ("requires a peer public
+    // key"). Refuse it here, before a device is armed for a dead tunnel.
+    if ((this.entrypointType === 'p2p' || this._usesDevice) && !this._peer.trim()) {
       this._showSnackbar(`${t('entrypointPeerKey')}: ${t('requiredField')}`);
       return;
     }
 
-    // A tun entrypoint's device must exist before it can be created, and only
-    // the app can create it: arm the VPN with the form's values and wait for it.
-    // Refused before the arm when another tun entrypoint holds the one device —
-    // arming would take it away from the entrypoint using it.
-    if (this.entrypointType === 'tun') {
+    // A device entrypoint's tun device must exist before it can be created, and
+    // only the app can create it: arm the VPN with the form's values and wait
+    // for it. Refused before the arm when another entrypoint holds the one
+    // device — arming would take it away from the entrypoint using it.
+    if (this._usesDevice) {
       const holder = tunDeviceHolder(this.entrypointId);
       if (holder) {
         this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
@@ -327,24 +338,24 @@ export class EntrypointDetailPage extends LitElement {
       const body = {
         name: this._name.trim(),
         type: this.entrypointType,
-        // A tun entrypoint binds no local socket: its device address is the net
-        // field below, and the endpoint is meaningless.
-        endpoint: this.entrypointType === 'tun' ? '' : this._endpoint.trim(),
+        // A device entrypoint binds no local socket: its device address is the
+        // net field below, and the endpoint is meaningless.
+        endpoint: this._usesDevice ? '' : this._endpoint.trim(),
         id: this._tunnelId.trim() || undefined,
         peer: this._peer.trim() || undefined,
         protocol: this.entrypointType === 'p2p' ? this._protocol : undefined,
         // Only a p2p entrypoint over udp has a session to hold between
-        // datagrams; a tun entrypoint's is always on the wire (see the form's
+        // datagrams; a device entrypoint's is always on the wire (see the form's
         // note), so neither value is sent for it.
         keepalive:
           this.entrypointType === 'p2p' && this._protocol === 'udp'
             ? this._keepalive
             : undefined,
-        net: this.entrypointType === 'tun' ? this._net.trim() || undefined : undefined,
-        mtu: this.entrypointType === 'tun' ? this._mtu || undefined : undefined,
-        device_name: this.entrypointType === 'tun' ? this._deviceName.trim() || undefined : undefined,
-        routes: this.entrypointType === 'tun' ? this._routes.trim() || undefined : undefined,
-        dns: this.entrypointType === 'tun' ? this._dns.trim() || undefined : undefined,
+        net: this._usesDevice ? this._net.trim() || undefined : undefined,
+        mtu: this._usesDevice ? this._mtu || undefined : undefined,
+        device_name: this._usesDevice ? this._deviceName.trim() || undefined : undefined,
+        routes: this._usesDevice ? this._routes.trim() || undefined : undefined,
+        dns: this._usesDevice ? this._dns.trim() || undefined : undefined,
         // Only a spoke shares a LAN: the hub's own share fields live on the tun
         // tunnel, and nothing else reads these two.
         share_lan: this.entrypointType === 'tun' ? this._shareLAN.trim() || undefined : undefined,
@@ -352,6 +363,16 @@ export class EntrypointDetailPage extends LitElement {
         // Only a tun spoke has a mesh path. Omitted on an edit would preserve
         // the old value, but the switch is explicit, so both states are sent.
         direct: this.entrypointType === 'tun' ? this._direct : undefined,
+        // A tungo entrypoint's split list: one destination per line, trimmed,
+        // blanks dropped. Sent on every save — an empty box is the operator
+        // clearing the list (everything direct), not "keep the old one".
+        rules:
+          this.entrypointType === 'tungo'
+            ? this._rules
+              .split('\n')
+              .map((s) => s.trim())
+              .filter(Boolean)
+            : undefined,
       };
 
       if (this.mode === 'create') {
@@ -383,11 +404,11 @@ export class EntrypointDetailPage extends LitElement {
   }
 
   private async _handleStart() {
-    // A tun entrypoint's device must exist before it can start, and only the app
-    // can create it. The form path arms on save, but a stopped entrypoint
-    // started from here has no save in between — this is where it is asked for,
-    // using the entrypoint's own stored values (not the form's).
-    if (this.entrypointType === 'tun') {
+    // A device entrypoint's tun device must exist before it can start, and only
+    // the app can create it. The form path arms on save, but a stopped
+    // entrypoint started from here has no save in between — this is where it is
+    // asked for, using the entrypoint's own stored values (not the form's).
+    if (this._usesDevice) {
       const holder = tunDeviceHolder(this.entrypointId);
       if (holder) {
         this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);
@@ -781,6 +802,14 @@ export class EntrypointDetailPage extends LitElement {
     .form-input[readonly] {
       background: var(--border-subtle); color: var(--text-muted);
     }
+    /* A list typed one entry per line (the split rules): monospace so the
+       entries line up, and room for a pasted list rather than one line. */
+    textarea.form-input {
+      min-height: 96px;
+      resize: vertical;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      line-height: 1.5;
+    }
 
     .danger-zone {
       margin-top: 20px; padding: 14px;
@@ -942,7 +971,7 @@ export class EntrypointDetailPage extends LitElement {
                   <span class="info-label">${t('fieldCreated')}</span>
                   <span class="info-value text">${formatTimestamp(ep.created_at)}</span>
                 </div>
-                ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
+                ${this.entrypointType === 'p2p' || this._usesDevice
                   ? ''
                   : html`
                 <div class="info-row">
@@ -955,10 +984,10 @@ export class EntrypointDetailPage extends LitElement {
                     : ''}
                 </div>`}
                 <div class="info-row">
-                  <span class="info-label">${this.entrypointType === 'tun' ? t('fieldNet') : t('fieldBindAddress')}</span>
+                  <span class="info-label">${this._usesDevice ? t('fieldNet') : t('fieldBindAddress')}</span>
                   <span class="info-value">${ep.entrypoint}</span>
                 </div>
-                ${this.entrypointType === 'tun'
+                ${this._usesDevice
                   ? html`
                     ${ep.options?.mtu
                       ? html`<div class="info-row"><span class="info-label">${t('fieldMTU')}</span><span class="info-value text">${ep.options.mtu}</span></div>`
@@ -969,22 +998,35 @@ export class EntrypointDetailPage extends LitElement {
                     <!-- What this spoke asked to share, and what its hub
                          actually approved: the two are not the same value, and
                          only the second reaches the hub's peers. A hub that
-                         approved nothing has no routes row at all. -->
-                    ${ep.options?.share_lan
+                         approved nothing has no routes row at all. A tungo split
+                         shares nothing at all, so neither row is its business. -->
+                    ${this.entrypointType === 'tun' && ep.options?.share_lan
                       ? html`<div class="info-row"><span class="info-label">${t('fieldShareLAN')}</span><span class="info-value text">${ep.options.share_lan}</span></div>`
                       : ''}
+                    ${this.entrypointType === 'tun'
+                      ? html`
                     <div class="info-row">
                       <span class="info-label">${t('fieldDirect')}</span>
                       <span class="info-value text">${ep.options?.direct ? t('directOn') : t('directOff')}</span>
                     </div>
                     ${ep.lan_routes?.length
                       ? html`<div class="info-row"><span class="info-label">${t('fieldLANRoutes')}</span><span class="info-value text">${ep.lan_routes.join(', ')}</span></div>`
+                      : ''}`
                       : ''}
                     ${ep.options?.routes
                       ? html`<div class="info-row"><span class="info-label">${t('fieldRoutes')}</span><span class="info-value text">${ep.options.routes}</span></div>`
                       : ''}
                     ${ep.options?.dns
                       ? html`<div class="info-row"><span class="info-label">${t('fieldDNS')}</span><span class="info-value text">${ep.options.dns}</span></div>`
+                      : ''}
+                    <!-- The split itself. An empty list is a working split
+                         (everything direct), so it is shown rather than
+                         hidden as "not configured". -->
+                    ${this.entrypointType === 'tungo'
+                      ? html`<div class="info-row">
+                      <span class="info-label">${t('fieldRules')}</span>
+                      <span class="info-value text">${ep.options?.rules?.length ? ep.options.rules.join(', ') : '—'}</span>
+                    </div>`
                       : ''}
                     <div class="info-row">
                       <span class="info-label">${t('entrypointPeerKey')}</span>
@@ -1000,7 +1042,7 @@ export class EntrypointDetailPage extends LitElement {
                         : ''}
                     </div>
                     ${this._renderTransport(ep)}
-                    <div class="p2p-hint">${t('tunPeerHint')}</div>
+                    <div class="p2p-hint">${this.entrypointType === 'tun' ? t('tunPeerHint') : t('tungoPeerHint')}</div>
                   `
                   : this.entrypointType === 'p2p'
                   ? html`
@@ -1112,18 +1154,18 @@ export class EntrypointDetailPage extends LitElement {
           ? html`
             <div class="section">
               <div class="card" style="padding:16px;">
-                <!-- What a tun entrypoint is and what it needs, before the fields
-                     it implies: the device is the one thing here that can make
-                     the save fail. -->
-                ${this.entrypointType === 'tun'
+                <!-- What a device entrypoint is and what it needs, before the
+                     fields it implies: the device is the one thing here that can
+                     make the save fail. -->
+                ${this._usesDevice
                   ? html`
                     <div class="p2p-hint warn">${t('tunPrivilegeHint')}</div>
-                    <div class="p2p-hint">${t('tunPeerHint')}</div>
+                    <div class="p2p-hint">${this.entrypointType === 'tun' ? t('tunPeerHint') : t('tungoPeerHint')}</div>
                   `
                   : ''}
 
-                <!-- A p2p or tun entrypoint has no tunnel id to route by. -->
-                ${this.entrypointType === 'p2p' || this.entrypointType === 'tun'
+                <!-- A p2p or device entrypoint has no tunnel id to route by. -->
+                ${this.entrypointType === 'p2p' || this._usesDevice
                   ? ''
                   : html`
                 <div class="form-group">
@@ -1141,7 +1183,7 @@ export class EntrypointDetailPage extends LitElement {
                     @input=${(e: Event) => { this._name = (e.target as HTMLInputElement).value; }}>
                 </div>
 
-                ${this.entrypointType === 'tun'
+                ${this._usesDevice
                   ? html`
                     <div class="form-group">
                       <label class="form-label">${t('fieldNet')}</label>
@@ -1151,13 +1193,17 @@ export class EntrypointDetailPage extends LitElement {
                            lives on the hub's own peers page, which this page has
                            no view of — it knows only the net being typed here and
                            the hub's key — so the hint points there rather than
-                           restating a subnet it cannot know. -->
-                      <div class="p2p-hint">${t('tunNetMatchesHub')}</div>
+                           restating a subnet it cannot know. A tungo split's
+                           address is not assigned by anyone: its peer is a p2p
+                           tunnel, not a tun hub. -->
+                      ${this.entrypointType === 'tun'
+                        ? html`<div class="p2p-hint">${t('tunNetMatchesHub')}</div>`
+                        : ''}
                     </div>
                     <!-- The hub this device dials. It belongs with the device
                          address above, not at the bottom of the form: the two
                          together are "which side of the tunnel is this node".
-                         Required — a tun entrypoint with no peer has nobody to
+                         Required — a device entrypoint with no peer has nobody to
                          reach, and the host refuses to start it. -->
                     <div class="form-group">
                       <label class="form-label">
@@ -1185,9 +1231,29 @@ export class EntrypointDetailPage extends LitElement {
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t('fieldDNS')}</label>
-                      <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
+                      <!-- A tun spoke asks its hub (10.10.0.1); a split has no
+                           hub DNS, so its example is the home gateway whose
+                           split DNS answers the listed names. -->
+                      <input class="form-input" .value=${this._dns}
+                        placeholder="${this.entrypointType === 'tungo' ? '192.168.100.100' : '10.10.0.1'}"
                         @input=${(e: Event) => { this._dns = (e.target as HTMLInputElement).value; }}>
                     </div>
+                    ${this.entrypointType === 'tungo'
+                      ? html`
+                    <!-- The split: one destination per line, because the list is
+                         read and edited as a list of hosts, not as a sentence.
+                         Listed traffic rides the tunnel to the peer above; the
+                         rest leaves through this device's own network. -->
+                    <div class="form-group">
+                      <label class="form-label">${t('fieldRules')}</label>
+                      <textarea class="form-input" rows="6" .value=${this._rules}
+                        placeholder="example.com&#10;192.168.100.0/24"
+                        @input=${(e: Event) => { this._rules = (e.target as HTMLTextAreaElement).value; }}></textarea>
+                      <div class="p2p-hint">${t('fieldRulesHint')}</div>
+                    </div>`
+                      : ''}
+                    ${this.entrypointType === 'tun'
+                      ? html`
                     <!-- LAN sharing, last: the subnets of this node's own LAN the
                          hub may let its peers reach, and the backend that runs
                          them. Opt-in and decided by the hub (its peers page shows
@@ -1217,7 +1283,8 @@ export class EntrypointDetailPage extends LitElement {
                         <div class="switch-knob"></div>
                       </div>
                     </div>
-                    <div class="p2p-hint">${t('fieldDirectHint')}</div>
+                    <div class="p2p-hint">${t('fieldDirectHint')}</div>`
+                      : ''}
                   `
                   : html`
                 <div class="form-group">
@@ -1227,8 +1294,8 @@ export class EntrypointDetailPage extends LitElement {
                 </div>`}
 
                 <!-- The peer key and the controls only a p2p entrypoint has. A
-                     tun entrypoint's key sits above, with the device it dials
-                     from. -->
+                     device entrypoint's key sits above, with the device it
+                     dials from. -->
                 ${this.entrypointType === 'p2p'
                   ? html`
                     <div class="form-group">

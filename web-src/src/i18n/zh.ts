@@ -137,6 +137,9 @@ const zh: Record<string, string> = {
   typeTun: 'TUN',
   typeTunDesc: '本机持有 tun 设备，为经 p2p 接入的对端转发——无端口、无公网地址',
   typeTunEntryDesc: '加入对端搭建的虚拟网络（tun 设备）',
+  typeTungo: 'TUN 分流',
+  typeTungoDesc: '本机持有 tun 设备并按目标分流：清单内的流量送到对端，其余直接走本机网络',
+  typeTungoEntryDesc: '只把清单内的目标送入对端网络，其余目标直接走本机网络',
 
   // Notifications
   copiedToClipboard: '已复制到剪贴板',
@@ -232,6 +235,11 @@ const zh: Record<string, string> = {
     'tun 设备需要管理员权限——Linux/macOS：root 或 CAP_NET_ADMIN；Windows：管理员。',
   tunPeerHint:
     '本机设备加入 hub 的网络：流量经 p2p 隧道到 hub 公钥，可访问范围由 hub 决定。',
+  tungoPeerHint:
+    '本机设备自行分流：规则清单内的目标经 p2p 隧道到 hub 公钥，其余目标直接走本机网络。',
+  fieldRules: '分流规则',
+  fieldRulesHint:
+    '每行一个目标：域名、IP 或 CIDR（如 192.168.100.0/24）。清单内的目标经 hub 出去，其余直接走本机网络。留空也是一种可用的分流——全部直连。',
   hubNoReflowTitle: 'hub 无回流：只发包、无回包',
   hubNoReflowHint:
     '已持续约 1 分钟只有上行、没有下行。排查：hub 是否在运行、本机地址是否在 hub 白名单、token 是否一致；点此看历史事件。',
@@ -342,7 +350,7 @@ const zh: Record<string, string> = {
   p2pTestFailed: '不可达',
   p2pKeyReset: '重置密钥',
   p2pKeyResetTitle: '重置 P2P 身份？',
-  p2pKeyResetWarning: '将生成新密钥替换当前密钥，所有运行中的 p2p 隧道、tun 中枢、p2p 入口点和 tun 入口点都会重启。凡是用旧公钥拨号本机的对端，以及包含旧公钥的白名单，都必须更新——使用旧密钥的对端会立即失去访问。',
+  p2pKeyResetWarning: '将生成新密钥替换当前密钥，所有运行中的 p2p 隧道、tun 中枢、p2p 入口点、tun 入口点和 tungo 入口点都会重启。凡是用旧公钥拨号本机的对端，以及包含旧公钥的白名单，都必须更新——使用旧密钥的对端会立即失去访问。',
   p2pKeyResetDone: '已生成新密钥',
   p2pKeyResetting: '重置中…',
   p2pKeyResetFailed: '重置失败',

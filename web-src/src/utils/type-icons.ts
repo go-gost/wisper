@@ -11,6 +11,7 @@ const TYPE_ICONS: Record<TunnelType | EntrypointType, string> = {
   udp: 'broadcast',
   p2p: 'hub',
   tun: 'network',
+  tungo: 'branch',
 };
 
 /** typeIcon returns the glyph name for a service type. */

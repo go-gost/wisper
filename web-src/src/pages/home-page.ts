@@ -721,10 +721,14 @@ export class HomePage extends LitElement {
   }
 
   private async _handleStart(item: Item) {
-    // A tun entrypoint's device must exist before it can start, and only the
-    // Android app can create it: arm the VPN with the entrypoint's stored
-    // values, then start. A no-op on desktop, where armVpn resolves true.
-    if (item.kind === 'entrypoint' && item.data.type === 'tun') {
+    // A device entrypoint's tun device must exist before it can start, and only
+    // the Android app can create it: arm the VPN with the entrypoint's stored
+    // values, then start. A no-op on desktop, where armVpn resolves true. A tungo
+    // split owns the same single device, so it arms exactly like a tun spoke.
+    if (
+      item.kind === 'entrypoint' &&
+      (item.data.type === 'tun' || item.data.type === 'tungo')
+    ) {
       const holder = tunDeviceHolder(item.data.id);
       if (holder) {
         this._showSnackbar(`${t('tunDeviceBusy')}: ${holder.name}`);

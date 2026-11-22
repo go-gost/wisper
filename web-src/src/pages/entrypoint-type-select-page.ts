@@ -12,6 +12,7 @@ const TYPE_COLORS: Record<EntrypointType, { bg: string; fg: string }> = {
   udp: { bg: '#fefce8', fg: '#d97706' },
   p2p: { bg: '#f5f3ff', fg: '#7c3aed' },
   tun: { bg: '#ecfeff', fg: '#0e7490' },
+  tungo: { bg: '#ecfdf5', fg: '#047857' },
 };
 
 @customElement('entrypoint-type-select-page')

@@ -1,7 +1,7 @@
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 export type TunnelType = 'file' | 'http' | 'tcp' | 'udp' | 'p2p' | 'tun';
-export type EntrypointType = 'tcp' | 'udp' | 'p2p' | 'tun';
+export type EntrypointType = 'tcp' | 'udp' | 'p2p' | 'tun' | 'tungo';
 export type ServiceStatus = 'running' | 'stopped' | 'error';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type LanguagePreference = 'en' | 'zh';
@@ -20,6 +20,7 @@ export const ENTRYPOINT_TYPES: { value: EntrypointType; label: string; desc: str
   { value: 'udp', label: 'UDP', desc: '' },
   { value: 'p2p', label: 'P2P', desc: '' },
   { value: 'tun', label: 'TUN', desc: '' },
+  { value: 'tungo', label: 'TUN Split', desc: '' },
 ];
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
@@ -309,6 +310,9 @@ export interface EntrypointOptions {
   blocked_peers?: string[];
   /** Opt-in spoke-to-spoke mesh path; the hub link remains the fallback. */
   direct?: boolean;
+  /** A tungo entrypoint's split list: destinations that go through the hub,
+   *  everything else dialled directly. Empty is a working split (all direct). */
+  rules?: string[];
 }
 
 /** One row of a tun spoke's local peer view. */
@@ -416,6 +420,10 @@ export interface EntrypointCreateRequest {
   /** Opt-in mesh data path for a tun spoke. Omitted on an update keeps the
    *  existing value; false turns it off. */
   direct?: boolean;
+  /** A tungo entrypoint's split list (domain / IP / CIDR, one per entry). Sent
+   *  whole on every save: [] is the explicit clear (everything direct), not
+   *  "keep the old list". */
+  rules?: string[];
 }
 
 // ─── Stats Snapshot ──────────────────────────────────────────────────────────

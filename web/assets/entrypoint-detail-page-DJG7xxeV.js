@@ -1,5 +1,6 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DCr0kI2s.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
-import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n as I,x as P,u as R,i as N,t as z}from"./index-DCr0kI2s.js";import{d as C,m,c as u,a as g,b as y,n as w,r as l}from"./format-DuHVQLlV.js";import{i as d}from"./app-scaffold-BaJygc80.js";import{t as E}from"./type-icons-DsI-rt1W.js";import{a as A}from"./transport-hRLQknOn.js";import{t as _,a as $}from"./vpn-CxYcmlVe.js";import{c as M}from"./clipboard-C3x8_sid.js";var F=Object.defineProperty,H=Object.getOwnPropertyDescriptor,o=(e,s,r,a)=>{for(var h=a>1?void 0:a?H(s,r):s,c=e.length-1,v;c>=0;c--)(v=e[c])&&(h=(a?v(s,r,h):v(h))||h);return a&&h&&F(s,r,h),h};let n=class extends x{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this._poll=0,this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._showTransportDetail=!1,this._formId="",this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._shareLAN="",this._shareMode="auto",this._direct=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>{f()},5e3),this._unsubs.push(k(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,super.disconnectedCallback();for(const e of this._unsubs)e();this._unsubs=[]}_load(){const e=this.entrypointId,s=window.location.search.includes("edit");if(e==="new"||!e){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===e)return;const r=T().find(a=>a.id===e);r&&(this._entrypoint=r,s?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._entrypoint?.id!==e)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._formId="",this._showTransportDetail=!1,this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._shareLAN="",this._shareMode="auto",this._direct=!1}_populateForm(e){this._name=e.name,this._endpoint=e.entrypoint,this._tunnelId=e.id??"",this._peer=e.options?.peer??"",this._formId!==e.id&&(this._formId=e.id??"",this._showTransportDetail=!1),this._protocol=e.options?.protocol==="udp"?"udp":"tcp",this._keepalive=e.options?.keepalive??!0,this._net=e.options?.net??"",this._mtu=e.options?.mtu??0,this._deviceName=e.options?.device_name??"",this._routes=e.options?.routes??"",this._dns=e.options?.dns??"",this._shareLAN=e.options?.share_lan??"",this._shareMode=e.options?.share_mode||"auto",this._direct=e.options?.direct===!0}_renderTransport(e){const s=A(e.peer_transport);return s?i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-dsnkuDXJ.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
+import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n as R,x as P,u as I,i as N,t as z}from"./index-dsnkuDXJ.js";import{d as C,m,c as u,a as g,b as _,n as w,r}from"./format-JAXIYG19.js";import{i as d}from"./app-scaffold-Dfhq2w1K.js";import{t as A}from"./type-icons-DvFgXXJ2.js";import{a as E}from"./transport-BobM2JNi.js";import{t as y,a as $}from"./vpn-3qz9vY6z.js";import{c as M}from"./clipboard-C3x8_sid.js";var H=Object.defineProperty,F=Object.getOwnPropertyDescriptor,o=(e,s,l,a)=>{for(var h=a>1?void 0:a?F(s,l):s,c=e.length-1,v;c>=0;c--)(v=e[c])&&(h=(a?v(s,l,h):v(h))||h);return a&&h&&H(s,l,h),h};let n=class extends x{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this._poll=0,this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._showTransportDetail=!1,this._formId="",this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._shareLAN="",this._shareMode="auto",this._direct=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>{f()},5e3),this._unsubs.push(k(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,super.disconnectedCallback();for(const e of this._unsubs)e();this._unsubs=[]}_load(){const e=this.entrypointId,s=window.location.search.includes("edit");if(e==="new"||!e){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===e)return;const l=T().find(a=>a.id===e);l&&(this._entrypoint=l,s?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._entrypoint?.id!==e)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._formId="",this._showTransportDetail=!1,this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._shareLAN="",this._shareMode="auto",this._direct=!1}_populateForm(e){this._name=e.name,this._endpoint=e.entrypoint,this._tunnelId=e.id??"",this._peer=e.options?.peer??"",this._formId!==e.id&&(this._formId=e.id??"",this._showTransportDetail=!1),this._protocol=e.options?.protocol==="udp"?"udp":"tcp",this._keepalive=e.options?.keepalive??!0,this._net=e.options?.net??"",this._mtu=e.options?.mtu??0,this._deviceName=e.options?.device_name??"",this._routes=e.options?.routes??"",this._dns=e.options?.dns??"",this._rules=(e.options?.rules??[]).join(`
+`),this._shareLAN=e.options?.share_lan??"",this._shareMode=e.options?.share_mode||"auto",this._direct=e.options?.direct===!0}_renderTransport(e){const s=E(e.peer_transport);return s?i`
       <div class="info-row">
         <span class="info-label">${t("p2pTransport")}</span>
         <span class="info-value text transport-value">
@@ -41,13 +42,14 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
               </div>
             `:p}
         `:p}
-    `:p}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(e){const s=(e??[])[0];if(!s)return t("eventsEntryDesc");const r=s.count||1;return r>1?`${s.message} ×${r}`:s.message}_hubNoReflow(e){for(const s of e??[]){if(s.message.includes("uplink without downlink"))return!0;if(s.message.includes("downlink recovered"))return!1}return!1}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}async _handleSave(){if(!this._name.trim()){this._showSnackbar(t("requiredField"));return}if((this.entrypointType==="p2p"||this.entrypointType==="tun")&&!this._peer.trim()){this._showSnackbar(`${t("entrypointPeerKey")}: ${t("requiredField")}`);return}if(this.entrypointType==="tun"){const e=_(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}if(!await $(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(t("vpnNotReady"));return}}this._saving=!0;try{const e={name:this._name.trim(),type:this.entrypointType,endpoint:this.entrypointType==="tun"?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,net:this.entrypointType==="tun"&&this._net.trim()||void 0,mtu:this.entrypointType==="tun"&&this._mtu||void 0,device_name:this.entrypointType==="tun"&&this._deviceName.trim()||void 0,routes:this.entrypointType==="tun"&&this._routes.trim()||void 0,dns:this.entrypointType==="tun"&&this._dns.trim()||void 0,share_lan:this.entrypointType==="tun"&&this._shareLAN.trim()||void 0,share_mode:this.entrypointType==="tun"&&this._shareMode||void 0,direct:this.entrypointType==="tun"?this._direct:void 0};this.mode==="create"?(await b(()=>import("./index-DCr0kI2s.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.create(e)),this._showSnackbar(t("saved")),this._navigate("/")):(await b(()=>import("./index-DCr0kI2s.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.update(this.entrypointId,e)),this._showSnackbar(t("saved")),this.mode="view",await f())}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await S(this.entrypointId),this._showSnackbar(t("deleted")),this._navigate("/")}catch{this._showSnackbar(t("deleteFailed"))}}async _handleStart(){if(this.entrypointType==="tun"){const e=_(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}const s=this._entrypoint?.options;if(!await $(s?.net??"",s?.routes??"",s?.mtu??0,s?.dns??"")){this._showSnackbar(t("vpnNotReady"));return}}try{await D(this.entrypointId),this._showSnackbar(t("started"))}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("startFailed")}${s?": "+s:""}`)}}async _handleStop(){try{await I(this.entrypointId),this._showSnackbar(t("stopped"))}catch{this._showSnackbar(t("stopFailed"))}}async _handleCopy(e){await M(e),this._showSnackbar(t("copiedToClipboard"))}_handleResetStats(e){this._resetKind=e,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await P(this.entrypointId,this._resetKind),this._entrypoint&&R(this.entrypointId,this._entrypoint.stats),this._showSnackbar(t("saved"))}catch{this._showSnackbar(t("saveFailed"))}}_cycleOption(e,s){const r=s.indexOf(e);return s[(r+1)%s.length]}_shareModeLabel(e){switch(e){case"kernel":return t("shareModeKernel");case"userspace":return t("shareModeUserspace");default:return t("shareModeAuto")}}render(){const e=this._entrypoint,s=e?e.stats:null,r=e?.options?.peer??"";return i`
+    `:p}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(e){const s=(e??[])[0];if(!s)return t("eventsEntryDesc");const l=s.count||1;return l>1?`${s.message} ×${l}`:s.message}_hubNoReflow(e){for(const s of e??[]){if(s.message.includes("uplink without downlink"))return!0;if(s.message.includes("downlink recovered"))return!1}return!1}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}get _usesDevice(){return this.entrypointType==="tun"||this.entrypointType==="tungo"}async _handleSave(){if(!this._name.trim()){this._showSnackbar(t("requiredField"));return}if((this.entrypointType==="p2p"||this._usesDevice)&&!this._peer.trim()){this._showSnackbar(`${t("entrypointPeerKey")}: ${t("requiredField")}`);return}if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}if(!await $(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(t("vpnNotReady"));return}}this._saving=!0;try{const e={name:this._name.trim(),type:this.entrypointType,endpoint:this._usesDevice?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,net:this._usesDevice&&this._net.trim()||void 0,mtu:this._usesDevice&&this._mtu||void 0,device_name:this._usesDevice&&this._deviceName.trim()||void 0,routes:this._usesDevice&&this._routes.trim()||void 0,dns:this._usesDevice&&this._dns.trim()||void 0,share_lan:this.entrypointType==="tun"&&this._shareLAN.trim()||void 0,share_mode:this.entrypointType==="tun"&&this._shareMode||void 0,direct:this.entrypointType==="tun"?this._direct:void 0,rules:this.entrypointType==="tungo"?this._rules.split(`
+`).map(s=>s.trim()).filter(Boolean):void 0};this.mode==="create"?(await b(()=>import("./index-dsnkuDXJ.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.create(e)),this._showSnackbar(t("saved")),this._navigate("/")):(await b(()=>import("./index-dsnkuDXJ.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.update(this.entrypointId,e)),this._showSnackbar(t("saved")),this.mode="view",await f())}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await D(this.entrypointId),this._showSnackbar(t("deleted")),this._navigate("/")}catch{this._showSnackbar(t("deleteFailed"))}}async _handleStart(){if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}const s=this._entrypoint?.options;if(!await $(s?.net??"",s?.routes??"",s?.mtu??0,s?.dns??"")){this._showSnackbar(t("vpnNotReady"));return}}try{await S(this.entrypointId),this._showSnackbar(t("started"))}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("startFailed")}${s?": "+s:""}`)}}async _handleStop(){try{await R(this.entrypointId),this._showSnackbar(t("stopped"))}catch{this._showSnackbar(t("stopFailed"))}}async _handleCopy(e){await M(e),this._showSnackbar(t("copiedToClipboard"))}_handleResetStats(e){this._resetKind=e,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await P(this.entrypointId,this._resetKind),this._entrypoint&&I(this.entrypointId,this._entrypoint.stats),this._showSnackbar(t("saved"))}catch{this._showSnackbar(t("saveFailed"))}}_cycleOption(e,s){const l=s.indexOf(e);return s[(l+1)%s.length]}_shareModeLabel(e){switch(e){case"kernel":return t("shareModeKernel");case"userspace":return t("shareModeUserspace");default:return t("shareModeAuto")}}render(){const e=this._entrypoint,s=e?e.stats:null,l=e?.options?.peer??"";return i`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._handleBack()}>
             ${d("chevron-left")}
           </button>
-          <span class="page-title">${d(E(this.entrypointType))}</span>
+          <span class="page-title">${d(A(this.entrypointType))}</span>
 
           ${this.mode==="view"&&e?i`
               ${e.status==="running"?i`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
@@ -103,7 +105,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                   <span class="info-label">${t("fieldCreated")}</span>
                   <span class="info-value text">${C(e.created_at)}</span>
                 </div>
-                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?"":i`
+                ${this.entrypointType==="p2p"||this._usesDevice?"":i`
                 <div class="info-row">
                   <span class="info-label">${t("fieldTunnelId")}</span>
                   <span class="info-value uuid">${e.id??"—"}</span>
@@ -112,28 +114,37 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                     </button>`:""}
                 </div>`}
                 <div class="info-row">
-                  <span class="info-label">${this.entrypointType==="tun"?t("fieldNet"):t("fieldBindAddress")}</span>
+                  <span class="info-label">${this._usesDevice?t("fieldNet"):t("fieldBindAddress")}</span>
                   <span class="info-value">${e.entrypoint}</span>
                 </div>
-                ${this.entrypointType==="tun"?i`
+                ${this._usesDevice?i`
                     ${e.options?.mtu?i`<div class="info-row"><span class="info-label">${t("fieldMTU")}</span><span class="info-value text">${e.options.mtu}</span></div>`:""}
                     ${e.options?.device_name?i`<div class="info-row"><span class="info-label">${t("fieldDeviceName")}</span><span class="info-value text">${e.options.device_name}</span></div>`:""}
                     <!-- What this spoke asked to share, and what its hub
                          actually approved: the two are not the same value, and
                          only the second reaches the hub's peers. A hub that
-                         approved nothing has no routes row at all. -->
-                    ${e.options?.share_lan?i`<div class="info-row"><span class="info-label">${t("fieldShareLAN")}</span><span class="info-value text">${e.options.share_lan}</span></div>`:""}
+                         approved nothing has no routes row at all. A tungo split
+                         shares nothing at all, so neither row is its business. -->
+                    ${this.entrypointType==="tun"&&e.options?.share_lan?i`<div class="info-row"><span class="info-label">${t("fieldShareLAN")}</span><span class="info-value text">${e.options.share_lan}</span></div>`:""}
+                    ${this.entrypointType==="tun"?i`
                     <div class="info-row">
                       <span class="info-label">${t("fieldDirect")}</span>
                       <span class="info-value text">${e.options?.direct?t("directOn"):t("directOff")}</span>
                     </div>
-                    ${e.lan_routes?.length?i`<div class="info-row"><span class="info-label">${t("fieldLANRoutes")}</span><span class="info-value text">${e.lan_routes.join(", ")}</span></div>`:""}
+                    ${e.lan_routes?.length?i`<div class="info-row"><span class="info-label">${t("fieldLANRoutes")}</span><span class="info-value text">${e.lan_routes.join(", ")}</span></div>`:""}`:""}
                     ${e.options?.routes?i`<div class="info-row"><span class="info-label">${t("fieldRoutes")}</span><span class="info-value text">${e.options.routes}</span></div>`:""}
                     ${e.options?.dns?i`<div class="info-row"><span class="info-label">${t("fieldDNS")}</span><span class="info-value text">${e.options.dns}</span></div>`:""}
+                    <!-- The split itself. An empty list is a working split
+                         (everything direct), so it is shown rather than
+                         hidden as "not configured". -->
+                    ${this.entrypointType==="tungo"?i`<div class="info-row">
+                      <span class="info-label">${t("fieldRules")}</span>
+                      <span class="info-value text">${e.options?.rules?.length?e.options.rules.join(", "):"—"}</span>
+                    </div>`:""}
                     <div class="info-row">
                       <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?r:m(r)}</span>
-                      ${r?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(r)}>
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?l:m(l)}</span>
+                      ${l?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
                           ${d("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
@@ -142,12 +153,12 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                         </button>`:""}
                     </div>
                     ${this._renderTransport(e)}
-                    <div class="p2p-hint">${t("tunPeerHint")}</div>
+                    <div class="p2p-hint">${this.entrypointType==="tun"?t("tunPeerHint"):t("tungoPeerHint")}</div>
                   `:this.entrypointType==="p2p"?i`
                     <div class="info-row">
                       <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?r:m(r)}</span>
-                      ${r?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(r)}>
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?l:m(l)}</span>
+                      ${l?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
                           ${d("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
@@ -181,12 +192,12 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                     <div class="stat-box">
                       <div class="stat-label">${t("p2pColDown")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${t("btnResetOutput")}">${d("rotate-cw")}</span></div>
                       <div class="stat-value">${g(s.output_bytes)}</div>
-                      <div class="stat-rate">${y(s.output_rate_bytes)}</div>
+                      <div class="stat-rate">${_(s.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">${t("p2pColUp")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${t("btnResetInput")}">${d("rotate-cw")}</span></div>
                       <div class="stat-value">${g(s.input_bytes)}</div>
-                      <div class="stat-rate">${y(s.input_rate_bytes)}</div>
+                      <div class="stat-rate">${_(s.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
@@ -239,16 +250,16 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
         ${this.mode!=="view"?i`
             <div class="section">
               <div class="card" style="padding:16px;">
-                <!-- What a tun entrypoint is and what it needs, before the fields
-                     it implies: the device is the one thing here that can make
-                     the save fail. -->
-                ${this.entrypointType==="tun"?i`
+                <!-- What a device entrypoint is and what it needs, before the
+                     fields it implies: the device is the one thing here that can
+                     make the save fail. -->
+                ${this._usesDevice?i`
                     <div class="p2p-hint warn">${t("tunPrivilegeHint")}</div>
-                    <div class="p2p-hint">${t("tunPeerHint")}</div>
+                    <div class="p2p-hint">${this.entrypointType==="tun"?t("tunPeerHint"):t("tungoPeerHint")}</div>
                   `:""}
 
-                <!-- A p2p or tun entrypoint has no tunnel id to route by. -->
-                ${this.entrypointType==="p2p"||this.entrypointType==="tun"?"":i`
+                <!-- A p2p or device entrypoint has no tunnel id to route by. -->
+                ${this.entrypointType==="p2p"||this._usesDevice?"":i`
                 <div class="form-group">
                   <label class="form-label">${t("fieldTunnelId")}</label>
                   <input class="form-input"
@@ -264,7 +275,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                     @input=${a=>{this._name=a.target.value}}>
                 </div>
 
-                ${this.entrypointType==="tun"?i`
+                ${this._usesDevice?i`
                     <div class="form-group">
                       <label class="form-label">${t("fieldNet")}</label>
                       <input class="form-input" .value=${this._net} placeholder="10.10.0.2/24"
@@ -273,13 +284,15 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                            lives on the hub's own peers page, which this page has
                            no view of — it knows only the net being typed here and
                            the hub's key — so the hint points there rather than
-                           restating a subnet it cannot know. -->
-                      <div class="p2p-hint">${t("tunNetMatchesHub")}</div>
+                           restating a subnet it cannot know. A tungo split's
+                           address is not assigned by anyone: its peer is a p2p
+                           tunnel, not a tun hub. -->
+                      ${this.entrypointType==="tun"?i`<div class="p2p-hint">${t("tunNetMatchesHub")}</div>`:""}
                     </div>
                     <!-- The hub this device dials. It belongs with the device
                          address above, not at the bottom of the form: the two
                          together are "which side of the tunnel is this node".
-                         Required — a tun entrypoint with no peer has nobody to
+                         Required — a device entrypoint with no peer has nobody to
                          reach, and the host refuses to start it. -->
                     <div class="form-group">
                       <label class="form-label">
@@ -307,9 +320,26 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t("fieldDNS")}</label>
-                      <input class="form-input" .value=${this._dns} placeholder="10.10.0.1"
+                      <!-- A tun spoke asks its hub (10.10.0.1); a split has no
+                           hub DNS, so its example is the home gateway whose
+                           split DNS answers the listed names. -->
+                      <input class="form-input" .value=${this._dns}
+                        placeholder="${this.entrypointType==="tungo"?"192.168.100.100":"10.10.0.1"}"
                         @input=${a=>{this._dns=a.target.value}}>
                     </div>
+                    ${this.entrypointType==="tungo"?i`
+                    <!-- The split: one destination per line, because the list is
+                         read and edited as a list of hosts, not as a sentence.
+                         Listed traffic rides the tunnel to the peer above; the
+                         rest leaves through this device's own network. -->
+                    <div class="form-group">
+                      <label class="form-label">${t("fieldRules")}</label>
+                      <textarea class="form-input" rows="6" .value=${this._rules}
+                        placeholder="example.com&#10;192.168.100.0/24"
+                        @input=${a=>{this._rules=a.target.value}}></textarea>
+                      <div class="p2p-hint">${t("fieldRulesHint")}</div>
+                    </div>`:""}
+                    ${this.entrypointType==="tun"?i`
                     <!-- LAN sharing, last: the subnets of this node's own LAN the
                          hub may let its peers reach, and the backend that runs
                          them. Opt-in and decided by the hub (its peers page shows
@@ -336,7 +366,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                         <div class="switch-knob"></div>
                       </div>
                     </div>
-                    <div class="p2p-hint">${t("fieldDirectHint")}</div>
+                    <div class="p2p-hint">${t("fieldDirectHint")}</div>`:""}
                   `:i`
                 <div class="form-group">
                   <label class="form-label">${t("fieldBindAddress")}</label>
@@ -345,8 +375,8 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
                 </div>`}
 
                 <!-- The peer key and the controls only a p2p entrypoint has. A
-                     tun entrypoint's key sits above, with the device it dials
-                     from. -->
+                     device entrypoint's key sits above, with the device it
+                     dials from. -->
                 ${this.entrypointType==="p2p"?i`
                     <div class="form-group">
                       <label class="form-label">
@@ -746,6 +776,14 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
     .form-input[readonly] {
       background: var(--border-subtle); color: var(--text-muted);
     }
+    /* A list typed one entry per line (the split rules): monospace so the
+       entries line up, and room for a pasted list rather than one line. */
+    textarea.form-input {
+      min-height: 96px;
+      resize: vertical;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      line-height: 1.5;
+    }
 
     .danger-zone {
       margin-top: 20px; padding: 14px;
@@ -823,4 +861,4 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as S,l as D,n a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([w()],n.prototype,"entrypointType",2);o([w()],n.prototype,"entrypointId",2);o([l()],n.prototype,"mode",2);o([l()],n.prototype,"_entrypoint",2);o([l()],n.prototype,"_saving",2);o([l()],n.prototype,"_snackbar",2);o([l()],n.prototype,"_showDeleteDialog",2);o([l()],n.prototype,"_showResetDialog",2);o([l()],n.prototype,"_name",2);o([l()],n.prototype,"_endpoint",2);o([l()],n.prototype,"_tunnelId",2);o([l()],n.prototype,"_peer",2);o([l()],n.prototype,"_showPeer",2);o([l()],n.prototype,"_showTransportDetail",2);o([l()],n.prototype,"_protocol",2);o([l()],n.prototype,"_keepalive",2);o([l()],n.prototype,"_net",2);o([l()],n.prototype,"_mtu",2);o([l()],n.prototype,"_deviceName",2);o([l()],n.prototype,"_routes",2);o([l()],n.prototype,"_dns",2);o([l()],n.prototype,"_shareLAN",2);o([l()],n.prototype,"_shareMode",2);o([l()],n.prototype,"_direct",2);n=o([z("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
+  `;o([w()],n.prototype,"entrypointType",2);o([w()],n.prototype,"entrypointId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_entrypoint",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_tunnelId",2);o([r()],n.prototype,"_peer",2);o([r()],n.prototype,"_showPeer",2);o([r()],n.prototype,"_showTransportDetail",2);o([r()],n.prototype,"_protocol",2);o([r()],n.prototype,"_keepalive",2);o([r()],n.prototype,"_net",2);o([r()],n.prototype,"_mtu",2);o([r()],n.prototype,"_deviceName",2);o([r()],n.prototype,"_routes",2);o([r()],n.prototype,"_dns",2);o([r()],n.prototype,"_rules",2);o([r()],n.prototype,"_shareLAN",2);o([r()],n.prototype,"_shareMode",2);o([r()],n.prototype,"_direct",2);n=o([z("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};

@@ -33,13 +33,14 @@ export function armVpn(net: string, routes: string, mtu: number, dns: string): P
 }
 
 /**
- * The running tun entrypoint other than `exceptId` that holds the app's single
- * VPN device, if any. There is one device, so a second tun entrypoint cannot
- * work — and arming the VPN for it would take the device away from the
- * entrypoint that is using it. Its name goes in the "device busy" message.
+ * The running entrypoint other than `exceptId` that holds the app's single VPN
+ * device, if any. There is one device, so a second device entrypoint — a tun
+ * spoke or a tungo split — cannot work, and arming the VPN for it would take the
+ * device away from the entrypoint that is using it. Its name goes in the
+ * "device busy" message.
  */
 export function tunDeviceHolder(exceptId: string): Entrypoint | undefined {
   return getEntrypoints().find(
-    (ep) => ep.type === 'tun' && ep.status === 'running' && ep.id !== exceptId,
+    (ep) => (ep.type === 'tun' || ep.type === 'tungo') && ep.status === 'running' && ep.id !== exceptId,
   );
 }
