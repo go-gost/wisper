@@ -400,10 +400,19 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 
 	var forward service.Service
 	{
-		var ch chain.Chainer
-		// init above already assembled this, so ChainConfig cannot fail here; the
-		// seam is read rather than rebuilt so a test dials the chain Run parses.
-		chainCfg, _ := s.ChainConfig()
+		var (
+			ch       chain.Chainer
+			chainCfg *xconfig.ChainConfig
+		)
+		// init above already assembled this, and the seam is read rather than
+		// rebuilt so a test dials the chain Run parses. A failure is still not
+		// something to swallow: ParseChain(nil) yields a nil chain, and x's
+		// router then falls back to DefaultRoute — every destination would leave
+		// the phone unmasked while the entrypoint still reported running.
+		chainCfg, err = s.ChainConfig()
+		if err != nil {
+			return
+		}
 		ch, err = chain_parser.ParseChain(chainCfg, log)
 		if err != nil {
 			log.Error(err)
