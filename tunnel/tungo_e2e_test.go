@@ -259,6 +259,44 @@ func TestTungoChainRelaysUDPOverP2P(t *testing.T) {
 	}
 }
 
+// TestTungoChainListedDomainRelaysOverP2P: a rule written as a name, dialled by
+// name through Router.Dial. The router resolves before the hop sees the address
+// (x/chain/router.go: Resolve then Route), so this pins the claim the whole
+// split rests on: with no resolver or hosts mapper configured — the split's
+// constraint, spec §3.8 — the hostname survives xnet.Resolve and still matches a
+// domain rule. A rules list written in names that was resolved to an IP first
+// would match nothing and send every flow direct, silently.
+//
+// The destination is "localhost" rather than a real domain because the rule list
+// has to be a name the test controls; the matcher is exact for domain patterns,
+// which is what makes "localhost" match "localhost:port" here.
+func TestTungoChainListedDomainRelaysOverP2P(t *testing.T) {
+	echo := startEchoServer(t)
+	_, port, err := net.SplitHostPort(echo)
+	if err != nil {
+		t.Fatalf("split echo address %s: %v", echo, err)
+	}
+	// The name the rule carries, dialled as a name: resolving it here would put
+	// the test back on the IP path the other two cases already cover.
+	domain := net.JoinHostPort("localhost", port)
+
+	router, relay := startSplitLink(t, "tungo-e2e-domain", strings.Repeat("b4", 32), "localhost")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	conn, err := router.Dial(ctx, "tcp", domain)
+	if err != nil {
+		t.Fatalf("dial %s through the tungo chain: %v", domain, err)
+	}
+	defer conn.Close()
+	mustEcho(t, conn, []byte("hello-tungo-domain")) // p2p_e2e_test.go
+
+	if got := relay.count(); got != 1 {
+		t.Errorf("relay service accepted %d connections, want exactly the one flow a listed domain sends through the tunnel", got)
+	}
+}
+
 // TestTungoChainUnlistedGoesDirect: the rules admit only example.com, so the
 // hop selects no node, the route is empty, and the dial leaves from this
 // process — the phone's own network in production. The relay must see nothing:
