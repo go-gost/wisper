@@ -736,6 +736,12 @@ cd wisper && git add config api tunnel/entrypoint tunnel/tunnel.go \
 **Implementation record:**
 
 - **日期/状态:** 2026-11-22 — 已完成。
+- **评审修复轮:** `dba2ee7` `test(api): pin the tungo create and update premises`
+  —— create 测试的「内核拒绝设备名」前提改为轮询断言（1s 内必失败，不再可能悄悄建出真实接口）；
+  新增「改 `net` 必须重建」的反方向用例；`s.config` 的读进锁；测试断言改 comma-ok。
+- **行为变化（要告诉 UI）：** 以前每次 `PUT` 都会重建运行中的 entrypoint（等于「保存即重启」），
+  现在只有真正改了非规则字段才重建。想重启一个健康运行的 tungo entrypoint 需要**先停再启**；
+  `POST /start` 对运行中的实例返回 `409 already running`。
 - **仓库 + commit:**
   - `wisper`（`github.com/go-gost/wisper`）：`beebd17`
     `feat(api): expose the tungo entrypoint type and its domain rules`（代码 + 测试）；本条记录为随后的
@@ -857,6 +863,8 @@ cd wisper && git add config api tunnel/entrypoint tunnel/tunnel.go \
 
 **Interfaces:**
 - Consumes: Task 6a 的 `rules` 与 `tungo` 类型
+- 注意：保存**不再**自动重启运行中的 entrypoint（只有非规则字段变更才重建）；UI 不要给用户「保存即生效并重启」
+  的暗示，重启入口是停+启。
 - Produces: 详情页/首页能创建与编辑 tungo entrypoint，`rules` 以换行文本往返
 
 - [ ] **Step 1: 写失败的 ui-test**
