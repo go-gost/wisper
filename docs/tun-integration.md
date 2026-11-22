@@ -257,9 +257,10 @@ app → VpnService(tun fd) → x/listener/tungo → x/handler/tungo（gVisor 栈
 ### 隧道不可用时
 
 没有任何静默直连的退路：清单内的流拨不通就是失败（白名单域名打不开），DNS 也在清单里，所以
-**隧道断了等于手机上不能解析**。这是事实上的 fail-closed。把它做成显式选项（fail-closed /
-fail-open）还没做，属于设计 §8.1 的待定项 —— 在那之前，「隧道断了就断网」是预期的表现，不是
-故障。
+**隧道一断连解析都拿不到**（唯一那个 hop 节点永远会被选中——最坏也是 `Select` 的 last-resort 分支——
+所以不会落回直连）。这是事实上的 fail-closed。把它做成显式选项（fail-closed / fail-open）还没做，
+属于设计 §8.1 的待定项 —— 在那之前，「隧道断了就断网」是预期的表现，不是故障。真机上 Android 会不会
+在 VPN 的 DNS 失败后回退到别的解析器，本期没有结论。
 
 ### 部署（2026-11-22 已在 pi / hub 上落地）
 
