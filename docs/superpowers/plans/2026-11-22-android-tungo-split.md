@@ -1175,8 +1175,9 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
 - **日期/状态:** 2026-11-22 — 已完成（只做加法；现有 `p2p-tun` 与手机的实时隧道未动）。
 - **仓库 + commit:**
   - `wisper`（`github.com/go-gost/wisper`）：`1fbdcdc` `docs: document the tungo split entrypoint and its deployment`
-    （`docs/tun-integration.md` 新增「手机上按域名分流（tungo entrypoint）」一节）+ 本条 record 的
-    `docs(plan)` 提交。
+    （`docs/tun-integration.md` 新增「手机上按域名分流（tungo entrypoint）」一节）；`deb08c4`
+    `docs: soften the unverified DNS-fallback claim in the tungo section`（自审后的措辞修正）+ 本条
+    record 的 `docs(plan)` 提交。
   - 运维（不在仓库）：pi 的 `/etc/gost/gost.yaml`（新增 `relay-phone`）、hub 的 tunnel 列表（新增 `gw-split`）。
 - **实际改动文件:**
   - pi `/etc/gost/gost.yaml`：在 `services` 列表末尾**追加**（diff 只有 10 行 +）：
@@ -1224,6 +1225,10 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
   - 现有隧道未被触碰：`p2p-tun`（`fbccb7c3-…`）的 peers 仍是
     `[pixel-9, dadax-PC, dadax]` 三个 key、顺序不变；`peer_stats` 里 pixel-9 仍 `up / direct`，
     `session_age_ms` 持续增长（26512s → 26872s），`current_conns=3`。cockpit 也未变。
+  - 收尾复核（写完文档后重跑）：`systemctl is-active gost` → `active`（MainPID 未变，全程没重启）；
+    `ss -ltn | grep 18080` 仍只一条 `127.0.0.1`；备份文件的 md5 与改动前一致
+    （`e27241db44cbc4afbfa3c6d14993a9be`）；`/api/tunnels` 三条 tunnel 全 `running`，pixel-9 仍
+    `up / direct`；临时进程与 `/tmp/gost.yaml.new` 已清理。
 - **与任务书的偏差（重要）:** 任务书 Step 3 要 `peers: ["<pixel-9 key>"]`，但 hub 的 p2p host 硬性要求
   **一个 key 只属于一个 tunnel**（`tunnel/p2p_host.go:848`），pixel-9 已在 `p2p-tun` 里，于是
   `POST` 返回 500 `peer zRiIjY4a… is already used by another p2p tunnel` 并整体回滚。安全规则①又禁止
