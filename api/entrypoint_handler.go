@@ -148,6 +148,12 @@ func validateTunDNS(dns string) error {
 // validateEntryPointRequest rejects a request the runtime cannot honor, before
 // any object is constructed.
 func validateEntryPointRequest(epType string, req *entrypointCreateRequest) error {
+	// The rule list belongs to the split: a tun or p2p entrypoint has no split to
+	// apply it to, so a request that carries one is a client bug worth naming
+	// rather than a field that is silently dropped.
+	if epType != entrypoint.TungoEntryPoint && len(derefStrings(req.Rules)) > 0 {
+		return fmt.Errorf("rules applies to tungo entrypoints")
+	}
 	switch epType {
 	case entrypoint.TunEntryPoint:
 		return validateTunEntryPoint(req)
@@ -157,19 +163,30 @@ func validateEntryPointRequest(epType string, req *entrypointCreateRequest) erro
 	return nil
 }
 
-// validateTungoEntryPoint checks what a split spoke cannot do without: a device
-// address, the hub's public key (a bad key would leave the chain node dialing
-// nothing, with no error on the way out) and the device fields it shares with a
-// tun spoke, which the listener skips silently when they do not parse. The rule
-// list may be empty: that is a working split that sends everything direct.
-func validateTungoEntryPoint(r *entrypointCreateRequest) error {
+// validateDeviceFields checks what every device entrypoint shares: the device
+// address, the route list and the resolver list. The listener skips an entry it
+// cannot parse without a word, so a typo here is a device that silently misses a
+// subnet or answers no queries.
+func validateDeviceFields(r *entrypointCreateRequest) error {
 	if err := validateTunNet(r.Net); err != nil {
 		return err
 	}
 	if err := validateTunRoutes(r.Routes); err != nil {
 		return err
 	}
-	if err := validateTunDNS(r.DNS); err != nil {
+	return validateTunDNS(r.DNS)
+}
+
+// validateTungoEntryPoint checks what a split spoke cannot do without: the
+// device fields, a device that captures its traffic, and the hub's public key (a
+// bad key would leave the chain node dialing nothing, with no error on the way
+// out). The rule list may be empty: that is a working split that sends
+// everything direct.
+func validateTungoEntryPoint(r *entrypointCreateRequest) error {
+	if err := validateDeviceFields(r); err != nil {
+		return err
+	}
+	if err := validateTungoSplit(r); err != nil {
 		return err
 	}
 	if !tunnel.ValidPeerKey(r.Peer) {
@@ -178,12 +195,73 @@ func validateTungoEntryPoint(r *entrypointCreateRequest) error {
 	return nil
 }
 
+// The two catch-alls a split's device needs. A device that captures only IPv4
+// sends every IPv6 flow around the tunnel — the one leak this tool cannot have —
+// so the v4 catch-all never travels without the v6 one.
+const (
+	catchAllV4 = "0.0.0.0/0"
+	catchAllV6 = "::/0"
+)
+
+// tungoDefaultDNS is the resolver a split hands its device when the form leaves
+// dns empty: the address the hub's dns service answers on (the device routes
+// 192.168.100.0/24 into the tunnel, see the design's §5.1). No resolver means
+// every app's queries go around the tunnel on the phone's own network.
+const tungoDefaultDNS = "192.168.100.100"
+
+// validateTungoSplit refuses the device that cannot work and normalises the one
+// that would leak, in place and before the entrypoint is built, so the value
+// that is stored is the safe one:
+//
+//   - no routes at all captures nothing: every flow leaves on the phone's own
+//     network while the entrypoint still looks healthy, so it is refused;
+//   - a v4 catch-all without a v6 one leaks IPv6 around the split, so the v6
+//     catch-all is appended (a named-subnet split, with neither catch-all, is
+//     left exactly as written);
+//   - an empty dns list leaves the device with no resolver.
+func validateTungoSplit(r *entrypointCreateRequest) error {
+	if strings.TrimSpace(r.Routes) == "" {
+		return fmt.Errorf("routes is required: a split entrypoint with no routes captures nothing, e.g. %q", catchAllV4+", "+catchAllV6)
+	}
+	r.Routes = withV6CatchAll(r.Routes)
+	if strings.TrimSpace(r.DNS) == "" {
+		r.DNS = tungoDefaultDNS
+	}
+	return nil
+}
+
+// withV6CatchAll appends ::/0 when the route list carries the IPv4 catch-all and
+// no IPv6 one. Anything else — a named subnet, both catch-alls, a v6-only list —
+// is returned unchanged: those are the operator's own choices, not a leak.
+func withV6CatchAll(routes string) string {
+	var hasV4, hasV6 bool
+	for _, s := range strings.Split(routes, ",") {
+		fields := strings.Fields(strings.TrimSpace(s))
+		if len(fields) == 0 {
+			continue
+		}
+		switch fields[0] {
+		case catchAllV4:
+			hasV4 = true
+		case catchAllV6:
+			hasV6 = true
+		}
+	}
+	if !hasV4 || hasV6 {
+		return routes
+	}
+	return routes + ", " + catchAllV6
+}
+
 // validateTunEntryPoint checks what a tun spoke cannot do without: a device
 // address and the hub's public key, plus the one device field of its own —
 // share_lan, the LAN it hands its hub.
 func validateTunEntryPoint(r *entrypointCreateRequest) error {
-	if err := validateTungoEntryPoint(r); err != nil {
+	if err := validateDeviceFields(r); err != nil {
 		return err
+	}
+	if !tunnel.ValidPeerKey(r.Peer) {
+		return fmt.Errorf("peer must be the hub's base64 public key")
 	}
 	// A malformed share_lan is refused here rather than at Run, as for a tun
 	// hub (see validateTunTunnel): the create would otherwise answer 201 and

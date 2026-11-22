@@ -1225,7 +1225,14 @@ export class EntrypointDetailPage extends LitElement {
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t('fieldRoutes')}</label>
-                      <input class="form-input" .value=${this._routes} placeholder="0.0.0.0/0"
+                      <!-- The split's safe value is both catch-alls: a v4-only
+                           list leaves every IPv6 flow on the phone's own
+                           network, which is the leak this device exists to
+                           prevent. The API appends ::/0 to a v4 catch-all and
+                           refuses an empty list, so the example is what the
+                           stored value ends up as. -->
+                      <input class="form-input" .value=${this._routes}
+                        placeholder="${this.entrypointType === 'tungo' ? '0.0.0.0/0, ::/0' : '0.0.0.0/0'}"
                         @input=${(e: Event) => { this._routes = (e.target as HTMLInputElement).value; }}>
                       <!-- A split has no hub subnet to fall back to: what it
                            carries is decided by the rules below, not by the

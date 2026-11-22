@@ -1059,6 +1059,7 @@ func TestEntrypointCreateTungoWithRules(t *testing.T) {
 	resp, created := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
 		"type": "tungo", "name": "phone", "net": "10.20.0.250/32",
 		"peer": peer, "rules": want, "device_name": refusedDeviceName,
+		"routes": "0.0.0.0/0",
 	})
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("create tungo entrypoint = %d: %v, want 201", resp.StatusCode, created)
@@ -1117,12 +1118,12 @@ func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) {
 		},
 		{
 			name:  "no peer",
-			body:  map[string]any{"type": "tungo", "name": "phone", "net": "10.20.0.250/32"},
+			body:  map[string]any{"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "routes": "0.0.0.0/0"},
 			wants: "peer",
 		},
 		{
 			name:  "peer is not a key",
-			body:  map[string]any{"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": "hub.example.com:443"},
+			body:  map[string]any{"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": "hub.example.com:443", "routes": "0.0.0.0/0"},
 			wants: "peer",
 		},
 	} {
@@ -1150,7 +1151,7 @@ func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) {
 	useGostLogger(t)
 	resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
 		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
-		"device_name": refusedDeviceName,
+		"routes": "0.0.0.0/0", "device_name": refusedDeviceName,
 	})
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("create without rules = %d: %v, want 201", resp.StatusCode, body)
@@ -1162,6 +1163,152 @@ func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) {
 	if rules := entrypointRules(t, body); len(rules) != 0 {
 		t.Errorf("rules = %v, want an empty list", rules)
 	}
+}
+
+// entrypointOptions reads the options object out of an entrypoint response.
+func entrypointOptions(t *testing.T, body map[string]any) map[string]any {
+	t.Helper()
+	opts, ok := body["options"].(map[string]any)
+	if !ok {
+		t.Fatalf("response has no options object: %v", body)
+	}
+	return opts
+}
+
+// TestEntrypointCreateTungoSafeDevice: the split's device has to capture both
+// address families and hand out a resolver without the operator having to
+// remember it. The spec (§5.1, §6.5) is explicit about both — a device that
+// captures only IPv4 sends every IPv6 flow around the split, and one that hands
+// out no resolver sends every app's DNS the same way — so the API normalises
+// what it stores instead of leaving either to the form.
+func TestEntrypointCreateTungoSafeDevice(t *testing.T) {
+	const peer = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+
+	t.Run("no routes is refused", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+		})
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("create with no routes = %d: %v, want 400", resp.StatusCode, body)
+		}
+		if msg, _ := body["error"].(string); !strings.Contains(msg, "routes") {
+			t.Errorf("error = %q, want it to name routes", msg)
+		}
+		if n := entrypoint.Count(); n != 0 {
+			t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
+		}
+	})
+
+	t.Run("v4 catch-all gains the v6 one", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+		useGostLogger(t)
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+			"routes": "0.0.0.0/0", "device_name": refusedDeviceName,
+		})
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("create with the v4 catch-all = %d: %v, want 201", resp.StatusCode, body)
+		}
+		id, _ := body["id"].(string)
+		defer entrypoint.Delete(id)
+		requireStartRefused(t, id)
+
+		opts := entrypointOptions(t, body)
+		if got, _ := opts["routes"].(string); got != "0.0.0.0/0, ::/0" {
+			t.Errorf("routes = %q, want the v6 catch-all appended: %q alone lets every IPv6 flow around the split", got, "0.0.0.0/0")
+		}
+		if got, _ := opts["dns"].(string); got != "192.168.100.100" {
+			t.Errorf("dns = %q, want the tunnel's resolver when the form leaves it empty", got)
+		}
+
+		// The normalised value is the stored one: a restart reads the config file,
+		// not this response, and a device rebuilt from the raw form value would
+		// leak again.
+		for _, ep := range config.Get().EntryPoints {
+			if ep.ID != id {
+				continue
+			}
+			if ep.Routes != "0.0.0.0/0, ::/0" {
+				t.Errorf("saved routes = %q, want the normalised list", ep.Routes)
+			}
+			if ep.DNS != "192.168.100.100" {
+				t.Errorf("saved dns = %q, want the resolver the create defaulted to", ep.DNS)
+			}
+		}
+	})
+
+	t.Run("named subnets are left alone", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+		useGostLogger(t)
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+			"routes": "192.168.100.0/24", "dns": "192.168.100.100",
+			"device_name": refusedDeviceName,
+		})
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("create with a named subnet = %d: %v, want 201", resp.StatusCode, body)
+		}
+		if id, _ := body["id"].(string); id != "" {
+			defer entrypoint.Delete(id)
+			requireStartRefused(t, id)
+		}
+		if got, _ := entrypointOptions(t, body)["routes"].(string); got != "192.168.100.0/24" {
+			t.Errorf("routes = %q, want the operator's own list unchanged", got)
+		}
+	})
+
+	t.Run("rules belong to the split", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tun", "name": "spoke", "net": "10.20.0.2/24", "peer": peer,
+			"rules": []string{"example.com"},
+		})
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("create tun entrypoint with rules = %d: %v, want 400", resp.StatusCode, body)
+		}
+		if msg, _ := body["error"].(string); !strings.Contains(msg, "rules applies to tungo entrypoints") {
+			t.Errorf("error = %q, want it to say rules belong to a tungo entrypoint", msg)
+		}
+		if n := entrypoint.Count(); n != 0 {
+			t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
+		}
+	})
+
+	t.Run("a tun spoke keeps its empty route list", func(t *testing.T) {
+		srv := setupTestServer(t)
+		defer srv.Close()
+		useGostLogger(t)
+
+		// The tun spoke's empty routes mean "the local net subnet" and its empty
+		// dns means "none", so neither the refusal nor the normalisation above may
+		// reach it.
+		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
+			"type": "tun", "name": "spoke", "net": "10.20.0.2/24", "peer": peer,
+			"device_name": refusedDeviceName,
+		})
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("create tun entrypoint without routes = %d: %v, want 201", resp.StatusCode, body)
+		}
+		id, _ := body["id"].(string)
+		defer entrypoint.Delete(id)
+		requireStartRefused(t, id)
+		opts := entrypointOptions(t, body)
+		if got, _ := opts["routes"].(string); got != "" {
+			t.Errorf("tun routes = %q, want the empty list the tun spoke has always accepted", got)
+		}
+		if got, _ := opts["dns"].(string); got != "" {
+			t.Errorf("tun dns = %q, want it left unset: the split's default resolver is not a tun spoke's", got)
+		}
+	})
 }
 
 // TestEntrypointUpdateKeepsRulesWithoutRestart: the rule list is a live object
@@ -1183,6 +1330,12 @@ func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) {
 		tunnel.NetOption("10.20.0.250/32"),
 		tunnel.PeerOption(peer),
 		tunnel.RulesOption("example.com", "192.168.100.0/24"),
+		// The device fields are the ones the API stores for the requests below:
+		// the v6 catch-all the route list gains, and the resolver an empty dns
+		// defaults to. A fixture that kept the raw form values would turn every
+		// rule edit into a rebuild, which is the failure this test is about.
+		tunnel.RoutesOption("0.0.0.0/0, ::/0"),
+		tunnel.DNSOption("192.168.100.100"),
 	)
 	// The hop resolves its rule bypass from the registry by name, so the rules
 	// have to be registered for the edit to be observable at all: this is what
@@ -1212,7 +1365,7 @@ func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) {
 	// A rule-only edit: everything else is what the entrypoint already is.
 	resp, body := putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
 		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
-		"rules": []string{"example.com"},
+		"routes": "0.0.0.0/0", "rules": []string{"example.com"},
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("update rules = %d: %v, want 200", resp.StatusCode, body)
@@ -1239,6 +1392,7 @@ func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) {
 	// Absent rules say nothing about them: the saved list carries over.
 	resp, body = putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
 		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+		"routes": "0.0.0.0/0",
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("update without rules = %d: %v, want 200", resp.StatusCode, body)
@@ -1253,7 +1407,7 @@ func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) {
 	// Explicitly empty is a clear: everything direct, and still no rebuild.
 	resp, body = putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
 		"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
-		"rules": []string{},
+		"routes": "0.0.0.0/0", "rules": []string{},
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("clear rules = %d: %v, want 200", resp.StatusCode, body)
@@ -1303,7 +1457,7 @@ func TestEntrypointUpdateChangedNetRebuilds(t *testing.T) {
 
 	resp, body := putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
 		"type": "tungo", "name": "phone", "net": newNet, "peer": peer,
-		"rules": []string{"example.com"}, "device_name": refusedDeviceName,
+		"routes": "0.0.0.0/0", "rules": []string{"example.com"}, "device_name": refusedDeviceName,
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("update net = %d: %v, want 200", resp.StatusCode, body)

@@ -16,7 +16,7 @@ test('the tungo entrypoint form shows the device fields, the peer and its rules'
   // spoke fills in.
   await expect(page.locator('input[placeholder="10.10.0.2/24"]')).toBeVisible();
   await expect(page.locator('input[placeholder="1300"]')).toBeVisible();
-  await expect(page.locator('input[placeholder="0.0.0.0/0"]')).toBeVisible();
+  await expect(page.locator('input[placeholder="0.0.0.0/0, ::/0"]')).toBeVisible();
   await expect(page.locator('input[placeholder="192.168.100.100"]')).toBeVisible();
 
   // The routes hint is the split's own: no hub subnet to fall back to, and the

@@ -109,7 +109,7 @@ const en: Record<string, string> = {
     'A refused claim is approved by adding its prefix to that peer\'s LAN row on the peers page. The peer re-asserts every ~20 seconds, so the approval takes effect without a restart.',
   fieldRoutes: 'Routes',
   fieldRoutesHint: 'Subnets to send through the device, comma-separated: 192.168.50.0/24, or 0.0.0.0/0 for everything. Empty defaults to the local net subnet (hub and other peers included).',
-  fieldTungoRoutesHint: 'Subnets to route into the device, comma-separated: 192.168.100.0/24, or 0.0.0.0/0 for everything. What the device carries is then decided by the split rules below: listed destinations ride the tunnel, the rest leave directly.',
+  fieldTungoRoutesHint: 'Subnets to route into the device, comma-separated. The safe value is both catch-alls, 0.0.0.0/0, ::/0: a v4-only route lets every IPv6 flow leave on the phone\'s own network, around the split. Required — a split with no routes captures nothing. What the device then carries is decided by the split rules below: listed destinations ride the tunnel, the rest leave directly.',
   fieldDNS: 'DNS',
   switchRewriteHost: 'Rewrite Host',
   switchEnableTLS: 'Enable TLS',
@@ -247,7 +247,7 @@ const en: Record<string, string> = {
     'This device splits its own traffic: a destination on the rules list exits through the p2p tunnel to the hub key, and everything else is dialled directly on this device\'s own network.',
   fieldRules: 'Split rules',
   fieldRulesHint:
-    'One destination per line: a domain, an IP or a CIDR (e.g. 192.168.100.0/24). Listed destinations go through the hub; everything else is dialled directly. An empty list is a working split — all traffic goes direct.',
+    'One destination per line: a domain, an IP or a CIDR (e.g. 192.168.100.0/24). A domain is matched exactly, so a subdomain needs the leading-dot form: .home.pi matches home.pi and every name under it, while home.pi matches only that name. Listed destinations go through the hub; everything else is dialled directly. An empty list is a working split — all traffic goes direct.',
   hubNoReflowTitle: 'No return traffic from the hub',
   hubNoReflowHint:
     'Uplink only, no downlink for about a minute. Check: is the hub running, is this address on the hub allowlist, does the token match; tap to see the event history.',
