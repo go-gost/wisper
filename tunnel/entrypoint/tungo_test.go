@@ -10,6 +10,7 @@ import (
 	"github.com/go-gost/core/bypass"
 	"github.com/go-gost/core/listener"
 	"github.com/go-gost/core/metadata"
+	"github.com/go-gost/core/observer/stats"
 	cfg "github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
 	tp "github.com/go-gost/wisper/tunnel"
@@ -68,18 +69,18 @@ func useDeviceListener(t *testing.T, build func(...listener.Option) listener.Lis
 }
 
 // loopbackDeviceListener stands in for the device with the cheapest thing that
-// serves: a loopback socket. It also pins what the device listener must not be
-// given — a tun device is a single conn that lives as long as the entrypoint, and
-// x wraps every accepted conn, so counters here would report the device as a
-// connection and its bytes twice, on top of the service's own.
+// serves: a loopback socket. It also pins what the device listener must be
+// given — the run's counters. This side has exactly one writer of them: x
+// counts handler errors on the service and nothing else, so the listener is
+// where a device's connections and bytes are counted, as tun.go and p2p.go do.
 func loopbackDeviceListener(t *testing.T) func(...listener.Option) listener.Listener {
 	return func(opts ...listener.Option) listener.Listener {
 		var o listener.Options
 		for _, opt := range opts {
 			opt(&o)
 		}
-		if o.Stats != nil {
-			t.Error("the device listener carries stats: the device would be counted as a connection and its bytes twice")
+		if o.Stats == nil {
+			t.Error("the device listener carries no stats: it is this side's only writer of the conn and byte counters")
 		}
 		if o.Addr != ":0" {
 			t.Errorf("device listener addr = %q, want :0 (a tungo listener binds no socket)", o.Addr)
@@ -634,7 +635,19 @@ func TestTungoEntryPointRunFailureReleasesDevice(t *testing.T) {
 func TestTungoEntryPointCloseReleasesProvider(t *testing.T) {
 	tungoRunConfig(t)
 	useSharedDevice(t)
-	useDeviceListener(t, loopbackDeviceListener(t))
+	// The device listener counts into the object the service reports — the same
+	// one, not a second set of counters nobody reads.
+	deviceListener := loopbackDeviceListener(t)
+	var listenerStats stats.Stats
+	useDeviceListener(t, func(opts ...listener.Option) listener.Listener {
+		ln := deviceListener(opts...)
+		var o listener.Options
+		for _, opt := range opts {
+			opt(&o)
+		}
+		listenerStats = o.Stats
+		return ln
+	})
 
 	const id = "tungo-close"
 	const provider = "tungo-ep-" + id
@@ -662,10 +675,15 @@ func TestTungoEntryPointCloseReleasesProvider(t *testing.T) {
 	if !tp.P2PHostRunning() {
 		t.Fatal("the shared host is not running after Run")
 	}
-	// The counters live on the service, so a running entrypoint has a status —
-	// which is where the stats task reads them from.
-	if st := s.Status(); st == nil || st.Stats() == nil {
+	// The counters live on the device listener, so a running entrypoint has a
+	// status — which is where the stats task reads them — and it reports the
+	// counters the listener is writing.
+	st := s.Status()
+	if st == nil || st.Stats() == nil {
 		t.Fatalf("Status() = %v, want the running service's status with its counters", st)
+	}
+	if st.Stats() != listenerStats {
+		t.Error("the device listener counts into a different object than the service reports")
 	}
 
 	if err := ep.Close(); err != nil {
@@ -688,6 +706,46 @@ func TestTungoEntryPointCloseReleasesProvider(t *testing.T) {
 	}
 	if st := s.Status(); st != nil {
 		t.Errorf("Status() = %v after Close, want nil", st)
+	}
+}
+
+// TestTungoEntryPointCloseDuringInitLeavesNoRules: init() registers the rules
+// entry before it hands the object to the entrypoint, so a Close landing in that
+// window snapshots no rules — and closeOnce means it never looks again. The init
+// has to give its own registration back, or the rules outlive the entrypoint
+// under a name its replacement reuses. A closed entrypoint entering init leaves
+// exactly that state, so the window is testable without racing goroutines.
+func TestTungoEntryPointCloseDuringInitLeavesNoRules(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	const id = "tungo-close-init"
+	const rulesName = "tungo-rules-" + id
+	tungoCleanup(t, id)
+
+	ep := NewTungoEntryPoint(
+		tp.IDOption(id),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.100.250/32"),
+		tp.RulesOption("example.com"),
+	)
+	s := ep.(*tungoEntryPoint)
+
+	// Close's one pass is already behind it: whatever init writes from here on
+	// is nobody's to clean up but init's own.
+	if err := ep.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	err := s.init()
+	if !errors.Is(err, ErrEntryPointClosed) {
+		t.Fatalf("init after Close = %v, want %v", err, ErrEntryPointClosed)
+	}
+	if registry.BypassRegistry().IsRegistered(rulesName) {
+		t.Errorf("%s outlived the entrypoint: a Close during init left the entry registered", rulesName)
+	}
+	if s.rules != nil {
+		t.Errorf("init kept a rules object (%v) after giving its registration back", s.rules)
 	}
 }
 

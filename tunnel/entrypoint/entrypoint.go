@@ -270,12 +270,12 @@ func Restart(id string) EntryPoint {
 func RestartRunning() { restartRunning(nil) }
 
 // RestartP2PRunning recreates the running entrypoints that consume the shared
-// p2p host — p2p and tun entrypoints — so they come back on a new identity after
-// tunnel.ResetP2PIdentity. Other entrypoint types are left untouched.
+// p2p host — p2p, tun and tungo entrypoints — so they come back on a new identity
+// after tunnel.ResetP2PIdentity. Other entrypoint types are left untouched.
 func RestartP2PRunning() {
 	restartRunning(func(ep EntryPoint) bool {
 		switch ep.Type() {
-		case P2PEntryPoint, TunEntryPoint:
+		case P2PEntryPoint, TunEntryPoint, TungoEntryPoint:
 			return true
 		}
 		return false

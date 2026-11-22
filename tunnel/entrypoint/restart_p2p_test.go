@@ -5,6 +5,7 @@ import (
 
 	cfg "github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/tunnel"
+	"github.com/go-gost/x/registry"
 	"github.com/go-gost/x/service"
 )
 
@@ -79,5 +80,71 @@ func TestRestartP2PRunningSkipsOtherEntrypoints(t *testing.T) {
 	next := Get("p2p-restart")
 	if next == nil || next == EntryPoint(ep) || next.IsClosed() {
 		t.Fatalf("p2p entrypoint was not restarted: %v", next)
+	}
+}
+
+// TestRestartP2PRunningRestartsTungo: a tungo entrypoint rides the same shared
+// host as p2p and tun (its chain node dials through the host's p2p provider), so
+// an identity reset has to restart it too. The provider holds the host that was
+// just stopped: its flows would fail while the entrypoint still reported
+// running, and only a restart moves it onto the new host.
+func TestRestartP2PRunningRestartsTungo(t *testing.T) {
+	tungoRunConfig(t)
+	// The real device step builds a tun interface, which a test must not do to
+	// the host it runs on; the lifecycle under test is everything around it.
+	useDeviceListener(t, loopbackDeviceListener(t))
+	for i := Count() - 1; i >= 0; i-- {
+		Delete(GetIndex(i).ID())
+	}
+	t.Cleanup(func() {
+		for i := Count() - 1; i >= 0; i-- {
+			Delete(GetIndex(i).ID())
+		}
+	})
+
+	const id = "tungo-restart"
+	const provider = "tungo-ep-" + id
+	tungoCleanup(t, id)
+
+	other := &nonP2PEntryPoint{id: "tcp-keep-tungo", typ: TCPEntryPoint}
+	Add(other)
+	ep := NewTungoEntryPoint(
+		tunnel.IDOption(id),
+		tunnel.NameOption("phone"),
+		tunnel.PeerOption(testPeerKey),
+		tunnel.NetOption("10.10.100.250/32"),
+		tunnel.RoutesOption("0.0.0.0/0"),
+		tunnel.RulesOption("example.com"),
+	)
+	Add(ep)
+	if err := ep.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	RestartP2PRunning()
+
+	if other.closeHit {
+		t.Fatal("RestartP2PRunning closed a non-p2p entrypoint")
+	}
+	if got := Get(other.ID()); got != EntryPoint(other) {
+		t.Fatal("non-p2p entrypoint was replaced")
+	}
+	if !ep.IsClosed() {
+		t.Fatal("old tungo entrypoint still open after restart")
+	}
+	next := Get(id)
+	if next == nil || next == ep {
+		t.Fatalf("tungo entrypoint was not replaced: %v", next)
+	}
+	if next.Type() != TungoEntryPoint {
+		t.Fatalf("restarted entrypoint type = %q, want %q", next.Type(), TungoEntryPoint)
+	}
+	if next.IsClosed() {
+		t.Fatalf("the tungo restart failed: %v", next.Err())
+	}
+	// The point of the restart: the replacement is on the host, with its
+	// provider registered, not stranded on the one that was stopped.
+	if !registry.P2PRegistry().IsRegistered(provider) {
+		t.Error("the restarted tungo entrypoint registered no p2p provider")
 	}
 }

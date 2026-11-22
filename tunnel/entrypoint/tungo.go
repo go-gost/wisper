@@ -181,6 +181,20 @@ func (s *tungoEntryPoint) init() error {
 	s.rules = ruleBypass
 	s.mu.Unlock()
 
+	// A Close can land between the Register above and the assignment: it
+	// snapshotted no rules, and closeOnce means it never looks again, so this
+	// init is the only one left to take the entry back. The identity test is the
+	// one Close uses — a successor that reuses the name keeps its own rules.
+	if s.IsClosed() {
+		if registry.BypassRegistry().GetAll()[s.rulesName] == ruleBypass {
+			registry.BypassRegistry().Unregister(s.rulesName)
+		}
+		s.mu.Lock()
+		s.rules = nil
+		s.mu.Unlock()
+		return ErrEntryPointClosed
+	}
+
 	svc := &xconfig.ServiceConfig{
 		Name: s.opts.Name,
 		// The tungo listener binds no socket: the address only labels the service.
@@ -338,10 +352,11 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 			return
 		}
 
-		// The counters belong to the service. The device listener must not have
-		// them: x wraps every accepted conn, and a tun device is a single conn that
-		// lives as long as the entrypoint, so counting it there would report one
-		// connection — and all of its bytes — twice.
+		// The device listener counts, like every other spoke's listener: x adds
+		// handler errors to the service's counters and nothing else, so the
+		// listener is the only writer of the connections and bytes and there is no
+		// double count. (A device is one conn for the entrypoint's lifetime; that
+		// reading belongs to the hub's device handler, not to these totals.)
 		pStats := xstats.NewStats(false)
 		{
 			// The totals a restarted entrypoint already displayed carry over: the
@@ -358,6 +373,7 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 		ln := newDeviceListener(
 			listener.AddrOption(svcCfg.Addr),
 			listener.LoggerOption(lnLogger),
+			listener.StatsOption(pStats),
 		)
 		// Init builds the device (and waits for the VpnService's fd on Android), so
 		// a failure here fails the whole Run. The listener must be closed on the way
@@ -525,7 +541,10 @@ func (s *tungoEntryPoint) Close() error {
 		// Only the first Close may touch the shared registry: a replacement
 		// reuses the name (the ID survives an update), and Unregister closes the
 		// value it finds, so a repeat call would take the successor's p2p host
-		// down with the name.
+		// down with the name. Unregistering by name — not by identity, as the
+		// rules below are — is safe because every swap path (Restart,
+		// restartRunning, handleStartEntrypoint) closes the old instance before a
+		// same-ID successor is constructed, so the name cannot hold one here.
 		registry.P2PRegistry().Unregister(s.provider)
 		if acquired {
 			tunnel.ReleaseP2PHost()
