@@ -4,11 +4,17 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"testing"
 
+	"github.com/go-gost/core/bypass"
+	"github.com/go-gost/core/listener"
+	"github.com/go-gost/core/metadata"
 	cfg "github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	tp "github.com/go-gost/wisper/tunnel"
 	chain_parser "github.com/go-gost/x/config/parsing/chain"
+	xlistener "github.com/go-gost/x/listener/tcp"
 	"github.com/go-gost/x/registry"
 )
 
@@ -22,6 +28,80 @@ func tungoCleanup(t *testing.T, id string) {
 		registry.P2PRegistry().Unregister("tungo-ep-" + id)
 	})
 }
+
+// tungoRunConfig gives a starting entrypoint a config directory and the p2p
+// setting the shared host needs to start: an unreachable derp URL, because a
+// failed relay is not a failed start. The URL is deliberately not the p2p tests'
+// one — the shared host outlives its last reference by a grace period, and a test
+// that starts a host with the same settings would be handed this one, with this
+// test's identity file and config directory. The previous config is put back
+// afterwards for the same reason.
+func tungoRunConfig(t *testing.T) {
+	t.Helper()
+	prev := cfg.Get()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{
+		P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp-tungo"},
+	}})
+	t.Cleanup(func() { cfg.Set(prev) })
+}
+
+// useSharedDevice turns on the app-device behavior for the duration of a test:
+// the single VpnService device, claimed by the entrypoint running on it and
+// reaching the listener as an fd. On a desktop the device is this process's own,
+// so neither applies.
+func useSharedDevice(t *testing.T) {
+	t.Helper()
+	orig := sharedDevice
+	sharedDevice = true
+	t.Cleanup(func() { sharedDevice = orig })
+}
+
+// useDeviceListener swaps the service's device listener for the duration of a
+// test: a real one builds a tun interface, which a test machine either cannot do
+// or should not do to the host it runs on.
+func useDeviceListener(t *testing.T, build func(...listener.Option) listener.Listener) {
+	t.Helper()
+	orig := newDeviceListener
+	newDeviceListener = build
+	t.Cleanup(func() { newDeviceListener = orig })
+}
+
+// loopbackDeviceListener stands in for the device with the cheapest thing that
+// serves: a loopback socket. It also pins what the device listener must not be
+// given — a tun device is a single conn that lives as long as the entrypoint, and
+// x wraps every accepted conn, so counters here would report the device as a
+// connection and its bytes twice, on top of the service's own.
+func loopbackDeviceListener(t *testing.T) func(...listener.Option) listener.Listener {
+	return func(opts ...listener.Option) listener.Listener {
+		var o listener.Options
+		for _, opt := range opts {
+			opt(&o)
+		}
+		if o.Stats != nil {
+			t.Error("the device listener carries stats: the device would be counted as a connection and its bytes twice")
+		}
+		if o.Addr != ":0" {
+			t.Errorf("device listener addr = %q, want :0 (a tungo listener binds no socket)", o.Addr)
+		}
+		return xlistener.NewListener(
+			listener.AddrOption("127.0.0.1:0"),
+			listener.LoggerOption(o.Logger),
+		)
+	}
+}
+
+// failingDeviceListener is the device step that cannot complete: Init reports
+// what a real one would (an fd that never arrived, a missing privilege) before
+// anything is served.
+type failingDeviceListener struct {
+	err error
+}
+
+func (l *failingDeviceListener) Init(metadata.Metadata) error { return l.err }
+func (l *failingDeviceListener) Accept() (net.Conn, error)    { return nil, l.err }
+func (l *failingDeviceListener) Addr() net.Addr               { return &net.TCPAddr{} }
+func (l *failingDeviceListener) Close() error                 { return nil }
 
 // TestTungoEntryPointServiceConfig pins the assembled config: a tungo listener
 // over a tungo handler, a single-node chain whose node carries a relay request
@@ -109,6 +189,12 @@ func TestTungoEntryPointServiceConfig(t *testing.T) {
 		if got := md[key]; got != want {
 			t.Errorf("listener metadata %s = %v, want %v", key, got, want)
 		}
+	}
+
+	// The fd provider is Android's, where the device belongs to the app: a
+	// desktop tun is created by the listener and has nothing handed over.
+	if got, ok := md["fd"]; ok {
+		t.Errorf("listener metadata carries fd = %v on a desktop device, want none", got)
 	}
 
 	if len(s.config.Chains) != 1 {
@@ -325,11 +411,12 @@ func TestTungoEntryPointRepeatInitReRegistersRules(t *testing.T) {
 }
 
 // TestTungoEntryPointRequiresPeer: without a peer key there is no chain to
-// build, so the assembly refuses instead of producing a node nothing can be
-// dialled to — and leaves nothing registered behind.
+// build, so the start refuses instead of producing a node nothing can be
+// dialled to — before the shared host, the registry or the device are touched —
+// and the refusal is the entrypoint's reported state, not only a return value:
+// an API start has already answered by the time it fails.
 func TestTungoEntryPointRequiresPeer(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	cfg.Set(&cfg.Config{})
+	tungoRunConfig(t)
 
 	const id = "tungo-no-peer"
 	tungoCleanup(t, id)
@@ -337,15 +424,314 @@ func TestTungoEntryPointRequiresPeer(t *testing.T) {
 	ep := NewTungoEntryPoint(tp.IDOption(id))
 	s := ep.(*tungoEntryPoint)
 
-	if err := s.init(); err == nil {
-		t.Fatal("init without a peer key = nil error, want a failure")
+	err := s.Run()
+	if err == nil {
+		t.Fatal("Run without a peer key = nil error, want a failure")
+	}
+	if !strings.Contains(err.Error(), "peer") {
+		t.Errorf("Run error = %q, want it to say the peer key is missing", err)
 	}
 	if s.config != nil {
-		t.Error("a peerless init assembled a config")
+		t.Error("a peerless Run assembled a config")
 	}
 	if registry.BypassRegistry().IsRegistered("tungo-rules-" + id) {
-		t.Error("a peerless init registered a rule bypass")
+		t.Error("a peerless Run registered a rule bypass")
 	}
+	if tp.P2PHostRunning() {
+		t.Error("a peerless Run started the shared host")
+	}
+	if got := s.Err(); got == nil || !strings.Contains(got.Error(), "peer") {
+		t.Errorf("Err() = %v, want the start failure: the list reads this field", got)
+	}
+	if evs := event.List(id); len(evs) == 0 || evs[len(evs)-1].Level != event.LevelError {
+		t.Errorf("events = %+v, want a trailing error event", evs)
+	}
+	_ = ep.Close()
+}
+
+// TestTungoEntryPointAndroidAsksForTheDeviceFD: on Android the device is the
+// app's VpnService one, created on the Java side, so the listener is given a
+// provider that asks for a descriptor when it builds a device rather than a
+// value captured at start: a rebuilt VPN or a restarted entrypoint must get a
+// live fd, and a start that races the app's establish has to wait for it.
+func TestTungoEntryPointAndroidAsksForTheDeviceFD(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	const id = "tungo-fd"
+	tungoCleanup(t, id)
+	useSharedDevice(t)
+
+	ep := NewTungoEntryPoint(
+		tp.IDOption(id),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.100.250/32"),
+	)
+	s := ep.(*tungoEntryPoint)
+	if err := s.init(); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	fd, ok := s.config.Services[0].Listener.Metadata["fd"].(func() int)
+	if !ok || fd == nil {
+		t.Fatalf("listener metadata fd = %T, want a func() int the listener calls per device",
+			s.config.Services[0].Listener.Metadata["fd"])
+	}
+	_ = ep.Close()
+}
+
+// TestTungoEntryPointClaimsDevice: on Android the app's single VPN device is
+// claimed by the entrypoint that runs on it, under its own ID and name; a
+// second entrypoint is refused with the holder's name and cannot take the claim
+// from under the running one; and Close gives the device back so the next start
+// can have it.
+func TestTungoEntryPointClaimsDevice(t *testing.T) {
+	tungoRunConfig(t)
+	useSharedDevice(t)
+	useDeviceListener(t, loopbackDeviceListener(t))
+
+	const (
+		id      = "tungo-device"
+		name    = "phone"
+		otherID = "tungo-device-second"
+	)
+	tungoCleanup(t, id)
+	tungoCleanup(t, otherID)
+
+	newEntryPoint := func(id, name string) EntryPoint {
+		ep := NewTungoEntryPoint(
+			tp.IDOption(id),
+			tp.NameOption(name),
+			tp.PeerOption(testPeerKey),
+			tp.NetOption("10.10.100.250/32"),
+			tp.RoutesOption("0.0.0.0/0"),
+			tp.DNSOption("192.168.100.100"),
+			tp.RulesOption("example.com"),
+		)
+		// Close is idempotent, so a failure halfway through the test does not
+		// leave the device claimed or a reference on the shared host.
+		t.Cleanup(func() { _ = ep.Close() })
+		return ep
+	}
+
+	// Claimed while it runs, and only by the entrypoint running on it.
+	ep := newEntryPoint(id, name)
+	if err := ep.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if ownerID, ownerName := tp.TunDeviceOwner(); ownerID != id || ownerName != name {
+		t.Fatalf("device owner = (%q, %q), want (%q, %q)", ownerID, ownerName, id, name)
+	}
+
+	// The API refuses this up front; this is the backstop, and it has to say
+	// who holds the device so the operator can stop it.
+	other := newEntryPoint(otherID, "second")
+	err := other.Run()
+	if err == nil {
+		t.Fatal("a second entrypoint started on the claimed device")
+	}
+	if !strings.Contains(err.Error(), name) {
+		t.Errorf("Run error = %q, want the holder's name %q", err, name)
+	}
+	if ownerID, _ := tp.TunDeviceOwner(); ownerID != id {
+		t.Errorf("a refused start left the device with %q, want the holder %q", ownerID, id)
+	}
+
+	// Close is what frees the device: a claim that outlived the run would
+	// refuse every later start of it, for good.
+	if err := ep.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if ownerID, ownerName := tp.TunDeviceOwner(); ownerID != "" || ownerName != "" {
+		t.Fatalf("Close kept the device claimed by (%q, %q)", ownerID, ownerName)
+	}
+
+	if err := other.Run(); err != nil {
+		t.Fatalf("Run after the holder closed: %v", err)
+	}
+	if ownerID, _ := tp.TunDeviceOwner(); ownerID != otherID {
+		t.Errorf("device owner = %q, want the entrypoint that started after the release", ownerID)
+	}
+	if err := other.Close(); err != nil {
+		t.Fatalf("Close the second: %v", err)
+	}
+}
+
+// TestTungoEntryPointRunFailureReleasesDevice: a start that dies after taking
+// the device has to give it back on every failure path — the next start of the
+// device is otherwise refused forever — and it has to be visible in the state
+// the list shows.
+func TestTungoEntryPointRunFailureReleasesDevice(t *testing.T) {
+	tungoRunConfig(t)
+	useSharedDevice(t)
+
+	const id = "tungo-run-fail"
+	const provider = "tungo-ep-" + id
+	tungoCleanup(t, id)
+
+	ep := NewTungoEntryPoint(
+		tp.IDOption(id),
+		tp.NameOption("phone"),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.100.250/32"),
+		tp.RoutesOption("0.0.0.0/0"),
+		tp.DNSOption("192.168.100.100"),
+		tp.RulesOption("example.com"),
+	)
+	s := ep.(*tungoEntryPoint)
+	t.Cleanup(func() { _ = ep.Close() })
+
+	// The device step fails after the claim: no VpnService fd arrived, a
+	// privilege is missing. Nothing else about the start is fake.
+	deviceErr := errors.New("tungo: no device fd: is the host's VPN up?")
+	useDeviceListener(t, func(...listener.Option) listener.Listener {
+		return &failingDeviceListener{err: deviceErr}
+	})
+
+	err := s.Run()
+	if err == nil {
+		t.Fatal("Run with a device that cannot be built = nil error, want a failure")
+	}
+	if !errors.Is(err, deviceErr) {
+		t.Errorf("Run error = %v, want the device failure", err)
+	}
+
+	// The claim above all: a start that dropped its object without releasing it
+	// would hold the device until the process ends.
+	if ownerID, ownerName := tp.TunDeviceOwner(); ownerID != "" || ownerName != "" {
+		t.Fatalf("a failed Run kept the device claimed by (%q, %q)", ownerID, ownerName)
+	}
+	if registry.P2PRegistry().IsRegistered(provider) {
+		t.Error("a failed Run kept its p2p provider registered")
+	}
+	if tp.P2PHostRunning() {
+		t.Error("a failed Run kept its reference on the shared host")
+	}
+
+	// Visible failure: the field the list reads, and an event for the history.
+	if got := s.Err(); !errors.Is(got, deviceErr) {
+		t.Errorf("Err() = %v, want the start failure", got)
+	}
+	if evs := event.List(id); len(evs) == 0 || evs[len(evs)-1].Level != event.LevelError {
+		t.Errorf("events = %+v, want a trailing error event", evs)
+	}
+
+	// The release is what this test is about: the same entrypoint can take the
+	// device again instead of being refused as its own holder.
+	useDeviceListener(t, loopbackDeviceListener(t))
+	if err := s.Run(); err != nil {
+		t.Fatalf("Run after the failed start: %v", err)
+	}
+	if ownerID, _ := tp.TunDeviceOwner(); ownerID != id {
+		t.Errorf("device owner = %q, want this entrypoint %q", ownerID, id)
+	}
+}
+
+// TestTungoEntryPointCloseReleasesProvider: Close is the whole teardown — the
+// service, the provider name and the shared host reference, the device and the
+// rules — and it is idempotent, so a handler that closes a replaced entrypoint
+// twice cannot take a successor's host down with the name.
+func TestTungoEntryPointCloseReleasesProvider(t *testing.T) {
+	tungoRunConfig(t)
+	useSharedDevice(t)
+	useDeviceListener(t, loopbackDeviceListener(t))
+
+	const id = "tungo-close"
+	const provider = "tungo-ep-" + id
+	const rulesName = "tungo-rules-" + id
+	tungoCleanup(t, id)
+
+	ep := NewTungoEntryPoint(
+		tp.IDOption(id),
+		tp.NameOption("phone"),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.100.250/32"),
+		tp.RoutesOption("0.0.0.0/0"),
+		tp.DNSOption("192.168.100.100"),
+		tp.RulesOption("example.com"),
+	)
+	s := ep.(*tungoEntryPoint)
+	t.Cleanup(func() { _ = ep.Close() })
+
+	if err := ep.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !registry.P2PRegistry().IsRegistered(provider) {
+		t.Fatal("provider not registered after Run")
+	}
+	if !tp.P2PHostRunning() {
+		t.Fatal("the shared host is not running after Run")
+	}
+	// The counters live on the service, so a running entrypoint has a status —
+	// which is where the stats task reads them from.
+	if st := s.Status(); st == nil || st.Stats() == nil {
+		t.Fatalf("Status() = %v, want the running service's status with its counters", st)
+	}
+
+	if err := ep.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := ep.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+	if registry.P2PRegistry().IsRegistered(provider) {
+		t.Error("provider still registered after Close")
+	}
+	if tp.P2PHostRunning() {
+		t.Error("shared host still running after the last reference went away")
+	}
+	if ownerID, _ := tp.TunDeviceOwner(); ownerID != "" {
+		t.Errorf("Close kept the device claimed by %q", ownerID)
+	}
+	if registry.BypassRegistry().IsRegistered(rulesName) {
+		t.Errorf("%s still registered after Close", rulesName)
+	}
+	if st := s.Status(); st != nil {
+		t.Errorf("Status() = %v after Close, want nil", st)
+	}
+}
+
+// TestTungoStaleCloseKeepsSuccessorRules: a replacement carries the same ID, so
+// the rules name is shared. A Close that arrives after the successor registered
+// its own object must leave that registration alone — the hop resolves its
+// bypass by name, so unregistering here would take the running split away.
+func TestTungoStaleCloseKeepsSuccessorRules(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg.Set(&cfg.Config{})
+
+	const id = "tungo-stale-close"
+	const rulesName = "tungo-rules-" + id
+	tungoCleanup(t, id)
+
+	newEntryPoint := func() *tungoEntryPoint {
+		ep := NewTungoEntryPoint(
+			tp.IDOption(id),
+			tp.PeerOption(testPeerKey),
+			tp.NetOption("10.10.100.250/32"),
+			tp.RulesOption("example.com"),
+		)
+		s := ep.(*tungoEntryPoint)
+		if err := s.init(); err != nil {
+			t.Fatalf("init: %v", err)
+		}
+		return s
+	}
+
+	old := newEntryPoint()
+	next := newEntryPoint()
+
+	if err := old.Close(); err != nil {
+		t.Fatalf("Close the replaced entrypoint: %v", err)
+	}
+	// The registry's own map, not Get: Get hands out a delegating wrapper whose
+	// Contains would keep working either way, so only the stored object shows
+	// which rules the name holds.
+	if got := registry.BypassRegistry().GetAll()[rulesName]; got == nil {
+		t.Fatal("a stale Close unregistered the successor's rules")
+	} else if got != bypass.Bypass(next.rules) {
+		t.Error("the registry no longer holds the successor's rules")
+	}
+	_ = next.Close()
 }
 
 // stubTunnel is a p2p provider that never opens a stream: the chain only has

@@ -41,13 +41,13 @@ type EntryPoint = tunnel.Tunnel
 // the action id (Background on the config-load path, where no click exists) so
 // a start's p2p seam calls can be joined with the action that caused it.
 //
-// The one exception is an Android tun entrypoint, whose device belongs to the
-// app's VpnService. The app learns what device to build by reading this
-// backend's /api/entrypoints, and this backend only starts listening once every
-// restored entrypoint has been started (see Start) — so waiting inline for that
-// device starves the very wait (tun.go's vpnDeviceWait) it depends on, and
-// marks the entrypoint failed on every cold start. Starting it in the
-// background lets the API answer, the VPN come up and the device arrive while
+// The one exception is an Android device entrypoint — tun or tungo — whose
+// device belongs to the app's VpnService. The app learns what device to build by
+// reading this backend's /api/entrypoints, and this backend only starts listening
+// once every restored entrypoint has been started (see Start) — so waiting
+// inline for that device starves the very wait (tun.go's vpnDeviceWait) it
+// depends on, and marks the entrypoint failed on every cold start. Starting it in
+// the background lets the API answer, the VPN come up and the device arrive while
 // the entrypoint is still waiting for it.
 // serviceLog is the logger an entrypoint's service runs under. A restored
 // entrypoint can start before any logger is configured -- in a test binary,
@@ -83,23 +83,32 @@ func restore(ctx context.Context, goos string, ep EntryPoint) {
 }
 
 // restoreAsync reports whether a restored entrypoint starts off the startup
-// path: an Android tun one, and nothing else — a device elsewhere is local, and
-// a p2p entrypoint binds a socket, so both are best reported at boot.
+// path: one that owns the app's VPN device on Android, and nothing else — a
+// device elsewhere is local, and a p2p entrypoint binds a socket, so both are
+// best reported at boot. Both device types (tun and tungo) wait for the same
+// VpnService device, so both have the same reason to start in the background.
 func restoreAsync(goos string, ep EntryPoint) bool {
-	return goos == "android" && ep.Type() == TunEntryPoint
+	if goos != "android" {
+		return false
+	}
+	switch ep.Type() {
+	case TunEntryPoint, TungoEntryPoint:
+		return true
+	}
+	return false
 }
 
 // Start begins an entrypoint that was just created, updated or started. It is
-// restore's contract for that case: inline everywhere but an Android tun
-// entrypoint, which runs in the background so the caller — an API handler, or
-// the app's own restore — returns while the entrypoint is already listed. The
-// app brings the device up for a *running* tun entrypoint, and it cannot see
-// one that has not been added yet, so a caller that blocks on the device
-// starves the very wait it is in: Run's device wait expires and the start
+// restore's contract for that case: inline everywhere but an Android device
+// entrypoint (tun or tungo), which runs in the background so the caller — an API
+// handler, or the app's own restore — returns while the entrypoint is already
+// listed. The app brings the device up for a *running* device entrypoint, and it
+// cannot see one that has not been added yet, so a caller that blocks on the
+// device starves the very wait it is in: Run's device wait expires and the start
 // fails with "no device fd".
 //
 // ctx is the request's when the start came from the API: its action id rides
-// the p2p seam calls the entrypoint makes. The Android tun run is started off
+// the p2p seam calls the entrypoint makes. The Android device run is started off
 // the request goroutine and outlives it, which is safe here — the seam reads
 // the id for a log field and never honours cancellation.
 //
@@ -110,17 +119,18 @@ func Start(ctx context.Context, ep EntryPoint) {
 }
 
 // CheckTunDeviceFree reports whether an entrypoint with this ID may use the tun
-// device. Android gives an app a single VPN device, so a second tun entrypoint
-// cannot work: both would read the same device and take each other's packets.
-// The web API checks this before an answer, so a request that cannot work is
-// refused with the name of the entrypoint holding the device — instead of being
-// accepted and leaving the running one broken.
+// device. Android gives an app a single VPN device, so a second entrypoint of
+// either device type — tun or tungo — cannot work: both would read the same
+// device and take each other's packets. The web API checks this before an answer,
+// so a request that cannot work is refused with the name of the entrypoint
+// holding the device — instead of being accepted and leaving the running one
+// broken.
 func CheckTunDeviceFree(id string) error {
 	ownerID, ownerName := tunnel.TunDeviceOwner()
 	if ownerID == "" || ownerID == id {
 		return nil
 	}
-	return fmt.Errorf("another tun entrypoint (%s) is already running: stop it first", ownerName)
+	return fmt.Errorf("the tun device is held by entrypoint (%s): stop it first", ownerName)
 }
 
 type entryPointList struct {

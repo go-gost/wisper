@@ -35,24 +35,51 @@ func (f *fakeRestoreEP) Run() error {
 	return nil
 }
 
-// TestRestoreAsyncOnAndroidTun: an Android tun entrypoint is the one restore
-// that must not wait. Its device belongs to the app's VpnService, which learns
-// what device to build from this very backend's API — and this backend only
-// starts listening once every restored entrypoint has been started. Waiting
+// TestRestoreAsyncOnAndroidDevice: an Android device entrypoint is the one
+// restore that must not wait. Its device belongs to the app's VpnService, which
+// learns what device to build from this very backend's API — and this backend
+// only starts listening once every restored entrypoint has been started. Waiting
 // inline therefore starves the wait for the device, and every cold start marks
-// the entrypoint failed.
-func TestRestoreAsyncOnAndroidTun(t *testing.T) {
-	ep := newFakeRestoreEP(TunEntryPoint)
+// the entrypoint failed. Both device types own that device, so both start in the
+// background.
+func TestRestoreAsyncOnAndroidDevice(t *testing.T) {
+	for _, typeName := range []string{TunEntryPoint, TungoEntryPoint} {
+		ep := newFakeRestoreEP(typeName)
 
-	// The assertion is the call returning at all: Run is still blocked.
-	restore(context.Background(), "android", ep)
+		// The assertion is the call returning at all: Run is still blocked.
+		restore(context.Background(), "android", ep)
 
-	select {
-	case <-ep.started:
-	case <-time.After(2 * time.Second):
-		t.Fatal("Run was never started")
+		select {
+		case <-ep.started:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s: Run was never started", typeName)
+		}
+		close(ep.release)
 	}
-	close(ep.release)
+}
+
+// TestRestoreAsyncPredicate: which entrypoints start off the startup path, and
+// why. Only the app's device forces it, and only on Android: a device elsewhere
+// is local, so a device that cannot be created is the answer at boot.
+func TestRestoreAsyncPredicate(t *testing.T) {
+	for _, tc := range []struct {
+		goos, typeName string
+		want           bool
+	}{
+		{"android", TunEntryPoint, true},
+		{"android", TungoEntryPoint, true},
+		{"linux", TunEntryPoint, false},
+		{"linux", TungoEntryPoint, false},
+		{"windows", TungoEntryPoint, false},
+		{"darwin", TungoEntryPoint, false},
+		{"android", P2PEntryPoint, false},
+		{"android", TCPEntryPoint, false},
+		{"android", UDPEntryPoint, false},
+	} {
+		if got := restoreAsync(tc.goos, newFakeRestoreEP(tc.typeName)); got != tc.want {
+			t.Errorf("restoreAsync(%s, %s) = %v, want %v", tc.goos, tc.typeName, got, tc.want)
+		}
+	}
 }
 
 // TestRestoreWaitsEverywhereElse: a tun device elsewhere is local, so the wait
@@ -64,6 +91,8 @@ func TestRestoreWaitsEverywhereElse(t *testing.T) {
 		{"linux", TunEntryPoint},
 		{"windows", TunEntryPoint},
 		{"darwin", TunEntryPoint},
+		{"linux", TungoEntryPoint},
+		{"darwin", TungoEntryPoint},
 		{"android", P2PEntryPoint},
 		{"android", TCPEntryPoint},
 	} {

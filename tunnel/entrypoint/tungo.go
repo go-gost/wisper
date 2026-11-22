@@ -1,20 +1,51 @@
 package entrypoint
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"log/slog"
+	"runtime"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/go-gost/core/chain"
+	"github.com/go-gost/core/handler"
+	"github.com/go-gost/core/listener"
+	"github.com/go-gost/core/observer/stats"
+	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
+	"github.com/go-gost/wisper/event"
 	"github.com/go-gost/wisper/tunnel"
+	xchain "github.com/go-gost/x/chain"
 	xconfig "github.com/go-gost/x/config"
+	chain_parser "github.com/go-gost/x/config/parsing/chain"
 	_ "github.com/go-gost/x/connector/relay" // chain node connector: a relay request to the hub
+	_ "github.com/go-gost/x/dialer/tcp"      // chain node dialer: the relay request rides a p2p tcp stream
+	tungohandler "github.com/go-gost/x/handler/tungo"
+	tungolistener "github.com/go-gost/x/listener/tungo"
+	mdx "github.com/go-gost/x/metadata"
+	xstats "github.com/go-gost/x/observer/stats"
 	"github.com/go-gost/x/registry"
 	xservice "github.com/go-gost/x/service"
 	"github.com/google/uuid"
 )
+
+// The device step is the one part of a run a test cannot take: a real tun
+// device needs CAP_NET_ADMIN, or the app's VpnService on Android, and building
+// one rewrites the running host's routes. It is a package var so a test can put
+// a loopback listener — or one that cannot be built — in its place and drive the
+// whole lifecycle.
+var newDeviceListener = tungolistener.NewListener
+
+// sharedDevice says whether the device is the app's own — Android's single
+// VpnService device — rather than one this process creates. Only that device has
+// to be claimed from the other entrypoints, and only it arrives as an fd handed
+// over out of band. A var, not a constant, for the same reason: a test can drive
+// both on a desktop build. Production reads the build's OS, as tun.go does.
+var sharedDevice = runtime.GOOS == "android"
 
 // tungoEntryPoint is the split spoke: it owns a tun device (on Android the
 // app's VpnService device) whose flows are terminated by a userspace stack by
@@ -30,10 +61,17 @@ type tungoEntryPoint struct {
 	provider string
 	// rulesName is the bypass registry name the chain hop references.
 	rulesName string
-	// rules is the object registered under rulesName. init replaces it on every
-	// run, and SetRules updates it in place, so it is guarded by mu.
+	// rules is the object this instance registered under rulesName. A
+	// replacement reuses the name (an update keeps the ID), so Close compares
+	// this object with the registry's current one and leaves a successor's rules
+	// alone; a rules edit mutates this object in place instead of
+	// re-registering.
 	rules  *tunnel.RuleBypass
 	config *xconfig.Config
+
+	forward  service.Service
+	acquired bool // holds one reference on the shared p2p host
+	claimed  bool // holds the app's single VPN device
 
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
@@ -130,12 +168,15 @@ func (s *tungoEntryPoint) init() error {
 	ruleBypass := tunnel.NewRuleBypass(rules)
 	registry.BypassRegistry().Unregister(s.rulesName)
 	if err := registry.BypassRegistry().Register(s.rulesName, ruleBypass); err != nil {
+		// The Unregister above took whatever this name held — this entrypoint's
+		// previous object, if it had one — so nothing is registered now: keeping
+		// the pointer would let a later Close unregister a name this init did
+		// not fill.
+		s.mu.Lock()
+		s.rules = nil
+		s.mu.Unlock()
 		return err
 	}
-	// Keep the object, not only its name: a rebuilt entrypoint reuses the name,
-	// so a Close that unregisters must be able to tell whether this instance
-	// registered anything, and a rules edit mutates this object in place
-	// instead of re-registering.
 	s.mu.Lock()
 	s.rules = ruleBypass
 	s.mu.Unlock()
@@ -158,6 +199,17 @@ func (s *tungoEntryPoint) init() error {
 				"dns":    s.opts.DNS,
 			},
 		},
+	}
+
+	// Android: the device is a VpnService's, created and configured on the Java
+	// side, and its fd reaches us outside the config. Each device asks for one
+	// when it is built (so a rebuilt VPN or a restarted entrypoint gets a live
+	// descriptor), and waits rather than failing: the app can only establish the
+	// VPN once the backend — and this entrypoint — is already running.
+	if sharedDevice {
+		svc.Listener.Metadata["fd"] = func() int {
+			return tunnel.WaitTunFD(vpnDeviceWait)
+		}
 	}
 
 	// Patch the tunnel chain into a split chain: the node dials the peer's
@@ -191,15 +243,242 @@ func (s *tungoEntryPoint) init() error {
 	return nil
 }
 
-// Run is the lifecycle — the device claim, the shared host reference and the
-// service — which this type does not build yet. It reports that rather than
-// half-starting a service with no device behind it.
-func (s *tungoEntryPoint) Run() error {
-	return errors.New("tungo entrypoint: the run lifecycle is not implemented yet")
+func (s *tungoEntryPoint) Run() error { return s.RunContext(context.Background()) }
+
+// RunContext is Run carrying the caller's action id: the shared host's
+// acquisition (Listen) and the peer's punch name it in their p2p seam log lines,
+// so a start that came from the UI can be joined with the p2p work it set in
+// motion. Run is this with no action, for the config-load and restart paths — an
+// Android restore starts from a background goroutine, where the id is still only
+// ever read for a log field.
+func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
+	if s.IsClosed() {
+		return ErrEntryPointClosed
+	}
+
+	// Every failure below is the entrypoint's reported state, not only a return
+	// value: a restored start runs off the startup path and an API start answers
+	// before a device exists, so the list has nothing but this field and the
+	// event log to say why an entrypoint is not serving.
+	defer func() {
+		// A closed entrypoint is a deliberate stop, not a failure: the marker
+		// exists so a start that raced its own Close ends like one stopped later.
+		if err != nil && !errors.Is(err, ErrEntryPointClosed) {
+			s.fail(err)
+		}
+	}()
+
+	// Without the peer there is no node to build: the chain's one hop is the link
+	// to the hub, so a peerless entrypoint has nothing to serve.
+	if s.peer == "" {
+		return errors.New("tungo entrypoint requires a peer public key")
+	}
+
+	if err = s.init(); err != nil {
+		return
+	}
+
+	// The identity is process-wide: take a reference on the shared host. A failed
+	// relay connection is not fatal: the engine retries in the background and the
+	// entrypoint keeps running, so it is logged rather than failing the Run.
+	host, err := tunnel.AcquireP2PHost(ctx)
+	if err != nil {
+		return
+	}
+	// Until the service is wired, Run owns the reference, the provider
+	// registration and the device claim; afterwards Close gives them back. A
+	// failure from here on rolls all three back: a claim left behind refuses
+	// every later start of this device, and a dropped object cannot release what
+	// it no longer points at.
+	started := false
+	defer func() {
+		if !started {
+			registry.P2PRegistry().Unregister(s.provider)
+			tunnel.ReleaseP2PHost()
+			s.releaseDevice()
+		}
+	}()
+
+	// One device at a time: on Android the app has a single VpnService device, and
+	// every device built from its fd reads the same packets, so a second
+	// entrypoint would take them from the first instead of adding a link. The web
+	// API checks the same thing before it answers a start.
+	if err = s.claimDevice(); err != nil {
+		return
+	}
+
+	// Register the provider before parsing the chain: the chain node resolves
+	// metadata.p2p by name at parse time. The Unregister clears a stale
+	// registration left by a previous Run in this process.
+	registry.P2PRegistry().Unregister(s.provider)
+	if err = registry.P2PRegistry().Register(s.provider, p2pProvider{host}); err != nil {
+		return
+	}
+
+	log := p2pLog().WithFields(map[string]any{
+		"kind":    "service",
+		"service": s.opts.Name,
+	})
+
+	// The peer is known up front and this side is the one that dials out, so bring
+	// its path up and punch now: the direct path is being arranged (and visible in
+	// the status) before the first flow, instead of waiting for traffic. Punch
+	// failures are logged, never fatal.
+	if err := host.PunchContext(ctx, s.peer); err != nil {
+		slog.Warn("tungo entrypoint: punch peer", "peer", s.peer, "err", err)
+		event.Record(s.ID(), event.LevelWarn, "punch %s failed: %v", s.peer, err)
+	}
+
+	var forward service.Service
+	{
+		var ch chain.Chainer
+		ch, err = chain_parser.ParseChain(s.config.Chains[0], log)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		// The counters belong to the service. The device listener must not have
+		// them: x wraps every accepted conn, and a tun device is a single conn that
+		// lives as long as the entrypoint, so counting it there would report one
+		// connection — and all of its bytes — twice.
+		pStats := xstats.NewStats(false)
+		{
+			// The totals a restarted entrypoint already displayed carry over: the
+			// counters are the run's, the display is the entrypoint's.
+			prev := s.Stats()
+			pStats.Add(stats.KindInputBytes, int64(prev.InputBytes))
+			pStats.Add(stats.KindOutputBytes, int64(prev.OutputBytes))
+			pStats.Add(stats.KindTotalConns, int64(prev.TotalConns))
+			pStats.Add(stats.KindTotalErrs, int64(prev.TotalErrs))
+		}
+
+		svcCfg := s.config.Services[0]
+		lnLogger := log.WithFields(map[string]any{"kind": "listener", "listener": "tungo"})
+		ln := newDeviceListener(
+			listener.AddrOption(svcCfg.Addr),
+			listener.LoggerOption(lnLogger),
+		)
+		// Init builds the device (and waits for the VpnService's fd on Android), so
+		// a failure here fails the whole Run. The listener must be closed on the way
+		// out: its loop retries a device creation that cannot succeed — one line per
+		// second, forever, for an object that is about to be discarded.
+		if err = ln.Init(mdx.NewMetadata(svcCfg.Listener.Metadata)); err != nil {
+			ln.Close()
+			return
+		}
+
+		handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tungo"})
+		// The chain (and no forwarder hop) is the client-mode switch: the stack's
+		// flows are dialled through the chain node, which is the peer, and the hop's
+		// whitelist bypass decides between that node and the direct route.
+		h := tungohandler.NewHandler(
+			handler.RouterOption(xchain.NewRouter(
+				chain.ChainRouterOption(ch),
+				chain.LoggerRouterOption(handlerLogger),
+			)),
+			handler.LoggerOption(handlerLogger),
+		)
+		if err = h.Init(mdx.NewMetadata(svcCfg.Handler.Metadata)); err != nil {
+			ln.Close()
+			return
+		}
+
+		forward = xservice.NewService(s.opts.Name, ln, h,
+			xservice.LoggerOption(log),
+			xservice.StatsOption(pStats),
+		)
+	}
+
+	s.mu.Lock()
+	// A restored Android entrypoint is started off the startup path, so Close can
+	// land while this Run is still waiting for its device. Under this lock is the
+	// only place that can be told apart: Close closes cclose before it takes the
+	// lock, so a Run that sees it here must not publish its service — nothing
+	// would ever close it.
+	closed := s.IsClosed()
+	if !closed {
+		s.forward, s.acquired = forward, true
+	}
+	s.mu.Unlock()
+
+	if closed {
+		_ = forward.Close()
+		return ErrEntryPointClosed // the deferred rollback releases the claim and the rest
+	}
+
+	started = true // the service, the reference, the provider and the claim are Close's now
+
+	go func() {
+		serveErr := forward.Serve()
+		if tunnel.CleanStop(serveErr) {
+			log.Info("tungo entrypoint stopped")
+			s.setErr(nil)
+		} else {
+			log.Errorf("tungo entrypoint stopped with error: %v", serveErr)
+			s.fail(serveErr)
+		}
+	}()
+
+	return nil
 }
 
-// Status has no service to report on until there is a run to serve.
-func (s *tungoEntryPoint) Status() *xservice.Status { return nil }
+// claimDevice takes the app's single VPN device for this entrypoint. The claim is
+// taken under the lock Close reads it with, so a Close that lands while a start is
+// claiming either sees the claim (and releases it) or is seen here (and refuses
+// to claim): the device cannot be left claimed by a run whose Close has already
+// returned. A device that is not the app's is this process's own — one per
+// entrypoint — and needs no claim.
+func (s *tungoEntryPoint) claimDevice() error {
+	if !sharedDevice {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.IsClosed() {
+		return ErrEntryPointClosed
+	}
+	if owner, ok := tunnel.ClaimTunDevice(s.opts.ID, s.opts.Name); !ok {
+		return fmt.Errorf("tun device is in use by entrypoint %q: stop it first", owner)
+	}
+	s.claimed = true
+	return nil
+}
+
+// releaseDevice gives the app's device back if this run took it. A start that was
+// refused never took it and must not release what the holder has — an update
+// keeps the ID, so both carry the same one.
+func (s *tungoEntryPoint) releaseDevice() {
+	s.mu.Lock()
+	claimed := s.claimed
+	s.claimed = false
+	s.mu.Unlock()
+
+	if claimed {
+		tunnel.ReleaseTunDevice(s.opts.ID)
+	}
+}
+
+// fail records a failure where the list can show it: the field the row reads, and
+// an event for the history. Without both, a start that died before serving reads
+// as a silently stopped entrypoint.
+func (s *tungoEntryPoint) fail(err error) {
+	s.setErr(err)
+	event.Record(s.ID(), event.LevelError, "tungo entrypoint: %v", err)
+}
+
+func (s *tungoEntryPoint) Status() *xservice.Status {
+	s.mu.RLock()
+	forward := s.forward
+	s.mu.RUnlock()
+
+	if ss, _ := forward.(tunnel.ServiceStatus); ss != nil {
+		return ss.Status()
+	}
+	return nil
+}
 
 func (s *tungoEntryPoint) Stats() cfg.ServiceStats {
 	s.mu.RLock()
@@ -225,16 +504,45 @@ func (s *tungoEntryPoint) SetStatsBaseline(baseline cfg.ServiceStats) {
 	s.statsBaseline = baseline
 }
 
-// Close releases what init registered. The device claim, the shared host
-// reference and the service arrive with the run lifecycle; the rules bypass is
-// what exists now, and it must not outlive the entrypoint — the name is reused
-// when an entrypoint is replaced. Idempotent.
+// Close stops the service (which closes the device), unregisters the provider and
+// the rules bypass, gives the shared host reference and the app's device back,
+// and is idempotent. The shared identity file is kept so stop/start keeps the
+// same key.
 func (s *tungoEntryPoint) Close() error {
+	var err error
 	s.closeOnce.Do(func() {
 		close(s.cclose)
-		registry.BypassRegistry().Unregister(s.rulesName)
+
+		s.mu.Lock()
+		forward, acquired := s.forward, s.acquired
+		s.forward, s.acquired = nil, false
+		rules := s.rules
+		s.mu.Unlock()
+
+		if forward != nil {
+			err = forward.Close()
+		}
+		// Only the first Close may touch the shared registry: a replacement
+		// reuses the name (the ID survives an update), and Unregister closes the
+		// value it finds, so a repeat call would take the successor's p2p host
+		// down with the name.
+		registry.P2PRegistry().Unregister(s.provider)
+		if acquired {
+			tunnel.ReleaseP2PHost()
+		}
+		// A start that was refused never claimed the device; releasing it anyway
+		// would free what another entrypoint — same ID across an update — holds.
+		s.releaseDevice()
+		// The rules are the whole split, and their name is reused by a
+		// replacement: unregister it only while the name still holds this
+		// instance's object, so a Close arriving after a successor registered its
+		// own leaves the successor's rules (and its split) in place. Get hands out
+		// a delegating wrapper, so the identity test reads the registry's map.
+		if rules != nil && registry.BypassRegistry().GetAll()[s.rulesName] == rules {
+			registry.BypassRegistry().Unregister(s.rulesName)
+		}
 	})
-	return nil
+	return err
 }
 
 func (s *tungoEntryPoint) IsClosed() bool {
