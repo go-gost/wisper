@@ -1180,6 +1180,10 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
 
 **Implementation record:**
 
+- **评审修复轮:** `5c85047` `docs: correct the tungo deployment facts the review caught`
+  —— 八条文档发现（relay 端口并非 socks5/http 网关、`x/handler/tungo` 的措辞、直连归因、
+  「保存不再重启」只对 tungo 成立、域名/IP 判定顺序、部署段落的「尚未生效」说明、
+  计划里的 SIGHUP 指令改成实际可用的 docker 路径、记录里的行号与六个 commit）以及 spec §5/§6.2 的同一处措辞。
 - **日期/状态:** 2026-11-22 — 已完成（只做加法；现有 `p2p-tun` 与手机的实时隧道未动）。
 - **仓库 + commit:**
   - `wisper`（`github.com/go-gost/wisper`），Task 7a 共六个提交（均未 push）：
