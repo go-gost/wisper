@@ -540,8 +540,10 @@ cd wisper && git add tunnel/entrypoint && git commit -m "feat(entrypoint): run a
 ### Task 5: 端到端 —— relay over p2p（TCP 与 DNS/UDP）
 
 **Files:**
-- Test: `wisper/tunnel/tungo_e2e_test.go`（可复用 `p2p_e2e_test.go` 的
-  `startEchoServer`/`startDerper`/`newDialingHost`/`registerProvider` 封装，同包 + 同 build tag）
+- Test: `wisper/tunnel/tungo_e2e_test.go`，**必须带 `//go:build p2ppoc`** —— 它复用的
+  `startEchoServer`/`startDerper`/`newDialingHost`/`registerProvider` 全在
+  `tunnel/p2p_e2e_test.go`、`p2p_poc_test.go`、`p2p_udp_poc_test.go` 的同一 tag 下，
+  所以默认 `go test ./tunnel/` 不会跑到它。
 
 **Interfaces:**
 - Consumes: Task 3 的 `tungoEntryPoint.init()`（取它生成的 chain 配置）、
@@ -552,9 +554,11 @@ cd wisper && git add tunnel/entrypoint && git commit -m "feat(entrypoint): run a
 
 ```go
 func TestTungoChainRelaysOverP2P(t *testing.T)
-// 起一个本地 relay 服务（x/listener/tcp + x/handler/relay，chain 指向 echo server）
+// 起一个本地 relay 服务 = xservice.NewService(name, tcp listener(127.0.0.1:0), handler relay)，
+// **不配 chain**：relay handler 直接拨请求里带的地址。把它的地址作为 wisper p2p tunnel 的
+// endpoint（runTunnel 的 echo 参数处），于是「手机 → p2p 流 → 这层 → echo」成立。
 // 用 entrypoint 生成的 chain 配置 ParseChain，Router.Dial("tcp", echoAddr)
-// 断言：数据往返成功，且流量确实经过 relay 服务（relay 服务侧记录一次连接）
+// 断言：数据往返成功，且 relay 服务侧确实处理过连接
 
 func TestTungoChainRelaysUDPOverP2P(t *testing.T)
 // 同样的链路，Router.Dial("udp", udpEchoAddr)：起一个 UDP echo（DNS 形状：收到什么回什么）
@@ -566,17 +570,17 @@ func TestTungoChainUnlistedGoesDirect(t *testing.T)
 
 - [ ] **Step 2: 运行确认失败**
 
-Run: `cd wisper && go test ./tunnel/ -run TestTungoChain -v -count=1`
+Run: `cd wisper && go test -tags p2ppoc ./tunnel/ -run TestTungoChain -v -count=1`
 Expected: FAIL（entrypoint 生成的链尚不能连接 relay 服务，或 FUDP 路径报错）
 
 - [ ] **Step 3: 修到通过**
 
-失败通常只会暴露接线问题（relay 服务的 chain 目标、p2p provider 命名、network 参数）。
-改 `tungo.go` 的组装或测试里的 server 配置，**不要改 x**。
+失败通常只会暴露接线问题（relay 服务是否接受请求里的地址、p2p provider 命名、network 参数）。
+只允许改测试里的 server 配置或 `tungo.go` 的组装，**不要改 x**。
 
 - [ ] **Step 4: 运行确认通过**
 
-Run: `cd wisper && go test ./tunnel/ -run TestTungoChain -v -count=1`
+Run: `cd wisper && go test -tags p2ppoc ./tunnel/ -run TestTungoChain -v -count=1`
 Expected: PASS
 
 - [ ] **Step 5: 提交**
