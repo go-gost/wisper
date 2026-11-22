@@ -149,7 +149,12 @@ type Options struct {
 	// LanRoutes is the hub's own routes, each a "cidr [via addr] [allow=keys]"
 	// spec resolved against the spokes' assigned addresses. They are injected
 	// before any claim, so a hub operator reaches a LAN that no spoke claims.
-	LanRoutes     []string
+	LanRoutes []string
+	// Rules is a tungo entrypoint's split list: the destinations that go
+	// through the tunnel, while everything else is dialled directly. It is a
+	// whitelist, so an empty list sends all traffic direct. Edits are applied
+	// in place by SetRules — the entrypoint is not rebuilt.
+	Rules         []string
 	CreatedAt     time.Time
 	Stats         config.ServiceStats
 	StatsBaseline config.ServiceStats
@@ -406,6 +411,15 @@ func LanAllowOption(spec string) Option {
 func LanRoutesOption(specs ...string) Option {
 	return func(opts *Options) {
 		opts.LanRoutes = specs
+	}
+}
+
+// RulesOption sets a tungo entrypoint's whitelist of destinations that go
+// through the tunnel. An empty list is valid: every destination is dialled
+// directly.
+func RulesOption(rules ...string) Option {
+	return func(opts *Options) {
+		opts.Rules = rules
 	}
 }
 
