@@ -1091,19 +1091,18 @@ cd x && git add handler/tungo && git commit -m "fix(tungo): guard the handler st
 
 ---
 
-### Task 7: 部署接线（pi + hub）与验收
+### Task 7a: 部署（只做加法）并在 pi 上验证 relay 腿
+
+**安全性前提：** 本步骤**只做加法** —— 加 pi 的 relay 服务、加 hub 的 p2p tunnel。
+**不要**在手机上还没切过来之前把 pixel-9 从现有 `p2p-tun`（type `tun`）的 `peers` 里移除，
+否则用户会立刻失去现在能用的隧道。
 
 **Files:**
-- Modify: `wisper/docs/tun-integration.md`（新增一节「手机上按域名分流（tungo entrypoint）」：
-  配置形状、规则语义、DNS 取舍、故障时的行为）
-- 运维（不在仓库）：`pi@192.168.100.100` 的 `/etc/gost/gost.yaml` 与 hub 的
-  `wisper.yaml`
+- Modify: `wisper/docs/tun-integration.md`（新增一节「手机上按域名分流（tungo entrypoint）」，含规则语义、
+  DNS 取舍、失败时的行为、以及「保存不再重启」）
+- 运维（不在仓库）：`pi@192.168.100.100` 的 `/etc/gost/gost.yaml`、hub 的 `wisper.yaml`
 
-**Interfaces:**
-- Consumes: Task 1–6 的全部产出
-- Produces: 一份可复制的配置清单 + 验收记录
-
-- [ ] **Step 1: pi 增加 relay 服务**（复用 `relay-wss` 与既有 bypasses）
+- [ ] **Step 1: pi 增加 relay 服务**（复用 `relay-wss` 与既有 bypasses，只绑回环）
 
 ```yaml
 - name: relay-phone
@@ -1113,56 +1112,49 @@ cd x && git add handler/tungo && git commit -m "fix(tungo): guard the handler st
     chain: relay-wss
 ```
 
-推送方式（pi 上 sudo 需密码，走 docker 写盘）：本地改 → `python -c` 校验 YAML →
+推送：本地改 → `python3 -c "import yaml,sys;yaml.safe_load(open('gost.yaml'))"` 校验 →
 `docker run --rm -i -v /etc/gost:/etc/gost alpine sh -c 'cp gost.yaml gost.yaml.bak.$(date +%Y%m%d-%H%M%S)
-&& cat > gost.yaml.tmp && mv gost.yaml.tmp gost.yaml'` → SIGHUP 热重载（`kill -HUP <MainPID>`）。
-Expected: 日志出现 `relay-phone` 的监听，且 `ss -ltnp | grep 18080` 只绑 127.0.0.1。
+&& cat > gost.yaml.tmp && mv gost.yaml.tmp gost.yaml'` → `kill -HUP <MainPID>` 热重载。
+Expected: 日志出现 `relay-phone` 的监听；`ss -ltn | grep 18080` 只绑 `127.0.0.1`。**记录备份文件名**。
 
-- [ ] **Step 2: hub 增加 p2p tunnel 并把手机从 tun tunnel 移出**
+- [ ] **Step 2: 在 pi 上验证 relay 腿本身**（不需要手机）
 
-wisper 的 `p2p-tun`（type `tun`）的 `peers` 移除 pixel-9 的 key；新增一个 type `p2p` 的
-tunnel：`endpoint: 127.0.0.1:18080`、`peers: [pixel-9 的 key]`。
-Expected: `/api/tunnels` 里两者并存；tun tunnel 的 peers 只剩 dadax / dadax-PC。
-
-- [ ] **Step 3: 建立手机侧的 tungo entrypoint（值照抄，别临场决定）**
-
+```sh
+# 用 gost 客户端经 relay 入口取一次公网地址；白名单外的域名应当从家宽直连
+gost -F relay://127.0.0.1:18080 -L tcp://127.0.0.1:18081 &
+curl -x http://127.0.0.1:18081 -sS -o /dev/null -w '%{http_code}\n' https://www.baidu.com
+curl -x http://127.0.0.1:18081 -sS -o /dev/null -w '%{http_code}\n' https://www.google.com
 ```
-type:  tungo
-peer:  <hub 的 base64 公钥>
-net:   10.10.100.250/32,fd00:10:10:100::250/128
-mtu:   1300
-routes: 0.0.0.0/0, ::/0
-dns:   192.168.100.100
-rules:
-  - 192.168.100.0/24        # DNS（UDP/53）+ 按 IP 访问的兜底
-  - home.pi                 # 内网子域名
-  - gost.local
-  - dadax
-  - <pi 的 gost:bypass:gfw 里的域名，逐条粘贴>
-```
+Expected: 两条都 200（第二条经 `relay-wss`）；gost 日志里能看到 `relay-phone` 的连接与链选择。
 
-内网子域名要能解析，必须已经在 pi 的 `hosts-dns` 里（spec §8.7）。
+- [ ] **Step 3: hub 增加 p2p tunnel（加法）**
 
-- [ ] **Step 3.5: 验证「停」不会留下挂住的 handler 协程**
+新增一个 type `p2p` 的 tunnel：`endpoint: 127.0.0.1:18080`、`peers: [pixel-9 的 key]`。
+Expected: `/api/tunnels` 里新 tunnel 存在且 running；现有 `p2p-tun` 的 peers **不变**。
 
-`x/handler/tungo` 的 `Close` 返回时，`Handle` 可能仍停在 `stack.Wait()`（gvisor 的 `Stack.Close` 不停止
-link endpoint）。真正解除它的是 **listener 关闭时关掉已 accept 的设备 conn**（`x/listener/tungo` 的
-`active`）。所以验收要连做三次「启动 → 约 1 分钟有流量 → 停止」，每次确认：
-`adb logcat` 无 panic/泄漏告警、hub 侧该 peer 的路由/流被收回、`/api/entrypoints` 状态回到 stopped。
-
-- [ ] **Step 4: 打 APK 并在真机按 spec §7 验收**
-
-```bash
-cd wisper && make apk   # 走 docker，Makefile 已带 --network host；本机直接 make android 会失败
-```
-
-逐条记录 spec §7 的 1–8（白名单域名 / 非白名单域名 / 内网子域名 / DNS / IPv6 /
-互斥 / 回归 / 隧道不可用）。Expected: 每条都有「命令 + 输出」形式的证据。
-
-- [ ] **Step 5: 提交文档与验收记录**
+- [ ] **Step 4: 提交文档**
 
 ```bash
 cd wisper && git add docs/tun-integration.md && git commit -m "docs: document the tungo split entrypoint and its deployment"
 ```
 
-**Implementation record:** _完成后填写（含 pi / hub 配置的备份文件名与验收结论）。_
+**Implementation record:** _完成后填写（含 pi 配置的备份文件名、两条 curl 的实测结果）。_
+
+---
+
+### Task 7b: 切到手机并做真机验收（需要设备在场）
+
+**为什么单列：** 这一步会让手机从 `tun` entrypoint 切到 `tungo`，并且要在手机上建 tungo entrypoint
+（`net: 10.10.100.250/32,fd00:10:10:100::250/128`、`routes: 0.0.0.0/0, ::/0`、`dns: 192.168.100.100`、
+`rules: [192.168.100.0/24, home.pi, gost.local, dadax, <gost:bypass:gfw 里的域名>]`）。
+**这一步必须和设备的使用者一起做**，因为 `adb devices` 当前没有连接（无线调试端口会轮换），
+而且切换瞬间会重建 VPN。
+
+- [ ] **Step 1: 构建 APK**（`cd wisper && make apk`，走 docker + `--network host`），确认产物存在。
+- [ ] **Step 2: 设备接入**（`adb connect <p2p 隧道地址>:<端口>`，见记忆里的无线调试流程），安装新 APK。
+- [ ] **Step 3: 在 App 里停掉旧 `tun` entrypoint、建 `tungo` entrypoint**（用上面那组值），启动。
+- [ ] **Step 4: 把 pixel-9 从 `p2p-tun` 的 peers 里移除**（此时手机已不再需要它）。
+- [ ] **Step 5: 按 spec §7 的 8 条逐条验收并留证**（白名单域名 / 非白名单域名 / 内网子域名 / DNS /
+  IPv6 / 互斥 / 回归 / 隧道不可用），外加本计划 §3.5 的三次「启动→有流量→停止」。
+
+**Implementation record:** _完成后填写（含每条的实测命令与输出、以及回滚方式：把 pixel-9 加回 `p2p-tun` 的 peers 并重新启动旧 `tun` entrypoint）。_
