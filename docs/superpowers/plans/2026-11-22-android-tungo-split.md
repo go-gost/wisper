@@ -169,8 +169,9 @@ cd x && git add listener/tungo && git commit -m "feat(tungo): adopt an Android V
 
 **Interfaces:**
 - Produces:
-  - `type ruleBypass struct`，实现 `github.com/go-gost/core/bypass.Bypass`；
-    `newRuleBypass(rules []string) *ruleBypass`；方法 `SetRules(rules []string)`、
+  - `type RuleBypass struct`（**导出**，`tunnel/entrypoint` 要用），实现
+    `github.com/go-gost/core/bypass.Bypass`；
+    `NewRuleBypass(rules []string) *RuleBypass`；方法 `SetRules(rules []string)`、
     `Contains(ctx context.Context, network, addr string, opts ...bypass.Option) bool`。
   - `tunnel.RulesOption(rules ...string) Option`；`Options.Rules []string`。
 - 语义：内部用 `xbypass.NewBypass(xbypass.MatchersOption(rules), xbypass.WhitelistOption(true))`，
@@ -188,7 +189,7 @@ func TestRuleBypassEmptyListMatchesEverything(t *testing.T) // 空清单：Conta
 - [ ] **Step 2: 运行确认失败**
 
 Run: `cd wisper && go test ./tunnel/ -run TestRuleBypass -v`
-Expected: FAIL（`newRuleBypass` 未定义）
+Expected: FAIL（`NewRuleBypass` 未定义）
 
 - [ ] **Step 3: 实现**
 
@@ -224,7 +225,7 @@ cd wisper && git add tunnel/rulebypass.go tunnel/rulebypass_test.go tunnel/tunne
 - Produces: `const TungoEntryPoint = "tungo"`；`NewTungoEntryPoint(opts ...tunnel.Option) EntryPoint`；
   `type tungoEntryPoint struct` 带 `init() error`（测试直接调用）；provider 命名
   `"tungo-ep-" + ID`；规则 bypass 注册名 `"tungo-rules-" + ID`。
-- Consumes: `tunnel.RulesOption`/`Options.Rules`（Task 2）、`tunnel.ChainConfig(id, name, recordMode)`
+- Consumes: `tunnel.NewRuleBypass`、`tunnel.RulesOption`/`Options.Rules`（Task 2）、`tunnel.ChainConfig(id, name, recordMode)`
   （照 `tunnel/entrypoint/p2p.go:125-175`）、`registry.BypassRegistry()`（注册规则对象，
   `x/config/parsing/bypass.List` 从那里取，见 `x/config/parsing/bypass/parse.go:88-99`）。
 
