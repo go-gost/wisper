@@ -67,6 +67,35 @@ func TestRuleBypassSwapTakesEffect(t *testing.T) {
 	}
 }
 
+func TestRuleBypassCopiesRules(t *testing.T) {
+	t.Run("constructor", func(t *testing.T) {
+		rules := []string{"listed.test"}
+		b := NewRuleBypass(rules)
+		rules[0] = "other.test"
+
+		if ruleMatches(b, "listed.test:443") {
+			t.Error("a caller mutating its own slice must not unlist an address")
+		}
+		if !ruleMatches(b, "other.test:443") {
+			t.Error("a caller mutating its own slice must not list an address")
+		}
+	})
+
+	t.Run("set rules", func(t *testing.T) {
+		rules := []string{"listed.test"}
+		b := NewRuleBypass(nil)
+		b.SetRules(rules)
+		rules[0] = "other.test"
+
+		if ruleMatches(b, "listed.test:443") {
+			t.Error("a caller mutating its own slice must not unlist an address")
+		}
+		if !ruleMatches(b, "other.test:443") {
+			t.Error("a caller mutating its own slice must not list an address")
+		}
+	})
+}
+
 func TestRuleBypassEmptyListMatchesEverything(t *testing.T) {
 	for name, rules := range map[string][]string{
 		"nil":   nil,
