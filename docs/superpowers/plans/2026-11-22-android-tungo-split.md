@@ -210,7 +210,59 @@ cd wisper && git add tunnel/rulebypass.go tunnel/rulebypass_test.go tunnel/tunne
   && git commit -m "feat(tunnel): add a whitelist rule bypass that can be swapped in place"
 ```
 
-**Implementation record:** _完成后填写（同上字段）。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成。
+- **仓库 + commit:**
+  - `wisper`（`github.com/go-gost/wisper`）：`3e551f9`
+    `feat(tunnel): add a whitelist rule bypass that can be swapped in place`
+    （代码 + 测试）；本条记录为随后的 `docs(plan)` 提交。
+  - `x`：本任务没有改动（直接用 `x/bypass` 的 `MatchersOption` +
+    `WhitelistOption(true)`）。
+- **实际改动文件:**
+  - `tunnel/rulebypass.go`（新增）— 导出 `RuleBypass`：`sync.RWMutex` 保护一个内部
+    `bypass.Bypass`；`NewRuleBypass(rules)` 调 `SetRules`；`SetRules` 在锁外重建
+    `xbypass.NewBypass(MatchersOption(rules), WhitelistOption(true))`，再在写锁内整体替换
+    （不重建 chain、不起 goroutine）；`Contains` 读锁取出内部对象后委托（幂等读，
+    不在持锁期间调用外部代码）；`IsWhitelist` 恒为 true。零值 `RuleBypass` 按空清单处理
+    （`Contains` 返回 true），不会 nil deref。
+  - `tunnel/rulebypass_test.go`（新增）— 四个测试：
+    `TestRuleBypassWhitelistSemantics`、`TestRuleBypassCIDRMatchesHostPort`、
+    `TestRuleBypassSwapTakesEffect`、`TestRuleBypassEmptyListMatchesEverything`
+    （后者含 `nil` / `空切片` 两个子测试，外加「先设清单再清空」）。
+  - `tunnel/tunnel.go` — `Options.Rules []string`（带语义注释：清单内走隧道、空清单全部直连、
+    编辑由 `SetRules` 原地生效）与 `func RulesOption(rules ...string) Option`。
+- **执行的命令与结果:**
+  - RED：`cd wisper && go test ./tunnel/ -run TestRuleBypass -v`
+    → 编译失败：`undefined: RuleBypass` / `undefined: NewRuleBypass`（符合预期）。
+  - GREEN：`cd wisper && CGO_ENABLED=1 go test ./tunnel/ -run TestRuleBypass -race -v`
+    → 4 个测试（+2 子测试）全部 PASS，无 DATA RACE 报告。
+  - 加注释后再跑 `-race -count=2` → 仍全 PASS。
+  - `cd wisper && CGO_ENABLED=1 go test ./tunnel/` → `ok ... 41.848s`。
+  - `cd wisper && go vet ./tunnel/` → 无输出；`gofmt -l tunnel/` → 无输出；
+    `CGO_ENABLED=1 go build ./...` → exit 0。
+- **评审发现与修复（自审）:**
+  - 语义核对：`x/bypass` 的 whitelist 是「匹配 = decisionProxy」，故 `Contains` 返回 true
+    确实是「清单外 → 直连」，与本 plan 的 Global Constraints 一致；`RuleBypass` 的
+    `IsWhitelist` 返回 true 也与这个语义相符。空清单时 `x` 的 `patterns` 保持 nil，走
+    「no predicates has no base match」分支 → `decisionBypass` → true，因此无需在
+    `RuleBypass` 里另写空清单短路；该不变量由
+    `TestRuleBypassEmptyListMatchesEverything` 钉住（万一 `x` 改语义会立刻红）。
+  - 锁的范围：`Contains` 只在读锁内拷贝指针，`SetRules` 在锁外构造新对象，避免在持锁时
+    调用外部代码，也把写临界区压到一次指针赋值。
+  - 命名冲突：本包 `natrules_test.go` 已有 `contains` 辅助函数，测试里的辅助函数改名为
+    `ruleMatches`，避免遮蔽。
+  - 测试卫生：SWAP 测试不依赖 `time.Sleep`，10 个 goroutine × 100 次并发读，配合 `-race`
+    覆盖 `Contains`/`IsWhitelist` 与 `SetRules` 的并发；交换后的断言在 `wg.Wait()` 之后，
+    结果确定。
+- **遗留项/限制:**
+  - `SetRules` 每次都会丢下旧的 `localBypass`；在无 loader 配置时 `x` 不起 goroutine，
+    旧对象连同其 `context.CancelFunc` 一起被 GC，未显式 `Close`（`NewBypass` 返回的是
+    `bypass.Bypass` 接口，没有 `Close`）。
+  - `RuleBypass` 只表述规则，不认识 chain/hop：把它挂到 hop 上、在 entrypoint 里随
+    `Options.Rules` 装配与热更新是 Task 3 / Task 6 的事。
+  - `x/bypass` 的 `Contains` 对空 `addr` 一律返回 false（=「清单内」）；上层取到的目的地址
+    来自 tun 栈，不会是空串，这里不额外处理。
 
 ---
 
