@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"context"
+	"io"
 	"net/netip"
 	"strings"
 	"testing"
@@ -21,9 +22,16 @@ import (
 //
 // Set once for the package: every device test here needs it, and each one
 // setting it for itself is how the gap below stayed open.
+//
+// It must be a real logger (NewLogger), not Nop(): the internal and the
+// external test packages of this directory share one test binary, and
+// p2p_poc_test.go (external, p2ppoc tag) stores a NewLogger in the same global.
+// core/logger keeps its default in an atomic.Value, which panics when two
+// different concrete types are stored — a Nop() here made every p2ppoc run of
+// this directory die in init before a test started.
 func init() {
 	if logger.Default() == nil {
-		logger.SetDefault(xlogger.Nop())
+		logger.SetDefault(xlogger.NewLogger(xlogger.OutputOption(io.Discard)))
 	}
 }
 
