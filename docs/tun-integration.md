@@ -197,6 +197,125 @@ Android 侧要新增一条 VpnService 通道 + 一处 x 改动。Android 可行�
 
 不在这一阶段：全流量出口（要 `protect()`，侵入 p2p/x）、tun↔tun 直连的手动链路。
 
+## 手机上按域名分流（tungo entrypoint）
+
+2026-11-22 落地。前面几节讲的是**全量 L3 进隧道**的 `tun` 入口点；这一节是新增的 `tungo`
+入口点：本地仍是 tun 设备（Android 上是 VpnService 的 fd），但栈把每个 TCP 流终止下来，
+**只把白名单里的目的送进隧道**，其余从手机自己的网络出去。分流按**域名**判定，不按 IP ——
+这正是 `tun` 做不到的那件事：VpnService 的路由在 `establish()` 时就定死了，而域名的 IP 不可
+预知。设计与取舍见 `docs/superpowers/specs/2026-11-22-android-tungo-split-design.md`。
+
+### 形状
+
+```
+app → VpnService(tun fd) → x/listener/tungo → x/handler/tungo（gVisor 栈 + 嗅探）
+    → Router.Dial(嗅到的 host:port，或 dst IP:port)
+        → chain hop-0（bypass = whitelist）
+            ├─ 命中 → node{connector: relay, dialer: tcp, metadata.p2p: provider}
+            │        → p2p tcp 流 → hub 的 p2p tunnel（endpoint 指向 pi 的 relay 服务）
+            │        → pi 的 relay handler → chain relay-wss（hop bypasses 原样复用）
+            └─ 未命中 → 空路由 → DefaultRoute.Dial → 手机自己的网络
+```
+
+`x/handler/tungo` 一行没改：栈、嗅探、UDP 都已在。新增的是 `x/listener/tungo` 的 Android fd
+分支、wisper 的 `tungo` 入口点（类型名 `tungo`），以及下面这套部署。
+
+### 规则：一份 whitelist，三种条目
+
+- **语义与 pi 的 `bypass-gfw` 完全相同**：`matched == whitelist` → 走代理。清单里 → 进隧道；
+  不在清单里 → 直连。
+- 三种条目：① 需要代理的域名（与 pi 的 `gost:bypass:gfw` 对齐）；② 内网域名后缀
+  （`home.pi`、`gost.local`、`dadax`）—— 内网服务按子域名访问，所以这些条目就是内网访问的
+  主路径；③ `192.168.100.0/24`（给 DNS 用，也是按 IP 访问时的兜底）。
+- **判定用的地址**：`Router.Dial` 收到的那个地址 —— TCP 嗅到 SNI/Host 时是 `host:port`，嗅不到
+  时是原始 `dstIP:port`；UDP 永远只有 `dstIP:port`。手机的默认动作是「不下发域名 → 直连」，
+  与 pi 上「嗅不到就按 IP 判」天然对齐。
+- 清单**故意放宽**无害：多送几个域名进隧道只是白绕一圈（pi 的 bypass 会让它从家宽直连）；
+  少送才会坏。
+- 两条硬约束（都在入口点侧，不在 pi）：
+  1. **不配 service 级 `bypass`**：TCP 路径上命中会直接丢弃这条流，不是直连 —— 直连只能来自
+     hop 级 bypass。
+  2. **不配 `resolver` / `hosts`**：router 会先解析，hop 的 bypass 看到的就是 IP，域名规则全部
+     静默失效。
+- 一个已知的非对称：bypass 只看一个地址，而带 SNI 的流传的是 `host:port`（原始 IP 丢了），
+  所以**带域名的流会顶掉 CIDR 规则** —— 这也是内网服务要按子域名访问、而不是按 IP 访问的原因。
+
+### DNS：唯一需要 UDP 的
+
+- VpnService 的 `dns` 设为 `192.168.100.100`，于是所有 app 的查询是 `UDP/53` 到它 → 命中
+  `192.168.100.0/24` → 走隧道 → pi 的 `dns` / `dns-tcp`（`hosts: hosts-dns`）作答。pi 那边已经是
+  想要的行为：`home.pi` / `.gost.local` / `.dadax` 走 hosts-dns；中文域走 `192.168.100.1`；
+  其余走 `8.8.8.8`/`8.8.4.4`（经 relay，无污染）。内网子域名可解析、被墙域名拿到未污染 IP、
+  国内域名走 ISP，三件事一次到位。
+- **只有 DNS 需要 UDP**：relay 把 UDP 帧化在同一条 TCP 里（`FUDP` 走 p2p tcp 流），所以不需要
+  `udp` 类型的 p2p tunnel，手机侧也只有一种流类型、一种 dialer。
+- 其余 UDP（QUIC、游戏、VoIP）一律直连：`handleUDPConn` 的 `Router.Dial("udp", dst)` 在清单外
+  落到 `DefaultRoute.Dial`，出来就是普通 UDP socket，而 app 在 VPN 之外，所以它真的从手机自己的
+  网络出去。被墙域名的 QUIC 因此也直连（没有 SNI，pi 上同样只能按 IP 判）。
+- 代价：每次查询多一次「回家」往返（pi 侧缓存 + Android 侧缓存缓解）。这是选定的取舍。
+
+### 隧道不可用时
+
+没有任何静默直连的退路：清单内的流拨不通就是失败（白名单域名打不开），DNS 也在清单里，所以
+**隧道断了等于手机上不能解析**。这是事实上的 fail-closed。把它做成显式选项（fail-closed /
+fail-open）还没做，属于设计 §8.1 的待定项 —— 在那之前，「隧道断了就断网」是预期的表现，不是
+故障。
+
+### 部署（2026-11-22 已在 pi / hub 上落地）
+
+pi 上加一个 relay 服务，**只绑回环**（绑 LAN 地址就等于开了一个人人可用的代理）：
+
+```yaml
+- name: relay-phone
+  addr: 127.0.0.1:18080
+  metadata:
+    enableStats: true
+  handler:
+    type: relay
+    chain: relay-wss
+  listener:
+    type: tcp
+```
+
+- 监听器是 `tcp`，不是 `relay`：`x/listener` 没有 relay 类型，relay 协议的识别在 handler 里
+  （所以这一端口将来也能服务 socks5/http 客户端）。
+- `chain: relay-wss` 就是既有那条链，hop-0 的 `bypasses: [bypass-gfw, bypass-local]` 原样复用，
+  分流逻辑一行不改：命中白名单的走出 `relay.gost.run`，`bypass-local` 命中的从家宽直连。
+- 热重载用 `SIGHUP`（不要重启服务）；实测 `ss -ltn` 只有 `127.0.0.1:18080` 一条。
+
+hub 上加一个 `p2p` tunnel，把这条流交给 pi 的 relay 服务：
+
+```json
+{"name": "gw-split", "type": "p2p", "endpoint": "127.0.0.1:18080"}
+```
+
+**一个 peer key 只能属于一个 p2p tunnel**，hub 里两个 tunnel 的 allowlist 同时出现同一个 key 会被
+拒绝（`peer … is already used by another p2p tunnel`，整个保存回滚）。所以手机切换时，「把 pixel-9
+加进新 tunnel」与「从 `p2p-tun` 的 peers 里移除」必须**一起**做：先加会 500，先移除会断掉手机上
+现在这条隧道。在切换之前，新 tunnel 可以先建好但**留空 allowlist**（空 = 不接受任何 peer，但状态
+是 running）。
+
+### 编辑与保存：保存不再等于重启
+
+- **只改 `rules`** → 就地 `SetRules`，不重建入口点、不 flap VPN：清单是链按名字解析的一个活
+  对象，能自己接住这次改动。
+- **改了 net / mtu / dns / peer 等任何其它字段** → 重建：设备会断一次再回来。
+- **什么都没改** → 不重建（旧行为是每次保存都重建一个健康的入口点）。
+- 所以「停/启」现在得分别做，UI 和脚本都不能再假设「保存 = 重启」。
+
+### 已知限制
+
+- **Android 只有一个 VPN 设备**：`tun` 与 `tungo` 互斥，同时在跑会被拒并点名持有设备的那个
+  入口点。
+- v1 只做 TCP + DNS-over-UDP；ICMP / mDNS / 广播不做。
+- 嗅不到域名的流（QUIC、非 TLS、原生 TCP 协议）按 IP 判 → 直连，与 pi 的表现一致。
+- 桌面端的 `tungo`（`x/listener/tungo` 在 linux/windows/darwin 自建设备）本期只保证类型可复用，
+  没专门验证体验。
+- **x 版本链仍未做**：wisper 的 `go.mod` 还 pin `x v0.29.0`，而 APK 构建（`android/Dockerfile.apk`）
+  只吃 wisper 仓库上下文、看不到工作区的 `go.work`。v0.29.0 的 `x/listener/tungo` 没有 android
+  的 fd 分支（会去开 `/dev/net/tun`），所以**发版前必须先给 x 打 tag 再 bump `go.mod`**，否则
+  装到手机上的 tungo 在 Android 上起不来。
+
 ## 相关
 
 - `wisper/docs/p2p-integration.md` — p2p 接缝评估（本文是其 tun 续篇）
