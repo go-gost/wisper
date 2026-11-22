@@ -602,6 +602,9 @@ cd wisper && git add tunnel/tungo_e2e_test.go && git commit -m "test(tunnel): re
 **Implementation record:**
 
 - **日期/状态:** 2026-11-22 — 已完成。
+- **评审修复轮:** `69998bb` `test(tunnel): keep the tungo e2e output pristine and its assertions tight`
+  —— Important（`-v` 输出不干净）+ 三个 Minor（`!= 1` 断言、接缝的注册副作用注释、`RunContext` 里不可达的 err 分支）。
+  全套 p2ppoc 里 `TestP2PTunnelDirectPath` 的失败在改动前就存在（stash 后同样失败），与本任务无关。
 - **仓库 + commit:** `wisper` —
   `0895c14` `test(tunnel): relay and FUDP over the p2p link end to end`（新测试 + `ChainConfig` 接缝）、
   `1201271` `fix(tunnel): keep one logger type in the test binary`（先决修复，见下）；
@@ -658,8 +661,8 @@ cd wisper && git add tunnel/tungo_e2e_test.go && git commit -m "test(tunnel): re
   - 无 `time.Sleep`、无固定端口（tcp/udp 都绑 `127.0.0.1:0`，derper 用 `freePort`），断言靠因果顺序
     而不是轮询：计数在往返成功时必然已经发生（流必须先到 relay 才能拿到 echo）；「未列」那条不需要
     等待，因为正确实现只做一次选择，而「先直连又偷偷摸到 relay」会让计数变 1。
-  - 输出沿用本套件既有约定（`clogger.Default()` 是 Debug），`-v` 下会有 x 的 JSON 调试行；
-    不是本文件引入的噪声。
+  - 输出已干净：修复轮把 `ParseChain`/router/relay 服务换成 discard logger，并在链路存活期间临时替换进程
+    默认 logger（`t.Cleanup` 最先注册、最后执行以还原）；`-v` 下只剩 p2p 库自己的 INFO 行。
   - 三处空白/显式导入（`x/connector/relay`、`x/dialer/tcp`、`x/handler/relay`、`x/listener/tcp`）
     是本文件自洽所需；没有改动 `x/`。
 - **遗留项/限制:**
