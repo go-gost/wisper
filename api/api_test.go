@@ -988,6 +988,30 @@ func TestCreateTunEntrypointRejectsBadShareLAN(t *testing.T) {
 // start is kept off it.
 const refusedDeviceName = "wisper-test-device-name"
 
+// requireStartRefused waits for the started entrypoint to record the failure of
+// its device step. The refusal is the premise every refusedDeviceName case rests
+// on: if the name ever stopped being refused, the start would build and configure
+// a real interface on the host — and bring x/handler/tungo's known Close/Handle
+// race into this package's -race run — while the assertions about the API's
+// fields still passed.
+func requireStartRefused(t *testing.T, id string) {
+	t.Helper()
+	timeout := time.After(2 * time.Second)
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		if ep := entrypoint.Get(id); ep != nil && ep.Err() != nil {
+			return
+		}
+		select {
+		case <-timeout:
+			t.Fatalf("the start of %q recorded no failure: %q is no longer refused, so it may have built a real device on this host",
+				id, refusedDeviceName)
+		case <-tick.C:
+		}
+	}
+}
+
 // useGostLogger gives the start path a gost default logger: creating a device
 // entrypoint runs the entrypoint inline, and x's components read
 // core/logger.Default(), which is nil in a test binary (wisper sets it at
@@ -1010,7 +1034,11 @@ func entrypointRules(t *testing.T, body map[string]any) []string {
 	raw, _ := opts["rules"].([]any)
 	rules := make([]string, 0, len(raw))
 	for _, v := range raw {
-		rules = append(rules, v.(string))
+		s, ok := v.(string)
+		if !ok {
+			t.Fatalf("rule %v in the response is not a string: %v", v, body)
+		}
+		rules = append(rules, s)
 	}
 	return rules
 }
@@ -1040,6 +1068,7 @@ func TestEntrypointCreateTungoWithRules(t *testing.T) {
 	}
 	id, _ := created["id"].(string)
 	defer entrypoint.Delete(id)
+	requireStartRefused(t, id)
 
 	if got := entrypointRules(t, created); !slices.Equal(got, want) {
 		t.Errorf("create response rules = %v, want %v", got, want)
@@ -1128,6 +1157,7 @@ func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) {
 	}
 	if id, _ := body["id"].(string); id != "" {
 		defer entrypoint.Delete(id)
+		requireStartRefused(t, id)
 	}
 	if rules := entrypointRules(t, body); len(rules) != 0 {
 		t.Errorf("rules = %v, want an empty list", rules)
@@ -1237,6 +1267,57 @@ func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) {
 	if got := entrypoint.Get(id); got != ep {
 		t.Error("clearing the rules replaced the entrypoint")
 	}
+}
+
+// TestEntrypointUpdateChangedNetRebuilds: the in-place path is only for a request
+// that changes nothing but the rule list. A changed device address has to rebuild
+// the run — the device is already built with the old one — so an update that
+// answered in place would return 200, keep the old entrypoint, and silently never
+// apply the edit.
+func TestEntrypointUpdateChangedNetRebuilds(t *testing.T) {
+	srv := setupTestServer(t)
+	defer srv.Close()
+	useGostLogger(t)
+
+	const id = "ep-tungo-net-put"
+	const peer = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
+	const newNet = "10.20.0.251/32"
+
+	ep := entrypoint.NewTungoEntryPoint(
+		tunnel.IDOption(id),
+		tunnel.NameOption("phone"),
+		tunnel.NetOption("10.20.0.250/32"),
+		tunnel.PeerOption(peer),
+		tunnel.RulesOption("example.com"),
+	)
+	// Assemble the split as a running entrypoint has it — the rules bypass
+	// registered under this ID's name — so the rebuild replaces a live object
+	// rather than an empty one.
+	if _, err := ep.(interface {
+		ChainConfig() (*xconfig.ChainConfig, error)
+	}).ChainConfig(); err != nil {
+		t.Fatalf("assemble the split chain: %v", err)
+	}
+	entrypoint.Add(ep)
+	t.Cleanup(func() { entrypoint.Delete(id) })
+
+	resp, body := putJSON(t, srv.URL+"/api/entrypoints/"+id, map[string]any{
+		"type": "tungo", "name": "phone", "net": newNet, "peer": peer,
+		"rules": []string{"example.com"}, "device_name": refusedDeviceName,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update net = %d: %v, want 200", resp.StatusCode, body)
+	}
+	got := entrypoint.Get(id)
+	if got == ep {
+		t.Fatal("a changed device address was applied in place: the run keeps its old device and the edit never happens")
+	}
+	if gotNet := got.Entrypoint(); gotNet != newNet {
+		t.Errorf("net after the update = %q, want %q", gotNet, newNet)
+	}
+	// The replacement is started with the refused device, like every other case
+	// here: skipping it would leave a real interface on the host.
+	requireStartRefused(t, id)
 }
 
 func TestGetStatsEmpty(t *testing.T) {

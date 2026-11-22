@@ -426,7 +426,12 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 			pStats.Add(stats.KindTotalErrs, int64(prev.TotalErrs))
 		}
 
+		// Under the same lock init writes it with: SetRules edits this config in
+		// place, so an unguarded read here would be an unsynchronized read of the
+		// very struct an edit is rewriting.
+		s.mu.RLock()
 		svcCfg := s.config.Services[0]
+		s.mu.RUnlock()
 		lnLogger := log.WithFields(map[string]any{"kind": "listener", "listener": "tungo"})
 		ln := newDeviceListener(
 			listener.AddrOption(svcCfg.Addr),
