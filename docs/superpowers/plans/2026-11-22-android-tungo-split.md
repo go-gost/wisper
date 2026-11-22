@@ -460,7 +460,80 @@ Expected: PASS，无 DATA RACE
 cd wisper && git add tunnel/entrypoint && git commit -m "feat(entrypoint): run and tear down the tungo entrypoint"
 ```
 
-**Implementation record:** _完成后填写。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成。
+- **仓库 + commit:** `wisper` — `feat(entrypoint): run and tear down the tungo entrypoint`（本次提交，见下）；
+  计划文档的记录另用 `docs(plan)` 提交。不涉及 `x`。
+- **实际改动的文件:**
+  - `tunnel/entrypoint/tungo.go`：`Run`/`RunContext`/`Status` 落地（acquire host → claim 设备
+    → 注册 provider → punch → `ParseChain` → 建 device listener → handler → `xservice.NewService`
+    → 发布 → `Serve` goroutine），`claimDevice`/`releaseDevice`/`fail` 三个私有方法，
+    `Close` 补全；类型新增 `forward`/`acquired`/`claimed` 字段；`newDeviceListener`、
+    `sharedDevice` 两个包级接缝；`init()` 增加 Android `fd` 注入、`Register` 失败清空 `s.rules`，
+    并改写 `s.rules` 的字段注释。
+  - `tunnel/entrypoint/entrypoint.go`：`restoreAsync` 认 `TungoEntryPoint`；
+    `CheckTunDeviceFree` 注释与错误措辞泛化为「持有设备」；`restore`/`Start` 的注释同步。
+  - `tunnel/entrypoint/tungo_test.go`：`TestTungoEntryPointRequiresPeer`（改为驱动 `Run`）+
+    新增 `TestTungoEntryPointClaimsDevice`、`TestTungoEntryPointRunFailureReleasesDevice`、
+    `TestTungoEntryPointCloseReleasesProvider`、`TestTungoEntryPointAndroidAsksForTheDeviceFD`、
+    `TestTungoStaleCloseKeepsSuccessorRules`，以及 `tungoRunConfig`/`useSharedDevice`/
+    `useDeviceListener`/`loopbackDeviceListener`/`failingDeviceListener` 辅助件。
+    `TestTungoEntryPointServiceConfig` 增加「桌面上不该有 `fd`」断言。
+  - `tunnel/entrypoint/restore_test.go`：`TestRestoreAsyncOnAndroidTun` →
+    `TestRestoreAsyncOnAndroidDevice`（两种设备类型）；新增谓词表测试
+    `TestRestoreAsyncPredicate`；`TestRestoreWaitsEverywhereElse` 增加 `tungo` 的非 Android 用例。
+- **测试/命令与结果:**
+  - RED：`cd wisper && go test ./tunnel/entrypoint/ -run 'TestTungo|TestRestore' -count=1`
+    → `FAIL [build failed] ... undefined: sharedDevice / newDeviceListener`（新生命周期测试
+    引用的实现与接缝尚不存在）。
+  - GREEN：`cd wisper && CGO_ENABLED=1 go test ./tunnel/entrypoint/ -race -count=1`
+    → `ok github.com/go-gost/wisper/tunnel/entrypoint 37.256s`，无 DATA RACE。
+  - `cd wisper && go test ./tunnel/entrypoint/ -count=2` → `ok ... 72s`（无跨测试泄漏）。
+  - `cd wisper && go test ./tunnel/ ./api/ -count=1` → `ok tunnel 41.795s`、`ok api 134.063s`。
+  - `GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build ./tunnel/... && GOOS=linux go build ./...`
+    → 两条均 exit 0。
+  - 变异验证（逐条临时改坏实现，确认对应测试会红，随后逐一还原）：
+    注释掉 `RunContext` 里的 `claimDevice()` → `TestTungoEntryPointClaimsDevice` 红
+    （`device owner = ("", ""), want ("tungo-device", "phone")`）；去掉回滚里的
+    `releaseDevice()` → `TestTungoEntryPointRunFailureReleasesDevice` 红
+    （`a failed Run kept the device claimed by ("tungo-run-fail", "phone")`）；`Close` 改回按名字
+    无条件注销规则 → `TestTungoStaleCloseKeepsSuccessorRules` 红；`Close` 去掉 provider 注销 →
+    `TestTungoEntryPointCloseReleasesProvider` 红；`restoreAsync` 改回只认 `tun` →
+    `TestRestoreAsyncPredicate` 红（`restoreAsync(android, tungo) = false, want true`）。
+- **评审发现与修复（自审）:**
+  - `x/registry` 的 **bypass** 注册表 `Get` 返回的是 `*bypassWrapper`（每次调用新建），不是
+    注册时的对象，因此「身份比较」必须读 `GetAll()[name]`；否则 `Close` 永远认为名字不是自己的，
+    规则永不注销（`TestTungoEntryPointServiceConfig` 立刻抓到）。
+  - `claimDevice` 把 `ClaimTunDevice` 放在 `s.mu` 内完成（`Close` 读 `claimed` 也在同一把锁内），
+    于是「Close 正好落在 claim 中间」只有两种结局：Close 看到 claim 并释放，或 claim 看到
+    `IsClosed` 并拒绝。`releaseDevice` 只在 `claimed` 为真时释放，避免更新后同 ID 的后任实例
+    被前任的 Close 解掉。
+  - 回滚只做 `provider`+`host`+`device` 三件（规则属 `init` 的注册物，由 `Close` 负责）；
+    `Close` 先于发布落地时（Android 后台 restore），`Run` 的发布锁内检查会走
+    `ErrEntryPointClosed` 分支并自己关掉服务，避免「没人关的服务」。
+  - `ErrEntryPointClosed` 不再 `setErr`/记事件：关闭是「停止」而非失败（`handleStart` 用
+    `Err() != nil` 判定「failed 但没关」的卡死状态，误记会让已关闭的 entrypoint 被当成卡死）。
+  - 测试辅助件 `loopbackDeviceListener` 顺带钉住两条硬约束：device listener **不带** stats
+    （否则设备被算成一条连接、字节双计）、地址只能是 `:0`。
+  - `tungoRunConfig` 用**独立**的 derp URL 并在结束时还原全局 config：共享 p2p host 在最后一次
+    release 后有 30s 宽限期，若沿用 p2p 测试的 settings，下一轮（`-count=2`）会复用上一轮
+    host 与旧身份目录，`TestP2PEntryPointLifecycle` 找不到自己的 `host.key`。这是本包既有的
+    顺序敏感性，用「不同 settings」隔离而不是去动它。
+- **遗留项/限制:**
+  - `RestartP2PRunning`（`entrypoint.go:267-273`）仍只匹配 `p2p`/`tun`：tungo 同样消费共享 host，
+    身份重置后不会被重建。不在本任务文件清单内（Task 6 的 API/类型收尾处一并处理），且在
+    linux 上驱动一次真实重建会去建 tun 设备，测试面需要另设接缝。
+  - `Close` 的**身份比较只覆盖规则 bypass**：provider 仍按名字注销（与 `p2p`/`tun` 一致）。
+    现有 `Restart`/`Delete` 路径都是「先关旧、再建新」，所以名字不会被后任抢走；若将来出现
+    「先建新后关旧」，同一 ID 的后任 provider 会被前任的 Close 撤掉（`x` 的 Unregister 会
+    close 它找到的值，但 `p2pProvider.Close` 是 no-op，故实际影响限于按名字查找）。
+  - `init()` 里 `BypassRegistry().Register` 失败时的 `s.rules = nil` 分支没有测试：失败只可能
+    来自「Unregister 与 Register 之间有人抢先注册同名」，无法在不加接缝的情况下注入。
+  - 代价：`Close` 为一次身份比较会 `GetAll()` 复制整张 bypass 表（条目数＝entrypoint/tunnel
+    的 bypass 数，量级很小）。
+  - 设备 fd 的等待（`WaitTunFD(vpnDeviceWait)`）在测试里只验证了「注入的是 provider 而不是
+    固定值」，真实 10s 等待行为仍只有 Android 真机/`x` 侧覆盖。
 
 ---
 
