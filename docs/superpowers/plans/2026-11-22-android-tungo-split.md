@@ -473,6 +473,16 @@ cd wisper && git add tunnel/entrypoint && git commit -m "feat(entrypoint): run a
   re-review 另指出：扩张后的重启路径会走 `restartRunning`，而它的 `Options` 字面量与
   `tunnel.TunnelOptions` 都没有 `Rules` —— 这会把清单清空成「全部直连」。当前不可达（API/config 还没有
   `rules` 字段），已移交 Task 6 并写进它的文件清单与测试清单。
+- **整分支评审修复轮（final fix wave，2026-11-22，Critical）:** 本任务的 Files 清单**漏了 Kotlin 那一侧**，
+  于是 `WisperService` 决定「App 要不要 VPN」的谓词仍是「`type == "tun"` 且 running」：恢复的 tungo
+  入口点永远拿不到设备（`no device fd`），而 `ARM_TTL_MS`（60 s）之后轮询会落到「没人要设备」并把
+  `TunVpnService.release()` 掉，把正在服务的入口点的 VPN 拆了。修复提交
+  `7aca21d` `fix(android): recognise the tungo entrypoint as a device holder`：
+  `WisperService.isDeviceHolderType()`（tun 或 tungo）成为唯一谓词，过滤、调用点与释放路径都用它，
+  并把 `TunVpnService`/`MainActivity` 里「只有 tun 想要设备」的三处注释一并更正。
+  该模块**没有 JVM 单测源集**（只有 `src/androidTest` 仪器测试，需要模拟器镜像），所以这轮没有加
+  JVM 测试，只把过滤函数改成对响应体取值的具名 `internal` 函数，并用工具链镜像的
+  `gradle :app:compileDebugKotlin` 验证编译。真机验收见 Task 7b 新增的 (a)(b) 两条。
 - **仓库 + commit:** `wisper` — `feat(entrypoint): run and tear down the tungo entrypoint`（本次提交，见下）；
   计划文档的记录另用 `docs(plan)` 提交。不涉及 `x`。
 - **实际改动的文件:**
@@ -605,6 +615,12 @@ cd wisper && git add tunnel/tungo_e2e_test.go && git commit -m "test(tunnel): re
 - **评审修复轮:** `69998bb` `test(tunnel): keep the tungo e2e output pristine and its assertions tight`
   —— Important（`-v` 输出不干净）+ 三个 Minor（`!= 1` 断言、接缝的注册副作用注释、`RunContext` 里不可达的 err 分支）。
   全套 p2ppoc 里 `TestP2PTunnelDirectPath` 的失败在改动前就存在（stash 后同样失败），与本任务无关。
+- **整分支评审修复轮（final fix wave，2026-11-22）:** 本任务只有三个测试，且两个 relay 用例都把
+  IP:port 传给 `startSplitLink`、入口点用例又直接调 `ch.Route`，所以 `Router.Dial` 的 resolve 那一步
+  没有任何测试覆盖 —— 规则写域名时，「解析后是否还能命中域名规则」是个空白。新增第四条
+  `TestTungoChainListedDomainRelaysOverP2P`（白名单 `localhost`、用 `localhost:<port>` 拨），
+  提交 `1dad62c` `test(tunnel): prove a listed domain traverses the tunnel`。用 `127.0.0.1` 当规则
+  重跑同一条会把 relay 计数打成 0，证明它确实在盯域名匹配而不是白过。
 - **仓库 + commit:** `wisper` —
   `0895c14` `test(tunnel): relay and FUDP over the p2p link end to end`（新测试 + `ChainConfig` 接缝）、
   `1201271` `fix(tunnel): keep one logger type in the test binary`（先决修复，见下）；
@@ -1000,6 +1016,13 @@ cd wisper && git add web-src web/assets && git commit -m "feat(web): edit the tu
     这种带斜杠的写法只匹配仓库根）。
   - 结果：`make typecheck` 无输出、`make ui-test` **38 passed**、`make web` `✓ built in 643ms`，
     重建产物随本条一起提交。
+- **整分支评审修复轮（final fix wave，2026-11-22）:** 本记录里那段 `fieldTungoRoutesHint` 文案已过时，
+  现在它写的是安全值 `0.0.0.0/0, ::/0`、v4-only 会让 IPv6 绕过分流、以及「此项必填」；tungo 的
+  routes 占位符也按类型改成了 `0.0.0.0/0, ::/0`（`entrypoint-detail-page.ts`），
+  对应 ui-test 断言同步改（`entrypoint-tungo-form.spec.ts`）。子域名的前导点写法（`.home.pi`）
+  写进了 `fieldRulesHint`（两语言），不在路由提示里 —— 它说的是清单条目而不是路由。
+  提交：`6fdc8d9` `fix(api): make the split's routes and dns safe by default`。
+  `make ui-test` 现在仍是 **38 passed / 0 failed**。
 
 
 ---
@@ -1275,6 +1298,14 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
       未验证，避免把标题读成「分流已生效」。
     - 本 Step 1 的操作步骤按实际做法改写（容器内写回 + `--privileged --pid=host` 容器发 SIGHUP）。
     - 记录小问题：`tunnel/p2p_host.go` 的空 allowlist 注释在 `825-828`；六个提交按 SHA 全部列出。
+- **整分支评审修复轮（final fix wave，2026-11-22）:** `docs/tun-integration.md` 补了两处，
+  `6cdca4a` `docs: state the split's trust boundary and its acceptance checks`：
+  - 「只绑回环」旁边新增**信任边界**段：白名单里的 peer（手机）可以要求 pi 拨**任何 pi 能到达的
+    目的地**（回环服务、家宽 LAN），`bypass-gfw` 只选链、不限制目的地 —— 所以 `gw-split` 的
+    allowlist 就是授权本身。
+  - 「内网域名后缀」改成前导点写法（`.home.pi` 等），因为匹配器按整名匹配。
+  - 同一条提交还补了 Task 7b 的两条验收（重启 App 进程后恢复的入口点自己拿到设备、空闲 ≥2 分钟后
+    VPN 仍在）与 `CheckTunDeviceFree` 文案对用户可见的提醒。
 - **遗留项/限制:**
   - `gw-split` 的 allowlist 现在是空的，**在 Task 7b 之前它不服务任何 peer**；p2p → relay 的端到端
     （含 relay 的 FUDP/DNS）仍未验证，只能在手机切过来之后验（本任务只验到 relay handler 这一跳）。
