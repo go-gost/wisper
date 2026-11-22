@@ -867,26 +867,26 @@ cd wisper && git add config api tunnel/entrypoint tunnel/tunnel.go \
   的暗示，重启入口是停+启。
 - Produces: 详情页/首页能创建与编辑 tungo entrypoint，`rules` 以换行文本往返
 
-- [ ] **Step 1: 写失败的 ui-test**
+- [x] **Step 1: 写失败的 ui-test**
 
 在既有测试里加一条：`tungo` 类型渲染出设备字段（net/mtu/routes/dns）、peer 选择与 `rules` 文本域，
 且**不**渲染 `share_lan`/`share_mode`/`direct`。
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `cd wisper && make ui-test`
 Expected: FAIL（现有按 `'tun'` 判定的分支不覆盖 tungo）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 按上面的文件清单改类型判定、加 `rules` 文本域与 i18n 两套 key。
 
-- [ ] **Step 4: 运行确认通过并重建 web 产物**
+- [x] **Step 4: 运行确认通过并重建 web 产物**
 
 Run: `cd wisper && make typecheck && make ui-test && make web`
 Expected: 三条都成功，`web/assets` 出现新的哈希产物
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 cd wisper && git add web-src web/assets && git commit -m "feat(web): edit the tungo entrypoint and its rules"
@@ -966,20 +966,40 @@ cd wisper && git add web-src web/assets && git commit -m "feat(web): edit the tu
   - 空清单的展示：视图模式显示 `—` 而不是隐藏该行——空清单是「全部直连」，是个可用状态；
     隐藏会让「我来过这里、确实清空了」无从判断。
   - `fieldRoutesHint` 是 tun 的文案（「留空则默认走本机 net 所在网段（含 hub 及其他 peer）」），
-    对 tungo 略偏；仍复用，因为它的主体（逗号分隔、`0.0.0.0/0` 表示全部）对两者都成立，
-    而计划里 tungo 的固定值就是 `0.0.0.0/0, ::/0`。`tunNetMatchesHub` 则对 tungo 是错的
-    （没有 tun hub 分配地址），已收窄到 tun。
+    对 tungo 略偏；**评审修复轮已改为 tungo 专用** `fieldTungoRoutesHint`（见下）。`tunNetMatchesHub`
+    则对 tungo 是错的（没有 tun hub 分配地址），已收窄到 tun。
   - `textarea` 用 `.value=${...}` 绑定而非 `value=` 属性，poll 时重填不会打断输入焦点；
     同时保证 `?edit` 首次渲染就带上已保存的清单。
 - **遗留项/限制:**
-  - `make ui-test` 仍非全绿：4 条既有失败（上面点名）与本任务无关，未修——它们分别属于
-    tun 表单测试的过期占位符、tun 表单的歧义 locator、以及 `tunnel-card` 的加密徽标测试漂移，
-    修它们会改动与 tungo 无关的断言，留待单独处理。
+  - `make ui-test` 曾有 4 条既有失败（上面点名），与本任务无关；**已在评审修复轮修掉**（见下一条），
+    现在整套是绿的。那次失败分别属于 tun 表单测试的过期 MTU 占位符、tun 表单的歧义 `.switch-row`
+    locator、以及 `tunnel-card` 的加密徽标测试漂移（徽标在 `f0419ed` 已被有意移除）。
   - tungo 不显示「本地对端（blocked_peers）」卡片：`blocked_peers` 只接了 tun spoke
     （Task 6a 未给 tungo 接这条），页面按 tun-only 保留。
   - View 模式的 `rules` 以 `, ` 连接显示（长清单会折行）；没有逐条可编辑的列表控件，编辑只有文本域。
   - 设备真正建立仍只有 Android 真机/root 覆盖；ui-test 的保存用例改为拦截 `POST /api/entrypoints`
     校验请求体（桌面无权限建设备，且不想污染夹具），设备创建本身由 Task 7 真机验收。
+- **评审修复轮:** `92e0b94` `test(web): green the ui suite and pin the tungo form's wire body`
+  —— Important（`make ui-test` 红：35 passed / 4 failed，违背本任务的验收门槛）+ 三个 Minor：
+  - 四红全部收掉，**没有**为了绿而删产品行为：`entrypoint-tun-form` 的 MTU 断言从 `1420` 改成表单实际渲染的
+    `1300`（`a730e43` 就把默认 MTU 降到了 1300）；「keeps LAN sharing last」的 `.switch-row` 收窄成
+    `.switch-row:has-text("Sharing Backend")`。
+  - `.secure` 徽标：`git log -S 'secure' -- web-src/src/components/tunnel-card.ts` 只有两条提交——
+    `b406bcd`（加上锁徽标）与 `f0419ed`（`replace lock badge with RTT on list`，注释写「now redundant」，
+    同一提交里 `home-page.ts` 的 `_secure()` 换成 `_rtt()`、也没人再设 `.secure`）。即**有意移除**
+    （p2p 加密是强制的，「不加密就拒绝建链」，逐项徽标不携带信息），不是重构丢失，所以更新测试而不是恢复元素：
+    `home-navigation` 的那条改成「card 存在且没有 `.secure`」并保留截图，`tunnel-detail` 的徽标测试删除；
+    同时清掉 `tunnel-card` 里已死的 `secure` 属性与 `.secure` CSS，并把两处仍在描述徽标的注释改成描述 RTT。
+  - 保存请求体加了防线：tungo 保存必须带 `net`（`10.10.100.250/32`，`validateTungoEntryPoint` 的硬要求）
+    且 `rules` 键必须存在（空清单也是 `[]`）；顺带断言 tun 保存体**没有** `rules`。
+  - 去掉死 key `typeTungoDesc`（两语言一致），并给 tungo 补自己的路由提示 `fieldTungoRoutesHint`
+    （逗号分隔 CIDR、`0.0.0.0/0` 表示全部，去向由分流规则决定）——不再复用 tun 的「留空默认走本机 net 网段」。
+  - 顺手删掉误提交的 `web-src/node_modules/nanoid/.claude/settings.local.json`（nanoid 包自带的本地
+    agent 设置，不是我们的文件），并在 `.gitignore` 加 `**/.claude/settings.local.json`
+    （带 `**/` 前缀，因为 vendored `node_modules` 在子目录里，只有 `.claude/settings.local.json`
+    这种带斜杠的写法只匹配仓库根）。
+  - 结果：`make typecheck` 无输出、`make ui-test` **38 passed**、`make web` `✓ built in 643ms`，
+    重建产物随本条一起提交。
 
 
 ---
