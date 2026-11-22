@@ -23,6 +23,10 @@ const (
 	// TunEntryPoint is a spoke: this node owns a tun device whose IP packets
 	// ride a p2p datagram tunnel to a hub's public key.
 	TunEntryPoint = "tun"
+	// TungoEntryPoint is a split spoke: this node owns a tun device whose flows
+	// are terminated by a userspace stack, and each flow either rides a relay
+	// request over a p2p tcp stream to the hub or is dialled directly.
+	TungoEntryPoint = "tungo"
 )
 
 var (
@@ -465,6 +469,8 @@ func NewByType(st string, options ...tunnel.Option) EntryPoint {
 		return NewP2PEntryPoint(options...)
 	case TunEntryPoint:
 		return NewTunEntryPoint(options...)
+	case TungoEntryPoint:
+		return NewTungoEntryPoint(options...)
 	}
 	return nil
 }
