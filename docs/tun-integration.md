@@ -199,11 +199,14 @@ Android 侧要新增一条 VpnService 通道 + 一处 x 改动。Android 可行�
 
 ## 手机上按域名分流（tungo entrypoint）
 
-2026-11-22 落地。前面几节讲的是**全量 L3 进隧道**的 `tun` 入口点；这一节是新增的 `tungo`
+2026-11-22 实现。部署形状已就位，但**分流尚未生效**（`gw-split` 的 allowlist 还是空的，手机仍跑在
+原来的 `p2p-tun` 上，细节见本节「部署」的开头）。前面几节讲的是**全量 L3 进隧道**的 `tun` 入口点；这一节是新增的 `tungo`
 入口点：本地仍是 tun 设备（Android 上是 VpnService 的 fd），但栈把每个 TCP 流终止下来，
-**只把白名单里的目的送进隧道**，其余从手机自己的网络出去。分流按**域名**判定，不按 IP ——
-这正是 `tun` 做不到的那件事：VpnService 的路由在 `establish()` 时就定死了，而域名的 IP 不可
-预知。设计与取舍见 `docs/superpowers/specs/2026-11-22-android-tungo-split-design.md`。
+**只把白名单里的目的送进隧道**，其余从手机自己的网络出去。判定**先看嗅到的域名**，嗅不到域名时
+才用目的 IP —— 这正是 `tun` 做不到的那件事：VpnService 的路由在 `establish()` 时就定死了，而域名的
+IP 不可预知。域名优先也解释了 DNS 凭什么走隧道：解析请求没有 SNI，它就是靠 IP 命中
+`192.168.100.0/24` 这一条 CIDR 规则的。设计与取舍见
+`docs/superpowers/specs/2026-11-22-android-tungo-split-design.md`。
 
 ### 形状
 
@@ -217,8 +220,10 @@ app → VpnService(tun fd) → x/listener/tungo → x/handler/tungo（gVisor 栈
             └─ 未命中 → 空路由 → DefaultRoute.Dial → 手机自己的网络
 ```
 
-`x/handler/tungo` 一行没改：栈、嗅探、UDP 都已在。新增的是 `x/listener/tungo` 的 Android fd
-分支、wisper 的 `tungo` 入口点（类型名 `tungo`），以及下面这套部署。
+这套分流/路由的**设计**没有要求改动 `x/handler/tungo`：栈、嗅探、UDP 都已在。新增的是
+`x/listener/tungo` 的 Android fd 分支、wisper 的 `tungo` 入口点（类型名 `tungo`），以及下面这套部署。
+（这个 branch 上 handler 后来确实被改过两次 —— `x@0316d18` / `x@0d006b9`，Task 6c —— 但那只是修一个
+既有的 `Close` 与 `Handle` 的竞争，与分流无关。）
 
 ### 规则：一份 whitelist，三种条目
 
@@ -264,6 +269,11 @@ app → VpnService(tun fd) → x/listener/tungo → x/handler/tungo（gVisor 栈
 
 ### 部署（2026-11-22 已在 pi / hub 上落地）
 
+**先说清现在的状态**：下面这套形状已经就位，但**分流还没有生效** —— hub 上的 `gw-split` allowlist
+是**空的**（不接受任何 peer），手机仍跑在原来的 `p2p-tun` 上，p2p → pi relay 这整段（含 relay 的
+FUDP/DNS）**尚未验证**，要等手机切过来（Task 7b）才有第一条真流量。已经验过的只有 pi 上 relay
+handler 这一跳（用本机 gost 客户端经 `127.0.0.1:18080` 取过国内外各一个 URL）。
+
 pi 上加一个 relay 服务，**只绑回环**（绑 LAN 地址就等于开了一个人人可用的代理）：
 
 ```yaml
@@ -278,10 +288,14 @@ pi 上加一个 relay 服务，**只绑回环**（绑 LAN 地址就等于开了�
     type: tcp
 ```
 
-- 监听器是 `tcp`，不是 `relay`：`x/listener` 没有 relay 类型，relay 协议的识别在 handler 里
-  （所以这一端口将来也能服务 socks5/http 客户端）。
+- 监听器是 `tcp`，不是 `relay`：`x/listener` 没有 relay 类型，relay 协议在 handler 里识别。
+  但这个端口**只认 relay**：`x/handler/relay` 上来就按 relay 读握手（`handler/relay/handler.go:219-222`），
+  首字节对不上 relay 版本直接 `ErrBadVersion` 断开，没有 socks5/http 探测 —— 它服务不了那些客户端，
+  也不该被当成通用代理端口暴露出去。
 - `chain: relay-wss` 就是既有那条链，hop-0 的 `bypasses: [bypass-gfw, bypass-local]` 原样复用，
-  分流逻辑一行不改：命中白名单的走出 `relay.gost.run`，`bypass-local` 命中的从家宽直连。
+  分流逻辑一行不改：`bypass-gfw`（whitelist 模式）里的目的走出 `relay.gost.run`，**其余一律从家宽
+  直连** —— 国内域名是因为「不在白名单里」而直连（hop 没选中任何节点），不是被 `bypass-local` 拦下来
+  的；`bypass-local` 命中的内网地址同样直连，两条路径的出口相同。
 - 热重载用 `SIGHUP`（不要重启服务）；实测 `ss -ltn` 只有 `127.0.0.1:18080` 一条。
 
 hub 上加一个 `p2p` tunnel，把这条流交给 pi 的 relay 服务：
@@ -298,7 +312,13 @@ hub 上加一个 `p2p` tunnel，把这条流交给 pi 的 relay 服务：
 所以只影响它自己。在那之前，新 tunnel 可以**留空 allowlist** 先建好（空 = 不接受任何 peer，但状态是
 running），这样切换时只剩两次 peers 保存。
 
-### 编辑与保存：保存不再等于重启
+### 编辑与保存：`tungo` 的保存不再等于重启
+
+下面这一节**只对 `tungo` 入口点成立**。就地更新靠的是 `RuleSetter`，而它只由 tungo 入口点实现
+（接口 `tunnel/entrypoint/entrypoint.go:39-47`，实现 `tunnel/entrypoint/tungo.go:265`）：API 只有在
+被替换的入口点实现了它、且除 `rules` 外没有任何字段变化时才就地生效
+（`api/entrypoint_handler.go:338`）。`tun` / `p2p` 入口点没有这个接缝，**哪怕什么都没改，保存一次
+照样把入口点重建一遍**。
 
 - **只改 `rules`** → 就地 `SetRules`，不重建入口点、不 flap VPN：清单是链按名字解析的一个活
   对象，能自己接住这次改动。

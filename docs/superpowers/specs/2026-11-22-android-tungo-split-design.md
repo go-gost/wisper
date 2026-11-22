@@ -138,7 +138,9 @@ SNI/Host 时是 `host:port`，嗅不到时是原始 `dstIP:port`；UDP 永远是
 
 实现形态：entrypoint 把 `Options.Rules` 组装成一个 `BypassConfig{Whitelist: true,
 Matchers: rules}`，hop-0 用 `bypasses: [<name>]` 引用它。清单内的地址 → 选中
-`relay` 节点；清单外 → 空路由 → `DefaultRoute.Dial`。**`x/handler/tungo` 一行都不用改。**
+`relay` 节点；清单外 → 空路由 → `DefaultRoute.Dial`。**这个设计不需要改动 `x/handler/tungo`**
+（本 branch 上它后来被 `0316d18`/`0d006b9` 动过两次（Task 6c），但只是修既有的
+`Close`/`Handle` 竞争，不是分流需要的改动）。
 
 ### 5.1 DNS：只有它需要 UDP
 
@@ -177,8 +179,10 @@ Matchers: rules}`，hop-0 用 `bypasses: [<name>]` 引用它。清单内的地�
    - `listener.go:96-99` 的 `net.InterfaceByName(name)` 失败是致命的（`return err`），
      Android 上会让听循环每轮都失败、永不交出 conn。照
      `x/listener/tun/listener.go:103-111` 降级为 `log.Warnf`。
-2. `x/handler/tungo`：**不需要改动**（§3.3、§5）。service 级 bypass 保持不配；
+2. `x/handler/tungo`：**设计上不需要改动**（§3.3、§5）。service 级 bypass 保持不配；
    规则全部由 hop 的 whitelist bypass 表达，TCP/UDP 都走同一条 `Router.Dial`。
+   （事实更正：分支上 `0316d18`/`0d006b9` 确实碰过这个 handler，但那是修一个既有的
+   `Close` 与 `Handle` 竞争，与分流无关 —— 本节说的是「分流设计没有拉出这个改动」。）
 
 ### wisper
 
