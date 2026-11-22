@@ -466,6 +466,13 @@ cd wisper && git add tunnel/entrypoint && git commit -m "feat(entrypoint): run a
 **Implementation record:**
 
 - **日期/状态:** 2026-11-22 — 已完成。
+- **评审修复轮:** `1a87d0f` `fix(entrypoint): restart and count the tungo entrypoint like the other spokes`
+  —— 两个 Important（`RestartP2PRunning` 补 `tungo` + 重启测试；device listener 挂 `listener.StatsOption`，
+  与 `tun.go:749`/`p2p.go:272` 一致，反转了原先「不带 stats」的测试缝）与两个 Minor（`init()` 赋完
+  `s.rules` 后重查 `IsClosed()` 并按身份注销；`Close` 的 provider 按名字注销处补顺序假设注释）。
+  re-review 另指出：扩张后的重启路径会走 `restartRunning`，而它的 `Options` 字面量与
+  `tunnel.TunnelOptions` 都没有 `Rules` —— 这会把清单清空成「全部直连」。当前不可达（API/config 还没有
+  `rules` 字段），已移交 Task 6 并写进它的文件清单与测试清单。
 - **仓库 + commit:** `wisper` — `feat(entrypoint): run and tear down the tungo entrypoint`（本次提交，见下）；
   计划文档的记录另用 `docs(plan)` 提交。不涉及 `x`。
 - **实际改动的文件:**
@@ -600,7 +607,9 @@ cd wisper && git add tunnel/tungo_e2e_test.go && git commit -m "test(tunnel): re
 
 **Files:**
 - Modify: `wisper/config/config.go`（`Tunnel` 加 `Rules []string` yaml/json `rules`）
-- Modify: `wisper/tunnel/entrypoint/entrypoint.go:304-320`（`restartRunning` 复制 `Rules`）
+- Modify: `wisper/tunnel/entrypoint/entrypoint.go:304-343`（`restartRunning` 的 `tunnel.Options` 字面量要复制 `Rules`）
+- Modify: `wisper/tunnel/tunnel.go:874-907`（`TunnelOptions` 要带上 `RulesOption(opts.Rules)` —— 否则
+  `Restart` / `handleStartEntrypoint` / `restartRunning` 三条重建路径都会把清单清空成「全部直连」）
 - Modify: `wisper/api/entrypoint_handler.go`（create request 的 `Rules` + `toOptions`；
   `entrypoint_handler.go:143-147` 的类型校验加 `case entrypoint.TungoEntryPoint:
   validateTungoEntryPoint(req)` —— 要求 `net` 与 `peer`，`rules` 可空（空=全部直连））
@@ -629,6 +638,7 @@ func TestEntrypointCreateTungoWithRules(t *testing.T)         // POST type=tungo
 func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) // 缺 net 或 peer → 400，错误信息点名缺哪个
 func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) // PUT 只改 rules → entrypoint ID 不变、服务未重建（stats 基线保留）、新规则立即生效（TunDeviceOwner 名称不变）
 func TestRestartRunningKeepsRules(t *testing.T)               // 触发 restartRunning → 重建后的 Options.Rules 与旧值一致（防静默丢字段）
+func TestRestartP2PRunningKeepsTungoRules(t *testing.T)        // ResetP2PIdentity 触发的重启（Task 4 新加的那条）同样保留 Rules
 ```
 
 - [ ] **Step 2: 运行确认失败**
