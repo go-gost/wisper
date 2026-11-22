@@ -941,6 +941,9 @@ cd x && git add handler/tungo && git commit -m "fix(tungo): guard the handler st
 
 - **日期/状态:** 2026-11-22 — 已完成。`Close` 与 `Handle` 对 `h.stack` 的读写已同一把锁；重复/并发
   `Close` 幂等；`Close` 先于 `Handle` 发布栈时不再泄漏。
+- **评审修复轮:** `0d006b9` `test(tungo): make the close-vs-handle race test deterministic`
+  —— Important（`time.Sleep(100ms)` 会让测试从 `closed` 分支绿着通过）+ 三个 Minor（`Init` 复位 `closed`、
+  调用方义务注释、管道清理）。RED 用提交的这版测试在回退守卫后重新取证。
 - **仓库 + commit:**
   - `x`（`github.com/go-gost/x`）：`0316d18` `fix(tungo): guard the handler stack against Close racing Handle`
     （`handler/tungo/handler.go` + 新增 `handler/tungo/handler_test.go`）。
