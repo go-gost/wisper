@@ -1,9 +1,14 @@
 package tunnel
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"sync"
 	"testing"
+
+	clogger "github.com/go-gost/core/logger"
+	xlogger "github.com/go-gost/x/logger"
 )
 
 func ruleMatches(b *RuleBypass, addr string) bool {
@@ -115,5 +120,34 @@ func TestRuleBypassEmptyListMatchesEverything(t *testing.T) {
 	b.SetRules(nil)
 	if !ruleMatches(b, "example.com:443") {
 		t.Error("clearing the list must send every address direct")
+	}
+}
+
+// TestRuleBypassLogsDecisions: the inner bypass reports each verdict at debug
+// through the logger it was built with, which is what makes "why did this flow
+// go direct" answerable from the service's own log. The swap in SetRules must
+// carry that logger too, or a hot edit would silence the split.
+func TestRuleBypassLogsDecisions(t *testing.T) {
+	var buf bytes.Buffer
+	log := xlogger.NewLogger(
+		xlogger.OutputOption(&buf),
+		xlogger.LevelOption(clogger.DebugLevel),
+	)
+	b := NewRuleBypass([]string{"listed.test"}, RuleBypassLoggerOption(log))
+
+	if ruleMatches(b, "listed.test:443") {
+		t.Fatal("listed.test is on the list, so it must go through the tunnel")
+	}
+	b.SetRules([]string{"listed.test"})
+	if !ruleMatches(b, "other.test:443") {
+		t.Fatal("other.test is not on the list, so it must dial direct")
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "proxy: listed.test:443") {
+		t.Errorf("log = %q, want the listed address decided as proxy", out)
+	}
+	if !strings.Contains(out, "bypass: other.test:443") {
+		t.Errorf("log = %q, want the unlisted address decided as bypass", out)
 	}
 }

@@ -198,10 +198,25 @@ func (s *tungoEntryPoint) init() error {
 	hop := chCfg.Hops[0]
 	hop.Bypasses = []string{s.rulesName}
 	node := hop.Nodes[0]
+	// ChainConfig describes the tunnel connector (tunnel.id, record.mode) and
+	// this split swaps that connector for the relay one, so those keys move onto
+	// the node rather than going away with the connector: the node still belongs
+	// to this tunnel, and a key ChainConfig adds later is carried too. The p2p
+	// marker is added to that map, never put in its place — which is what a
+	// wholesale replacement did.
+	nodeMD := make(map[string]any, len(node.Metadata)+len(node.Connector.Metadata)+1)
+	for k, v := range node.Metadata {
+		nodeMD[k] = v
+	}
+	for k, v := range node.Connector.Metadata {
+		nodeMD[k] = v
+	}
+	nodeMD["p2p"] = s.provider
+	node.Metadata = nodeMD
+
 	node.Addr = s.peer
 	node.Connector = &xconfig.ConnectorConfig{Type: "relay"}
 	node.Dialer = &xconfig.DialerConfig{Type: "tcp"}
-	node.Metadata = map[string]any{"p2p": s.provider}
 
 	// The rules, the object that holds them and the config that describes them
 	// are written in one critical section, and only after everything that does
@@ -215,7 +230,14 @@ func (s *tungoEntryPoint) init() error {
 	// The clone is this init's own copy: neither the registry object nor the
 	// config below reaches the caller's slice.
 	rules := slices.Clone(s.opts.Rules)
-	ruleBypass := tunnel.NewRuleBypass(rules)
+	// The logger is the service's own, so the bypass's debug line — which
+	// address was decided which way, and the rule it matched — is read in the
+	// same stream as the rest of this entrypoint's log.
+	ruleBypass := tunnel.NewRuleBypass(rules, tunnel.RuleBypassLoggerOption(p2pLog().WithFields(map[string]any{
+		"kind":    "service",
+		"service": s.opts.Name,
+		"rules":   s.rulesName,
+	})))
 	registry.BypassRegistry().Unregister(s.rulesName)
 	if err := registry.BypassRegistry().Register(s.rulesName, ruleBypass); err != nil {
 		// The Unregister above took whatever this name held — this entrypoint's

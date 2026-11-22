@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/go-gost/core/bypass"
+	"github.com/go-gost/core/logger"
 	xbypass "github.com/go-gost/x/bypass"
 )
 
@@ -20,13 +21,30 @@ import (
 type RuleBypass struct {
 	mu    sync.RWMutex
 	inner bypass.Bypass
+	// log is the inner bypass's logger: it reports which way each address was
+	// decided at debug level, which is the only visible trace of why a flow took
+	// the tunnel. Set at construction, never replaced.
+	log logger.Logger
 }
 
 var _ bypass.Bypass = (*RuleBypass)(nil)
 
+// RuleBypassOption configures a RuleBypass at construction.
+type RuleBypassOption func(*RuleBypass)
+
+// RuleBypassLoggerOption sets the logger the inner bypass reports its decisions
+// through. A nil logger is the same as leaving it unset: the inner bypass then
+// discards its own messages.
+func RuleBypassLoggerOption(log logger.Logger) RuleBypassOption {
+	return func(b *RuleBypass) { b.log = log }
+}
+
 // NewRuleBypass returns a RuleBypass holding rules.
-func NewRuleBypass(rules []string) *RuleBypass {
+func NewRuleBypass(rules []string, opts ...RuleBypassOption) *RuleBypass {
 	b := &RuleBypass{}
+	for _, opt := range opts {
+		opt(b)
+	}
 	b.SetRules(rules)
 	return b
 }
@@ -39,6 +57,7 @@ func (b *RuleBypass) SetRules(rules []string) {
 	next := xbypass.NewBypass(
 		xbypass.MatchersOption(slices.Clone(rules)),
 		xbypass.WhitelistOption(true),
+		xbypass.LoggerOption(b.log),
 	)
 
 	b.mu.Lock()

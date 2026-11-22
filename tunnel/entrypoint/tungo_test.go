@@ -237,6 +237,15 @@ func TestTungoEntryPointServiceConfig(t *testing.T) {
 	if got := node.Metadata["p2p"]; got != "tungo-ep-"+id {
 		t.Errorf("node metadata p2p = %v, want tungo-ep-%s", got, id)
 	}
+	// The split swaps ChainConfig's tunnel connector for the relay one; the keys
+	// that connector described still belong to this node, and dropping them with
+	// the connector was what a wholesale metadata replacement did.
+	if got := node.Metadata["tunnel.id"]; got != id {
+		t.Errorf("node metadata tunnel.id = %v, want %s: the split's node still belongs to this tunnel", got, id)
+	}
+	if got, ok := node.Metadata["record.mode"]; !ok || got == "" {
+		t.Errorf("node metadata record.mode = %v (present %t), want the record mode ChainConfig set", got, ok)
+	}
 
 	if len(s.config.Bypasses) != 1 {
 		t.Fatalf("config has %d bypasses, want 1", len(s.config.Bypasses))
