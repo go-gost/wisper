@@ -937,7 +937,66 @@ Run: `cd x && CGO_ENABLED=1 go test ./handler/tungo/ -race -count=1` → PASS，
 cd x && git add handler/tungo && git commit -m "fix(tungo): guard the handler stack against Close racing Handle"
 ```
 
-**Implementation record:** _完成后填写。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成。`Close` 与 `Handle` 对 `h.stack` 的读写已同一把锁；重复/并发
+  `Close` 幂等；`Close` 先于 `Handle` 发布栈时不再泄漏。
+- **仓库 + commit:**
+  - `x`（`github.com/go-gost/x`）：`0316d18` `fix(tungo): guard the handler stack against Close racing Handle`
+    （`handler/tungo/handler.go` + 新增 `handler/tungo/handler_test.go`）。
+  - `wisper`（`github.com/go-gost/wisper`）：本任务只有这条 Implementation record，
+    `docs(plan): implementation record for task 6c`。
+- **实际改动文件:**
+  - `x/handler/tungo/handler.go`：
+    - `tungoHandler` 新增 `mu sync.Mutex` 与 `closed bool`；`cancel`/`stack` 移到锁下（字段注释写明
+      「不在锁内 `stack.Wait`/`stack.Close`」）。`Init` 写 `h.cancel` 也走同一把锁。
+    - `Handle`：`core.CreateStack` 成功后 `h.mu.Lock()`；若 `h.closed` 则解锁、
+      **自己** `stack.Close()` 并返回 nil（该栈从未发布，没人会来关它）；否则 `h.stack = stack`、
+      解锁，然后照旧 `stack.Wait()`。
+    - `Close`：锁内取走 `h.stack`/`h.cancel` 并**置 nil**、置 `h.closed = true`，解锁后再 `cancel()`
+      与 `s.Close()`；因此第二次（含并发的第二次）`Close` 只返回 nil，不会关两次。
+    - 公开形状、metadata、stats、其它 handler 均未改动；`stack.go` 未改。
+  - `x/handler/tungo/handler_test.go`（新增）：
+    - `var _ io.Closer = (*tungoHandler)(nil)` 钉住 `handler.Handler` + `io.Closer` 形状。
+    - `deviceConn`：包住设备 conn，在 link endpoint 第一次 `Read` 时关闭 `read` 通道——这是唯一
+      不碰被发布的 `h.stack` 的外部观察点。
+    - `TestHandlerCloseRacesHandle`：`net.Pipe` 当设备、ctx metadata 里
+      `&tun_util.Config{MTU: 1400}`、`Handle` 在 goroutine、读到设备后 `Close`（**两个 goroutine
+      并发**各调一次，都要求返回 nil）、断言 `h.stack` 在锁下已为 nil、关闭 pipe 对端放行 link
+      endpoint 后 `Handle` 在 5s 内返回且 error 为 nil（不 panic 由测试进程本身兜底）。
+    - `TestHandlerCloseBeforeHandle`：先 `Close` 再 `Handle`，`Handle` 必须在 5s 内返回 nil
+      （即自己关掉刚建的栈，而不是 `stack.Wait()` 卡死）。
+- **执行的命令与结果:**
+  - RED（竞态）：`cd x && CGO_ENABLED=1 go test ./handler/tungo/ -run TestHandlerCloseRacesHandle -race -count=1`
+    → FAIL，`WARNING: DATA RACE`：`Read ... (*tungoHandler).Close() handler.go:171` 与
+    `Previous write ... (*tungoHandler).Handle() handler.go:159`（正是任务书点名的一对）。
+    当时的测试用顺序两次 `Close`、且不含「`h.stack` 已为 nil」的内部断言（该断言要 `h.mu`，
+    修复前无法编译）。
+  - RED（Close 先行）：`-run TestHandlerCloseBeforeHandle -race` → FAIL
+    `handler_test.go: Handle did not return after Close`（5s 超时，修复前 `stack.Wait()` 永不返回）。
+  - GREEN：`cd x && CGO_ENABLED=1 go test ./handler/tungo/ -race -count=3` → PASS，无 DATA RACE；
+    `cd x && go test ./handler/tungo/ -count=1` → `ok ... 0.107s`；`go vet ./handler/tungo/`、
+    `gofmt -l handler/tungo/` → 均无输出；`cd x && go build ./...` → exit 0。
+  - 变异验证（证明断言有力，均当场恢复）：删掉 `Close` 里的 `h.stack = nil` →
+    `TestHandlerCloseRacesHandle` 报 `Close left the stack published on the handler`；
+    把 `Handle` 的 `if h.closed` 改成 `if false && h.closed` → `TestHandlerCloseBeforeHandle`
+    重新 5s 超时。
+- **评审发现与修复（自审）:**
+  - 只锁 `h.stack` 不够：`Close` 若在 `CreateStack` 期间跑完，`Handle` 仍会发布栈并 `Wait` 到天荒地老，
+    所以补了 `closed` 标志与「自建自关」分支（否则就是任务书禁止的泄漏）。
+  - `Close` 必须锁内取指针并置 nil：先解锁再关、或关完再置 nil，都会让并发第二次 `Close` 关两次。
+    测试因此改成两个 goroutine 并发 `Close`，而不是顺序两次。
+  - `h.cancel` 虽然只在 `Init` 写，也一并纳入同一把锁，避免「同一字段两种纪律」的读法歧义。
+  - 测试助手原先在类型断言失败时用 `%T` 打印已被置零的断言结果，改为先取接口再断言。
+  - `handler.Handler` 接口本身没有 `Close`，测试用 `io.Closer` 断言确认服务侧形状未变。
+- **遗留项/限制:**
+  - `Close` 只关 gvisor 栈，不会关设备 conn：`Handle` 仍卡在 `stack.Wait()`，直到设备读失败
+    （tun fd 被撤销 / conn 被关）才返回。测试用关闭 `net.Pipe` 对端模拟这一点。若真机上「停 VPN」
+    不先让设备读返回错误，`Handle` goroutine 会滞留到 fd 消失——这是既有设计，本任务不改变，
+    真机验收（Task 7）时值得确认停/启能立刻回收。
+  - 同一实例上 `Init` 后再 `Close` 再 `Handle` 会立刻关闭新栈（`closed` 不复位）；`x` 每次解析
+    配置都新建 handler 实例，故不构成实际问题。
+  - 未处理同一实例上并发两次 `Handle`（既有行为，任务范围外）。
 
 ---
 
