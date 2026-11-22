@@ -1122,7 +1122,7 @@ cd x && git add handler/tungo && git commit -m "fix(tungo): guard the handler st
   DNS 取舍、失败时的行为、以及「保存不再重启」）
 - 运维（不在仓库）：`pi@192.168.100.100` 的 `/etc/gost/gost.yaml`、hub 的 `wisper.yaml`
 
-- [ ] **Step 1: pi 增加 relay 服务**（复用 `relay-wss` 与既有 bypasses，只绑回环）
+- [x] **Step 1: pi 增加 relay 服务**（复用 `relay-wss` 与既有 bypasses，只绑回环）
 
 ```yaml
 - name: relay-phone
@@ -1144,7 +1144,7 @@ socks5/http，所以这一端口将来也能服务别的客户端。）
 && cat > gost.yaml.tmp && mv gost.yaml.tmp gost.yaml'` → `kill -HUP <MainPID>` 热重载。
 Expected: 日志出现 `relay-phone` 的监听；`ss -ltn | grep 18080` 只绑 `127.0.0.1`。**记录备份文件名**。
 
-- [ ] **Step 2: 在 pi 上验证 relay 腿本身**（不需要手机）
+- [x] **Step 2: 在 pi 上验证 relay 腿本身**（不需要手机）
 
 ```sh
 # 用 gost 客户端经 relay 入口起一个本地 HTTP 代理，再各取一次
@@ -1154,20 +1154,100 @@ curl -x http://127.0.0.1:18081 -sS -o /dev/null -w '%{http_code}\n' https://www.
 ```
 Expected: 两条都 200（第二条经 `relay-wss`）；gost 日志里能看到 `relay-phone` 的连接与链选择。
 
-- [ ] **Step 3: hub 增加 p2p tunnel（加法）**
+- [x] **Step 3: hub 增加 p2p tunnel（加法）**
 
-新增一个 type `p2p` 的 tunnel：`endpoint: 127.0.0.1:18080`、`peers: [pixel-9 的 key]`。
+新增一个 type `p2p` 的 tunnel：`endpoint: 127.0.0.1:18080`。**peers 先留空**：hub 硬性要求一个 peer key
+只属于一个 tunnel，pixel-9 现在还在 `p2p-tun` 里，带 key 建会被 500 拒绝（`peer … is already used by
+another p2p tunnel`），而本任务不许动那条正在用的隧道 —— 所以 key 在 Task 7b 的 Step 4 里与「从
+`p2p-tun` 移除」成对完成。
 走 API（无需重启容器，避免打断现在的隧道）：hub 的 wisper API 在 `127.0.0.1:8900`（host 网络，无认证）：
-`curl -sS -X POST http://127.0.0.1:8900/api/tunnels -H 'content-type: application/json' -d '{"name":"gw-split","type":"p2p","endpoint":"127.0.0.1:18080","peers":["<pixel-9 key>"]}'`
+`curl -sS -X POST http://127.0.0.1:8900/api/tunnels -H 'content-type: application/json' -d '{"name":"gw-split","type":"p2p","endpoint":"127.0.0.1:18080"}'`
 Expected: `/api/tunnels` 里新 tunnel 存在且 running；现有 `p2p-tun` 的 peers **不变**。
 
-- [ ] **Step 4: 提交文档**
+- [x] **Step 4: 提交文档**
 
 ```bash
 cd wisper && git add docs/tun-integration.md && git commit -m "docs: document the tungo split entrypoint and its deployment"
 ```
 
-**Implementation record:** _完成后填写（含 pi 配置的备份文件名、两条 curl 的实测结果）。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成（只做加法；现有 `p2p-tun` 与手机的实时隧道未动）。
+- **仓库 + commit:**
+  - `wisper`（`github.com/go-gost/wisper`）：`1fbdcdc` `docs: document the tungo split entrypoint and its deployment`
+    （`docs/tun-integration.md` 新增「手机上按域名分流（tungo entrypoint）」一节）+ 本条 record 的
+    `docs(plan)` 提交。
+  - 运维（不在仓库）：pi 的 `/etc/gost/gost.yaml`（新增 `relay-phone`）、hub 的 tunnel 列表（新增 `gw-split`）。
+- **实际改动文件:**
+  - pi `/etc/gost/gost.yaml`：在 `services` 列表末尾**追加**（diff 只有 10 行 +）：
+    ```yaml
+    - name: relay-phone
+      addr: 127.0.0.1:18080
+      metadata:
+        enableStats: true
+      handler:
+        type: relay
+        chain: relay-wss
+      listener:
+        type: tcp
+    ```
+    其余 keys（`tproxy-tcp` / `dns` / `dns-tcp` / `chains` / `bypasses` / `hosts` …）逐字节未变。
+  - `wisper/docs/tun-integration.md`：新增一节（形状、规则的三种条目与两条硬约束、DNS 取舍、
+    隧道不可用时的表现、pi/hub 的部署形状与 peer key 唯一性、保存不再重启、已知限制）。
+- **执行的命令与结果:**
+  - **备份文件名：`gost.yaml.bak.20261122-181625`**（4892 字节 = 改动前的 4892，同上一条备份
+    `gost.yaml.bak.20261116-073349` 之后的唯一新备份）。写入方式（pi 的 `sudo` 要密码、pi 用户在
+    docker 组）：
+    `docker run --rm -v /etc/gost:/etc/gost -v /tmp/gost.yaml.new:/new.yaml:ro alpine sh -c 'cp gost.yaml gost.yaml.bak.$(date +%Y%m%d-%H%M%S); cat /new.yaml > gost.yaml.tmp; cp gost.yaml.tmp gost.yaml; rm -f gost.yaml.tmp'`。
+  - 解析校验（**装进去之前**，对 `/tmp/gost.yaml.new` 用 pi 自己的 python3）：
+    `python3 -c "import yaml;yaml.safe_load(...)"` → `parsed services: ['tproxy-tcp','dns','dns-tcp','relay-phone']`；
+    sha256 与本地一致（`fed8795d…f4439`），装好后 `/etc/gost/gost.yaml` 的 sha256 也相同。alpine 里没有
+    python3，所以校验在宿主上做。
+  - 热重载：`kill -HUP 1507438`（MainPID）。**注意**：pi 用户无权向 root 进程发信号（`Operation not
+    permitted`），`sudo -n` 也不行，所以用 `docker run --rm --privileged --pid=host alpine kill -HUP 1507438`
+    —— 仍是 SIGHUP 热重载，没有重启服务（`ActiveState=active`、MainPID 不变）。
+  - 监听证据：`ss -ltne | grep 18080` → `LISTEN 0 4096 127.0.0.1:18080 0.0.0.0:* ino:90765503
+    cgroup:/system.slice/gost.service` —— 只有一条，绑 `127.0.0.1`，cgroup 证明是 gost 自己开的。
+  - relay 腿（不需要手机）：在 pi 上 `gost -L http://127.0.0.1:18081 -F relay://127.0.0.1:18080 &`
+    （gost 3.3.3+f4247b9，与守护进程同版本），随后：
+    - `curl -x http://127.0.0.1:18081 -o /dev/null -w '%{http_code}' https://www.baidu.com` → **200**
+    - `curl -x http://127.0.0.1:18081 -o /dev/null -w '%{http_code}' https://www.google.com` → **200**
+    - pi 的日志（同一 sids）证实分流在 pi 上生效：
+      - baidu：`route(retry=0) www.baidu.com:443`（无节点前缀 → 空路由 → 家宽直连，
+        `src 192.168.100.100:33058`）
+      - google：`route(retry=0) node-0@relay.gost.run:443 > www.google.com:443` → 走 `relay-wss`
+      - 两条都有 `"service":"relay-phone","listener":"tcp","handler":"relay"` 的 connect/close 记录。
+    - 临时进程已杀（`kill 1762745`，`ss` 无 18081，`ps` 已退出）。
+  - hub：`POST http://127.0.0.1:8900/api/tunnels` →
+    **新 tunnel id `1998cf71-f4b0-41d7-965d-7e8dcaa3e01d`**，`name=gw-split type=p2p
+    endpoint=127.0.0.1:18080 status=running`（201）。
+  - 现有隧道未被触碰：`p2p-tun`（`fbccb7c3-…`）的 peers 仍是
+    `[pixel-9, dadax-PC, dadax]` 三个 key、顺序不变；`peer_stats` 里 pixel-9 仍 `up / direct`，
+    `session_age_ms` 持续增长（26512s → 26872s），`current_conns=3`。cockpit 也未变。
+- **与任务书的偏差（重要）:** 任务书 Step 3 要 `peers: ["<pixel-9 key>"]`，但 hub 的 p2p host 硬性要求
+  **一个 key 只属于一个 tunnel**（`tunnel/p2p_host.go:848`），pixel-9 已在 `p2p-tun` 里，于是
+  `POST` 返回 500 `peer zRiIjY4a… is already used by another p2p tunnel` 并整体回滚。安全规则①又禁止
+  现在就把它从 `p2p-tun` 移除，所以本任务**先建空 allowlist 的 tunnel**（合法、状态 running、不接受任何
+  peer），把「加进 `gw-split` + 从 `p2p-tun` 移除」这对原子操作留给 Task 7b 一起做。因此 Task 7b 的
+  Step 4 除了移除，还要**把 pixel-9 加进 `gw-split`**（`PUT /api/tunnels/1998cf71-…/peers`）。
+- **评审发现与修复（自审）:**
+  - 任务书里的 gost 版本是 3.3.1，实测是 **3.3.3+f4247b9**（`/usr/local/bin/gost`，systemd 同一份）。
+    处置方式不变，只更正记录。
+  - `kill -HUP` 在 pi 上不可用（权限），改用 `--privileged --pid=host` 的临时容器发信号；没有落到
+    「重启服务」这条路上。alpine 无 python3，校验因此放在宿主做（对将安装的那份文件校验，等价）。
+  - 日志里找不到 `config reloaded` 与 `listening on` 两行（gost 的这两条启动日志不进这个文件输出，
+    且日志每 ~17 分钟按 100MB 轮转）；改用 `cgroup:/system.slice/gost.service` + 实际 relay 流量
+    作为「新服务由 gost 自己起来并生效」的证据，比日志文本更强。
+  - 新 tunnel 建在 `127.0.0.1:18080`，与 pi 上那条只绑回环的 listener 对齐——hub 与 gost 同在 pi 上，
+    所以这条 endpoint 不需要、也不应该暴露到 LAN。
+- **遗留项/限制:**
+  - `gw-split` 的 allowlist 现在是空的，**在 Task 7b 之前它不服务任何 peer**；p2p → relay 的端到端
+    （含 relay 的 FUDP/DNS）仍未验证，只能在手机切过来之后验（本任务只验到 relay handler 这一跳）。
+  - 隧道不可用时的失败策略（设计 §8.1：显式 fail-closed / fail-open）仍未实现，文档里按「事实上的
+    fail-closed」记录。
+  - x 版本链仍是发版阻塞项（wisper pin `x v0.29.0`，APK 构建看不到 `go.work`，v0.29.0 的
+    `x/listener/tungo` 没有 android fd 分支）——已写进文档的「已知限制」，Task 7b 的 `make apk` 之前
+    必须先处理。
 
 ---
 
@@ -1182,7 +1262,13 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
 - [ ] **Step 1: 构建 APK**（`cd wisper && make apk`，走 docker + `--network host`），确认产物存在。
 - [ ] **Step 2: 设备接入**（`adb connect <p2p 隧道地址>:<端口>`，见记忆里的无线调试流程），安装新 APK。
 - [ ] **Step 3: 在 App 里停掉旧 `tun` entrypoint、建 `tungo` entrypoint**（用上面那组值），启动。
-- [ ] **Step 4: 把 pixel-9 从 `p2p-tun` 的 peers 里移除**（此时手机已不再需要它）。
+- [ ] **Step 4: 把 pixel-9 从 `p2p-tun` 的 peers 里移除，并把同一个 key 加进 `gw-split`**（此时手机已不再
+  需要 `p2p-tun`）。hub 不允许一个 key 同时出现在两个 tunnel 的 allowlist 里（tun hub 与 p2p tunnel 共用
+  同一张路由表：`tunnel/tun.go:546` 与 `tunnel/p2p.go:418` 都走 `p2pHost.register`），所以只能是两次
+  相邻的请求，顺序是**先 `PUT /api/tunnels/fbccb7c3-39cf-487d-bce1-4be05bcd8a39/peers` 去掉它、紧接着
+  `PUT /api/tunnels/1998cf71-f4b0-41d7-965d-7e8dcaa3e01d/peers` 把 `[pixel-9]` 加上**（反过来的第一次
+  请求会 500）。中间那几秒手机上没有任何隧道 —— 此时旧 `tun` 入口点已停，新 `tungo` 入口点本来就还连不上，
+  所以这段窗口只影响它自己。
 - [ ] **Step 5: 按 spec §7 的 8 条逐条验收并留证**（白名单域名 / 非白名单域名 / 内网子域名 / DNS /
   IPv6 / 互斥 / 回归 / 隧道不可用），外加本计划 §3.5 的三次「启动→有流量→停止」。
 
