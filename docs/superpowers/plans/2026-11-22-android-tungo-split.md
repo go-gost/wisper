@@ -446,7 +446,10 @@ Expected: FAIL（Run/Close 未实现）
 → `xservice.NewService` → serve 顺序，加上 `tun.go:673-693` 的
 claim（无设备则失败并回滚）/release、Android 的 `WaitTunFD` 注入、stats 基线
 （`StatsOption`）。`Close` 幂等：unregister provider、release host、release device、
-关 service。**不给 device listener 挂 stats**（避免连接数双计）。失败必须能看见：
+关 service。**device listener 要挂 `stats`（`listener.StatsOption(pStats)`），与 `tun.go:749`、
+`p2p.go:272` 的 spoke 写法一致** —— 这一侧只有 listener 会写这些计数器（`x/service` 只计错误），
+所以不存在双计；hub 的「device 被算成一条连接」问题只发生在 hub 的 device handler 侧。
+失败必须能看见：
 `setErr` + `event.Record`，让 entrypoint 在列表里显示失败；v1 不实现包级 liveness。
 
 - [ ] **Step 4: 运行确认通过（含 race）**
