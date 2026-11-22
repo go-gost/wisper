@@ -257,6 +257,22 @@ func (s *tungoEntryPoint) init() error {
 	return nil
 }
 
+// ChainConfig returns the chain this entrypoint's flows are dialled through —
+// the config init assembles — and assembles it on first use, so a caller that
+// is not Run can reach the same wiring without taking the device. The chain is
+// the split itself: the relay node over the p2p link, with the rule whitelist
+// on its hop. Anything that has to dial it (Run's parser, or a test carrying
+// traffic over the peer) reads this one assembly instead of rebuilding a copy
+// that would prove nothing about the product.
+func (s *tungoEntryPoint) ChainConfig() (*xconfig.ChainConfig, error) {
+	if s.config == nil {
+		if err := s.init(); err != nil {
+			return nil, err
+		}
+	}
+	return s.config.Chains[0], nil
+}
+
 func (s *tungoEntryPoint) Run() error { return s.RunContext(context.Background()) }
 
 // RunContext is Run carrying the caller's action id: the shared host's
@@ -346,7 +362,12 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 	var forward service.Service
 	{
 		var ch chain.Chainer
-		ch, err = chain_parser.ParseChain(s.config.Chains[0], log)
+		var chainCfg *xconfig.ChainConfig
+		if chainCfg, err = s.ChainConfig(); err != nil {
+			log.Error(err)
+			return
+		}
+		ch, err = chain_parser.ParseChain(chainCfg, log)
 		if err != nil {
 			log.Error(err)
 			return
