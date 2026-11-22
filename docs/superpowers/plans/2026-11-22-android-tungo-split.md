@@ -733,7 +733,110 @@ cd wisper && git add config api tunnel/entrypoint tunnel/tunnel.go \
   && git commit -m "feat(api): expose the tungo entrypoint type and its domain rules"
 ```
 
-**Implementation record:** _完成后填写。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-22 — 已完成。
+- **仓库 + commit:**
+  - `wisper`（`github.com/go-gost/wisper`）：`beebd17`
+    `feat(api): expose the tungo entrypoint type and its domain rules`（代码 + 测试）；本条记录为随后的
+    `docs(plan)` 提交。
+  - `x`：本任务没有改动（按分工不改 `x/`；期间发现的 `x/handler/tungo` 关闭竞态见「遗留项」）。
+- **实际改动文件:**
+  - `config/config.go` — `Tunnel.Rules []string`，yaml/json 都是 `rules,omitempty`
+    （带语义注释：whitelist、空=全部直连、编辑原地生效不重建）。
+  - `tunnel/tunnel.go` — `TunnelOptions` 加 `RulesOption(opts.Rules...)`；`TunnelOptions` 的注释补上
+    「它也是三条重建路径共用的那组字段」。
+  - `tunnel/entrypoint/entrypoint.go` — `restartRunning` 的 `tunnel.Options` 字面量加
+    `Rules: p.opts.Rules`（并加注释说明这个字面量漏字段会静默丢）；`LoadConfig` 加
+    `Rules: cfg.Rules`、`SaveConfig` 加 `Rules: opts.Rules`（持久化两腿，缺任一都会在重启后清空清单）；
+    新增 `RuleSetter`（`SetRules(rules []string)`）作为「运行中可换清单」的接缝。
+  - `tunnel/entrypoint/tungo.go` — `init()` 改为**单段临界区**：先把与规则无关的 `svc`/`chCfg`/node
+    组装完，再在一段 `s.mu.Lock()` 内做「克隆 `opts.Rules`、建 `RuleBypass`、Unregister+Register、
+    赋 `s.rules`、写 `s.config` 的 Bypasses 镜像」；`IsClosed` 复查与身份注销也在同一段锁内（配置在
+    复查之后才写，所以已关闭的 init 不会留下可被 `ChainConfig` 读到的 `s.config`）。新增 `SetRules`：
+    同一把锁内克隆进 `s.opts.Rules`、调用 `s.rules.SetRules(...)` 原地替换、同步
+    `s.config.Bypasses[].Matchers`。`ChainConfig()` 的 `s.config` 读取改到 `s.mu` 下（写入现在也在
+    锁内，读侧跟上同一套锁纪律）。
+  - `api/entrypoint_handler.go` — `Rules *[]string`（`json:"rules,omitempty"`，缺席=沿用/`[]`=清空，
+    与 `blocked_peers` 同语义）+ `toOptions` 的 `tunnel.RulesOption(derefStrings(r.Rules)...)`；
+    `Peer` 注释改成「p2p, tun and tungo」；校验拆成 `validateTungoEntryPoint`（net/routes/dns/peer，
+    rules 可空）与 `validateTunEntryPoint`（tungo 的那套 + share_lan），create/update 的类型 switch
+    都接上 `case entrypoint.TungoEntryPoint`；update 里 `Rules` 与 `BlockedPeers`/`Direct` 一样做
+    「缺席=沿用」填空，并在 `old.Close()` **之前**就构建替代对象；`rulesOnlyUpdate` + `sameRunOptions`
+    判定「只改清单」时走热更新（`rs.SetRules(...)`，不 Close、不 Start、不换对象，`event` 记
+    updated、`SaveConfig` 落盘、响应的仍是同一个 entrypoint）。
+  - `api/tunnel_handler.go` — `tunnelOptionsResp.Rules`（`json:"rules,omitempty"`），`toTunnelResponse`
+    回写 `opts.Rules`。
+  - 测试：`api/api_test.go`（`TestEntrypointCreateTungoWithRules`、
+    `TestEntrypointCreateTungoRequiresNetAndPeer`、`TestEntrypointUpdateKeepsRulesWithoutRestart`，外加
+    `useGostLogger`/`refusedDeviceName`/`entrypointRules` 辅助件，并把既有的
+    `TestCreateTunEntrypointShareFields` 改为复用 `useGostLogger`）；
+    `tunnel/entrypoint/restart_test.go`（`TestRestartRunningKeepsRules` +
+    `runningTungoWithRules`/`requireTungoRules` 辅助件）；`tunnel/entrypoint/restart_p2p_test.go`
+    （`TestRestartP2PRunningKeepsTungoRules`）；`tunnel/entrypoint/tungo_test.go`
+    （`TestTungoSetRulesWhileInitKeepsTheEdit`、`TestTungoRulesRoundTrip`）。
+- **测试/命令与结果:**
+  - RED（先只落地配置字段，行为尚未实现）：
+    `cd wisper && go test ./api/ -run "TestEntrypointCreateTungo|TestEntrypointUpdateKeepsRules" -v`
+    → `RequiresNetAndPeer` 四个子用例全部 201（`want 400`）、
+    `TestEntrypointUpdateKeepsRulesWithoutRestart` → `the rule edit replaced the entrypoint`；更早一步
+    （`config.Tunnel.Rules` 都没有时）是编译失败 `ep.Rules undefined`。都是「字段/行为缺失」的失败。
+  - GREEN：同命令 → 3 个测试（+4 子测试）全 PASS。
+  - `cd wisper && CGO_ENABLED=1 go test ./api/ ./tunnel/entrypoint/ -race -count=1`
+    → `ok api 163.910s`、`ok tunnel/entrypoint 55.418s`，`WARNING: DATA RACE` 出现 0 次。
+  - `cd wisper && go test ./tunnel/ ./api/ -count=1` → `ok tunnel 41.842s`、`ok api 139.008s`。
+  - `cd wisper && go build ./...`、`go vet ./api/ ./tunnel/ ./tunnel/entrypoint/ ./config/`、
+    `gofmt -l api config tunnel` → 均无输出。
+  - 变异验证（逐条临时改坏实现，确认对应测试会红，随后逐一还原）：
+    去掉 `restartRunning` 字面量里的 `Rules:` → 两个重启测试红（`restarted rules = [], want [...]`）；
+    去掉 `TunnelOptions` 里的 `RulesOption` → 同样两个测试红；去掉 `LoadConfig` 的 `Rules: cfg.Rules`
+    → `TestTungoRulesRoundTrip` 红（`loaded Rules = []`）；去掉 `SaveConfig` 的 `Rules: opts.Rules`
+    → 同测试红（`persisted Rules = []`）；把 `init()` 退回「先 RLock 克隆、后 Lock 赋值」两段 →
+    `TestTungoSetRulesWhileInitKeepsTheEdit` 红
+    （`the running split does not tunnel the edited rule new.example`）。
+- **评审发现与修复（自审）:**
+  - **init 两段临界区（Task 3 记录的遗留）**：选了「合成一段临界区」而不是「热路径复用既有对象」。
+    理由：复用对象救不了顺序 —— init 若在锁外先读快照、再对对象调 `SetRules`，中间落地的编辑照样被覆盖；
+    只有把「读快照 → 建立/写入对象 → 写镜像」放进同一段锁，两种顺序才都以「编辑胜出」收场。锁内只有
+    注册表调用与几次结构体构造（不含网络、不含回调），且 `Close` 是先 `close(cclose)` 再取锁，不形成
+    反向锁序。
+  - **`restartRunning` 的字面量与 `TunnelOptions` 是同一组字段的两份表述**：两边都补了 `Rules`，并在
+    字面量处留下「漏字段会静默丢」的注释（这轮 re-review 就是从这条路发现的）。
+  - **热更新的判定**用「按构造器生成替代对象、与旧 options 整体比对」，而不是逐字段枚举：构造器负责套
+    默认值（name、MTU），所以「表单没重述 mtu」不会被误判成变化；整体比对让**将来新增的字段自动落到
+    重建路径**（fail-safe），不需要有人记得同步比较函数。`ID`/`CreatedAt`/`Stats`/`StatsBaseline` 属于
+    对象而不是请求、`Rules` 是这次允许改的字段，比对前清空；`ShareMode` 按规范化值比较 —— 这点是
+    `TestEntrypointUpdateKeepsRulesWithoutRestart` 第一次跑红时暴露的：响应把未设置映射成 `auto`，
+    `""` vs `auto` 会让每一次保存都重建。
+  - 热更新只对「类型未变、未关闭、`Err()` 为空、`IsServiceFailed()` 为假」的 entrypoint 生效：把失败/
+    停机的 entrypoint 保存一次本来就是让它重新起来的方式，这条行为没有改。
+  - 替代对象在 `old.Close()` **之前**构建：非法类型/无法满足的请求不再先把运行中的 entrypoint 关掉
+    （旧顺序是先关再 400）。
+  - `ChainConfig()` 的 `s.config` 读也纳入 `s.mu`：写入现在在锁内，读侧跟上才不会留下半套锁纪律。
+  - **`-race` 撞到 `x/handler/tungo` 的关闭竞态**：整个 `api` 包 `-race` 跑下来报
+    `handler/tungo.Close`（读 `h.stack`）与 `Handle`（写 `h.stack`）竞态，栈经
+    `Delete → tungoEntryPoint.Close → xservice.Close`。这是 `x` 的既有缺陷（本任务不改 `x/`），触发点是
+    「测试里真的起了一个 tungo service 又立刻关掉」。修法在测试侧：两个 create 用例用一个内核拒绝的
+    设备名（`refusedDeviceName`，超过接口名长度上限）让 Run 在建设备那步失败，从而不在这台机器上真建
+    设备、也不起 serve goroutine（`status=stopped`，201 与字段往返照旧）。顺带也满足「测试不该动宿主
+    设备」。
+  - 规则/持久化测试的清理都走已有的 `tungoCleanup`；重启测试沿用 `TestRestartP2PRunningRestartsTungo`
+    的 `tungoRunConfig` + `t.Chdir` + `loopbackDeviceListener` 组合，`-count=2`/`-count=3` 未见跨用例泄漏。
+- **遗留项/限制:**
+  - **`x/handler/tungo` 的 `Close`/`Handle` 竞态没有修**（按分工不改 `x/`）：`Handle` 在
+    `core.CreateStack` 之后无锁写 `h.stack`，`Close` 无锁读它。真机上「entrypoint 刚起就停/更新」会
+    命中，`-race` 下必然报。这是 `x` 的独立缺陷，建议单独开一个 x 任务（加互斥，或让 `Close` 不读
+    尚未发布的 `stack`）。
+  - **热更新只覆盖「清单」**：改 `net`/`mtu`/`routes`/`dns`/`peer`/`name` 仍然重建（本来就必须重建）。
+  - **UI 还没有 `rules` 字段**（Task 6b）：App/详情页要自己把 `rules` 当换行文本收发；本任务只保证
+    API/JSON/配置这一层。
+  - **规则条目的语法不在 API 层校验**：`rules` 里写错一个 CIDR 只会被 `x/bypass` 当成普通地址匹配
+    （与 pi 的 `bypass-gfw` 行为一致），不报错。要「创建即拒绝」需要一份与 `x/bypass` 同步的校验器。
+  - **`SetRules` 在 entrypoint 已关闭时只写 `opts`/镜像**：`s.rules` 指向的对象已从注册表撤下，调它
+    不产生效果；这也是热更新只对运行中的 entrypoint 生效的原因之一。
+  - `restartRunning` 的字面量仍是「手抄 TunnelOptions」：本轮只补 `Rules`，没有换成
+    `tunnel.TunnelOptions(p.opts)`（那会连带改 `StatsBaseline` 的来源，超出本任务范围）。
+
 
 ---
 
