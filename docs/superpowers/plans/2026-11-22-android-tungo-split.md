@@ -1052,6 +1052,13 @@ rules:
 
 内网子域名要能解析，必须已经在 pi 的 `hosts-dns` 里（spec §8.7）。
 
+- [ ] **Step 3.5: 验证「停」不会留下挂住的 handler 协程**
+
+`x/handler/tungo` 的 `Close` 返回时，`Handle` 可能仍停在 `stack.Wait()`（gvisor 的 `Stack.Close` 不停止
+link endpoint）。真正解除它的是 **listener 关闭时关掉已 accept 的设备 conn**（`x/listener/tungo` 的
+`active`）。所以验收要连做三次「启动 → 约 1 分钟有流量 → 停止」，每次确认：
+`adb logcat` 无 panic/泄漏告警、hub 侧该 peer 的路由/流被收回、`/api/entrypoints` 状态回到 stopped。
+
 - [ ] **Step 4: 打 APK 并在真机按 spec §7 验收**
 
 ```bash
