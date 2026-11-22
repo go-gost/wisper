@@ -888,6 +888,51 @@ cd wisper && git add web-src web/assets && git commit -m "feat(web): edit the tu
 
 ---
 
+### Task 6c: x —— 修 `handler/tungo` 的 `Close`/`Handle` 竞态（真机验收前必须）
+
+**为什么在这里：** Task 6a 的测试发现 `x/handler/tungo` 有一个既有竞态：`Handle` 在
+`core.CreateStack` 之后无锁写 `h.stack`（`x/handler/tungo/handler.go:159`），`Close()` 无锁读它
+（`:171`）。tungo entrypoint 每一次「起来就停」都会命中（VPN 重建、restart、用户点停），`-race`
+下必然报；生产上是未同步的指针读写。`x/` 在前面的任务里是禁区，所以单列在这里。
+
+**Files:**
+- Modify: `x/handler/tungo/handler.go`（`h.stack` 的读写加同一把锁；`Close` 取到栈后只关一次）
+- Test: `x/handler/tungo/handler_test.go`（若不存在则新建）
+
+**Interfaces:**
+- Consumes: 现有 `Handle`/`Close` 形状不变（`handler.Handler` + `io.Closer`）。
+- Produces: `Close` 与 `Handle` 并发安全；重复 `Close` 幂等。
+
+- [ ] **Step 1: 写失败的测试**
+
+```go
+func TestHandlerCloseRacesHandle(t *testing.T)
+// net.Pipe 当设备 conn，ctx 里塞 &tun_util.Config{MTU: 1400}
+// go h.Handle(ctx, c)；等栈建立（轮询 h.stack 非 nil 的**测试内**观察点，或用 Close 的同步点）
+// 再 h.Close()；断言不 panic、Handle 返回、第二次 Close 也返回 nil
+Run: `cd x && CGO_ENABLED=1 go test ./handler/tungo/ -run TestHandlerCloseRacesHandle -race -count=1`
+Expected: FAIL，`-race` 报 `handler.go:159` 与 `:171` 的 data race
+```
+
+- [ ] **Step 2: 实现**
+
+`tungoHandler` 加 `mu sync.Mutex`；`Handle` 里写 `h.stack` 与 `Close` 里读/关它都在这把锁下
+（不要在锁内 `stack.Wait()`）；`Close` 取到指针后置 nil，保证只关一次。
+
+- [ ] **Step 3: 运行确认通过**
+
+Run: `cd x && CGO_ENABLED=1 go test ./handler/tungo/ -race -count=1` → PASS，无 DATA RACE
+
+- [ ] **Step 4: 提交（`x` 仓库）**
+
+```bash
+cd x && git add handler/tungo && git commit -m "fix(tungo): guard the handler stack against Close racing Handle"
+```
+
+**Implementation record:** _完成后填写。_
+
+---
+
 ### Task 7: 部署接线（pi + hub）与验收
 
 **Files:**
