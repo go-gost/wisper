@@ -677,16 +677,66 @@ cd wisper && git add tunnel/tungo_e2e_test.go && git commit -m "test(tunnel): re
 
 ---
 
-### Task 6: 配置 / API / UI（类型 + 规则），含重启不丢字段
+### Task 6a: Go 侧 —— 配置、API、以及三条重建路径的 `Rules`
 
 **Files:**
 - Modify: `wisper/config/config.go`（`Tunnel` 加 `Rules []string` yaml/json `rules`）
 - Modify: `wisper/tunnel/entrypoint/entrypoint.go:304-343`（`restartRunning` 的 `tunnel.Options` 字面量要复制 `Rules`）
 - Modify: `wisper/tunnel/tunnel.go:874-907`（`TunnelOptions` 要带上 `RulesOption(opts.Rules)` —— 否则
   `Restart` / `handleStartEntrypoint` / `restartRunning` 三条重建路径都会把清单清空成「全部直连」）
-- Modify: `wisper/api/entrypoint_handler.go`（create request 的 `Rules` + `toOptions`；
+- Modify: `wisper/api/entrypoint_handler.go`（create request 的 `Rules *[]string`（缺席=沿用、`[]`=清空，
+  与 `blocked_peers` 同语义）+ `toOptions` 里的 `tunnel.RulesOption(derefStrings(r.Rules)...)`；
   `entrypoint_handler.go:143-147` 的类型校验加 `case entrypoint.TungoEntryPoint:
   validateTungoEntryPoint(req)` —— 要求 `net` 与 `peer`，`rules` 可空（空=全部直连））
+- Modify: `wisper/api/entrypoint_handler.go:24`（`Peer` 字段的注释从 "p2p and tun" 改成含 tungo）
+- Test: `wisper/api/api_test.go`、`wisper/tunnel/entrypoint/restart_test.go`、`restart_p2p_test.go`
+
+**Interfaces:**
+- Consumes: `tunnel.RulesOption`（Task 2）、`TungoEntryPoint`（Task 3）、`s.rules`（Task 3 的修复轮）
+- Produces: JSON 字段 `rules: ["example.com","home.pi","192.168.100.0/24"]`；`config.Tunnel.Rules`；
+  三条重建路径都保留 `Rules`
+
+- [ ] **Step 1: 写失败的测试**
+
+```go
+func TestEntrypointCreateTungoWithRules(t *testing.T)          // POST type=tungo+rules → 201；GET 回读 rules 一致
+func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) // 缺 net 或 peer → 400，错误信息点名缺哪个
+func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) // PUT 只改 rules → entrypoint ID 不变、服务未重建（统计基线保留）、新规则立即生效
+func TestRestartRunningKeepsRules(t *testing.T)                // restartRunning → 重建后的 Options.Rules 与旧值一致
+func TestRestartP2PRunningKeepsTungoRules(t *testing.T)        // ResetP2PIdentity 触发的重启同样保留 Rules
+```
+
+- [ ] **Step 2: 运行确认失败**
+
+Run: `cd wisper && go test ./api/ -run "TestEntrypointCreateTungo|TestEntrypointUpdateKeepsRules" -v`
+Expected: FAIL（未知类型 `tungo` / 字段被忽略）
+
+- [ ] **Step 3: 实现**
+
+`config.Tunnel.Rules`、`api` 的 `Rules *[]string` + `toOptions`、`restartRunning` 复制、
+`tunnel.TunnelOptions` 带上 `RulesOption`。**热更新**：`SetRules`（`s.rules.SetRules(...)` 原地替换）
+要绕开 Task 3 记录里指出的「init 两段临界区」隐患 —— 在两个临界区之间落地会被覆盖，所以把
+「克隆 `opts.Rules` + 赋值 `s.rules` + 写镜像」收进同一段锁内。
+
+- [ ] **Step 4: 运行确认通过**
+
+Run: `cd wisper && CGO_ENABLED=1 go test ./api/ ./tunnel/entrypoint/ -race -count=1`
+Expected: PASS，无 DATA RACE
+
+- [ ] **Step 5: 提交**
+
+```bash
+cd wisper && git add config api tunnel/entrypoint tunnel/tunnel.go \
+  && git commit -m "feat(api): expose the tungo entrypoint type and its domain rules"
+```
+
+**Implementation record:** _完成后填写。_
+
+---
+
+### Task 6b: UI 与 web 产物
+
+**Files:**
 - Modify: `wisper/web-src/src/pages/entrypoint-detail-page.ts`（**不要**把 `'tun'` 全量替换：
   - 设备字段与 peer 选择：`302`、`313`、`343-347`、`945-961` 改成「`tun` 或 `tungo`」；
   - **仅 `tun` 保留**：`share_lan`/`share_mode`/`direct`（`350-354`）与 hub 侧的
@@ -697,45 +747,35 @@ cd wisper && git add tunnel/tungo_e2e_test.go && git commit -m "test(tunnel): re
 - Modify: `wisper/web-src/src/i18n/en.ts` 与 `web-src/src/i18n/zh.ts`（`fieldRules` 等新文案，
   两套 key 必须一致）
 - Regenerate: `wisper/web/assets`（受跟踪的构建产物）
-- Test: `wisper/api/api_test.go`（新增用例）、`wisper/tunnel/entrypoint/restart_test.go`
+- Test: `wisper/web-src` 的既有 ui-test（`make ui-test`）
 
 **Interfaces:**
-- Consumes: `tunnel.RulesOption`（Task 2）、`TungoEntryPoint`（Task 3）
-- Produces: JSON 字段 `rules: ["example.com","home.pi","192.168.100.0/24"]`；
-  `PUT /api/entrypoints/{id}` 对 `rules` 的语义与 `blocked_peers` 一致（缺席=沿用，
-  `[]`=清空 → 用 `*[]string`）
+- Consumes: Task 6a 的 `rules` 与 `tungo` 类型
+- Produces: 详情页/首页能创建与编辑 tungo entrypoint，`rules` 以换行文本往返
 
-- [ ] **Step 1: 写失败的测试**
+- [ ] **Step 1: 写失败的 ui-test**
 
-```go
-func TestEntrypointCreateTungoWithRules(t *testing.T)         // POST type=tungo+rules → 201；GET 回读 rules 一致
-func TestEntrypointCreateTungoRequiresNetAndPeer(t *testing.T) // 缺 net 或 peer → 400，错误信息点名缺哪个
-func TestEntrypointUpdateKeepsRulesWithoutRestart(t *testing.T) // PUT 只改 rules → entrypoint ID 不变、服务未重建（stats 基线保留）、新规则立即生效（TunDeviceOwner 名称不变）
-func TestRestartRunningKeepsRules(t *testing.T)               // 触发 restartRunning → 重建后的 Options.Rules 与旧值一致（防静默丢字段）
-func TestRestartP2PRunningKeepsTungoRules(t *testing.T)        // ResetP2PIdentity 触发的重启（Task 4 新加的那条）同样保留 Rules
-```
+在既有测试里加一条：`tungo` 类型渲染出设备字段（net/mtu/routes/dns）、peer 选择与 `rules` 文本域，
+且**不**渲染 `share_lan`/`share_mode`/`direct`。
 
 - [ ] **Step 2: 运行确认失败**
 
-Run: `cd wisper && go test ./api/ -run "TestEntrypointCreateTungo|TestEntrypointUpdateKeepsRules" -v`
-Expected: FAIL（未知类型 `tungo` / 字段被忽略）
+Run: `cd wisper && make ui-test`
+Expected: FAIL（现有按 `'tun'` 判定的分支不覆盖 tungo）
 
 - [ ] **Step 3: 实现**
 
-`config.Tunnel.Rules`、`api` 的 `Rules *[]string` + `toOptions` 里的
-`tunnel.RulesOption(derefStrings(r.Rules)...)`、`restartRunning` 复制、UI 的类型判定与
-rules 文本域（`split('\n')` + trim + 去空行），最后重建 web 资源。
+按上面的文件清单改类型判定、加 `rules` 文本域与 i18n 两套 key。
 
-- [ ] **Step 4: 运行确认通过**
+- [ ] **Step 4: 运行确认通过并重建 web 产物**
 
-Run: `cd wisper && go test ./api/ ./tunnel/entrypoint/ -v && make typecheck && make ui-test && make web`
-Expected: 测试 PASS；typecheck / ui-test / web 全部成功，`web/assets` 有新的哈希产物
+Run: `cd wisper && make typecheck && make ui-test && make web`
+Expected: 三条都成功，`web/assets` 出现新的哈希产物
 
 - [ ] **Step 5: 提交**
 
 ```bash
-cd wisper && git add config api tunnel/entrypoint web-src web/assets \
-  && git commit -m "feat(api): expose the tungo entrypoint type and its domain rules"
+cd wisper && git add web-src web/assets && git commit -m "feat(web): edit the tungo entrypoint and its rules"
 ```
 
 **Implementation record:** _完成后填写。_
