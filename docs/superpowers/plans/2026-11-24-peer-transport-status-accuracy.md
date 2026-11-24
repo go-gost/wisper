@@ -391,6 +391,56 @@ git commit -m "docs(plan): record the device verification"
 
 ---
 
+## Final review
+
+A fresh reviewer read the whole branch (5 commits, `b6a9629..6f125c9`) against
+this plan. No Critical findings; three Important, all fixed in `feec91e`; three
+Minor, two fixed in `dc48f97` and one ruled below.
+
+**Fixed — every one verified by a test that failed first:**
+
+1. **The detail led with a raw i18n key.** `p2pTransportConnected` had been
+   commented out by accident in `da0454e`, and this branch's `connecting` and
+   `server-unreachable` states made it reachable on a path that previously only
+   ran while connected — so tapping ⓘ showed `p2pTransportConnected ·
+   establishing the peer session`. Worse, the plan's own e2e assertion
+   (`toContainText('Connected')`) passed *on the raw key*, pinning nothing.
+   Fixed by restoring both locales' key and adding `TransportSpec.leadKey`: the
+   detail now leads with the state's own word, and only a state with a live
+   session says "Connected". The e2e asserts the exact lead word per state and
+   rejects any literal `p2pTransport*` text in the detail. Verified RED by
+   deleting the key and rebuilding: `direct: detail leaks a raw i18n key`.
+2. **`P2PHostStatus()` and `P2PHostRunning()` could describe different hosts.**
+   A settings change or `ResetP2PIdentity` tears the host down and builds
+   another, so reading the status and then the flag paired a dead host's zero
+   relay state with the replacement's "running" — the very outage this branch
+   exists to stop inventing. Fixed with `tunnel.P2PHostSnapshot()`: one reading,
+   which re-checks the host's identity after `Status()` and answers "no host"
+   (never an outage) when it changed. Adopted by `toTunnelResponse`, the
+   identity endpoint and the event ticker (`runner/task/stats.go`), which had
+   the same two-read sequence. Verified RED with an interleaving seam
+   (`afterHostStatusRead`): `P2PHostSnapshot answered from a host that had been
+   replaced`.
+3. **The stopped-endpoint test never reproduced the bug.** It built an
+   entrypoint that had never had a host, so the pre-fix code returned an empty
+   word too and the test passed on the broken code. Rewritten around the real
+   window — a stopped object while a live host still reports the peer — via a
+   `p2pSnapshot` seam. Verified RED: `peer_transport = "direct" on a stopped
+   endpoint, want empty`, which is the user's bug verbatim. Two sibling cases
+   pin the other two outcomes of the same decision (no host → `connecting`,
+   relay down → `server-unreachable`), both RED the same way.
+
+**Minor, fixed (`dc48f97`):** the "detail outlives a poll" test waited 3.5s
+against the page's 5s interval, so it could not outlast one; it waits 6.5s now.
+And the home list's stopped-chip gate — a different call site from the detail
+page — gained its own assertion, verified RED by removing the gate.
+
+**Minor, ruled:** a running object whose host does not answer reports
+`connecting` rather than nothing. That is the intended reading (a host being
+built is not an outage) and it is what `peerTransportWord` now does by default;
+the alternative — no badge at all — is what the reviewer flagged as confusing,
+and it is gone.
+
 ## Deferred
 
 - **「有数据才变直连」= 打洞节奏，不是状态上报。** 2026-11-24 09:49–09:50 的实测：第一轮打洞
