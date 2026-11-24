@@ -341,12 +341,12 @@ cadence in Deferred, which needs its own evidence and design.
 Because Task 3 was cancelled there is no `p2p` tag and no `go.mod` bump: the shipped
 change is wisper-only (`7f6a630`, `50cfbcf`).
 
-- [ ] **Step 1: Ask, then build**
+- [x] **Step 1: Ask, then build**
 
   两个动作都算「本工作区之外」，需要用户明确点头：打 p2p tag / push（已不需要）以及
   在用户手机上装 APK。未经同意不做。
 
-- [ ] **Step 2: Build and install the APK**
+- [x] **Step 2: Build and install the APK**
 
   按 `.memory/notes/wisper-apk-build.md`：`docker` 构建且**必须** `--network host`、
   用 device-trusted key 重签、`adb install -r --no-incremental`、装完 `monkey` 重新拉起
@@ -354,7 +354,7 @@ change is wisper-only (`7f6a630`, `50cfbcf`).
   `nmap -Pn -n -T4 --min-rate 3000 -p 30000-49999 10.10.100.250` 找；扫到的端口里可能有一个
   只接受 TCP 但不是 adbd（`adb connect` 会失败并留下 `offline` 条目）。
 
-- [ ] **Step 3: Verify the three states on the device**
+- [x] **Step 3: Verify the three states on the device**
 
   `adb -s <ip:port> forward tcp:18900 tcp:8900`，然后
 
@@ -373,7 +373,7 @@ change is wisper-only (`7f6a630`, `50cfbcf`).
   3. 期间抓 hub 日志（`ssh pi@192.168.100.100 'docker logs --since 10m p2p-tun-wisper-1'`），
      确认没有 `quic handshake … context deadline exceeded` 突发被 UI 掩盖。
 
-- [ ] **Step 4: Record**
+- [x] **Step 4: Record**
 
 ```bash
 cd /root/code/go-gost/wisper
@@ -382,12 +382,36 @@ git commit -m "docs(plan): record the device verification"
 ```
 
 **Implementation record:**
-- 日期/状态：
-- 仓库 + commit：
-- 实际改动文件：
-- 测试/命令与结果：
-- Review 发现与修法：
-- 遗留/限制：
+- **日期/状态:** 2026-11-24 — 已完成，设备实测通过。
+- **仓库 + commit:** `wisper` `649ee6d` 之后只有本条记录（`docs(plan)`）；APK 产物不入库。
+- **实际改动文件:** 无代码改动。临时设备测试 `web-e2e/tests/device-transport*.spec.ts` 用完即删
+  （它们打到真机 API，依赖具体 entrypoint id 与手机在线，不能进 CI）。
+- **测试/命令与结果:**
+  - 构建：`docker build --network host -f android/Dockerfile.apk --build-arg
+    WISPER_VERSION=1.10.2-dev.261124-2105 --build-arg WISPER_VERSION_CODE=11002
+    --target apk --output type=local,dest=dist/android .` → `BUILD SUCCESSFUL in 1m 9s`，
+    产物 76.8MB（Nov 24 13:17）。
+  - 产物核对：解 `lib/arm64-v8a/libwisper.so` → 含 `connecting` 字面量、版本串
+    `1.10.2-dev.261124-2105`，p2p 仍是 `p2p@v0.15.4`（Task 3 已取消，符合预期）；
+    `/assets/index-7mPyKAzD.js` 含 `p2pTransportConnecting`。
+  - 重签：cert SHA-256 `39c3df75…624470`，与设备信任的 key 一致 ⇒ `install -r` 保留 app 数据。
+  - 安装：`adb install -r` → `Success`（incremental，2.4s）。
+  - **装包前基线（旧 APK）**：停机后 `status=stopped` 而 `peer_transport='direct'`
+    **持续 26 秒**（+0s…+26s 全部 direct）—— 用户报的现象逐字复现。
+  - **装包后（新 APK）**：
+    - 停机态 `has_key=false`，字段整个省略，+0s 起一直为空（对照旧包 26 秒）。
+    - 冷启动采样：`+0s…+32s connecting` → `+34s direct`（rtt 10ms），全程**无**
+      `server-unreachable`。
+    - 数据面：`tun0 10.10.100.250/24`，ping hub 4/4 0% loss avg 11.4ms，
+      doctor `path: direct` / `quic path: direct` / `quic role: server` / punch 1/1。
+    - UI（Playwright 打真机 API，arm 上跑真机 bundle）：徽标「直连」，
+      ⓘ 详情「已连接 · 两端直连（打洞成功），流量不经过中继。」—— **无裸 i18n key**。
+    - 冷启动 UI 时间线：`["连接中", "直连"]`，从未出现「不可达」；停机后徽标立即消失。
+- **Review 发现与修法:** 设备实测暴露两个测试设计问题（非产品缺陷）：① 断言只写英文，
+  而手机是中文界面（「直连」），改为双语表；② 在 host 的 30s teardown grace 内重启会复用热 host、
+  一秒内直达直连，看不到 `connecting` —— 改为先停机、等过 grace 再启，才是冷启动窗口。
+- **遗留/限制:** 冷启动 32s 才建好会话，与任务 ① 的 Deferred（relay 注册黑洞 3×10s）一致，
+  本轮只保证它显示为「连接中」而非「不可达」。真机 smoke 未纳入自动化，需要手机在线。
 
 ---
 
