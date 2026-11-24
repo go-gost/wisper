@@ -1,9 +1,11 @@
 import { t } from '../i18n/i18n';
 
 /**
- * A p2p peer's current path, as p2p's Status.PeerTransports reports it: either
- * a hole-punched session or, when there is none, the most specific reason. The
- * strings are p2p's wire values — keep them in sync with p2p's status.go.
+ * A p2p peer's current path, as the API reports it: either a hole-punched
+ * session or, when there is none, the most specific reason. Most strings are
+ * p2p's wire values (keep them in sync with p2p's status.go); `connecting` and
+ * `server-unreachable` are the API's, because only it knows whether the host's
+ * relay is up.
  */
 export type PeerTransport =
   | 'direct'
@@ -14,7 +16,12 @@ export type PeerTransport =
   | 'peer-direct-off'
   | 'no-candidates'
   | 'stun-unreachable'
-  | 'server-unreachable';
+  | 'server-unreachable'
+  // The API's own words, not p2p's: a listed peer with no live path is still
+  // connecting while the relay is up, and server-unreachable only when the
+  // relay itself is down. p2p cannot report either — it has no idea whether
+  // its own relay connection is the reason.
+  | 'connecting';
 
 /** The i18n keys are resolved per call: labels must follow the locale. */
 interface TransportSpec {
@@ -73,6 +80,12 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     tone: 'warn',
     labelKey: 'p2pTransportRelay',
     whyKey: 'p2pTransportWhyStun',
+  },
+  connecting: {
+    icon: 'rotate-cw',
+    tone: 'muted',
+    labelKey: 'p2pTransportConnecting',
+    whyKey: 'p2pTransportWhyConnecting',
   },
   'server-unreachable': {
     icon: 'close',

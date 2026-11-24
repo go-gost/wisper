@@ -180,8 +180,14 @@ export class EntrypointDetailPage extends LitElement {
    *  also lives in its tooltip — but a phone has no hover, so without the tap a
    *  grey 中继 reads as "not connected" rather than "connected, on the relay".
    *  A single-peer entrypoint also reports the round-trip time measured over
-   *  that path, drawn beside the badge the same way a peer row draws it. */
+   *  that path, drawn beside the badge the same way a peer row draws it.
+   *
+   *  A stopped endpoint draws no row at all: it has no session and no path, and
+   *  the shared host outlives its Close by the teardown grace — so the word the
+   *  last run ended on would otherwise sit under a "stopped" banner for that
+   *  whole window, describing a session the operator just switched off. */
   private _renderTransport(ep: Entrypoint) {
+    if (ep.status !== 'running') return nothing;
     const st = transportStyle(ep.peer_transport);
     if (!st) return nothing;
     return html`
@@ -949,7 +955,7 @@ export class EntrypointDetailPage extends LitElement {
                 </div>
               `
               : nothing}
-            ${this.entrypointType === 'tun' && ep.status === 'running' && (ep.peer_transport === 'server-unreachable' || !ep.peer_transport)
+            ${this.entrypointType === 'tun' && ep.status === 'running' && ep.peer_transport === 'server-unreachable'
               ? html`
                 <div class="status-banner degraded">
                   <span class="status-dot-mini"></span>

@@ -121,6 +121,10 @@ test('every transport state carries a tappable detail', async ({ page }) => {
     { transport: 'punching', badge: 'punching' },
     { transport: 'no-candidates', badge: 'relay' },
     { transport: 'stun-unreachable', badge: 'relay' },
+    // The API's own word for a peer whose session is still being established:
+    // it used to arrive as "server-unreachable", which claimed the hub was down
+    // for the whole first connection.
+    { transport: 'connecting', badge: 'connecting' },
   ];
 
   for (const { transport, badge: want } of states) {
@@ -151,4 +155,69 @@ test('every transport state carries a tappable detail', async ({ page }) => {
       `${transport}: ⓘ not centered on the badge`,
     ).toBeLessThan(4);
   }
+});
+
+/**
+ * A stopped endpoint draws no transport row, and a "connecting" peer does not
+ * raise the unreachable banner.
+ *
+ * Two leftovers of the same bug: the shared p2p host outlives an entrypoint's
+ * Close by its teardown grace, so the API used to keep reporting the path the
+ * last run ended on — a stopped tun entrypoint sat under a "stopped" banner
+ * still labelled "direct". And the banner's condition treated any missing word
+ * as an outage, so an ordinary first connection read "Server (hub) is
+ * unreachable" until the session came up.
+ */
+test('a stopped entrypoint has no transport row and only an unreachable relay raises the banner', async ({ page }) => {
+  const base = {
+    id: 'e2e-transport-status',
+    name: 'tun',
+    type: 'tun',
+    endpoint: '127.0.0.1:9',
+    entrypoint: '10.10.100.250/24',
+    favorite: false,
+    created_at: '2026-01-15T10:30:00Z',
+    error: '',
+    options: {
+      keepalive: true,
+      peer: 'dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA',
+      net: '10.10.100.250/24',
+    },
+    stats: {
+      current_conns: 0,
+      total_conns: 79,
+      total_errs: 0,
+      request_rate: 0,
+      input_bytes: 0,
+      output_bytes: 0,
+      input_rate_bytes: 0,
+      output_rate_bytes: 0,
+    },
+    events: [],
+  };
+
+  // Each state is served (and the page loaded) fresh: the page's own poll
+  // re-reads /api/entrypoints on a timer, so a state left in place would be
+  // replaced mid-assertion by whichever fixture was routed last.
+  const serve = async (ep: Record<string, unknown>) => {
+    await page.route('**/api/entrypoints', r => r.fulfill({ json: [ep] }));
+    await page.route('**/api/entrypoints/e2e-transport-status', r => r.fulfill({ json: ep }));
+    await page.goto('/entrypoint/tun/e2e-transport-status');
+  };
+
+  // Stopped: no badge, even though the API's last word was "direct".
+  await serve({ ...base, status: 'stopped', peer_transport: 'direct' });
+  await expect(page.locator('.status-banner').first()).toContainText('Stopped');
+  await expect(page.locator('.peer-badge')).toHaveCount(0);
+
+  // Running and still connecting: the badge is drawn, the banner is not.
+  await serve({ ...base, status: 'running', peer_transport: 'connecting' });
+  await expect(page.locator('.peer-badge').first()).toContainText('connecting');
+  await expect(page.getByText('Server (hub) is unreachable')).toHaveCount(0);
+
+  // Running with the relay genuinely down: the banner is the point of the word.
+  await serve({ ...base, status: 'running', peer_transport: 'server-unreachable' });
+  await expect(page.getByText('Server (hub) is unreachable')).toBeVisible();
+
+  await page.screenshot({ path: 'test-results/entrypoint-transport-status.png', fullPage: true });
 });

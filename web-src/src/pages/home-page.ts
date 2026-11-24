@@ -183,9 +183,12 @@ export class HomePage extends LitElement {
 
   /** _transport is the p2p chip for a row. Only an entrypoint has it: its one
    *  peer has one path, while a tunnel's peers may each be on a different one
-   *  — that per-peer view belongs on the peers page, not on a summary row. */
+   *  — that per-peer view belongs on the peers page, not on a summary row. A
+   *  stopped entrypoint draws none: the shared host outlives its Close by the
+   *  teardown grace, so the word would outlive the session it describes. */
   private _transport(item: Item): TransportView | null {
-    return item.kind === 'entrypoint' ? transportView(item.data.peer_transport) : null;
+    if (item.kind !== 'entrypoint' || item.data.status !== 'running') return null;
+    return transportView(item.data.peer_transport);
   }
 
   /** _rtt is the entrypoint row's round-trip time in milliseconds — the one

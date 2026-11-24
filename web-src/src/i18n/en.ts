@@ -376,6 +376,7 @@ const en: Record<string, string> = {
   p2pTransportRelay: 'relay',
   p2pTransportPunch: 'punched',
   p2pTransportPunching: 'punching',
+  p2pTransportConnecting: 'connecting',
   doctorTitle: 'Diagnostics',
   doctorDesc:
     'A pasteable diagnostic report: the relay state, the transport counters, each peer\'s path and recent punch rounds, with verdicts. Rendered in-process here, so the relay\'s liveness is real.',
@@ -384,6 +385,7 @@ const en: Record<string, string> = {
   p2pTransportHint: 'Peers reach each other directly (hole-punched): no traffic through the relay.',
   p2pTransportWhyRelay: 'on the relay — no direct path is in use',
   p2pTransportWhyPunching: 'negotiating a direct path',
+  p2pTransportWhyConnecting: 'establishing the peer session',
   p2pTransportWhyFailed: 'punch failed (often a symmetric NAT)',
   p2pTransportWhyDisabled: 'direct path is off in the settings',
   p2pTransportWhyPeerDirectOff: 'the peer has the direct path off',
