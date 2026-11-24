@@ -66,8 +66,10 @@ test('the transport badge carries a tappable detail that outlives a poll', async
   // disabled is a connected peer on the relay, so "Connected" is the right lead.
   await expect(detail).toContainText('Connected');
 
-  // A poll tick repopulates the form; it must not close the detail.
-  await page.waitForTimeout(3500);
+  // A poll tick repopulates the form; it must not close the detail. The page's
+  // own interval is 5s, so the wait has to outlast one full tick — a shorter
+  // wait would prove nothing about the repopulation.
+  await page.waitForTimeout(6500);
   await expect(detail).toBeVisible();
 
   await page.screenshot({ path: 'test-results/entrypoint-transport-detail.png', fullPage: true });
@@ -227,6 +229,17 @@ test('a stopped entrypoint has no transport row and only an unreachable relay ra
   // Running with the relay genuinely down: the banner is the point of the word.
   await serve({ ...base, status: 'running', peer_transport: 'server-unreachable' });
   await expect(page.getByText('Server (hub) is unreachable')).toBeVisible();
+
+  // The same gate on the list row, which builds its chip from a different call
+  // site: a stopped card must not draw the stale path either.
+  await page.route('**/api/entrypoints', r =>
+    r.fulfill({ json: [{ ...base, status: 'stopped', peer_transport: 'direct' }] }));
+  await page.route('**/api/tunnels', r => r.fulfill({ json: [] }));
+  await page.goto('/');
+  // The list opens on the tunnels tab; the stopped entrypoint is on its own.
+  await page.getByRole('button', { name: 'Entrypoints' }).click();
+  await expect(page.getByText(base.name).first()).toBeVisible();
+  await expect(page.locator('.transport')).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/entrypoint-transport-status.png', fullPage: true });
 });
