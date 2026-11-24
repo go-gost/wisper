@@ -205,7 +205,7 @@ git commit -m "feat(api): report connecting separately from an unreachable serve
 - Consumes: the API words from Task 1 (`connecting`, `server-unreachable`).
 - Produces: `PeerTransport` gains `'connecting'`; `transportStyle('connecting')` returns `{ icon: 'rotate-cw', tone: 'muted', label: t('p2pTransportConnecting'), why: t('p2pTransportWhyConnecting') }`.
 
-- [ ] **Step 1: Extend the transport table**
+- [x] **Step 1: Extend the transport table**
 
 In `SPECS`, next to `punching`:
 
@@ -220,29 +220,29 @@ In `SPECS`, next to `punching`:
 
 Add `'connecting'` to the `PeerTransport` union in alphabetical position. `muted`, not `warn`: nothing is broken yet, and a first connection is routinely a second or two — the same reasoning that made `peer-direct-off` informational rather than a fault.
 
-- [ ] **Step 2: Add both locales**
+- [x] **Step 2: Add both locales**
 
 `en.ts`: `p2pTransportConnecting: 'connecting'`, `p2pTransportWhyConnecting: 'establishing the peer session'`.
 `zh.ts`: `p2pTransportConnecting: '连接中'`, `p2pTransportWhyConnecting: '正在建立对端会话'`.
 
 Verify key parity before moving on: `grep -c "p2pTransport" web-src/src/i18n/en.ts web-src/src/i18n/zh.ts` must print the same number for both files.
 
-- [ ] **Step 3: Stop drawing a stopped endpoint's path**
+- [x] **Step 3: Stop drawing a stopped endpoint's path**
 
 In `_renderTransport(ep)`, return `nothing` when `ep.status !== 'running'`. The row is about a live session; a stopped endpoint's last word is a leftover, and the status banner above already says stopped.
 
 In the same file, the "server unreachable" banner condition becomes `ep.peer_transport === 'server-unreachable'` only — drop the `|| !ep.peer_transport` arm, which is what made the banner appear during an ordinary first connection.
 
-- [ ] **Step 4: Gate the list row**
+- [x] **Step 4: Gate the list row**
 
 In `home-page.ts`'s `_transport(item)`, return `null` unless `item.data.status === 'running'`, so the list and the detail page agree about a stopped endpoint.
 
-- [ ] **Step 5: Type-check and build**
+- [x] **Step 5: Type-check and build**
 
 Run: `cd /root/code/go-gost/wisper && make typecheck && make web`
 Expected: `tsc --noEmit` clean; Vite writes `web/`. Confirm `web/assets` changed (`git status --short web`), because `web/` is a tracked build product in this repo.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /root/code/go-gost/wisper
@@ -251,12 +251,31 @@ git commit -m "feat(web): draw a connecting peer and hide a stopped endpoint's p
 ```
 
 **Implementation record:**
-- 日期/状态：
-- 仓库 + commit：
-- 实际改动文件：
-- 测试/命令与结果：
-- Review 发现与修法：
-- 遗留/限制：
+- **日期/状态:** 2026-11-24 — 已完成。
+- **仓库 + commit:** `wisper` `50cfbcf` `feat(web): draw a connecting peer and hide a stopped endpoint's path`
+  （代码 + web 产物 + e2e）。
+- **实际改动文件:**
+  - `web-src/src/utils/transport.ts` — `PeerTransport` 增加 `connecting`，`SPECS` 增加
+    `connecting: { icon: 'rotate-cw', tone: 'muted', labelKey: 'p2pTransportConnecting' }`；类型注释改为
+    「大部分是 p2p 的 wire 值，`connecting`/`server-unreachable` 是 API 的」。
+  - `web-src/src/i18n/en.ts` / `zh.ts` — `p2pTransportConnecting`（connecting / 连接中）、
+    `p2pTransportWhyConnecting`（establishing the peer session / 正在建立对端会话）。
+  - `web-src/src/pages/entrypoint-detail-page.ts` — `_renderTransport` 在 `status !== 'running'` 时返回
+    `nothing`；unreachable banner 条件去掉 `|| !ep.peer_transport`。
+  - `web-src/src/pages/home-page.ts` — `_transport` 只在 `running` 时返回视图。
+  - `web-e2e/tests/entrypoint-transport-detail.spec.ts` — 状态表补 `connecting`；新增
+    「stopped 无 transport 行 / connecting 不弹 banner / server-unreachable 才弹」用例。
+  - `web/assets/*` — Vite 重新构建产物（仓库跟踪的构建结果）。
+- **测试/命令与结果:**
+  - `make typecheck` → 干净。
+  - `scripts/ui-test.sh -g transport` → 5 passed。
+  - **回退验证**（把两个 page 文件 `git checkout` 回原版再 `make web`）→
+    新用例在 `.peer-badge toHaveCount(0)` 处失败（`1 failed`），证明它真的会挂。
+  - 恢复后 `scripts/ui-test.sh`（全量）→ **39 passed (31.3s)**。
+- **Review 发现与修法:** `grep -c p2pTransport` 两边数字不等（19 vs 18）是**行数**而非 key 数（同一行有两个键），
+  改用解析 key 的脚本核对 → 414/414 完全一致，不再依赖 grep 计数。
+- **遗留/限制:** `connecting` 用 `muted`（不是 `warn`）：首连通常只有一两秒，且没有坏掉的东西；
+  真正「一直 connecting」的场景目前无 UI 提示，靠事件页的 punch 失败告警。
 
 ---
 
