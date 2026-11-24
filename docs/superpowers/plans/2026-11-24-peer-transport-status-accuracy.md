@@ -279,162 +279,106 @@ git commit -m "feat(web): draw a connecting peer and hide a stopped endpoint's p
 
 ---
 
-### Task 3: The QUIC server reports a direct path as soon as it holds one
+### Task 3: ~~The QUIC server reports a direct path as soon as it holds one~~ — **cancelled: premise falsified**
 
-**Files:**
-- Modify: `p2p/internal/host/quic.go` (`quicPair.pathName`)
-- Test: `p2p/internal/host/quic_direct_test.go`
+**Status: cancelled, no code change in `p2p`.** Reverted; the `p2p` tree is clean.
 
-**Interfaces:**
-- Consumes: `quicPair.hasDirect()` (already exists: "a direct underlay is installed on the pair").
-- Produces: no new API. `pathName()` on a `quicRoleServer` pair now returns `quicPathDirect` while `directSock != nil && !closed`.
+The plan assumed the QUIC *server* role lagged behind reality because
+`quicPair.pathName()` only reads `conn.RemoteAddr()`, which changes only after the
+client's first migrated datagram. That is a real code fact, and the change was
+implemented and made its own new test pass — but it broke an existing contract, and
+the field evidence does not support the premise.
 
-- [ ] **Step 1: Write the failing test**
+- **Existing test that forbids it:** `TestQUICRelayLossKeepsDirect`
+  (`p2p/internal/host/quic_failure_test.go:214`) retires the client's direct path and
+  then waits up to 5 s for the **server** to read `relay`. Reporting `direct` from
+  `hasDirect()` makes the server keep claiming a path the peer has already left, so
+  the change fails that test (`condition not met before timeout`) — the server's
+  `RemoteAddr()` fallback is the deliberate "the peer left" signal, not an oversight.
+- **Field evidence against the premise:** Pixel 9 (QUIC **server** for this pair) at
+  2026-11-24, from its own event history and the hub log:
+  - `09:49:48.473` phone: `stream:Vmm16NVN <-> …` over derp — pair established, no direct underlay yet.
+  - `09:49:53.223` hub: `direct punch: seed failed …` + `backoff retryIn=5m0s` — **there was no direct path**.
+  - `09:50:48.524` hub: `direct punch: start` → `09:50:49.178` `quic underlay direct event=installed`.
+  - `09:50:50` phone: `peer …: derp → direct`.
+  So the badge read `relay` for 61 s because the pair genuinely **was** on relay: the
+  punch failed, armed a 5 m backoff, and only ran again when the peer re-announced
+  candidates. The switch to `direct` came one second after the underlay was installed —
+  not "only when there is data".
+- **Bounded by design, not tens of seconds:** once a direct underlay is installed, the
+  server sees a direct datagram within one `directHeartbeatInterval` (3 s), so any
+  server-side reporting lag is ≤3 s. What the operator perceives as "waits for data"
+  is the punch cadence (failed round + backoff), which is the Deferred item below.
 
-```go
-// TestQUICServerPathFollowsInstalledDirect: the server role has no preferred
-// path to read — it follows the address the client migrates to, which only
-// becomes the direct one after the client's first datagram arrives on it. Until
-// then a server that already holds a punched underlay reported "relay", so a
-// spoke whose hub is the QUIC server only showed a direct badge once it started
-// sending. The pair's own record of the underlay is the correct answer: the
-// seed handshake has already proven that path.
-func TestQUICServerPathFollowsInstalledDirect(t *testing.T) {
-	e := &engine{transport: transportQUIC, quics: make(map[derpclient.PublicKey]*quicPeer)}
-	peer := derpclient.PublicKey{11}
-	pair := newQUICPair(e, peer, quicRoleServer, nil, nil, nil)
-	t.Cleanup(pair.close)
+Ruling: Task 3 is dropped; `p2p` stays untouched at `v0.15.4`, and Task 4 loses its
+reason to exist. The `p2p` work that remains justified is the idle-path re-punch
+cadence in Deferred, which needs its own evidence and design.
 
-	if got := pair.pathName(); got != quicPathRelay {
-		t.Fatalf("path before a punch = %q, want %q", got, quicPathRelay)
-	}
+**Implementation record:**
+- **日期/状态:** 2026-11-24 — 已取消（前提被证伪，无代码落地）。
+- **仓库 + commit:** `p2p` 无改动；工作树回到 `v0.15.4` 的干净状态（改动已 `git checkout` 还原）。
+- **实际改动文件:** 无。
+- **测试/命令与结果:**
+  - 实现阶段：新增 `TestQUICServerPathFollowsInstalledDirect` 先红（`path after addDirect = "relay"`），
+    改 `quicPair.pathName()` 后转绿。
+  - **回归证据**：`CGO_ENABLED=1 go test -race ./internal/host -run 'TestQUIC'` →
+    `--- FAIL: TestQUICRelayLossKeepsDirect (6.45s) condition not met before timeout`
+    —— 该用例要求 server 在客户端离开直连后退回 `relay`，我的改动恰好违反它。
+  - 还原后 `go test ./internal/host -run TestQUICRelayLossKeepsDirect -count=1` → `ok 5.089s`；
+    `git status --short` 为空。
+- **Review 发现与修法:** 现场时间线（手机自身事件 + hub 日志）显示 09:49:48 建立会话、
+  09:49:53 打洞失败并进入 5m backoff、09:50:48 重打洞、09:50:49 装上 underlay、
+  09:50:50 徽标变直连 —— 徽标与事实一致，不存在「缺 direct 报告」的滞后。
+- **遗留/限制:** 「有数据才变直连」的真实成因是打洞节奏（失败 + backoff 5m，靠对端候选公告提前打断），
+  记入 Deferred，需单独取证与设计（涉及 H3 退避语义）。
 
-	peerSock := mustListenUDP(t)
-	t.Cleanup(func() { peerSock.Close() })
-	sock := mustListenUDP(t)
-	if err := pair.addDirect(sock, udpAddrPort(t, peerSock), [seedTokenLen]byte{1}); err != nil {
-		t.Fatalf("addDirect: %v", err)
-	}
-	if got := pair.pathName(); got != quicPathDirect {
-		t.Fatalf("path after addDirect = %q, want %q", got, quicPathDirect)
-	}
+---
 
-	pair.removeDirect(sock)
-	if got := pair.pathName(); got != quicPathRelay {
-		t.Fatalf("path after removeDirect = %q, want %q", got, quicPathRelay)
-	}
-}
-```
+### Task 4: Ship to the device — **STOP for the user's approval first**
 
-- [ ] **Step 2: Run it to verify it fails**
+**Files:** none. This is a build-and-install step, plus this plan's record.
 
-Run: `cd /root/code/go-gost/p2p && go test ./internal/host -run TestQUICServerPathFollowsInstalledDirect -count=1`
-Expected: FAIL — `path after addDirect = "relay", want "direct"`.
+Because Task 3 was cancelled there is no `p2p` tag and no `go.mod` bump: the shipped
+change is wisper-only (`7f6a630`, `50cfbcf`).
 
-- [ ] **Step 3: Implement it**
+- [ ] **Step 1: Ask, then build**
 
-In `quicPair.pathName`, before the `conn.RemoteAddr()` fallback:
+  两个动作都算「本工作区之外」，需要用户明确点头：打 p2p tag / push（已不需要）以及
+  在用户手机上装 APK。未经同意不做。
 
-```go
-	// A server has no preferred path to read; it follows the address the client
-	// migrates to, which is only observed once the client's first datagram
-	// arrives on the direct path. The pair's own record is the answer until
-	// then: a punched underlay has already completed the seed handshake, so the
-	// path is proven before any of its traffic is seen. Reporting relay here
-	// made a spoke read "relay" for as long as it stayed idle, even though the
-	// client had been preferring direct from the moment it installed.
-	if p.hasDirect() {
-		return quicPathDirect
-	}
-```
+- [ ] **Step 2: Build and install the APK**
 
-`hasDirect` takes `p.mu` itself, so keep it outside the existing `p.mu` block (that block is released before this point).
+  按 `.memory/notes/wisper-apk-build.md`：`docker` 构建且**必须** `--network host`、
+  用 device-trusted key 重签、`adb install -r --no-incremental`、装完 `monkey` 重新拉起
+  （装包会杀掉 app，tunnel 会静默停掉）。无线调试端口用
+  `nmap -Pn -n -T4 --min-rate 3000 -p 30000-49999 10.10.100.250` 找；扫到的端口里可能有一个
+  只接受 TCP 但不是 adbd（`adb connect` 会失败并留下 `offline` 条目）。
 
-- [ ] **Step 4: Run the suite around it**
+- [ ] **Step 3: Verify the three states on the device**
 
-Run: `cd /root/code/go-gost/p2p && go test ./internal/host -run 'TestQUIC' -count=1`
-Expected: PASS, including `TestQUICPairMigratesRelayDirectRelay` (it explicitly retires the underlay and expects relay) and `TestQUICModeDirectPunch`.
+  `adb -s <ip:port> forward tcp:18900 tcp:8900`，然后
 
-Then the whole package with the race detector, which is what CI runs:
+  ```bash
+  curl -s http://127.0.0.1:18900/api/stats | python3 -c "
+  import json,sys
+  for e in json.load(sys.stdin)['entrypoints']:
+      print(e['status'], repr(e.get('peer_transport')), e.get('peer_rtt_ms'))"
+  ```
 
-Run: `cd /root/code/go-gost/p2p && CGO_ENABLED=1 go test -race -count=1 ./internal/host`
-Expected: PASS. A timeout in `TestTransportStatsCounters` under load is the known sandbox flake, not this change — re-run it alone to confirm.
+  验收（读成一条时间线）：
 
-- [ ] **Step 5: Commit**
+  1. 停 → `POST /api/entrypoints/<id>/start`，每 2 s 采样：先 `running` + `connecting`
+     （relay 在位时**不再**出现 `server-unreachable`），随后 `derp`，再 `direct`。
+  2. 再停一次并立刻采样：第一拍就没有 `peer_transport`，不是十几秒后才消失。
+  3. 期间抓 hub 日志（`ssh pi@192.168.100.100 'docker logs --since 10m p2p-tun-wisper-1'`），
+     确认没有 `quic handshake … context deadline exceeded` 突发被 UI 掩盖。
 
-```bash
-cd /root/code/go-gost/p2p
-git add internal/host/quic.go internal/host/quic_direct_test.go
-git commit -m "fix(host): report a server's installed direct path before its first datagram"
-```
-
-Then append the p2p half of the implementation record to the plan, in the wisper repo, and commit that separately (the plan lives in wisper):
+- [ ] **Step 4: Record**
 
 ```bash
 cd /root/code/go-gost/wisper
 git add docs/superpowers/plans/2026-11-24-peer-transport-status-accuracy.md
-git commit -m "docs(plan): record task 3's p2p commit"
-```
-
-**Implementation record:**
-- 日期/状态：
-- 仓库 + commit：
-- 实际改动文件：
-- 测试/命令与结果：
-- Review 发现与修法：
-- 遗留/限制：
-
----
-
-### Task 4: Ship the p2p fix to the device — **STOP for the user's approval first**
-
-**Files:**
-- Modify: `wisper/go.mod`, `wisper/go.sum`
-- Modify: this plan (record)
-
-**Interfaces:**
-- Consumes: a released p2p tag containing Task 3.
-- Produces: `github.com/go-gost/p2p vX.Y.Z` in `wisper/go.mod`.
-
-- [ ] **Step 1: Ask, then tag**
-
-Do **not** tag or push without an explicit yes. The scope is: a p2p patch tag (`git tag v0.15.5` on main after Task 3's commit), `git push origin main --tags` in `p2p/`, then the wisper bump. If the user declines, this task stays open and Tasks 1–2 still ship (they are independent of p2p).
-
-- [ ] **Step 2: Bump and verify**
-
-```bash
-cd /root/code/go-gost/wisper && GOWORK=off go get github.com/go-gost/p2p@vX.Y.Z && GOWORK=off go mod tidy
-cd /root/code/go-gost/wisper && GOWORK=off go build ./... && GOWORK=off go test ./api ./tunnel -count=1
-```
-
-- [ ] **Step 3: Verify on the device**
-
-The recipes are established; use them rather than inventing new ones.
-
-Field observation, before and after, from the phone's own API (the phone's `10.10.100.250` is reachable directly; find the wireless-debugging port with `nmap -Pn -n -T4 --min-rate 3000 -p 30000-49999 10.10.100.250` and `adb connect` the open one — one of them is a decoy that accepts TCP but is not adbd):
-
-```bash
-adb -s <ip:port> forward tcp:18900 tcp:8900
-curl -s http://127.0.0.1:18900/api/stats | python3 -c "
-import json,sys
-for e in json.load(sys.stdin)['entrypoints']:
-    print(e['status'], repr(e.get('peer_transport')), e.get('peer_rtt_ms'))"
-```
-
-Acceptance, read as one timeline:
-
-1. Stop the entrypoint, then `POST /api/entrypoints/<id>/start`, and sample every 2 s: the first samples read `running` with `peer_transport` `connecting` (never `server-unreachable` while the relay is up), then `derp`, then `direct` — and with the p2p fix, `direct` arrives on the phone's side without requiring traffic.
-2. Stop it again and sample immediately: `peer_transport` is absent from the first sample after the stop, not 10–30 s later.
-3. Pull the hub's log for the same window (`ssh pi@192.168.100.100 'docker logs --since 10m p2p-tun-wisper-1'`) and confirm no `quic handshake … context deadline exceeded` burst was hidden by the UI change.
-
-Build and install the APK only after that, following `.memory/notes/wisper-apk-build.md` (`docker` with `--network host`, re-sign with the device-trusted key, `adb install -r --no-incremental`).
-
-- [ ] **Step 4: Commit**
-
-```bash
-cd /root/code/go-gost/wisper
-git add go.mod go.sum docs/superpowers/plans/2026-11-24-peer-transport-status-accuracy.md
-git commit -m "chore(deps): bump p2p for the server-side path report"
+git commit -m "docs(plan): record the device verification"
 ```
 
 **Implementation record:**
@@ -449,5 +393,11 @@ git commit -m "chore(deps): bump p2p for the server-side path report"
 
 ## Deferred
 
+- **「有数据才变直连」= 打洞节奏，不是状态上报。** 2026-11-24 09:49–09:50 的实测：第一轮打洞
+  `seed failed`（v4 候选 58.37.24.59:49896）+ `backoff retryIn=5m0s`，55 s 后靠对端候选公告
+  打断退避才重打一轮，装上 underlay 后 1 s 徽标即变直连。要缩短这段等待需要动两处之一：
+  `directConn.backoff()` 的 H3 退避语义（cap 5m），或「会话重建/链路重现时主动 kick」的触发器
+  —— 与 [[p2p-punch-trigger-missing-on-link-represent]] 中 v0.14.8 的修复同源，但这里是**已建立
+  会话之后**的首轮失败，不在那次修复范围内。需要单独取证（手机侧 debug 日志）+ 设计，勿顺手改。
 - **The first connection still takes ~30 s when the hub's relay registration has gone stale.** Field sequence on 2026-11-24: the phone restarted its entrypoint at `09:49:18`, its punch failed with `caps timeout` at `09:49:21`, the hub ran three 10 s QUIC handshakes that each expired (`09:49:22`, `09:49:35`, `09:49:45`), and only then did p2p's relay-blackhole cure fire (`relay handshake blackhole … re-registering`, stage 1) — the very next handshake succeeded in 0.77 s (`09:49:48`). So the latency is the cure's 3×10 s budget, not the UI. Shortening it is a p2p tuning decision (handshake deadline vs. strike count) and needs its own evidence; Tasks 1–2 only stop the UI from calling that window "unreachable".
 - **Direct↔relay flapping on an idle path.** The same hub log shows the direct underlay retired with `reason=heartbeat` after lifetimes of 12–45 s during a relay-jitter window (`09:42`–`09:46`), each followed by a `1m`/`2m`/`5m` backoff. Once traffic resumed at `09:50` the path held for over an hour. This is the known idle/one-way watchdog interaction, unrelated to the badge; leave it alone until it is reproduced deliberately.
