@@ -81,6 +81,8 @@ test('the entrypoint badge colours peer-direct-off apart from derp', async ({ pa
     const detail = page.locator('.detail-text');
     await expect(detail, `${transport}: detail opens`).toBeVisible();
     await expect(detail, `${transport}: detail says connected`).toContainText('Connected');
+    expect((await detail.textContent()) ?? '', `${transport}: detail leaks a raw key`)
+      .not.toMatch(/p2pTransport/);
   }
 
   expect(

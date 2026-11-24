@@ -212,7 +212,7 @@ export class EntrypointDetailPage extends LitElement {
           <div class="info-row detail-row">
             <span class="info-label"></span>
             <span class="info-value text detail-text">
-              ${t('p2pTransportConnected')}${st.why ? ` · ${st.why}` : ` · ${t('p2pTransportHint')}`}
+              ${st.lead}${st.why ? ` · ${st.why}` : ` · ${t('p2pTransportHint')}`}
             </span>
           </div>
           <!-- The round trip behind the inline number, in full. QUIC reports

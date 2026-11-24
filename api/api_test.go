@@ -4035,13 +4035,26 @@ func TestPeerTransportWord(t *testing.T) {
 	}
 }
 
-// TestStoppedEntrypointReportsNoTransport: a stopped endpoint keeps its peer
-// key in options, but it has no session and no path, so it must not keep
-// publishing the word its last run ended on — the UI would show "direct" for
-// the whole teardown grace of the shared host.
+// TestStoppedEntrypointReportsNoTransport is the regression test for the
+// stale badge: a stopped endpoint must not keep publishing the path its last
+// run ended on.
+//
+// Reproducing it needs a host that is still up and still reporting the peer —
+// the shared host outlives an entrypoint's Close by its teardown grace, which
+// is exactly the window the bug lived in. Before the fix, toTunnelResponse read
+// that snapshot whatever the object's status was, so a stopped endpoint came
+// back with "direct" for up to 30s. The seam below supplies that live snapshot,
+// so the assertion fails on the old code and passes on the new one.
 func TestStoppedEntrypointReportsNoTransport(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	key := strings.Repeat("A", 43)
+
+	// A host that is up, with the peer on a direct path: the snapshot a stopped
+	// endpoint used to keep reading.
+	defer withP2PSnapshot(t, p2p.Status{
+		RelayConnected: true,
+		PeerTransports: map[string]string{key: "direct"},
+	})()
 
 	ep := entrypoint.NewByType(entrypoint.TunEntryPoint,
 		tunnel.NameOption("stopped tun"),
@@ -4061,6 +4074,85 @@ func TestStoppedEntrypointReportsNoTransport(t *testing.T) {
 	if resp.PeerTransport != "" {
 		t.Errorf("peer_transport = %q on a stopped endpoint, want empty", resp.PeerTransport)
 	}
+	for _, row := range resp.PeerStats {
+		if row.Transport != "" {
+			t.Errorf("peer_stats[%s].transport = %q on a stopped endpoint, want empty", row.Key, row.Transport)
+		}
+	}
+}
+
+// TestRunningEntrypointWithoutHostIsConnecting: a running endpoint whose host
+// is not up yet — Start returns before Run acquires the host, and a settings
+// change rebuilds it — is still connecting, not unreachable. Only a live
+// snapshot that says the relay is down makes the server unreachable.
+func TestRunningEntrypointWithoutHostIsConnecting(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	key := strings.Repeat("A", 43)
+
+	// No host answers at all.
+	defer withP2PSnapshot(t)()
+
+	// Not started and not closed is "running" as far as the response is
+	// concerned; that is the window this case is about.
+	ep := entrypoint.NewByType(entrypoint.TunEntryPoint,
+		tunnel.NameOption("running tun"),
+		tunnel.NetOption("10.10.100.9/24"),
+		tunnel.PeerOption(key),
+	)
+	if ep == nil {
+		t.Fatal("NewByType returned no entrypoint")
+	}
+	t.Cleanup(func() { _ = ep.Close() })
+
+	resp := toTunnelResponse(ep)
+	if resp.Status != "running" {
+		t.Fatalf("status = %q, want running", resp.Status)
+	}
+	if resp.PeerTransport != transportConnecting {
+		t.Errorf("peer_transport = %q with no host, want %q", resp.PeerTransport, transportConnecting)
+	}
+}
+
+// TestRunningEntrypointReportsRelayOutage: the same endpoint, with a host that
+// answers and says its relay is down, is the one case that reaches
+// server-unreachable. Without this the connecting word could hide a real
+// outage, because both cases start as an empty transport.
+func TestRunningEntrypointReportsRelayOutage(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	key := strings.Repeat("A", 43)
+
+	defer withP2PSnapshot(t, p2p.Status{RelayConnected: false})()
+
+	ep := entrypoint.NewByType(entrypoint.TunEntryPoint,
+		tunnel.NameOption("relay down"),
+		tunnel.NetOption("10.10.100.9/24"),
+		tunnel.PeerOption(key),
+	)
+	if ep == nil {
+		t.Fatal("NewByType returned no entrypoint")
+	}
+	t.Cleanup(func() { _ = ep.Close() })
+
+	resp := toTunnelResponse(ep)
+	if resp.PeerTransport != transportServerUnreachable {
+		t.Errorf("peer_transport = %q with the relay down, want %q",
+			resp.PeerTransport, transportServerUnreachable)
+	}
+}
+
+// withP2PSnapshot swaps the API's host reading for one fixed answer and returns
+// the restore. ok is false when no status is given: the "host does not answer"
+// case, which is what a release or a rebuild looks like from here.
+func withP2PSnapshot(t *testing.T, st ...p2p.Status) func() {
+	t.Helper()
+	prev := p2pSnapshot
+	p2pSnapshot = func() (p2p.Status, bool) {
+		if len(st) == 0 {
+			return p2p.Status{}, false
+		}
+		return st[0], true
+	}
+	return func() { p2pSnapshot = prev }
 }
 
 // TestPeerTransportWireShape pins the spellings the web client reads, so a

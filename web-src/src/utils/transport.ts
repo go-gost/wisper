@@ -35,6 +35,13 @@ interface TransportSpec {
   labelKey: string;
   /** Why it is on the relay — empty for a direct path. */
   whyKey?: string;
+  /** The detail's lead word: what the connection is, before the reason. Absent
+   *  means "connected" — the badge and the RTT beside it describe a live
+   *  session, so a state that has one can say so. The two states with no
+   *  session (a peer still connecting, a relay that is down) name themselves
+   *  instead: leading them with "Connected" contradicts the badge that was
+   *  tapped to open the detail. */
+  leadKey?: string;
 }
 
 const SPECS: Record<PeerTransport, TransportSpec> = {
@@ -86,12 +93,14 @@ const SPECS: Record<PeerTransport, TransportSpec> = {
     tone: 'muted',
     labelKey: 'p2pTransportConnecting',
     whyKey: 'p2pTransportWhyConnecting',
+    leadKey: 'p2pTransportConnecting',
   },
   'server-unreachable': {
     icon: 'close',
     tone: 'warn',
     labelKey: 'p2pTransportUnreachable',
     whyKey: 'p2pTransportWhyServerUnreachable',
+    leadKey: 'p2pTransportUnreachable',
   },
 };
 
@@ -106,6 +115,9 @@ export interface TransportStyle {
   /** Why this peer is not on a direct path — empty when it is one. Shown as a
    *  tappable detail, because a phone has no hover for the tooltip. */
   why: string;
+  /** The detail's lead word: "Connected" for a live session, or the state's own
+   *  name when there is no session to connect to (see TransportSpec.leadKey). */
+  lead: string;
 }
 
 /** transportStyle maps a transport value to what to draw; null when unknown
@@ -122,6 +134,7 @@ export function transportStyle(value?: string): TransportStyle | null {
     label,
     hint: why ? `${label} · ${why}` : t('p2pTransportHint'),
     why,
+    lead: t(spec.leadKey ?? 'p2pTransportConnected'),
   };
 }
 

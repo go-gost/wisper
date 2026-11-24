@@ -240,7 +240,11 @@ func (t *updateStatsTask) observeTransitions() {
 	}
 	t.service = cur
 
-	on := tunnel.P2PHostRunning()
+	// One reading of the shared host answers both questions: whether it is up
+	// (whose transitions are the start/stop events) and what it reports. Asking
+	// twice would let a rebuild between the calls pair one host's status with
+	// another's running flag — the same race P2PHostSnapshot exists to close.
+	st, on := tunnel.P2PHostSnapshot()
 	if t.hostSet && on != t.hostOn {
 		if on {
 			event.Global(event.LevelInfo, "p2p host started")
@@ -255,17 +259,9 @@ func (t *updateStatsTask) observeTransitions() {
 		// event above already says so. Forget the baselines instead of
 		// reporting a burst of disconnects for sessions that no longer exist,
 		// and re-seed the relay on the next start rather than reading the zero
-		// Status as an outage.
-		t.peers, t.punches, t.relaySeen = nil, nil, false
-		return
-	}
-
-	// One Status covers every p2p tunnel and entrypoint: the host is shared.
-	st := tunnel.P2PHostStatus()
-	if !tunnel.P2PHostRunning() {
-		// The host was released between the two reads above, so this zero
-		// Status is the teardown, not an outage: take the same reset path the
-		// host-down branch does. The stop itself is reported next tick.
+		// Status as an outage. A host released mid-tick lands here too: the
+		// snapshot says "no host", so this zero Status is the teardown and the
+		// stop itself is reported next tick.
 		t.peers, t.punches, t.relaySeen = nil, nil, false
 		return
 	}

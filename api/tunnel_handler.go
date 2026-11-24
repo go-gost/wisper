@@ -377,6 +377,13 @@ func peerTransportWord(transport string, relayUp bool) string {
 	return transportConnecting
 }
 
+// p2pSnapshot reads the shared p2p host's status and whether it answered, as
+// one reading (see tunnel.P2PHostSnapshot). It is a variable so a test can
+// supply a live host without starting one: the host needs a relay socket and a
+// valid identity, and what these tests pin is the mapping from its answer to
+// the API's words, not the host itself.
+var p2pSnapshot = tunnel.P2PHostSnapshot
+
 // peerRTTFields carries the pair's transport RTT out of one peer's diagnostic.
 // The mapping itself lives in tunnel.PeerRTTFor, so the API faces and the tun
 // spoke's peer list cannot disagree about which transport to read.
@@ -494,20 +501,26 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	// shared host outlives an entrypoint's Close by its teardown grace, and its
 	// still-live peer session would otherwise keep a stopped endpoint wearing
 	// the path its last run ended on.
+	//
+	// A running object whose host is not up yet (an entrypoint's Start returns
+	// before its Run acquires the host, and a settings change rebuilds it) is
+	// not an outage either: peerTransportWord calls an empty word with the relay
+	// presumed up "connecting". relayUp therefore starts true and only a live
+	// snapshot can turn it false, so only a host that says its relay is down
+	// makes the server unreachable.
 	var transports map[string]string
 	var diagnostics map[string]p2p.PeerDiagnostic
-	var relayUp, hostKnown bool
-	if hasP2PPeers(opts) && status == "running" {
-		st := tunnel.P2PHostStatus()
-		// The host can be released between reading the status and reading this
-		// flag (see runner/task/stats.go for the same race): a zero Status is
-		// then the teardown, not an outage, so report nothing rather than
-		// accusing the server of being unreachable.
-		if tunnel.P2PHostRunning() {
+	// reportTransport gates the word itself: only a running object with p2p
+	// peers has a path to report at all. Everything else — a plain tunnel, a
+	// stopped endpoint — leaves peer_transport absent rather than inventing a
+	// state for a session that does not exist.
+	reportTransport := hasP2PPeers(opts) && status == "running"
+	relayUp := true
+	if reportTransport {
+		if st, ok := p2pSnapshot(); ok {
 			transports = st.PeerTransports
 			diagnostics = st.PeerDiagnostics
 			relayUp = st.RelayConnected
-			hostKnown = true
 		}
 	}
 	// The hub's LAN routing, read once and used twice: the peer rows' LAN
@@ -526,9 +539,9 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		for _, p := range ps.PeerStats() {
 			d := diagnostics[p.Key]
 			rtt := peerRTTFields(diagnostics, p.Key)
-			transport := transports[p.Key]
-			if hostKnown {
-				transport = peerTransportWord(transport, relayUp)
+			transport := ""
+			if reportTransport {
+				transport = peerTransportWord(transports[p.Key], relayUp)
 			}
 			row := peerStatsJSON{
 				Key:             p.Key,
@@ -570,9 +583,8 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 		rttPeer = opts.Peers[0]
 	}
 	if rttPeer != "" {
-		resp.PeerTransport = transports[rttPeer]
-		if hostKnown {
-			resp.PeerTransport = peerTransportWord(resp.PeerTransport, relayUp)
+		if reportTransport {
+			resp.PeerTransport = peerTransportWord(transports[rttPeer], relayUp)
 		}
 		rtt := peerRTTFields(diagnostics, rttPeer)
 		resp.PeerRTTMs = rtt.RTTMs

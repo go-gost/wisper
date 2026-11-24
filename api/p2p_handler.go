@@ -108,10 +108,13 @@ func peerDiagnosticsJSON(in map[string]p2p.PeerDiagnostic) map[string]peerDiagno
 // no p2p tunnel or entrypoint is running; Running says which of the two states
 // the host is in.
 func handleGetP2PIdentity(w http.ResponseWriter, r *http.Request) {
-	st := tunnel.P2PHostStatus()
+	// One reading: the counters and Running must describe the same host, or a
+	// rebuild between the two reads pairs a dead host's zeros with the
+	// replacement's "running" — the same race P2PHostSnapshot closes.
+	st, running := tunnel.P2PHostSnapshot()
 	writeJSON(w, http.StatusOK, p2pIdentityResponse{
 		PublicKey:       tunnel.P2PHostPublicKey(),
-		Running:         tunnel.P2PHostRunning(),
+		Running:         running,
 		DirectPeers:     st.DirectPeers,
 		DerpPeers:       st.DerpPeers,
 		PunchAttempts:   st.PunchAttempts,

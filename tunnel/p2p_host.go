@@ -227,14 +227,49 @@ func (m *p2pHostManager) warmPeers(ctx context.Context, peers []string) {
 // right now, and PunchSuccess/PunchAttempts whether punching works from here —
 // the difference between "direct is on" and "direct is actually in use".
 func P2PHostStatus() p2p.Status {
-	p2pHost.mu.Lock()
-	host := p2pHost.host
-	p2pHost.mu.Unlock()
-	if host == nil {
-		return p2p.Status{}
-	}
-	return host.Status()
+	st, _ := P2PHostSnapshot()
+	return st
 }
+
+// P2PHostSnapshot returns the shared host's status together with whether it is
+// a live host: one reading, so a caller cannot pair a status taken from one
+// host with the running flag of its replacement.
+//
+// The pairing is what this exists to prevent. A settings change or an identity
+// reset tears the host down and builds another; a caller that reads the status
+// and then asks "is a host running?" gets yes for the new host and a snapshot
+// from the dead one, and a closed host's zero relay state then reads as an
+// outage that never happened.
+//
+// The host is captured under the manager lock and Status is read outside it —
+// Status takes the host's own locks, and holding the manager lock across it
+// would order two subsystems' locks for no gain. The host's identity is
+// re-checked afterwards instead: a replacement means this snapshot belongs to
+// nobody, and ok=false says "ask again", never "the relay is down".
+func P2PHostSnapshot() (p2p.Status, bool) {
+	p2pHost.mu.Lock()
+	host, refs := p2pHost.host, p2pHost.refs
+	p2pHost.mu.Unlock()
+	if host == nil || refs <= 0 {
+		return p2p.Status{}, false
+	}
+	st := host.Status()
+	if afterHostStatusRead != nil {
+		afterHostStatusRead()
+	}
+	p2pHost.mu.Lock()
+	current := p2pHost.host == host && p2pHost.refs > 0
+	p2pHost.mu.Unlock()
+	if !current {
+		return p2p.Status{}, false
+	}
+	return st, true
+}
+
+// afterHostStatusRead runs between reading a host's status and re-checking that
+// it is still the live host. It exists so a test can interleave the replacement
+// this function guards against; nil in production (like identityRename).
+var afterHostStatusRead func()
 
 // ensurePublicKey returns the running host's key, or materializes the identity
 // when no host is running. The manager lock keeps concurrent callers from

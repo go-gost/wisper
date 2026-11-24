@@ -1183,3 +1183,57 @@ func TestP2PHostGraceKeepsHostAcrossRestart(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+// TestP2PHostSnapshotIsOneReading: the status and the "is it live" answer come
+// from the same host, or from none.
+//
+// A pair of independent reads is what this exists to prevent. A settings change
+// or an identity reset tears the host down and builds another; a caller that
+// read the status and then asked "is a host running?" got yes for the
+// replacement while holding the dead host's snapshot, and a closed host's zero
+// relay state then reads as an outage that never happened. So the failure is
+// interleaved deliberately: the host is swapped between the read and the check.
+func TestP2PHostSnapshotIsOneReading(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	// No host at all: no answer, and nothing fabricated.
+	if _, ok := P2PHostSnapshot(); ok {
+		t.Fatal("P2PHostSnapshot answered with no host running")
+	}
+	if st := P2PHostStatus(); st.RelayConnected {
+		t.Fatalf("P2PHostStatus with no host = %+v, want the zero value", st)
+	}
+
+	// The real acquisition path, so the host under test is a real one: a p2p
+	// tunnel's Run takes a reference and starts it.
+	cfg.Set(&cfg.Config{Settings: &cfg.Settings{P2P: &cfg.P2PSettings{Derp: "wss://127.0.0.1:1/derp", Direct: &directOff}}})
+	tn := NewP2PTunnel(IDOption("snapshot-host"), EndpointOption("127.0.0.1:9"), PeersOption(testPeerKey))
+	if err := tn.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	t.Cleanup(func() { _ = tn.Close() })
+
+	if _, ok := P2PHostSnapshot(); !ok {
+		t.Fatal("P2PHostSnapshot refused a host that is up")
+	}
+
+	// The interleaving the re-check exists for: the host is replaced after its
+	// status was read. The status now belongs to a host nobody holds, and
+	// reporting it — with the replacement's running flag — is how a healthy new
+	// host came to be shown as unreachable. The answer must be "ask again".
+	prev := afterHostStatusRead
+	afterHostStatusRead = func() {
+		p2pHost.mu.Lock()
+		p2pHost.teardownLocked()
+		p2pHost.mu.Unlock()
+		afterHostStatusRead = nil
+	}
+	t.Cleanup(func() { afterHostStatusRead = prev })
+
+	if _, ok := P2PHostSnapshot(); ok {
+		t.Fatal("P2PHostSnapshot answered from a host that had been replaced")
+	}
+	if st := P2PHostStatus(); st.RelayConnected {
+		t.Fatalf("P2PHostStatus after teardown = %+v, want the zero value", st)
+	}
+}

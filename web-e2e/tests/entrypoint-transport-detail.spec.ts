@@ -63,6 +63,7 @@ test('the transport badge carries a tappable detail that outlives a poll', async
   await info.click();
   const detail = page.locator('.detail-text');
   await expect(detail).toBeVisible();
+  // disabled is a connected peer on the relay, so "Connected" is the right lead.
   await expect(detail).toContainText('Connected');
 
   // A poll tick repopulates the form; it must not close the detail.
@@ -111,23 +112,28 @@ test('every transport state carries a tappable detail', async ({ page }) => {
     events: [],
   };
 
-  // The words Status.PeerTransports reports, with the badge text each carries.
+  // The words Status.PeerTransports reports, with the badge text each carries
+  // and the word its detail leads with. The lead word is asserted exactly
+  // because it used to be a blanket "Connected" — which the raw i18n key
+  // p2pTransportConnected satisfies by substring, so a missing translation
+  // passed. These strings exist in the locale, so an untranslated key cannot.
   const states = [
-    { transport: 'direct', badge: 'direct' },
-    { transport: 'derp', badge: 'relay' },
-    { transport: 'disabled', badge: 'relay' },
-    { transport: 'peer-direct-off', badge: 'relay' },
-    { transport: 'failed', badge: 'relay' },
-    { transport: 'punching', badge: 'punching' },
-    { transport: 'no-candidates', badge: 'relay' },
-    { transport: 'stun-unreachable', badge: 'relay' },
-    // The API's own word for a peer whose session is still being established:
-    // it used to arrive as "server-unreachable", which claimed the hub was down
-    // for the whole first connection.
-    { transport: 'connecting', badge: 'connecting' },
+    { transport: 'direct', badge: 'direct', lead: 'Connected' },
+    { transport: 'derp', badge: 'relay', lead: 'Connected' },
+    { transport: 'disabled', badge: 'relay', lead: 'Connected' },
+    { transport: 'peer-direct-off', badge: 'relay', lead: 'Connected' },
+    { transport: 'failed', badge: 'relay', lead: 'Connected' },
+    { transport: 'punching', badge: 'punching', lead: 'Connected' },
+    { transport: 'no-candidates', badge: 'relay', lead: 'Connected' },
+    { transport: 'stun-unreachable', badge: 'relay', lead: 'Connected' },
+    // The API's own words for a peer with no session: it used to arrive as
+    // "server-unreachable" alone, which claimed the hub was down for the whole
+    // first connection. Neither of these has a connection to call Connected.
+    { transport: 'connecting', badge: 'connecting', lead: 'connecting' },
+    { transport: 'server-unreachable', badge: 'unreachable', lead: 'unreachable' },
   ];
 
-  for (const { transport, badge: want } of states) {
+  for (const { transport, badge: want, lead } of states) {
     const ep = { ...base, peer_transport: transport };
     await page.route('**/api/entrypoints', r => r.fulfill({ json: [ep] }));
     await page.route('**/api/entrypoints/e2e-transport', r => r.fulfill({ json: ep }));
@@ -142,10 +148,13 @@ test('every transport state carries a tappable detail', async ({ page }) => {
     await expect(info, `${transport}: ⓘ`).toBeVisible();
     await info.click();
 
-    const detail = page.locator('.detail-text');
+    const detail = page.locator('.detail-text').first();
     await expect(detail, `${transport}: detail opens`).toBeVisible();
-    await expect(detail, `${transport}: detail says it is connected`).toContainText('Connected');
-    await expect(detail, `${transport}: detail is not empty`).not.toHaveText('');
+    // Exact lead word, so an untranslated key (which renders as the literal
+    // "p2pTransportConnected") cannot pass.
+    await expect(detail, `${transport}: detail lead word`).toContainText(lead);
+    const text = (await detail.textContent()) ?? '';
+    expect(text, `${transport}: detail leaks a raw i18n key`).not.toMatch(/p2pTransport/);
 
     // The badge and the ⓘ share a line, in every state.
     const b = (await badge.boundingBox())!;
