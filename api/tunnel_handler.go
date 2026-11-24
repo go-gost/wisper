@@ -346,6 +346,37 @@ func peersJSON(peers []string, aliases map[string]string, disabled []string, pee
 	return out
 }
 
+// Transport words the API adds on top of p2p's own vocabulary. p2p reports
+// only peers with a live data path; these two say why a listed peer has none,
+// which p2p cannot know: it has no idea whether its own relay connection is up.
+// They are API-layer words and never travel on the wire between peers.
+const (
+	// transportConnecting is a peer with no live path while the relay is up:
+	// the pair is still being established (a first connection, or a punch whose
+	// underlay has not been installed yet).
+	transportConnecting = "connecting"
+	// transportServerUnreachable is a peer with no live path while the relay
+	// itself is down: the host cannot reach the server at all, so nothing it
+	// does to the peer can work.
+	transportServerUnreachable = "server-unreachable"
+)
+
+// peerTransportWord names a peer's path for the API: the host's own word when
+// there is a live path, and otherwise the reason there is none. relayUp is the
+// host's relay state, which is what separates "still connecting" from "cannot
+// reach the server": both look identical from the peer's side — an empty word —
+// and reporting the second when the first is true is what made a device read
+// "unreachable" for the first tens of seconds of every run.
+func peerTransportWord(transport string, relayUp bool) string {
+	if transport != "" {
+		return transport
+	}
+	if !relayUp {
+		return transportServerUnreachable
+	}
+	return transportConnecting
+}
+
 // peerRTTFields carries the pair's transport RTT out of one peer's diagnostic.
 // The mapping itself lives in tunnel.PeerRTTFor, so the API faces and the tun
 // spoke's peer list cannot disagree about which transport to read.
@@ -458,12 +489,26 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	// same host: a hub reaches its spokes over p2p, so its allowlist is a p2p
 	// allowlist), and a p2p entrypoint's single peer. One snapshot read serves
 	// both the path word and the per-peer diagnostics.
+	//
+	// A stopped object has no session and no path, so it reports none: the
+	// shared host outlives an entrypoint's Close by its teardown grace, and its
+	// still-live peer session would otherwise keep a stopped endpoint wearing
+	// the path its last run ended on.
 	var transports map[string]string
 	var diagnostics map[string]p2p.PeerDiagnostic
-	if hasP2PPeers(opts) {
+	var relayUp, hostKnown bool
+	if hasP2PPeers(opts) && status == "running" {
 		st := tunnel.P2PHostStatus()
-		transports = st.PeerTransports
-		diagnostics = st.PeerDiagnostics
+		// The host can be released between reading the status and reading this
+		// flag (see runner/task/stats.go for the same race): a zero Status is
+		// then the teardown, not an outage, so report nothing rather than
+		// accusing the server of being unreachable.
+		if tunnel.P2PHostRunning() {
+			transports = st.PeerTransports
+			diagnostics = st.PeerDiagnostics
+			relayUp = st.RelayConnected
+			hostKnown = true
+		}
 	}
 	// The hub's LAN routing, read once and used twice: the peer rows' LAN
 	// column below and the routes list at the end are two views of one RIB
@@ -482,8 +527,8 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 			d := diagnostics[p.Key]
 			rtt := peerRTTFields(diagnostics, p.Key)
 			transport := transports[p.Key]
-			if transport == "" && tunnel.P2PHostRunning() {
-				transport = "server-unreachable"
+			if hostKnown {
+				transport = peerTransportWord(transport, relayUp)
 			}
 			row := peerStatsJSON{
 				Key:             p.Key,
@@ -526,8 +571,8 @@ func toTunnelResponse(t tunnel.Tunnel) tunnelResponse {
 	}
 	if rttPeer != "" {
 		resp.PeerTransport = transports[rttPeer]
-		if resp.PeerTransport == "" && tunnel.P2PHostRunning() {
-			resp.PeerTransport = "server-unreachable"
+		if hostKnown {
+			resp.PeerTransport = peerTransportWord(resp.PeerTransport, relayUp)
 		}
 		rtt := peerRTTFields(diagnostics, rttPeer)
 		resp.PeerRTTMs = rtt.RTTMs

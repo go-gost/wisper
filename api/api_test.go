@@ -4009,3 +4009,73 @@ func TestTraceTimesMillis(t *testing.T) {
 		t.Errorf("traceTimesMillis = %v, want [1700000000000 1700000001000]", got)
 	}
 }
+
+// TestPeerTransportWord pins the three-way split that replaced the old
+// "empty means unreachable" reading: a live path is reported as is, a peer the
+// host does not list yet is still connecting, and only a relay that is itself
+// down makes the server unreachable.
+func TestPeerTransportWord(t *testing.T) {
+	cases := []struct {
+		name      string
+		transport string
+		relayUp   bool
+		want      string
+	}{
+		{"direct path", "direct", true, "direct"},
+		{"never engaged", "", true, "connecting"},
+		{"relay down", "", false, "server-unreachable"},
+		{"live path outranks a relay outage", "direct", false, "direct"},
+		{"peer turned direct off", "peer-direct-off", true, "peer-direct-off"},
+	}
+	for _, c := range cases {
+		if got := peerTransportWord(c.transport, c.relayUp); got != c.want {
+			t.Errorf("%s: peerTransportWord(%q, %v) = %q, want %q",
+				c.name, c.transport, c.relayUp, got, c.want)
+		}
+	}
+}
+
+// TestStoppedEntrypointReportsNoTransport: a stopped endpoint keeps its peer
+// key in options, but it has no session and no path, so it must not keep
+// publishing the word its last run ended on — the UI would show "direct" for
+// the whole teardown grace of the shared host.
+func TestStoppedEntrypointReportsNoTransport(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	key := strings.Repeat("A", 43)
+
+	ep := entrypoint.NewByType(entrypoint.TunEntryPoint,
+		tunnel.NameOption("stopped tun"),
+		tunnel.NetOption("10.10.100.9/24"),
+		tunnel.PeerOption(key),
+	)
+	if ep == nil {
+		t.Fatal("NewByType returned no entrypoint")
+	}
+	ep.Close()
+	t.Cleanup(func() { _ = ep.Close() })
+
+	resp := toTunnelResponse(ep)
+	if resp.Status != "stopped" {
+		t.Fatalf("status = %q, want stopped", resp.Status)
+	}
+	if resp.PeerTransport != "" {
+		t.Errorf("peer_transport = %q on a stopped endpoint, want empty", resp.PeerTransport)
+	}
+}
+
+// TestPeerTransportWireShape pins the spellings the web client reads, so a
+// renamed word cannot silently leave the UI with no badge at all.
+func TestPeerTransportWireShape(t *testing.T) {
+	for _, c := range []struct{ word, want string }{
+		{transportConnecting, `"peer_transport":"connecting"`},
+		{transportServerUnreachable, `"peer_transport":"server-unreachable"`},
+	} {
+		b, err := json.Marshal(tunnelResponse{PeerTransport: c.word})
+		if err != nil {
+			t.Fatalf("marshal %q: %v", c.word, err)
+		}
+		if !strings.Contains(string(b), c.want) {
+			t.Errorf("peer_transport wire shape = %s, want %s", b, c.want)
+		}
+	}
+}
