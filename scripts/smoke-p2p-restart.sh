@@ -247,7 +247,32 @@ for r in $(seq 1 "$ROUNDS"); do
     [ "$st" = running ] || curl -sf -X POST "$SPOKE_API/api/entrypoints/$EP/start" >/dev/null
   fi
 
+  # Sample both sides while the round is in flight. The doctor is a read-only
+  # snapshot that already carries the per-peer view (path, transport error,
+  # session, caps, punch trace), and unlike debug logging it does not perturb
+  # the timing — which matters here, because turning debug on makes the failure
+  # disappear. Two seconds is fine: the interesting transitions are seconds
+  # apart, and the samples are only kept when the round is slow.
+  SAMPLES="$W/round$r-samples.txt"
+  : > "$SAMPLES"
+  ROUND_DONE="$W/round$r.done"
+  rm -f "$ROUND_DONE"
+  (
+    while [ ! -f "$ROUND_DONE" ]; do
+      {
+        printf '=== %s spoke ===\n' "$(date -u +%T)"
+        curl -sf "$SPOKE_API/api/p2p/doctor" 2>/dev/null
+        printf '=== %s hub ===\n' "$(date -u +%T)"
+        curl -sf "$HUB_API/api/p2p/doctor" 2>/dev/null
+      } >> "$SAMPLES"
+      sleep 2
+    done
+  ) &
+  SAMPLER=$!
+
   SECS=$(time_to_pair "$SPOKE" 60)
+  : > "$ROUND_DONE"
+  wait "$SAMPLER" 2>/dev/null
   if probe x x "$SPOKE"; then
     ok "round $r: repaired in ${SECS}s"
   else
@@ -262,7 +287,9 @@ for r in $(seq 1 "$ROUNDS"); do
     curl -sf "$HUB_API/api/logs?tail=2000" > "$W/slow-round$r-hub.json" 2>/dev/null
     curl -sf "$SPOKE_API/api/p2p/doctor" > "$W/slow-round$r-spoke.txt" 2>/dev/null
     curl -sf "$HUB_API/api/p2p/doctor" > "$W/slow-round$r-hub.txt" 2>/dev/null
+    mv "$SAMPLES" "$W/slow-round$r-samples.txt" 2>/dev/null
   fi
+  rm -f "$SAMPLES" "$ROUND_DONE"
   # 3s is the handshake budget a healthy pair needs (measured ~50ms); anything
   # near 10s means an attempt spent its whole deadline on a stale route.
   if [ "$SECS" -ge 8 ]; then
