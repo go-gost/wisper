@@ -25,6 +25,12 @@ KEEP=0
 ROUNDS=4
 PAUSE=3
 PRE_PAUSE=0
+# DIRECT=1 turns the direct path on and measures it. Off by default because it
+# needs the derper's STUN port and adds a NAT-shaped variable to every round;
+# on because with it off this harness never runs a punch at all, which is how a
+# 66s direct-path regression stayed invisible here while the relay came up in a
+# second.
+DIRECT=0
 
 die() { echo "$*" >&2; exit 2; }
 
@@ -34,6 +40,7 @@ while [ $# -gt 0 ]; do
     --rounds) [ $# -ge 2 ] || die "--rounds needs a value"; ROUNDS=$2; shift 2 ;;
     --pause) [ $# -ge 2 ] || die "--pause needs a value"; PAUSE=$2; shift 2 ;;
     --pre-pause) [ $# -ge 2 ] || die "--pre-pause needs a value"; PRE_PAUSE=$2; shift 2 ;;
+    --direct) DIRECT=1; shift ;;
     -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
     -*) die "unknown argument: $1" ;;
     *) W=$1; shift ;;
@@ -122,15 +129,27 @@ docker run -d --name "$ORIGIN" --network "$NET" --network-alias origin \
 trap 'docker rm -f "$ORIGIN" >/dev/null 2>&1; cleanup' EXIT
 
 for d in hub spoke; do
-  cat > "$W/$d/.config/wisper/wisper.yaml" <<'YAML'
+  mkdir -p "$W/$d/.config/wisper"
+  cat > "$W/$d/.config/wisper/wisper.yaml" <<YAML
 settings:
   lang: en
   p2p:
     derp: wss://derper/derp
     secure: false
-    direct: false
+    direct: $([ "$DIRECT" = 1 ] && echo true || echo false)$([ "$DIRECT" = 1 ] && printf '\n    stun: derper:3478' || true)
 YAML
 done
+# set_direct turns the direct path on for one instance through the API.
+#
+# The settings YAML cannot do it: the app loads it, then writes its own snapshot
+# back over it, and `direct` does not survive that round trip — seeded files ran
+# with direct off while `derp` and `stun` were honoured, which is exactly the
+# blind spot this flag exists to close. PUT /api/config is the supported path.
+set_direct() { # <api>
+  curl -sf "$1/api/config" 2>/dev/null \
+    | jq '.p2p.direct = true | .p2p.stun = "derper:3478"' \
+    | curl -sf -X PUT -H 'Content-Type: application/json' --data @- "$1/api/config" >/dev/null
+}
 
 start_wisper() { # <container> <dir> [--replace]
   local args=()
@@ -139,6 +158,24 @@ start_wisper() { # <container> <dir> [--replace]
     -v "$2:/lab" -v "$W/wisper:/lab/wisper:ro" -e HOME=/lab \
     --entrypoint /lab/wisper alpine:3.22 -addr :8900 \
     -log.level "${WISPER_LOG_LEVEL:-info}" >/dev/null
+}
+
+# time_to_direct waits until the spoke reports a direct path for its peer, and
+# prints the seconds it took. The relay carries traffic the whole time, so this
+# is the second half of "the session is up": a pair that comes back on the relay
+# and never goes direct is a punch problem, not an establishment one.
+time_to_direct() { # <api> <limit-seconds>
+  local api=$1 limit=${2:-60} start
+  start=$(date +%s)
+  for _ in $(seq 1 "$limit"); do
+    if curl -sf "$api/api/p2p/doctor" 2>/dev/null | grep -qE 'path:[[:space:]]+direct'; then
+      echo $(( $(date +%s) - start ))
+      return 0
+    fi
+    sleep 1
+  done
+  echo "$limit"
+  return 1
 }
 
 host_port() { local out; out=$(docker port "$1" 8900/tcp) || return 1; echo "${out##*:}"; }
@@ -218,6 +255,18 @@ time_to_pair() { # <spoke-container> <deadline-seconds>
 # first-attempt cost (one failed handshake plus the blackhole cure) is a
 # different defect. It is printed as context so a reader does not mistake it for
 # this script's subject.
+if [ "$DIRECT" = 1 ]; then
+  # Both sides, before the first measurement: a peer that has direct off asks
+  # for the relay and the other side honours it, so turning it on for one end
+  # alone measures nothing.
+  set_direct "$HUB_API"
+  set_direct "$SPOKE_API"
+  # The p2p settings are part of the host signature: changing them rebuilds the
+  # host, so wait for both to be serving again before the clock starts.
+  wait_api "$HUB_API" && wait_api "$SPOKE_API" || die "API did not come back after enabling direct"
+  sleep 1
+fi
+
 say "first pair (control: no stale route can exist yet)"
 FIRST=$(time_to_pair "$SPOKE" 60) || die "the control start never paired; the harness is not measuring what it claims"
 echo "     control start: ${FIRST}s (not asserted: a first handshake and its cure)"
@@ -277,6 +326,17 @@ for r in $(seq 1 "$ROUNDS"); do
     ok "round $r: repaired in ${SECS}s"
   else
     bad "round $r: never repaired within 60s"
+  fi
+  if [ "$DIRECT" = 1 ]; then
+    DSECS=$(time_to_direct "$SPOKE_API" 60)
+    # A direct path should follow within a couple of seconds of the relay. Ten
+    # is one full handshake deadline: past that the punch is backing off over
+    # something it should not, and the operator sits on the relay for a minute.
+    if [ "$DSECS" -ge 10 ]; then
+      bad "round $r: direct path took ${DSECS}s"
+    else
+      say "round $r: direct path in ${DSECS}s"
+    fi
   fi
   # A slow round is the interesting one and it is not reproducible on demand,
   # so the evidence is captured when it happens rather than by re-running with
