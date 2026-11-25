@@ -24,6 +24,7 @@ W="/tmp/wisper-p2p-restart-smoke"
 KEEP=0
 ROUNDS=4
 PAUSE=3
+PRE_PAUSE=0
 
 die() { echo "$*" >&2; exit 2; }
 
@@ -32,6 +33,7 @@ while [ $# -gt 0 ]; do
     --keep) KEEP=1; shift ;;
     --rounds) [ $# -ge 2 ] || die "--rounds needs a value"; ROUNDS=$2; shift 2 ;;
     --pause) [ $# -ge 2 ] || die "--pause needs a value"; PAUSE=$2; shift 2 ;;
+    --pre-pause) [ $# -ge 2 ] || die "--pre-pause needs a value"; PRE_PAUSE=$2; shift 2 ;;
     -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
     -*) die "unknown argument: $1" ;;
     *) W=$1; shift ;;
@@ -219,6 +221,13 @@ time_to_pair() { # <spoke-container> <deadline-seconds>
 say "first pair (control: no stale route can exist yet)"
 FIRST=$(time_to_pair "$SPOKE" 60) || die "the control start never paired; the harness is not measuring what it claims"
 echo "     control start: ${FIRST}s (not asserted: a first handshake and its cure)"
+# Settle time before the first kill. The first restart after a fresh pair is
+# the one that misbehaves, so how soon it follows the pair is a variable worth
+# isolating rather than assuming.
+if [ "$PRE_PAUSE" -gt 0 ]; then
+  say "waiting ${PRE_PAUSE}s before the first restart"
+  sleep "$PRE_PAUSE"
+fi
 
 # The case under test. Each round kills the spoke outright — the phone's app
 # being killed, not a tunnel being toggled — and starts it again with the same
