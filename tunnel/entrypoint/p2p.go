@@ -237,10 +237,18 @@ func (s *p2pEntryPoint) RunContext(ctx context.Context) (err error) {
 	// bring its path up and punch now: the direct path is being arranged (and
 	// visible in the status) before the first local client arrives, instead of
 	// waiting for traffic. Punch failures are logged, never fatal.
+	// Off the startup path on purpose. A punch that cannot reach the peer costs
+	// a whole handshake deadline, and this call sits in Run before the service
+	// starts serving: measured on a phone, a failed punch held the tunnel for
+	// 10s after launch while the relay session came up 86ms after it gave up.
+	// The path is arranged either way — the first packet establishes it — so
+	// what the blocking call bought was delay, not readiness.
 	if peer := s.opts.Peer; peer != "" {
-		if err := host.PunchContext(ctx, peer); err != nil {
-			slog.Warn("p2p entrypoint: punch peer", "peer", peer, "err", err)
-		}
+		go func(p string) {
+			if err := host.PunchContext(ctx, p); err != nil {
+				slog.Warn("p2p entrypoint: punch peer", "peer", p, "err", err)
+			}
+		}(peer)
 	}
 
 	var forward service.Service

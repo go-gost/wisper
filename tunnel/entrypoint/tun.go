@@ -704,10 +704,18 @@ func (s *tunEntryPoint) RunContext(ctx context.Context) (err error) {
 	// bring its path up and punch now: the direct path is being arranged (and
 	// visible in the status) before the first packet. Punch failures are
 	// logged, never fatal.
-	if err := host.PunchContext(ctx, s.peer); err != nil {
-		slog.Warn("tun entrypoint: punch peer", "peer", s.peer, "err", err)
-		event.Record(s.ID(), event.LevelWarn, "punch %s failed: %v", s.peer, err)
-	}
+	// Off the startup path on purpose. A punch that cannot reach the peer costs
+	// a whole handshake deadline, and this call sits in Run before the service
+	// starts serving: measured on a phone, a failed punch held the tunnel for
+	// 10s after launch while the relay session came up 86ms after it gave up.
+	// The path is arranged either way — the first packet establishes it — so
+	// what the blocking call bought was delay, not readiness.
+	go func() {
+		if err := host.PunchContext(ctx, s.peer); err != nil {
+			slog.Warn("tun entrypoint: punch peer", "peer", s.peer, "err", err)
+			event.Record(s.ID(), event.LevelWarn, "punch %s failed: %v", s.peer, err)
+		}
+	}()
 
 	// The control channel is the spoke's half of LAN routing: it claims this
 	// spoke's share_lan at the hub and installs every netview the hub
