@@ -6,7 +6,7 @@ import type { Entrypoint, EntrypointRequest } from '../api/types';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
 import { formatBytes, formatClockTime, formatDuration } from '../utils/format';
-import { requestDestination } from '../utils/entrypoint-request';
+import { requestDestination, ruleCovers } from '../utils/entrypoint-request';
 import { updateEntrypointRules } from '../store/entrypoint-store';
 import '../components/app-scaffold';
 
@@ -145,7 +145,8 @@ export class EntrypointRequestsPage extends LitElement {
 
     const rules = this._entrypoint?.options?.rules ?? [];
     const listed = rules.includes(key);
-    const next = listed ? rules.filter(rule => rule !== key) : [...rules, key];
+    if (!listed && rules.some(rule => ruleCovers(rule, key))) return;
+    const next = listed ? rules.filter(rule => rule !== key) : [...new Set([...rules, key])];
     this._savingKey = key;
     this._setRowError(key, '');
     try {
@@ -183,6 +184,8 @@ export class EntrypointRequestsPage extends LitElement {
     const destinationLabel = `${destination.name}${destination.port ? `:${destination.port}` : ''}`;
     const rules = this._entrypoint?.options?.rules ?? [];
     const listed = rules.includes(destination.key);
+    const coveringRule = listed ? undefined : rules.find(rule => ruleCovers(rule, destination.key));
+    const coveredLabel = coveringRule ? t('requestsRuleCoveredBy', { rule: coveringRule }) : '';
     const protocol = [request.network, request.proto].filter(Boolean).join(' · ');
     const duration = `${(request.duration_ms / 1000).toFixed(1)} s`;
     const key = this._requestKey(request);
@@ -219,13 +222,25 @@ export class EntrypointRequestsPage extends LitElement {
                 @click=${() => this._toggleExpanded(request)}>${primary}</button>`
             : html`<div class="row-content">${primary}</div>`}
           ${destination.key
-            ? html`<button type="button" class="rule-action"
-                title=${actionLabel}
-                aria-label=${actionLabel}
-                ?disabled=${this._savingKey !== ''}
-                @click=${() => this._toggleRule(request)}>
-                <span aria-hidden="true">${icon(listed ? 'minus' : 'plus')}</span>
-              </button>`
+            ? listed
+              ? html`<button type="button" class="rule-action"
+                  title=${actionLabel}
+                  aria-label=${actionLabel}
+                  ?disabled=${this._savingKey !== ''}
+                  @click=${() => this._toggleRule(request)}>
+                  <span aria-hidden="true">${icon('minus')}</span>
+                </button>`
+              : coveringRule
+                ? html`<span class="rule-covered" role="img" title=${coveredLabel} aria-label=${coveredLabel}>
+                    <span aria-hidden="true">${icon('check')}</span>
+                  </span>`
+                : html`<button type="button" class="rule-action"
+                    title=${actionLabel}
+                    aria-label=${actionLabel}
+                    ?disabled=${this._savingKey !== ''}
+                    @click=${() => this._toggleRule(request)}>
+                    <span aria-hidden="true">${icon('plus')}</span>
+                  </button>`
             : nothing}
         </div>
         <div class="request-meta">
@@ -388,8 +403,13 @@ export class EntrypointRequestsPage extends LitElement {
       border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
       background: var(--surface); color: var(--accent); cursor: pointer; flex-shrink: 0;
     }
-    .rule-action > span { display: inline-flex; }
-    .rule-action svg { width: 12px; height: 12px; }
+    .rule-action > span, .rule-covered > span { display: inline-flex; }
+    .rule-action svg, .rule-covered svg { width: 12px; height: 12px; }
+    .rule-covered {
+      flex: 0 0 24px; width: 24px; height: 24px; min-height: 24px; box-sizing: border-box;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--text-muted); cursor: default; flex-shrink: 0;
+    }
     .request-meta {
       min-width: 0; margin-top: 2px; color: var(--text-muted); font-size: var(--font-xs);
       line-height: 1.4; overflow-wrap: anywhere;

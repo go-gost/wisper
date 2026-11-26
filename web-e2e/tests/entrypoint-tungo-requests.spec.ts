@@ -277,6 +277,104 @@ test('adds a host to the rules and removes an already listed destination', async
   await expect(removeRow.getByRole('button', { name: /Add to rules/ })).toBeVisible();
 });
 
+test('renders exact, suffix, CIDR, and port-normalized rule coverage', async ({ page }) => {
+  const requests = [
+    { ...FLOWS[1], time: '2026-11-26T12:00:07Z', host: 't.me:80', dst: '149.154.167.99:80' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:06Z', host: 'sub.t.me:443', dst: '149.154.167.99:443' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:05Z', host: 'exact.example:443', dst: '198.51.100.5:443' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:04Z', dst: '192.168.100.201:4096' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:03Z', dst: '[2001:db8::201]:443' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:02Z', host: 'port.example:8080', dst: '198.51.100.6:8080' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:01Z', host: 'case.example:443', dst: '198.51.100.7:443' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:00Z', host: 'nott.me:443', dst: '198.51.100.8:443' },
+  ];
+  const mock = await mockEntrypoint(page, {
+    rules: [
+      'exact.example',
+      '.t.me',
+      '192.168.100.0/24',
+      '2001:db8::/64',
+      'port.example:8080',
+      '.EXAMPLE',
+    ],
+    requests,
+  });
+  await page.goto(REQUESTS);
+
+  const requestsPage = page.locator('entrypoint-requests-page');
+  const rows = requestsPage.locator('.request-row');
+  await expect(rows).toHaveCount(requests.length);
+
+  const covered = [
+    ['t.me:80', '.t.me'],
+    ['sub.t.me:443', '.t.me'],
+    ['192.168.100.201:4096', '192.168.100.0/24'],
+    ['[2001:db8::201]:443', '2001:db8::/64'],
+    ['port.example:8080', 'port.example:8080'],
+    ['case.example:443', '.EXAMPLE'],
+  ];
+  for (const [destination, rule] of covered) {
+    const row = rows.filter({ hasText: destination });
+    const label = `Covered by rule: ${rule}`;
+    await expect(row.locator('.rule-covered')).toHaveAttribute('title', label);
+    await expect(row.locator('.rule-covered')).toHaveAttribute('aria-label', label);
+    await expect(row.locator('.rule-covered svg polyline')).toHaveCount(1);
+    await expect(row.locator('.rule-action')).toHaveCount(0);
+    await expect(row.getByRole('button')).toHaveCount(0);
+  }
+
+  const exact = rows.filter({ hasText: 'exact.example:443' });
+  await expect(exact.locator('.rule-action')).toHaveAttribute('title', 'Remove from rule: exact.example');
+  await expect(exact.locator('.rule-action svg line')).toHaveCount(1);
+  await expect(exact.locator('.rule-covered')).toHaveCount(0);
+
+  const uncovered = rows.filter({ hasText: 'nott.me:443' });
+  await expect(uncovered.locator('.rule-action')).toHaveAttribute('title', 'Add to rules: nott.me');
+  await expect(uncovered.locator('.rule-action svg line')).toHaveCount(2);
+  await expect(uncovered.locator('.rule-covered')).toHaveCount(0);
+  expect(mock.ruleBodies()).toEqual([]);
+});
+
+test('adds a bare host and removes only its exact rule when a broader rule still covers it', async ({ page }) => {
+  const requests = [
+    { ...FLOWS[1], time: '2026-11-26T12:00:03Z', host: 't.me:80', dst: '149.154.167.99:80' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:02Z', host: 'both.example.com:443', dst: '198.51.100.9:443' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:01Z', host: 'uncovered.example:8443', dst: '198.51.100.10:8443' },
+    { ...FLOWS[1], time: '2026-11-26T12:00:00Z', dst: '192.168.100.201:4096' },
+  ];
+  const mock = await mockEntrypoint(page, {
+    rules: ['.t.me', '192.168.100.0/24', '.example.com', 'both.example.com'],
+    requests,
+  });
+  await page.goto(REQUESTS);
+
+  const requestsPage = page.locator('entrypoint-requests-page');
+  const rows = requestsPage.locator('.request-row');
+  await expect(rows).toHaveCount(requests.length);
+
+  const covered = rows.filter({ hasText: 't.me:80' });
+  await expect(covered.locator('.rule-covered')).toHaveAttribute('title', 'Covered by rule: .t.me');
+  await expect(covered.locator('.rule-action')).toHaveCount(0);
+
+  const exact = rows.filter({ hasText: 'both.example.com:443' });
+  await exact.locator('.rule-action').click();
+  await expect.poll(() => mock.ruleBodies().length).toBe(1);
+  expect(mock.ruleBodies()[0]).toEqual(['.t.me', '192.168.100.0/24', '.example.com']);
+  await expect(exact.locator('.rule-covered')).toHaveAttribute('title', 'Covered by rule: .example.com');
+  await expect(exact.locator('.rule-action')).toHaveCount(0);
+
+  const uncovered = rows.filter({ hasText: 'uncovered.example:8443' });
+  await uncovered.locator('.rule-action').click();
+  await expect.poll(() => mock.ruleBodies().length).toBe(2);
+  expect(mock.ruleBodies()[1]).toEqual([
+    '.t.me',
+    '192.168.100.0/24',
+    '.example.com',
+    'uncovered.example',
+  ]);
+  await expect(uncovered.locator('.rule-action')).toHaveAttribute('title', 'Remove from rule: uncovered.example');
+});
+
 test('turning auto refresh off stops the timer while manual refresh still works', async ({ page }) => {
   const now = new Date('2026-11-26T12:00:00Z');
   await page.clock.install({ time: now });

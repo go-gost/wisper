@@ -268,6 +268,7 @@ const zh: Record<string, string> = {
   requestsRemoveRule: '移出规则',
   requestsAddRuleFor: '加入规则：{destination}',
   requestsRemoveRuleFor: '移出规则：{destination}',
+  requestsRuleCoveredBy: '已由规则覆盖：{rule}',
   requestsRefresh: '刷新',
   requestsAuto: '自动',
   requestsShowing: '显示最后 {shown} 条，共 {total} 条',

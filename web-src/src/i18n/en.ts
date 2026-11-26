@@ -276,6 +276,7 @@ const en: Record<string, string> = {
   requestsRemoveRule: 'Remove from rule',
   requestsAddRuleFor: 'Add to rules: {destination}',
   requestsRemoveRuleFor: 'Remove from rule: {destination}',
+  requestsRuleCoveredBy: 'Covered by rule: {rule}',
   requestsRefresh: 'Refresh',
   requestsAuto: 'Auto',
   requestsShowing: 'Showing the last {shown} of {total}',
