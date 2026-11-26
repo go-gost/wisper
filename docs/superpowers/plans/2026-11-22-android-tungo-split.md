@@ -1352,4 +1352,35 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
     仍然说 tun 设备（互斥是按设备实现的），**这句对用户可见**：手机上同时启两个设备型入口点时
     看到的就是它，别当成 bug 再报一次。
 
-**Implementation record:** _完成后填写（含每条的实测命令与输出、以及回滚方式：把 pixel-9 加回 `p2p-tun` 的 peers 并重新启动旧 `tun` entrypoint）。_
+**Implementation record:**
+
+- **日期/状态:** 2026-11-26 — 已完成（真机 Pixel 9，Wi-Fi 192.168.100.8）。
+- **仓库 + commit:** `wisper` `f21429b`（嗅探修复）与 `333cc1b`（规则 UI），均已在 `main` 上推送；
+  APK `1.10.2-dev.261126-2205`（versionCode 11002，重签 signer `39c3df75…`）。
+- **实际配置:** entrypoint `a4e24941-…`：`net 10.10.100.250/24,fd00:10:10:100::250/128`、
+  `routes 0.0.0.0/0, ::/0`、`dns 192.168.100.100`、6398 条规则（LAN + `.home.pi`/`.gost.local`/`.dadax` +
+  pi 的 6394 个 `gost:bypass:gfw` 域名）。hub 侧 pixel-9 从 `p2p-tun` 移到 `gw-split`（背靠背两次 PUT，均 200）。
+- **验收结果（全部实测）:**
+  1. 白名单域名：手机 `nc` 打 `t.me:80`（Host 头）→ 收到 `301 Moved Permanently`；pi 的 `relay-phone`
+     日志出现 `>> t.me:80` → `route node-0@relay.gost.run:443` → `<-> t.me:80`。**域名规则首次真正生效**
+     （此前 `sniffing` 未开导致只按 IP 判定，是本次验收抓到的 Critical，修复见 `f21429b`）。
+  2. 非白名单域名：`www.baidu.com` → 手机 `200 OK`，pi 的 `relay-phone` 无任何 baidu 记录（走本机网络）。
+  3. 内网子域名：`nc home.pi 80` 可解析（经隧道 DNS）并由规则 `.home.pi` 送进隧道（app 日志显示嗅探到的
+     主机名与链节点）。
+  4. DNS：pi 的 `relay-phone` 处理 `192.168.100.100:53` 的 FUDP 会话并返回应答（UDP over relay 实锤）。
+  5. IPv6：设备确实捕获 `::/0`（`ip route show table all` 有 `default dev tun0`，v6 也有），但这台 Wi-Fi
+     没有全局 v6，因此被捕获的 v6 流会 `network is unreachable` 并回落 v4 —— 属预期，未能在该环境下验证
+     v6 穿越。
+  6. 互斥：`tungo` 运行时启动 `tun` → `409 the tun device is held by entrypoint (split): stop it first`。
+  7. 回归：`x`/`wisper` 的既有测试全绿（见上表）；手机上的旧 `tun` entrypoint 配置与行为未改动。
+  8. 隧道不可用：停掉 hub 的 `gw-split` 后，白名单请求**无响应**（不回落到直连）；重新 start 后立即恢复
+     `301`，无需重启 App —— fail-closed 成立。
+  9. 启停 ×3：每轮 `running`、无 error、`tun0` 重建且双栈地址齐全；重启 App 后 tungo entrypoint 无需用户
+     操作自行拿到设备（Kotlin 设备持有者判定修复生效）。
+- **回滚方式:** 把 pixel-9 加回 `p2p-tun` 的 peers（`PUT /api/tunnels/<p2p-tun>/peers`），并从 `gw-split`
+  移除；停掉手机上的 `tungo` entrypoint、启动旧 `tun` entrypoint。pi 的 `relay-phone` 可以留着（只绑回环，
+  无流量就不用）。
+- **遗留/限制:** i) 这台 Wi-Fi 无 v6，v6 穿越未验证；ii) 全捕获在无 v6 网络下会把 v6 流打进栈并立刻失败，
+  日志 error 偏吵（v1 行为，与 ss-android 同类）；iii) HTTP/1.0（无 `Connection` 头）的请求在嗅探路径上
+  没有拿到响应，HTTP/1.1 正常 —— 真实客户端不会这么发，未进一步追。
+
