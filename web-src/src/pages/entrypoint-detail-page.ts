@@ -9,10 +9,11 @@ import { armVpn, tunDeviceHolder } from '../utils/vpn';
 import { getEntrypoints, refresh, remove, start, stop, subscribe, resetStats } from '../store/entrypoint-store';
 import { setItemStats } from '../store/stats-store';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
-import type { Entrypoint, EntrypointType, WisperEvent } from '../api/types';
+import { formatBytes, formatRate, formatNumber, formatTimestamp, formatClockTime, maskKey } from '../utils/format';
+import { requestDestinationLabel } from '../utils/entrypoint-request';
+import { GoBackend } from '../api/backend';
+import type { Entrypoint, EntrypointType, EntrypointRequest, WisperEvent } from '../api/types';
 import '../components/app-scaffold';
-import '../components/entrypoint-requests-card';
 
 type PageMode = 'view' | 'edit' | 'create';
 
@@ -28,11 +29,14 @@ export class EntrypointDetailPage extends LitElement {
    *  never reached it — an accusation of a silent hub outlived the silence and
    *  stayed on screen until the app was killed. */
   private _poll = 0;
+  private _requestBackend = new GoBackend();
+  private _latestRequestFor = '';
 
   // ── State ────────────────────────────────────────────────────────────
 
   @state() private mode: PageMode = 'view';
   @state() private _entrypoint: Entrypoint | null = null;
+  @state() private _latestRequest: EntrypointRequest | null = null;
   @state() private _saving = false;
   @state() private _snackbar = '';
   @state() private _showDeleteDialog = false;
@@ -131,6 +135,8 @@ export class EntrypointDetailPage extends LitElement {
       if (this.mode === 'create') return;
       this.mode = 'create';
       this._entrypoint = null;
+      this._latestRequest = null;
+      this._latestRequestFor = '';
       this._resetForm();
       return;
     }
@@ -140,6 +146,7 @@ export class EntrypointDetailPage extends LitElement {
     const existing = getEntrypoints().find(e => e.id === id);
     if (existing) {
       this._entrypoint = existing;
+      this._loadLatestRequest(existing);
       if (isEdit) {
         this.mode = 'edit';
         this._populateForm(existing);
@@ -150,6 +157,20 @@ export class EntrypointDetailPage extends LitElement {
         }
       }
     }
+  }
+
+  private _loadLatestRequest(ep: Entrypoint) {
+    if (this.entrypointType !== 'tungo' || this._latestRequestFor === ep.id) return;
+    this._latestRequestFor = ep.id;
+    this._latestRequest = null;
+    void this._requestBackend.getEntrypointRequests(ep.id, 1)
+      .then(body => {
+        if (this._latestRequestFor !== ep.id) return;
+        this._latestRequest = body.requests?.[0] ?? null;
+      })
+      .catch(() => {
+        if (this._latestRequestFor === ep.id) this._latestRequest = null;
+      });
   }
 
   private _resetForm() {
@@ -363,6 +384,16 @@ export class EntrypointDetailPage extends LitElement {
     if (!e) return t('eventsEntryDesc');
     const n = e.count || 1;
     return n > 1 ? `${e.message} ×${n}` : e.message;
+  }
+
+  private _latestRequestLine(): string {
+    const request = this._latestRequest;
+    if (!request) return t('requestsEntryDesc');
+    return t('requestsEntryLatest', {
+      time: formatClockTime(Date.parse(request.time)),
+      destination: requestDestinationLabel(request),
+      route: request.tunneled ? t('requestsTunnel') : t('requestsDirect'),
+    });
   }
 
   /** Whether the hub is currently not returning traffic: the newest liveness
@@ -678,6 +709,23 @@ export class EntrypointDetailPage extends LitElement {
       border: 1px solid var(--border-subtle);
       overflow: hidden;
     }
+
+    .entry-card {
+      min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+      background: var(--surface); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg); color: inherit; text-decoration: none; cursor: pointer;
+    }
+    .entry-card:hover { background: var(--border-subtle); }
+    .entry-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .entry-icon { display: inline-flex; color: var(--accent); flex: none; }
+    .entry-copy { flex: 1; min-width: 0; }
+    .entry-title { display: block; font-size: var(--font-sm); font-weight: 600; color: var(--text); }
+    .entry-desc {
+      display: block; margin-top: 2px; font-size: var(--font-sm); color: var(--text-muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .entry-chevron { display: inline-flex; color: var(--text-muted); flex: none; }
+    .entry-chevron svg { width: 16px; height: 16px; }
 
     .info-row {
       display: flex; align-items: center;
@@ -1368,10 +1416,27 @@ export class EntrypointDetailPage extends LitElement {
                   </div>
                 `
                 : ''}
-              ${this.entrypointType === 'tungo'
-                ? html`<entrypoint-requests-card .entrypoint=${ep}></entrypoint-requests-card>`
-                : nothing}
             </div>
+
+            ${this.mode === 'view' && ep && this.entrypointType === 'tungo'
+              ? html`
+                <div class="section">
+                  <a class="entry-card requests-entry"
+                    href=${`/entrypoint/${this.entrypointType}/${this.entrypointId}/requests`}
+                    @click=${(event: Event) => {
+                      event.preventDefault();
+                      this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/requests`);
+                    }}>
+                    <span class="entry-icon" aria-hidden="true">${icon('branch')}</span>
+                    <span class="entry-copy">
+                      <span class="entry-title">${t('requestsEntryTitle')}</span>
+                      <span class="entry-desc">${this._latestRequestLine()}</span>
+                    </span>
+                    <span class="entry-chevron" aria-hidden="true">${icon('chevron-right')}</span>
+                  </a>
+                </div>
+              `
+              : nothing}
 
             ${this.mode === 'view' && this._entrypoint && this.entrypointType === 'tun'
               ? html`
@@ -1398,19 +1463,19 @@ export class EntrypointDetailPage extends LitElement {
             ${this.mode === 'view' && this._entrypoint
               ? html`
                 <div class="section">
-                  <div class="card" style="padding:0;">
-                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
-                      @click=${() => this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`)}>
-                      <span style="color:var(--accent);">${icon('activity')}</span>
-                      <div style="flex:1;">
-                        <div style="font-size:var(--font-sm);font-weight:600;">${t('eventsEntryTitle')}</div>
-                        <div style="font-size:var(--font-sm);color:var(--text-muted);">
-                          ${this._latestEventLine(this._entrypoint.events)}
-                        </div>
-                      </div>
-                      <span style="color:var(--text-muted);">&rarr;</span>
-                    </div>
-                  </div>
+                  <a class="entry-card"
+                    href=${`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`}
+                    @click=${(event: Event) => {
+                      event.preventDefault();
+                      this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`);
+                    }}>
+                    <span class="entry-icon" aria-hidden="true">${icon('activity')}</span>
+                    <span class="entry-copy">
+                      <span class="entry-title">${t('eventsEntryTitle')}</span>
+                      <span class="entry-desc">${this._latestEventLine(this._entrypoint.events)}</span>
+                    </span>
+                    <span class="entry-chevron" aria-hidden="true">${icon('chevron-right')}</span>
+                  </a>
                 </div>
               `
               : nothing}

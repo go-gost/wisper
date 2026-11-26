@@ -3,8 +3,9 @@ import type { Page } from '@playwright/test';
 
 const ID = 'e2e-tungo-requests';
 const DETAIL = `/entrypoint/tungo/${ID}`;
+const REQUESTS = `${DETAIL}/requests`;
 
-const REQUESTS = [
+const FLOWS = [
   {
     time: '2026-11-26T12:00:03Z',
     host: 'api.example.com',
@@ -82,7 +83,7 @@ async function mockEntrypoint(
   page: Page,
   options: {
     rules?: string[];
-    requests?: typeof REQUESTS;
+    requests?: typeof FLOWS;
     failRequestsAfterFirst?: boolean;
     ruleStatus?: number;
   } = {},
@@ -98,7 +99,7 @@ async function mockEntrypoint(
     if (options.failRequestsAfterFirst && requestCalls > 1) {
       return route.fulfill({ status: 500, json: { error: 'requests unavailable' } });
     }
-    return route.fulfill({ json: { requests: options.requests ?? REQUESTS } });
+    return route.fulfill({ json: { requests: options.requests ?? FLOWS } });
   });
   await page.route(`**/api/entrypoints/${ID}/rules`, route => {
     expect(route.request().method()).toBe('PUT');
@@ -117,20 +118,23 @@ async function mockEntrypoint(
   };
 }
 
-test('renders newest-first tunnel and direct flows and polls on the two-second tick', async ({ page }) => {
+test('renders compact newest-first tunnel and direct flows and polls on the two-second tick', async ({ page }) => {
   // Playwright's clock makes the polling assertion deterministic: runFor(2000)
   // advances exactly one refresh interval instead of racing a wall-clock timeout.
   const now = new Date('2026-11-26T12:00:00Z');
   await page.clock.install({ time: now });
   await page.clock.pauseAt(now);
   const mock = await mockEntrypoint(page);
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  await expect(card).toBeVisible();
-  await expect(card.locator('.requests-count')).toHaveText('3 requests');
-  const rows = card.locator('.request-row');
+  const requestsPage = page.locator('entrypoint-requests-page');
+  await expect(requestsPage).toBeVisible();
+  await expect(requestsPage.getByRole('heading', { name: 'Recent requests' })).toBeVisible();
+  await expect(requestsPage.locator('.requests-count')).toHaveText('3 requests');
+  const rows = requestsPage.locator('.request-row');
   await expect(rows).toHaveCount(3);
+  await expect(rows.first()).toHaveCSS('padding', '8px 12px');
+  await expect(requestsPage.locator('.requests-panel')).toBeVisible();
 
   const tunneled = rows.nth(0);
   await expect(tunneled).toContainText('api.example.com');
@@ -153,6 +157,19 @@ test('renders newest-first tunnel and direct flows and polls on the two-second t
   await expect(udp.locator('.route-badge')).toHaveText('Tunnel');
   await expect(udp.locator('.request-error')).toContainText('lookup failed');
 
+  // Path hops stay out of the default one-line row and expand from it. The
+  // row's accessible name keeps its facts instead of only saying "Show path".
+  await expect(requestsPage.locator('.request-path')).toHaveCount(0);
+  await expect(tunneled.getByRole('button', { name: /api\.example\.com.*Tunnel.*Show path/ })).toBeVisible();
+  await tunneled.locator('.row-toggle').click();
+  const path = tunneled.locator('.request-path');
+  await expect(path).toBeVisible();
+  await expect(path).toContainText('home');
+  await expect(path).toContainText('127.0.0.1:8421');
+  await expect(path).toContainText('12.00ms');
+  await tunneled.locator('.row-toggle').click();
+  await expect(path).toBeHidden();
+
   await expect.poll(() => mock.requestCalls()).toBe(1);
   await page.clock.runFor(2000);
   await expect.poll(() => mock.requestCalls()).toBe(2);
@@ -160,10 +177,10 @@ test('renders newest-first tunnel and direct flows and polls on the two-second t
 
 test('adds a host to the rules and removes an already listed destination', async ({ page }) => {
   const mock = await mockEntrypoint(page);
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  const rows = card.locator('.request-row');
+  const requestsPage = page.locator('entrypoint-requests-page');
+  const rows = requestsPage.locator('.request-row');
   const addRow = rows.filter({ hasText: 'api.example.com' });
   await expect(addRow.getByRole('button', { name: /Add to rules/ })).toBeVisible();
   await addRow.getByRole('button', { name: /Add to rules/ }).click();
@@ -185,56 +202,65 @@ test('turning auto refresh off stops the timer while manual refresh still works'
   await page.clock.install({ time: now });
   await page.clock.pauseAt(now);
   const mock = await mockEntrypoint(page);
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  await expect(card.locator('.request-row')).toHaveCount(3);
-  const auto = card.getByRole('button', { name: 'Auto', exact: true });
+  const requestsPage = page.locator('entrypoint-requests-page');
+  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  const auto = requestsPage.getByRole('button', { name: 'Auto', exact: true });
   await expect(auto).toHaveAttribute('aria-pressed', 'true');
   await auto.click();
   await expect(auto).toHaveAttribute('aria-pressed', 'false');
   await page.clock.runFor(5000);
   expect(mock.requestCalls()).toBe(1);
 
-  await card.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await requestsPage.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(() => mock.requestCalls()).toBe(2);
-  await expect(card.locator('.request-row')).toHaveCount(3);
+  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
 });
 
-test('collapsing the card pauses polling and says why', async ({ page }) => {
+test('pauses the timer while the page is hidden and resumes when visible', async ({ page }) => {
   const now = new Date('2026-11-26T12:00:00Z');
   await page.clock.install({ time: now });
   await page.clock.pauseAt(now);
   const mock = await mockEntrypoint(page);
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  await expect(card.locator('.request-row')).toHaveCount(3);
-  await card.getByRole('button', { name: 'Collapse recent requests' }).click();
-  await expect(card.locator('.request-row')).toHaveCount(0);
-  await expect(card.locator('.pause-indicator')).toHaveText('Paused while collapsed');
+  const requestsPage = page.locator('entrypoint-requests-page');
+  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(requestsPage.locator('.pause-indicator')).toHaveText('Paused while the page is hidden');
   await page.clock.runFor(6000);
   expect(mock.requestCalls()).toBe(1);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect.poll(() => mock.requestCalls()).toBe(2);
+  await expect(requestsPage.locator('.pause-indicator')).toHaveCount(0);
 });
 
 test('a failed refresh keeps the last rows and shows an inline error', async ({ page }) => {
   const mock = await mockEntrypoint(page, { failRequestsAfterFirst: true });
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  await expect(card.locator('.request-row')).toHaveCount(3);
-  await card.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(card.locator('.requests-error')).toContainText('Could not load recent requests');
-  await expect(card.locator('.request-row')).toHaveCount(3);
+  const requestsPage = page.locator('entrypoint-requests-page');
+  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  await requestsPage.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(requestsPage.locator('.requests-error')).toContainText('Could not load recent requests');
+  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
   expect(mock.requestCalls()).toBe(2);
 });
 
 test('a rejected rule edit is shown on its row and leaves the rules unchanged', async ({ page }) => {
   const mock = await mockEntrypoint(page, { ruleStatus: 500 });
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  const row = card.locator('.request-row').filter({ hasText: 'api.example.com' });
+  const requestsPage = page.locator('entrypoint-requests-page');
+  const row = requestsPage.locator('.request-row').filter({ hasText: 'api.example.com' });
   const button = row.getByRole('button', { name: /Add to rules/ });
   await button.click();
   await expect(row.locator('.row-error')).toContainText('Could not update rule: rule rejected');
@@ -244,24 +270,24 @@ test('a rejected rule edit is shown on its row and leaves the rules unchanged', 
 
 test('caps rendered rows at 200 and reports the full returned count', async ({ page }) => {
   const requests = Array.from({ length: 201 }, (_, index) => ({
-    ...REQUESTS[1],
+    ...FLOWS[1],
     time: new Date(Date.UTC(2026, 10, 26, 12, 0, 201 - index)).toISOString(),
     dst: `192.0.2.${index + 1}:80`,
   }));
   await mockEntrypoint(page, { rules: [], requests });
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  await expect(card.locator('.requests-count')).toHaveText('201 requests');
-  await expect(card.locator('.request-row')).toHaveCount(200);
-  await expect(card.locator('.showing-count')).toHaveText('Showing the last 200 of 201');
+  const requestsPage = page.locator('entrypoint-requests-page');
+  await expect(requestsPage.locator('.requests-count')).toHaveText('201 requests');
+  await expect(requestsPage.locator('.request-row')).toHaveCount(200);
+  await expect(requestsPage.locator('.showing-count')).toHaveText('Showing the last 200 of 201');
 });
 
 test('shows a translated empty state when no flows have been recorded', async ({ page }) => {
   await mockEntrypoint(page, { requests: [] });
-  await page.goto(DETAIL);
+  await page.goto(REQUESTS);
 
-  const card = page.locator('entrypoint-requests-card');
-  await expect(card.locator('.requests-empty')).toHaveText('No recent requests');
-  await expect(card.locator('.request-row')).toHaveCount(0);
+  const requestsPage = page.locator('entrypoint-requests-page');
+  await expect(requestsPage.locator('.requests-empty')).toHaveText('No recent requests');
+  await expect(requestsPage.locator('.request-row')).toHaveCount(0);
 });

@@ -231,6 +231,53 @@ test('a tungo entrypoint renders its saved rules in view and edit mode', async (
   await page.screenshot({ path: 'test-results/tungo-entrypoint-edit.png', fullPage: true });
 });
 
+test('the detail page links to recent requests without rendering the list inline', async ({ page }) => {
+  const ep = tungoEntrypoint(['192.0.2.20']);
+  let requestCalls = 0;
+  const now = new Date('2026-11-26T12:00:00Z');
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now);
+  await page.route('**/api/entrypoints', r => r.fulfill({ json: [ep] }));
+  await page.route('**/api/entrypoints/e2e-tungo-long', r => r.fulfill({ json: ep }));
+  await page.route(/\/api\/entrypoints\/e2e-tungo-long\/requests(?:\?.*)?$/, r => {
+    requestCalls += 1;
+    return r.fulfill({
+      json: {
+        requests: [{
+          time: '2026-11-26T12:00:03Z',
+          host: 'api.example.com',
+          dst: '198.51.100.10:443',
+          network: 'tcp',
+          proto: 'http',
+          tunneled: true,
+          input_bytes: 1024,
+          output_bytes: 2048,
+          duration_ms: 12,
+          err: '',
+          path: [],
+        }],
+      },
+    });
+  });
+
+  await page.goto('/entrypoint/tungo/e2e-tungo-long');
+
+  const entry = page.locator('a.requests-entry');
+  await expect(entry).toBeVisible();
+  await expect(entry).toHaveAttribute('href', '/entrypoint/tungo/e2e-tungo-long/requests');
+  await expect(entry).toContainText('Recent requests');
+  await expect(entry).toContainText(/\d{2}:\d{2}:\d{2}/);
+  await expect(entry).toContainText('api.example.com:443');
+  await expect(entry).toContainText('Tunnel');
+  await expect(page.locator('.request-row')).toHaveCount(0);
+  await expect(page.locator('entrypoint-requests-card')).toHaveCount(0);
+
+  // The detail page's ordinary five-second snapshot refresh must not turn the
+  // one-shot teaser fetch into another request-history poll.
+  await page.clock.runFor(6000);
+  expect(requestCalls).toBe(1);
+});
+
 function tungoEntrypoint(rules: string[]) {
   return {
     id: 'e2e-tungo-long',

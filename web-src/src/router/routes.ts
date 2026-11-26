@@ -14,6 +14,7 @@ const settingsPage = () => import('../pages/settings-page');
 const inspectorPage = () => import('../pages/inspector-page');
 const tunnelPeersPage = () => import('../pages/tunnel-peers-page');
 const eventsPage = () => import('../pages/events-page');
+const entrypointRequestsPage = () => import('../pages/entrypoint-requests-page');
 
 /**
  * Create the Lit router with all application routes.
@@ -147,6 +148,18 @@ export function createRouter(host: ReactiveControllerHost & HTMLElement) {
           ></events-page>`,
         enter: async () => {
           await eventsPage();
+          return true;
+        },
+      },
+      {
+        path: '/entrypoint/:type/:id/requests',
+        render: (params: { type?: string; id?: string }) =>
+          html`<entrypoint-requests-page
+            parent-type=${params.type ?? ''}
+            parent-id=${params.id ?? ''}
+          ></entrypoint-requests-page>`,
+        enter: async () => {
+          await entrypointRequestsPage();
           return true;
         },
       },
