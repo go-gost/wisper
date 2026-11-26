@@ -1397,6 +1397,14 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
 - 提交：`797c632`（ring/recorder/API）、`1a8eaa1`（Path 判据 + 清洗）、`27b2ab2`（UI），均已推送；
   门禁 `-race`、`make typecheck/ui-test`（51 passed）、`make web`、`go test ./api/`。
 - 已知口径：HTTP 嗅探路径的请求记录只有请求侧字节（下行记 0），属 x 侧计数口径，未在本计划内改动。
+- 后续三处调整（同日，均来自真机使用反馈）：
+  - **按 SID 合并**（`0dccaa7`）：同一条流的请求级与连接级两条记录合成一条，host/dst 取首个非空、字节与耗时取大、
+    `path` 取更长、`tunneled` 取或、err 取更新者、时间取更早；空 SID 不合并。
+  - **改成二级页面**（`4eca132`）：详情页只保留一个「最近请求」入口卡片（图标 + 标题 + 最新一条的摘要 + chevron），
+    列表移到 `/entrypoint/:type/:id/requests`，与「历史事件」页同构（自己的取数、定时器与返回路径）。
+  - **行密度对齐 inspector**：单行 `padding 6–8px 12px`、`font-size: var(--font-sm)`，时间/目标/徽标/字节/耗时/错误
+    一行放完，`path` hops 折叠在点击展开的第二行，不再用表格或卡片。
+
 
 - **遗留/限制:** i) 这台 Wi-Fi 无 v6，v6 穿越未验证；ii) 全捕获在无 v6 网络下会把 v6 流打进栈并立刻失败，
   日志 error 偏吵（v1 行为，与 ss-android 同类）；iii) HTTP/1.0（无 `Connection` 头）的请求在嗅探路径上
