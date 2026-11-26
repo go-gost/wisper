@@ -85,6 +85,144 @@ func TestRequestRingConcurrentAppendAndRead(t *testing.T) {
 	}
 }
 
+func TestRequestRecorderClassifiesPath(t *testing.T) {
+	tests := []struct {
+		name         string
+		network      string
+		path         []xrecorder.PathHop
+		route        string
+		wantTunneled bool
+	}{
+		{
+			name:         "chain hop",
+			network:      "tcp",
+			path:         []xrecorder.PathHop{{Chain: "split", Node: "hub", Addr: "relay-peer"}},
+			wantTunneled: true,
+		},
+		{
+			name:         "node hop",
+			network:      "tcp",
+			path:         []xrecorder.PathHop{{Node: "hub", Addr: "relay-peer"}},
+			wantTunneled: true,
+		},
+		{
+			name:         "target hop ignores legacy route",
+			network:      "tcp",
+			path:         []xrecorder.PathHop{{Addr: "149.154.167.99:80"}},
+			route:        "hub@relay > 149.154.167.99:80",
+			wantTunneled: false,
+		},
+		{
+			name:         "empty TCP path ignores legacy route",
+			network:      "tcp",
+			route:        "hub@relay > 149.154.167.99:80",
+			wantTunneled: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ring := newRequestRing(0)
+			data, err := json.Marshal(xrecorder.HandlerRecorderObject{
+				Time:     time.Now(),
+				DstAddr:  "149.154.167.99:80",
+				Network:  tt.network,
+				Path:     tt.path,
+				Route:    tt.route,
+				Duration: time.Millisecond,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ring.Record(context.Background(), data); err != nil {
+				t.Fatal(err)
+			}
+			got := ring.list(0)
+			if len(got) != 1 {
+				t.Fatalf("Record(path %+v) stored %d rows, want 1", tt.path, len(got))
+			}
+			if got[0].Tunneled != tt.wantTunneled {
+				t.Errorf("Record(path %+v) tunneled = %v, want %v", tt.path, got[0].Tunneled, tt.wantTunneled)
+			}
+		})
+	}
+}
+
+func TestRequestRecorderEmitsPathWithoutRoute(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     []xrecorder.PathHop
+		wantPath bool
+	}{
+		{
+			name: "with path",
+			path: []xrecorder.PathHop{
+				{Chain: "split", Hop: 0, Node: "hub", Addr: "relay-peer", ConnectMs: 5},
+				{Hop: 1, Addr: "149.154.167.99:80", ConnectMs: 12},
+			},
+			wantPath: true,
+		},
+		{name: "empty path", wantPath: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ring := newRequestRing(0)
+			data, err := json.Marshal(xrecorder.HandlerRecorderObject{
+				Time:     time.Now(),
+				DstAddr:  "149.154.167.99:80",
+				Network:  "tcp",
+				Path:     tt.path,
+				Duration: time.Millisecond,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ring.Record(context.Background(), data); err != nil {
+				t.Fatal(err)
+			}
+			got := ring.list(0)
+			if len(got) != 1 {
+				t.Fatalf("Record(path %+v) stored %d rows, want 1", tt.path, len(got))
+			}
+			encoded, err := json.Marshal(got[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var object map[string]json.RawMessage
+			if err := json.Unmarshal(encoded, &object); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := object["route"]; ok {
+				t.Error("Record(path) JSON contains legacy route, want it omitted")
+			}
+			raw, ok := object["path"]
+			if ok != tt.wantPath {
+				t.Fatalf("Record(path %+v) JSON path presence = %v, want %v", tt.path, ok, tt.wantPath)
+			}
+			if !tt.wantPath {
+				return
+			}
+			var path []map[string]json.RawMessage
+			if err := json.Unmarshal(raw, &path); err != nil {
+				t.Fatal(err)
+			}
+			if len(path) != 2 {
+				t.Fatalf("Record(path) JSON path length = %d, want 2", len(path))
+			}
+			for _, field := range []string{"chain", "hop", "node", "addr", "connect_ms", "err"} {
+				if _, ok := path[0][field]; !ok {
+					t.Errorf("Record(path) JSON hop is missing %q: %s", field, raw)
+				}
+			}
+			if _, ok := path[0]["connectMs"]; ok {
+				t.Errorf("Record(path) JSON hop contains connectMs, want connect_ms: %s", raw)
+			}
+			if string(path[0]["connect_ms"]) != "5" || string(path[1]["connect_ms"]) != "12" {
+				t.Errorf("Record(path) JSON connect_ms values = %s, %s, want 5, 12", path[0]["connect_ms"], path[1]["connect_ms"])
+			}
+		})
+	}
+}
+
 func TestRequestRecorderIgnoresMalformedRecords(t *testing.T) {
 	ring := newRequestRing(0)
 	for _, junk := range []string{
@@ -104,23 +242,28 @@ func TestRequestRecorderIgnoresMalformedRecords(t *testing.T) {
 	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
 	records := []xrecorder.HandlerRecorderObject{
 		{
-			Time:        base,
-			Host:        "example.com:443",
-			DstAddr:     "203.0.113.10:443",
-			Network:     "tcp",
-			Proto:       "tls",
-			Route:       "203.0.113.10:443",
+			Time:    base,
+			Host:    "example.com:443",
+			DstAddr: "203.0.113.10:443",
+			Network: "tcp",
+			Proto:   "tls",
+			Path: []xrecorder.PathHop{
+				{Hop: 0, Addr: "203.0.113.10:443", ConnectMs: 8},
+			},
 			InputBytes:  12,
 			OutputBytes: 34,
 			Duration:    1500 * time.Millisecond,
 		},
 		{
-			Time:        base.Add(time.Second),
-			Host:        "tunneled.example:443",
-			DstAddr:     "198.51.100.20:443",
-			Network:     "tcp",
-			Proto:       "http",
-			Route:       "tungo-ep@peer > 198.51.100.20:443",
+			Time:    base.Add(time.Second),
+			Host:    "tunneled.example:443",
+			DstAddr: "198.51.100.20:443",
+			Network: "tcp",
+			Proto:   "http",
+			Path: []xrecorder.PathHop{
+				{Chain: "split", Hop: 0, Node: "hub", Addr: "relay-peer", ConnectMs: 4},
+				{Hop: 1, Addr: "198.51.100.20:443", ConnectMs: 9},
+			},
 			InputBytes:  56,
 			OutputBytes: 78,
 			Duration:    2750 * time.Millisecond,
@@ -142,13 +285,13 @@ func TestRequestRecorderIgnoresMalformedRecords(t *testing.T) {
 		t.Fatalf("recorded rows = %d, want 2", len(got))
 	}
 	if !got[0].Tunneled {
-		t.Error("a route with a chain node was marked direct")
+		t.Error("a path with a chain node was marked direct")
 	}
 	if got[0].DurationMS != 2750 || got[0].InputBytes != 56 || got[0].OutputBytes != 78 || got[0].Err != "dial failed" {
 		t.Errorf("recorded fields = %+v, want the handler object's counters, duration and error", got[0])
 	}
 	if got[1].Tunneled {
-		t.Error("a route containing only the destination was marked tunneled")
+		t.Error("a path containing only the destination was marked tunneled")
 	}
 	if !got[1].Time.Equal(base) || got[1].Host != "example.com:443" || got[1].Dst != "203.0.113.10:443" {
 		t.Errorf("direct record = %+v, want the original time and destination", got[1])
@@ -194,7 +337,7 @@ func TestRequestRecorderFiltersChainArtifactsAndDNS(t *testing.T) {
 	}
 }
 
-func TestRequestRecorderClassifiesUDPWithoutRoute(t *testing.T) {
+func TestRequestRecorderClassifiesUDPWithoutPath(t *testing.T) {
 	ring := newRequestRing(0)
 	ring.setTunneledClassifier(func(ctx context.Context, network, host, dst string) bool {
 		return host == "tunneled.example:53"

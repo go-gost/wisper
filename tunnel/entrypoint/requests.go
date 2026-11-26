@@ -14,24 +14,33 @@ import (
 
 const defaultRequestRingCapacity = 500
 
+// RequestPathHop describes one dial hop in a Request's path. The final target
+// hop has no chain or node.
+type RequestPathHop struct {
+	Chain     string `json:"chain"`
+	Hop       int    `json:"hop"`
+	Node      string `json:"node"`
+	Addr      string `json:"addr"`
+	ConnectMS uint64 `json:"connect_ms"`
+	Err       string `json:"err"`
+}
+
 // Request is one recent flow handled by a tungo entrypoint. Tunneled is true
-// when the router selected a chain node: x writes a chained route as
-// "node@addr > ... > destination", while a direct route contains only the
-// resolved destination (or is empty when dialing failed before route selection).
-// The UDP handler currently omits the route buffer, so an empty UDP route is
+// when Path contains a chain or node hop; a direct path contains only the
+// target hop. The UDP handler currently omits Path, so an empty UDP path is
 // classified by asking the entrypoint's live chain which node it selects.
 type Request struct {
-	Time        time.Time `json:"time"`
-	Host        string    `json:"host"`
-	Dst         string    `json:"dst"`
-	Network     string    `json:"network"`
-	Proto       string    `json:"proto"`
-	Route       string    `json:"route"`
-	Tunneled    bool      `json:"tunneled"`
-	InputBytes  uint64    `json:"input_bytes"`
-	OutputBytes uint64    `json:"output_bytes"`
-	DurationMS  int64     `json:"duration_ms"`
-	Err         string    `json:"err"`
+	Time        time.Time        `json:"time"`
+	Host        string           `json:"host"`
+	Dst         string           `json:"dst"`
+	Network     string           `json:"network"`
+	Proto       string           `json:"proto"`
+	Path        []RequestPathHop `json:"path,omitempty"`
+	Tunneled    bool             `json:"tunneled"`
+	InputBytes  uint64           `json:"input_bytes"`
+	OutputBytes uint64           `json:"output_bytes"`
+	DurationMS  int64            `json:"duration_ms"`
+	Err         string           `json:"err"`
 }
 
 // requestRing is a fixed-size, concurrency-safe history. next is the oldest
@@ -59,6 +68,24 @@ func isRecordableDestination(dst string) bool {
 		host = dst
 	}
 	return net.ParseIP(host) != nil && port != "53"
+}
+
+func requestPath(path []xrecorder.PathHop) []RequestPathHop {
+	if len(path) == 0 {
+		return nil
+	}
+	out := make([]RequestPathHop, len(path))
+	for i, hop := range path {
+		out[i] = RequestPathHop{
+			Chain:     hop.Chain,
+			Hop:       hop.Hop,
+			Node:      hop.Node,
+			Addr:      hop.Addr,
+			ConnectMS: hop.ConnectMs,
+			Err:       hop.Err,
+		}
+	}
+	return out
 }
 
 func (r *requestRing) append(req Request) {
@@ -106,9 +133,10 @@ func (r *requestRing) list(limit int) []Request {
 }
 
 // Record implements recorder.Recorder for handler-level tungo flow records.
-// Malformed payloads, non-IP-literal chain artifacts and port 53 DNS records
-// are deliberately ignored: request history must never take down the data path
-// that produced it.
+// Tunneled is derived from Path, with the live chain classifying an empty UDP
+// path. Malformed payloads, non-IP-literal chain artifacts and port 53 DNS
+// records are deliberately ignored: request history must never take down the
+// data path that produced it.
 func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.RecordOption) error {
 	if r == nil {
 		return nil
@@ -120,8 +148,14 @@ func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.
 	if !isRecordableDestination(ro.DstAddr) {
 		return nil
 	}
-	tunneled := strings.Contains(ro.Route, " > ")
-	if !tunneled && ro.Route == "" && strings.HasPrefix(ro.Network, "udp") {
+	tunneled := false
+	for _, hop := range ro.Path {
+		if hop.Chain != "" || hop.Node != "" {
+			tunneled = true
+			break
+		}
+	}
+	if len(ro.Path) == 0 && strings.HasPrefix(ro.Network, "udp") {
 		r.mu.RLock()
 		classify := r.classify
 		r.mu.RUnlock()
@@ -135,7 +169,7 @@ func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.
 		Dst:         ro.DstAddr,
 		Network:     ro.Network,
 		Proto:       ro.Proto,
-		Route:       ro.Route,
+		Path:        requestPath(ro.Path),
 		Tunneled:    tunneled,
 		InputBytes:  ro.InputBytes,
 		OutputBytes: ro.OutputBytes,
