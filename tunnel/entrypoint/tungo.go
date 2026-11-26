@@ -15,6 +15,7 @@ import (
 	"github.com/go-gost/core/handler"
 	"github.com/go-gost/core/listener"
 	"github.com/go-gost/core/observer/stats"
+	"github.com/go-gost/core/recorder"
 	"github.com/go-gost/core/service"
 	cfg "github.com/go-gost/wisper/config"
 	"github.com/go-gost/wisper/event"
@@ -28,6 +29,7 @@ import (
 	tungolistener "github.com/go-gost/x/listener/tungo"
 	mdx "github.com/go-gost/x/metadata"
 	xstats "github.com/go-gost/x/observer/stats"
+	xrecorder "github.com/go-gost/x/recorder"
 	"github.com/go-gost/x/registry"
 	xservice "github.com/go-gost/x/service"
 	"github.com/google/uuid"
@@ -76,6 +78,7 @@ type tungoEntryPoint struct {
 	favorite      atomic.Bool
 	stats         cfg.ServiceStats
 	statsBaseline cfg.ServiceStats
+	requests      *requestRing
 
 	cclose    chan struct{}
 	closeOnce sync.Once
@@ -113,6 +116,7 @@ func NewTungoEntryPoint(opts ...tunnel.Option) EntryPoint {
 		peer:      options.Peer,
 		provider:  "tungo-ep-" + options.ID,
 		rulesName: "tungo-rules-" + options.ID,
+		requests:  newRequestRing(0),
 		cclose:    make(chan struct{}),
 	}
 }
@@ -492,6 +496,18 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 		}
 
 		handlerLogger := log.WithFields(map[string]any{"kind": "handler", "handler": "tungo"})
+		requests := s.requestHistoryRing()
+		if requests == nil {
+			requests = newRequestRing(0)
+			s.setRequestHistoryRing(requests)
+		}
+		// The TCP path records the router's route buffer. The UDP path currently
+		// dials without that buffer, so an empty UDP route is classified by asking
+		// the same live chain which node it would select for the recorded flow.
+		requests.setTunneledClassifier(func(ctx context.Context, network, host, dst string) bool {
+			route := ch.Route(ctx, network, dst, chain.WithHostRouteOption(host))
+			return route != nil && len(route.Nodes()) > 0
+		})
 		// The chain (and no forwarder hop) is the client-mode switch: the stack's
 		// flows are dialled through the chain node, which is the peer, and the hop's
 		// whitelist bypass decides between that node and the direct route.
@@ -501,6 +517,10 @@ func (s *tungoEntryPoint) RunContext(ctx context.Context) (err error) {
 				chain.LoggerRouterOption(handlerLogger),
 			)),
 			handler.LoggerOption(handlerLogger),
+			handler.RecordersOption(recorder.RecorderObject{
+				Record:   xrecorder.RecorderServiceHandler,
+				Recorder: requests,
+			}),
 		)
 		if err = h.Init(mdx.NewMetadata(svcCfg.Handler.Metadata)); err != nil {
 			ln.Close()

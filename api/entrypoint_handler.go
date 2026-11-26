@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -375,6 +376,87 @@ func handleGetEntrypoint(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toTunnelResponse(ep))
 }
 
+const (
+	defaultEntrypointRequestLimit = 50
+	maxEntrypointRequestLimit     = 500
+)
+
+type entrypointRequestsResponse struct {
+	Requests []entrypoint.Request `json:"requests"`
+}
+
+func handleGetEntrypointRequests(w http.ResponseWriter, r *http.Request) {
+	ep := entrypoint.Get(r.PathValue("id"))
+	if ep == nil {
+		writeError(w, http.StatusNotFound, "entrypoint not found")
+		return
+	}
+
+	limit := defaultEntrypointRequestLimit
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			writeError(w, http.StatusBadRequest, "limit must be a positive integer")
+			return
+		}
+		limit = n
+	}
+	if limit > maxEntrypointRequestLimit {
+		limit = maxEntrypointRequestLimit
+	}
+
+	var requests []entrypoint.Request
+	if lister, ok := ep.(interface {
+		Requests(int) []entrypoint.Request
+	}); ok {
+		requests = lister.Requests(limit)
+	}
+	if requests == nil {
+		requests = []entrypoint.Request{}
+	}
+	writeJSON(w, http.StatusOK, entrypointRequestsResponse{Requests: requests})
+}
+
+type entrypointRulesRequest struct {
+	// A pointer distinguishes "no rules field" from an explicit [] — the latter
+	// is a valid split that sends every flow direct.
+	Rules *[]string `json:"rules"`
+}
+
+func handleUpdateEntrypointRules(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	ep := entrypoint.Get(id)
+	if ep == nil {
+		writeError(w, http.StatusNotFound, "entrypoint not found")
+		return
+	}
+	if ep.Type() != entrypoint.TungoEntryPoint {
+		writeError(w, http.StatusBadRequest, "rules applies to tungo entrypoints")
+		return
+	}
+	setter, ok := ep.(entrypoint.RuleSetter)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "entrypoint does not support rules")
+		return
+	}
+
+	var req entrypointRulesRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if req.Rules == nil {
+		writeError(w, http.StatusBadRequest, "rules is required")
+		return
+	}
+
+	setter.SetRules(*req.Rules)
+	event.Record(id, event.LevelInfo, "updated")
+	if err := entrypoint.SaveConfig(); err != nil {
+		slog.Error("save config", "err", err)
+	}
+	writeJSON(w, http.StatusOK, toTunnelResponse(ep))
+}
+
 func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	old := entrypoint.Get(id)
@@ -467,6 +549,7 @@ func handleUpdateEntrypoint(w http.ResponseWriter, r *http.Request) {
 	ep.SetStats(old.Stats())
 	ep.SetStatsBaseline(old.StatsBaseline())
 	ep.Favorite(old.IsFavorite())
+	entrypoint.PreserveRequestHistory(ep, old)
 
 	// Swap, then start — the same order create and start use, and the only one
 	// that works: the replacement has to be listed for an Android tun device to
@@ -582,6 +665,7 @@ func handleStartEntrypoint(w http.ResponseWriter, r *http.Request) {
 	newEP.SetStats(ep.Stats())
 	newEP.SetStatsBaseline(ep.StatsBaseline())
 	newEP.Favorite(ep.IsFavorite())
+	entrypoint.PreserveRequestHistory(newEP, ep)
 
 	// Same as create: listed first, then started (see Start).
 	entrypoint.Set(newEP)

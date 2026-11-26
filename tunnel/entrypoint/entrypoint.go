@@ -255,6 +255,7 @@ func Restart(id string) EntryPoint {
 	if newEP == nil {
 		return nil
 	}
+	PreserveRequestHistory(newEP, ep)
 
 	// The replacement re-reads what the old run captured when it started, but
 	// the counters stay the old run's: dropping them while keeping a
@@ -299,6 +300,7 @@ func RestartP2PRunning() {
 func restartRunning(match func(EntryPoint) bool) {
 	type restartInfo struct {
 		index         int
+		old           EntryPoint
 		opts          tunnel.Options
 		fav           bool
 		stats         config.ServiceStats
@@ -315,6 +317,7 @@ func restartRunning(match func(EntryPoint) bool) {
 		}
 		pending = append(pending, restartInfo{
 			index:         i,
+			old:           ep,
 			opts:          ep.Options(),
 			fav:           ep.IsFavorite(),
 			stats:         ep.Stats(),
@@ -358,6 +361,7 @@ func restartRunning(match func(EntryPoint) bool) {
 		if newEP == nil {
 			continue
 		}
+		PreserveRequestHistory(newEP, p.old)
 
 		newEP.SetStats(p.stats)
 		newEP.SetStatsBaseline(p.statsBaseline)
