@@ -4,6 +4,7 @@ import type {
   Entrypoint,
   EntrypointCreateRequest,
   EntrypointPeersResponse,
+  EntrypointRequestsResponse,
   PendingPeer,
   StatsSnapshot,
   Tunnel,
@@ -171,6 +172,17 @@ export class GoBackend {
   updateEntrypointPeers(id: string, blocked?: string[]): Promise<EntrypointPeersResponse> {
     const body = blocked === undefined ? {} : { blocked };
     return this.request<EntrypointPeersResponse>('PUT', `/api/entrypoints/${id}/peers`, body);
+  }
+
+  getEntrypointRequests(id: string, limit = 500): Promise<EntrypointRequestsResponse> {
+    return this.request<EntrypointRequestsResponse>(
+      'GET',
+      `/api/entrypoints/${id}/requests?limit=${limit}`,
+    );
+  }
+
+  updateEntrypointRules(id: string, rules: string[]): Promise<Entrypoint> {
+    return this.request<Entrypoint>('PUT', `/api/entrypoints/${id}/rules`, { rules });
   }
 
   // ─── Stats ──────────────────────────────────────────────────────────────

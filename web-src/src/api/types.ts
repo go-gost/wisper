@@ -339,6 +339,34 @@ export interface EntrypointPeersResponse {
   peers: EntryPeer[];
 }
 
+export interface EntrypointRequestHop {
+  chain: string;
+  hop: number;
+  node: string;
+  addr: string;
+  connect_ms: number;
+  err: string;
+}
+
+/** One recent flow recorded by a tungo entrypoint, newest first. */
+export interface EntrypointRequest {
+  time: string;
+  host: string;
+  dst: string;
+  network: string;
+  proto: string;
+  tunneled: boolean;
+  input_bytes: number;
+  output_bytes: number;
+  duration_ms: number;
+  err: string;
+  path?: EntrypointRequestHop[];
+}
+
+export interface EntrypointRequestsResponse {
+  requests: EntrypointRequest[];
+}
+
 export interface Entrypoint {
   id: string;
   name: string;

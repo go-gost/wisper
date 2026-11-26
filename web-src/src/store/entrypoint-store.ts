@@ -70,6 +70,15 @@ export async function remove(id: string): Promise<void> {
   notify();
 }
 
+/** Apply a tungo split edit immediately, then refresh the full snapshot. */
+export async function updateEntrypointRules(id: string, rules: string[]): Promise<Entrypoint> {
+  const ep = await backend.updateEntrypointRules(id, rules);
+  entrypoints = entrypoints.map(x => (x.id === id ? ep : x));
+  notify();
+  await refresh();
+  return ep;
+}
+
 export async function start(id: string): Promise<void> {
   await backend.startEntrypoint(id);
   await refresh();

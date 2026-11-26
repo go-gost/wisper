@@ -12,6 +12,7 @@ import { copyToClipboard } from '../utils/clipboard';
 import { formatBytes, formatRate, formatNumber, formatTimestamp, maskKey } from '../utils/format';
 import type { Entrypoint, EntrypointType, WisperEvent } from '../api/types';
 import '../components/app-scaffold';
+import '../components/entrypoint-requests-card';
 
 type PageMode = 'view' | 'edit' | 'create';
 
@@ -1367,6 +1368,9 @@ export class EntrypointDetailPage extends LitElement {
                   </div>
                 `
                 : ''}
+              ${this.entrypointType === 'tungo'
+                ? html`<entrypoint-requests-card .entrypoint=${ep}></entrypoint-requests-card>`
+                : nothing}
             </div>
 
             ${this.mode === 'view' && this._entrypoint && this.entrypointType === 'tun'

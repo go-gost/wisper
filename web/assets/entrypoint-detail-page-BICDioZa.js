@@ -1,26 +1,195 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BbgSiaFz.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
-import{a as w,v as f,h as k,d as T,c as t,A as h,b as i,_ as b,w as D,l as S,n as R,x as E,u as z,i as P,t as I}from"./index-BbgSiaFz.js";import{d as C,m,c as v,a as g,b as _,n as $,r as l}from"./format-4Eh0bGOY.js";import{i as d}from"./app-scaffold-DXLopf7S.js";import{t as A}from"./type-icons-DvFgXXJ2.js";import{a as N}from"./transport-DY3HT0IY.js";import{t as y,a as x}from"./vpn-CHD5idJc.js";import{c as L}from"./clipboard-C3x8_sid.js";var M=Object.defineProperty,O=Object.getOwnPropertyDescriptor,o=(e,s,n,p)=>{for(var c=p>1?void 0:p?O(s,n):s,a=e.length-1,u;a>=0;a--)(u=e[a])&&(c=(p?u(s,n,c):u(c))||c);return p&&c&&M(s,n,c),c};let r=class extends w{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this._poll=0,this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._showTransportDetail=!1,this._formId="",this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._rulesSearch="",this._newRule="",this._rulesEditorOpen=!1,this._rulesDraft="",this._rulesEditorTrigger=null,this._shareLAN="",this._shareMode="auto",this._direct=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>{f()},5e3),this._unsubs.push(k(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,this._setRulesBackgroundInert(!1),super.disconnectedCallback();for(const e of this._unsubs)e();this._unsubs=[]}updated(e){e.has("_rulesEditorOpen")&&(this._setRulesBackgroundInert(this._rulesEditorOpen),this._rulesEditorOpen?this.renderRoot.querySelector(".rules-bulk-textarea")?.focus():(this._rulesEditorTrigger?.focus(),this._rulesEditorTrigger=null))}_load(){const e=this.entrypointId,s=window.location.search.includes("edit");if(e==="new"||!e){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===e)return;const n=T().find(p=>p.id===e);n&&(this._entrypoint=n,s?(this.mode="edit",this._populateForm(n)):(this.mode!=="edit"||this._entrypoint?.id!==e)&&(this.mode="view",this._populateForm(n)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._formId="",this._showTransportDetail=!1,this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._rulesSearch="",this._newRule="",this._rulesEditorOpen=!1,this._rulesDraft="",this._rulesEditorTrigger=null,this._shareLAN="",this._shareMode="auto",this._direct=!1}_populateForm(e){this._name=e.name,this._endpoint=e.entrypoint,this._tunnelId=e.id??"",this._peer=e.options?.peer??"",this._formId!==e.id&&(this._formId=e.id??"",this._showTransportDetail=!1),this._protocol=e.options?.protocol==="udp"?"udp":"tcp",this._keepalive=e.options?.keepalive??!0,this._net=e.options?.net??"",this._mtu=e.options?.mtu??0,this._deviceName=e.options?.device_name??"",this._routes=e.options?.routes??"",this._dns=e.options?.dns??"",this._rules=(e.options?.rules??[]).join(`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-DrUh4Z_Y.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
+import{i as R,a as S,G as q,c as t,v as z,A as c,b as a,t as E,w as x,h as P,d as C,_ as $,x as I,l as A,n as N,y as L,u as M}from"./index-DrUh4Z_Y.js";import{n as _,r as o,e as O,a as g,g as H,d as K,m as w,c as m,b as k}from"./format-4RwY444_.js";import{i as h}from"./app-scaffold-D-tvoIm9.js";import{t as F}from"./type-icons-DvFgXXJ2.js";import{a as j}from"./transport-C4AN4tSq.js";import{t as T,a as D}from"./vpn-FVX1ETBE.js";import{c as V}from"./clipboard-C3x8_sid.js";var B=Object.defineProperty,U=Object.getOwnPropertyDescriptor,f=(e,s,r,n)=>{for(var d=n>1?void 0:n?U(s,r):s,i=e.length-1,u;i>=0;i--)(u=e[i])&&(d=(n?u(s,r,d):u(d))||d);return n&&d&&B(s,r,d),d};const W=2e3,X=200;let v=class extends S{constructor(){super(...arguments),this.entrypoint=null,this._requests=[],this._error="",this._open=!0,this._auto=!0,this._loading=!1,this._pageHidden=document.visibilityState==="hidden",this._savingKey="",this._rowErrors=new Map,this._backend=new q,this._poll=0,this._connected=!1,this._activeEntrypointId="",this._entrypointVersion=0,this._loadToken=0,this._onVisibilityChange=()=>{this._pageHidden=document.visibilityState==="hidden",this._configurePolling(),!this._pageHidden&&this._open&&this._auto&&this._load(!0)}}connectedCallback(){super.connectedCallback(),this._connected=!0,this._activeEntrypointId=this.entrypoint?.id??"",document.addEventListener("visibilitychange",this._onVisibilityChange),this._configurePolling(),this._load()}disconnectedCallback(){this._connected=!1,document.removeEventListener("visibilitychange",this._onVisibilityChange),window.clearInterval(this._poll),this._poll=0,super.disconnectedCallback()}updated(e){if(!e.has("entrypoint")||!this._connected)return;const s=this.entrypoint?.id??"";s!==this._activeEntrypointId&&(this._activeEntrypointId=s,this._entrypointVersion+=1,this._loadToken+=1,this._requests=[],this._error="",this._loading=!1,this._savingKey="",this._rowErrors=new Map,this._configurePolling(),this._load())}_configurePolling(){window.clearInterval(this._poll),this._poll=0,!(!this._connected||!this._open||!this._auto||this._pageHidden)&&(this._poll=window.setInterval(()=>void this._load(),W))}async _load(e=!1){const s=this.entrypoint?.id;if(!s||!this._connected||this._loading&&!e)return;const r=this._entrypointVersion,n=++this._loadToken;this._loading=!0;try{const d=await this._backend.getEntrypointRequests(s,500);if(!this._connected||r!==this._entrypointVersion||n!==this._loadToken)return;this._requests=d.requests??[],this._error=""}catch(d){if(!this._connected||r!==this._entrypointVersion||n!==this._loadToken)return;const i=d instanceof Error?d.message:"";this._error=`${t("requestsError")}${i?`: ${i}`:""}`}finally{r===this._entrypointVersion&&n===this._loadToken&&(this._loading=!1)}}_toggleOpen(){this._open=!this._open,this._configurePolling(),this._open&&this._load(!0)}_toggleAuto(){this._auto=!this._auto,this._configurePolling(),this._auto&&this._open&&!this._pageHidden&&this._load(!0)}_destination(e){const s=e.dst.trim();let r=s,n="";if(s.startsWith("[")){const i=s.indexOf("]");if(i>0){r=s.slice(1,i);const u=s.slice(i+1);/^:\d+$/.test(u)&&(n=u.slice(1))}}else{const i=s.match(/^(.*):(\d+)$/);i&&!i[1].includes(":")&&(r=i[1],n=i[2])}const d=e.host.trim();return{key:d||r,name:d||r,port:n}}_setRowError(e,s){const r=new Map(this._rowErrors);s?r.set(e,s):r.delete(e),this._rowErrors=r}async _toggleRule(e){const s=this.entrypoint?.id,{key:r}=this._destination(e);if(!s||!r||this._savingKey)return;const n=this.entrypoint?.options?.rules??[],i=n.includes(r)?n.filter(b=>b!==r):[...n,r],u=this._entrypointVersion;this._savingKey=r,this._setRowError(r,"");try{if(await z(s,i),!this._connected||u!==this._entrypointVersion)return;await this._load(!0)}catch(b){if(!this._connected||u!==this._entrypointVersion)return;const y=b instanceof Error?b.message:"";this._setRowError(r,`${t("requestsRuleError")}${y?`: ${y}`:""}`)}finally{this._connected&&u===this._entrypointVersion&&(this._savingKey="")}}_renderRequest(e){const s=this._destination(e),n=(this.entrypoint?.options?.rules??[]).includes(s.key),d=[e.network,e.proto].filter(Boolean).join("/"),i=this._rowErrors.get(s.key);return a`
+      <li class="request-row">
+        <div class="request-primary">
+          <div class="request-field request-time">
+            <span class="field-label">${t("requestsTime")}</span>
+            <time datetime=${e.time}>${O(Date.parse(e.time))}</time>
+          </div>
+          <div class="request-field request-destination">
+            <span class="field-label">${t("requestsDestination")}</span>
+            <span class="destination-text" title=${s.name}>
+              ${s.name}${s.port?a`<span class="destination-port">:${s.port}</span>`:c}
+            </span>
+          </div>
+          <span class="route-badge ${e.tunneled?"tunnel":"direct"}">
+            ${e.tunneled?t("requestsTunnel"):t("requestsDirect")}
+          </span>
+          ${s.key?a`
+              <button type="button" class="rule-action"
+                aria-label=${n?t("requestsRemoveRuleFor",{destination:s.key}):t("requestsAddRuleFor",{destination:s.key})}
+                ?disabled=${this._savingKey!==""}
+                @click=${()=>this._toggleRule(e)}>
+                ${n?t("requestsRemoveRule"):t("requestsAddRule")}
+              </button>`:c}
+        </div>
+        <div class="request-meta">
+          <span class="request-field">
+            <span class="field-label">${t("requestsProtocol")}</span>
+            <span>${d}</span>
+          </span>
+          <span class="request-field">
+            <span class="field-label">${t("requestsTraffic")}</span>
+            <span>${t("requestsTrafficValue",{in:g(e.input_bytes),out:g(e.output_bytes)})}</span>
+          </span>
+          <span class="request-field">
+            <span class="field-label">${t("requestsDuration")}</span>
+            <span>${H(e.duration_ms*1e6)}</span>
+          </span>
+          ${e.err?a`<span class="request-field request-error">
+                <span class="field-label">${t("requestsFlowError")}</span>
+                <span>${e.err}</span>
+              </span>`:c}
+        </div>
+        ${i?a`<div class="row-error" role="alert">${i}</div>`:c}
+      </li>
+    `}render(){const e=this._requests.slice(0,X),s=this._pageHidden?t("requestsPausedHidden"):this._open?"":t("requestsPausedCollapsed");return a`
+      <div class="card">
+        <header class="card-header">
+          <div class="header-main">
+            <div class="title-group">
+              <h2 id="requests-title">${t("requestsTitle")}</h2>
+              <span class="requests-count">${t(this._requests.length===1?"requestsCountOne":"requestsCount",{n:this._requests.length})}</span>
+            </div>
+            <div class="controls">
+              <button type="button" class="auto-toggle" aria-pressed=${this._auto}
+                @click=${this._toggleAuto}>
+                <span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>
+                <span>${t("requestsAuto")}</span>
+              </button>
+              <button type="button" class="refresh-button" ?disabled=${this._loading}
+                @click=${()=>this._load(!0)}>
+                ${h("rotate-cw")}<span>${t("requestsRefresh")}</span>
+              </button>
+              <button type="button" class="collapse-button"
+                aria-label=${this._open?t("requestsCollapse"):t("requestsExpand")}
+                aria-expanded=${this._open}
+                @click=${this._toggleOpen}>
+                ${h(this._open?"chevron-up":"chevron-down")}
+              </button>
+            </div>
+          </div>
+          ${s?a`<div class="pause-indicator" role="status">${s}</div>`:c}
+        </header>
+        ${this._open?a`
+            <div class="requests-body">
+              ${this._error?a`<div class="requests-error" role="alert">${this._error}</div>`:c}
+              ${this._requests.length===0?a`<div class="requests-empty">${t("requestsEmpty")}</div>`:a`
+                  <ol class="request-list" role="list" aria-label=${t("requestsTitle")}>
+                    ${e.map(r=>this._renderRequest(r))}
+                  </ol>
+                  ${this._requests.length>e.length?a`<div class="showing-count">${t("requestsShowing",{shown:e.length,total:this._requests.length})}</div>`:c}
+                `}
+            </div>
+          `:c}
+      </div>
+    `}};v.styles=R`
+    :host { display: block; margin-top: 16px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      container-type: inline-size;
+    }
+    .card-header { padding: 12px 14px; background: var(--surface); }
+    .header-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .title-group { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    h2 { margin: 0; font-size: var(--font-md); font-weight: 600; color: var(--text); }
+    .requests-count { font-size: var(--font-sm); color: var(--text-muted); white-space: nowrap; }
+    .controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    button { font-family: inherit; cursor: pointer; }
+    button:disabled { cursor: default; opacity: 0.55; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .auto-toggle, .refresh-button, .collapse-button {
+      min-height: 28px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--text-secondary); font-size: var(--font-sm);
+    }
+    .auto-toggle { padding: 4px 8px; }
+    .refresh-button { padding: 4px 8px; }
+    .refresh-button svg { width: 13px; height: 13px; }
+    .collapse-button { width: 28px; padding: 3px; }
+    .collapse-button svg { width: 15px; height: 15px; }
+    .toggle-track {
+      width: 28px; height: 16px; padding: 2px; box-sizing: border-box;
+      border-radius: 8px; background: var(--border); transition: background var(--transition-fast);
+    }
+    .toggle-knob {
+      display: block; width: 12px; height: 12px; border-radius: 50%; background: #fff;
+      transition: transform var(--transition-fast);
+    }
+    .auto-toggle[aria-pressed='true'] .toggle-track { background: var(--accent); }
+    .auto-toggle[aria-pressed='true'] .toggle-knob { transform: translateX(12px); }
+    .pause-indicator { margin-top: 8px; font-size: var(--font-xs); color: var(--amber); }
+    .requests-body { border-top: 1px solid var(--border-subtle); }
+    .requests-error {
+      padding: 8px 14px; color: var(--red-text); background: var(--red-bg);
+      font-size: var(--font-sm); line-height: 1.4;
+    }
+    .requests-empty { padding: 18px 14px; color: var(--text-muted); font-size: var(--font-sm); }
+    .request-list { list-style: none; margin: 0; padding: 0; }
+    .request-row { padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
+    .request-row:last-child { border-bottom: none; }
+    .request-primary {
+      display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto;
+      align-items: center; gap: 8px 12px;
+    }
+    .request-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--font-sm); }
+    .field-label { color: var(--text-muted); font-size: var(--font-xs); line-height: 1.2; }
+    .request-time { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+    .request-destination { color: var(--text); }
+    .destination-text { overflow-wrap: anywhere; }
+    .destination-port { color: var(--text-muted); }
+    .route-badge {
+      display: inline-flex; align-items: center; justify-content: center; padding: 2px 8px;
+      border-radius: var(--radius-pill); font-size: var(--font-xs); font-weight: 600; white-space: nowrap;
+    }
+    .route-badge.tunnel { color: var(--info); background: var(--info-bg); }
+    .route-badge.direct { color: var(--green-text); background: var(--green-bg); }
+    .rule-action {
+      min-height: 28px; padding: 4px 8px; border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm); background: var(--surface); color: var(--accent);
+      font-size: var(--font-xs); font-weight: 600; white-space: nowrap;
+    }
+    .request-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; }
+    .request-meta .request-field { flex-direction: row; align-items: baseline; gap: 5px; }
+    .request-error { color: var(--red-text); overflow-wrap: anywhere; }
+    .row-error { margin-top: 6px; color: var(--red-text); font-size: var(--font-xs); line-height: 1.4; }
+    .showing-count { padding: 8px 14px; color: var(--text-muted); font-size: var(--font-xs); }
+    @container (max-width: 560px) {
+      .header-main { align-items: flex-start; }
+      .controls { width: 100%; }
+      .request-primary { grid-template-columns: auto minmax(0, 1fr) auto; }
+      .rule-action { grid-column: 1 / -1; justify-self: start; }
+      .request-meta { flex-direction: column; gap: 6px; }
+    }
+    @media (pointer: coarse) {
+      .auto-toggle, .refresh-button, .collapse-button, .rule-action { min-height: 32px; }
+      .collapse-button { width: 32px; }
+    }
+  `;f([_({attribute:!1})],v.prototype,"entrypoint",2);f([o()],v.prototype,"_requests",2);f([o()],v.prototype,"_error",2);f([o()],v.prototype,"_open",2);f([o()],v.prototype,"_auto",2);f([o()],v.prototype,"_loading",2);f([o()],v.prototype,"_pageHidden",2);f([o()],v.prototype,"_savingKey",2);f([o()],v.prototype,"_rowErrors",2);v=f([E("entrypoint-requests-card")],v);var G=Object.defineProperty,Q=Object.getOwnPropertyDescriptor,p=(e,s,r,n)=>{for(var d=n>1?void 0:n?Q(s,r):s,i=e.length-1,u;i>=0;i--)(u=e[i])&&(d=(n?u(s,r,d):u(d))||d);return n&&d&&G(s,r,d),d};let l=class extends S{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this._poll=0,this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._showTransportDetail=!1,this._formId="",this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._rulesSearch="",this._newRule="",this._rulesEditorOpen=!1,this._rulesDraft="",this._rulesEditorTrigger=null,this._shareLAN="",this._shareMode="auto",this._direct=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>{x()},5e3),this._unsubs.push(P(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,this._setRulesBackgroundInert(!1),super.disconnectedCallback();for(const e of this._unsubs)e();this._unsubs=[]}updated(e){e.has("_rulesEditorOpen")&&(this._setRulesBackgroundInert(this._rulesEditorOpen),this._rulesEditorOpen?this.renderRoot.querySelector(".rules-bulk-textarea")?.focus():(this._rulesEditorTrigger?.focus(),this._rulesEditorTrigger=null))}_load(){const e=this.entrypointId,s=window.location.search.includes("edit");if(e==="new"||!e){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===e)return;const r=C().find(n=>n.id===e);r&&(this._entrypoint=r,s?(this.mode="edit",this._populateForm(r)):(this.mode!=="edit"||this._entrypoint?.id!==e)&&(this.mode="view",this._populateForm(r)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._formId="",this._showTransportDetail=!1,this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._rulesSearch="",this._newRule="",this._rulesEditorOpen=!1,this._rulesDraft="",this._rulesEditorTrigger=null,this._shareLAN="",this._shareMode="auto",this._direct=!1}_populateForm(e){this._name=e.name,this._endpoint=e.entrypoint,this._tunnelId=e.id??"",this._peer=e.options?.peer??"",this._formId!==e.id&&(this._formId=e.id??"",this._showTransportDetail=!1),this._protocol=e.options?.protocol==="udp"?"udp":"tcp",this._keepalive=e.options?.keepalive??!0,this._net=e.options?.net??"",this._mtu=e.options?.mtu??0,this._deviceName=e.options?.device_name??"",this._routes=e.options?.routes??"",this._dns=e.options?.dns??"",this._rules=(e.options?.rules??[]).join(`
 `),this._shareLAN=e.options?.share_lan??"",this._shareMode=e.options?.share_mode||"auto",this._direct=e.options?.direct===!0}_ruleLines(){return this._rules.split(`
 `).map((e,s)=>({line:s,value:e.trim()})).filter(e=>e.value!=="")}_ruleCountLabel(e=this._rules){const s=e.split(`
-`).map(n=>n.trim()).filter(Boolean).length;return s?t("rulesCount",{n:s}):t("rulesEmptyDirect")}_matchingRules(){const e=this._rulesSearch.trim().toLocaleLowerCase();return e?this._ruleLines().filter(s=>s.value.toLocaleLowerCase().includes(e)).slice(0,50):[]}_removeRule(e){const s=this._rules.split(`
+`).map(r=>r.trim()).filter(Boolean).length;return s?t("rulesCount",{n:s}):t("rulesEmptyDirect")}_matchingRules(){const e=this._rulesSearch.trim().toLocaleLowerCase();return e?this._ruleLines().filter(s=>s.value.toLocaleLowerCase().includes(e)).slice(0,50):[]}_removeRule(e){const s=this._rules.split(`
 `);s.splice(e,1),this._rules=s.join(`
-`)}_addRule(){const e=this._newRule.trim();if(!e||this._ruleLines().some(n=>n.value===e)){this._newRule="";return}const s=this._rules.trimEnd();this._rules=s?`${s}
-${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentTarget,this._rulesDraft=this._rules,this._rulesEditorOpen=!0}_closeRulesEditor(e){e&&(this._rules=this._rulesDraft),this._rulesEditorOpen=!1}_setRulesBackgroundInert(e){this.renderRoot.querySelector("app-scaffold")?.toggleAttribute("inert",e)}_handleRulesEditorKeydown(e){if(e.key==="Escape"){e.preventDefault(),this._closeRulesEditor(!1);return}if(e.key!=="Tab")return;const s=this.renderRoot.querySelector(".rules-editor-panel");if(!s)return;const n=Array.from(s.querySelectorAll('textarea:not([disabled]), input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'));if(!n.length)return;const p=s.getRootNode().activeElement,c=n[0],a=n[n.length-1];e.shiftKey&&p===c?(e.preventDefault(),a.focus()):!e.shiftKey&&p===a&&(e.preventDefault(),c.focus())}_renderTransport(e){if(e.status!=="running")return h;const s=N(e.peer_transport);return s?i`
+`)}_addRule(){const e=this._newRule.trim();if(!e||this._ruleLines().some(r=>r.value===e)){this._newRule="";return}const s=this._rules.trimEnd();this._rules=s?`${s}
+${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentTarget,this._rulesDraft=this._rules,this._rulesEditorOpen=!0}_closeRulesEditor(e){e&&(this._rules=this._rulesDraft),this._rulesEditorOpen=!1}_setRulesBackgroundInert(e){this.renderRoot.querySelector("app-scaffold")?.toggleAttribute("inert",e)}_handleRulesEditorKeydown(e){if(e.key==="Escape"){e.preventDefault(),this._closeRulesEditor(!1);return}if(e.key!=="Tab")return;const s=this.renderRoot.querySelector(".rules-editor-panel");if(!s)return;const r=Array.from(s.querySelectorAll('textarea:not([disabled]), input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'));if(!r.length)return;const n=s.getRootNode().activeElement,d=r[0],i=r[r.length-1];e.shiftKey&&n===d?(e.preventDefault(),i.focus()):!e.shiftKey&&n===i&&(e.preventDefault(),d.focus())}_renderTransport(e){if(e.status!=="running")return c;const s=j(e.peer_transport);return s?a`
       <div class="info-row">
         <span class="info-label">${t("p2pTransport")}</span>
         <span class="info-value text transport-value">
           <span class="peer-badge ${s.tone}" title=${s.hint}>
-            ${d(s.icon)}<span>${s.label}</span>
+            ${h(s.icon)}<span>${s.label}</span>
           </span>
-          ${(e.peer_rtt_live??e.peer_kcp_live)&&(e.peer_rtt_ms??0)>0?i`<span class="peer-rtt" title="${t("peersRTTHint")} · ${e.peer_transport??""}">${e.peer_rtt_ms}ms</span>`:h}
+          ${(e.peer_rtt_live??e.peer_kcp_live)&&(e.peer_rtt_ms??0)>0?a`<span class="peer-rtt" title="${t("peersRTTHint")} · ${e.peer_transport??""}">${e.peer_rtt_ms}ms</span>`:c}
           <button class="detail-btn" title=${t("p2pTransportDetail")}
             aria-label=${t("p2pTransportDetail")} aria-expanded=${this._showTransportDetail?"true":"false"}
             @click=${()=>{this._showTransportDetail=!this._showTransportDetail}}>
-            ${d("info")}
+            ${h("info")}
           </button>
         </span>
       </div>
-      ${this._showTransportDetail?i`
+      ${this._showTransportDetail?a`
           <div class="info-row detail-row">
             <span class="info-label"></span>
             <span class="info-value text detail-text">
@@ -30,13 +199,13 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
           <!-- The round trip behind the inline number, in full. QUIC reports
                only the RTT; the KCP-only retransmit timeout and variance stay
                with a live KCP session so QUIC is not shown a false zero. -->
-          ${(e.peer_rtt_live??e.peer_kcp_live)&&(e.peer_rtt_ms??0)>0?i`
+          ${(e.peer_rtt_live??e.peer_kcp_live)&&(e.peer_rtt_ms??0)>0?a`
               <div class="info-row detail-row">
                 <span class="info-label">${t("peersDiagRTT")}</span>
                 <span class="info-value text detail-text">${e.peer_rtt_ms}ms</span>
               </div>
-            `:h}
-          ${e.peer_kcp_live?i`
+            `:c}
+          ${e.peer_kcp_live?a`
               <div class="info-row detail-row">
                 <span class="info-label">${t("peersDiagRTO")}</span>
                 <span class="info-value text detail-text">${e.peer_rto_ms??0}ms</span>
@@ -45,42 +214,42 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                 <span class="info-label">${t("peersDiagRTTVar")}</span>
                 <span class="info-value text detail-text">${e.peer_rttvar_ms??0}ms</span>
               </div>
-            `:h}
-        `:h}
-    `:h}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(e){const s=(e??[])[0];if(!s)return t("eventsEntryDesc");const n=s.count||1;return n>1?`${s.message} ×${n}`:s.message}_hubNoReflow(e){for(const s of e??[]){if(s.message.includes("uplink without downlink"))return!0;if(s.message.includes("downlink recovered"))return!1}return!1}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}get _usesDevice(){return this.entrypointType==="tun"||this.entrypointType==="tungo"}async _handleSave(){if(!this._name.trim()){this._showSnackbar(t("requiredField"));return}if((this.entrypointType==="p2p"||this._usesDevice)&&!this._peer.trim()){this._showSnackbar(`${t("entrypointPeerKey")}: ${t("requiredField")}`);return}if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}if(!await x(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(t("vpnNotReady"));return}}this._saving=!0;try{const e={name:this._name.trim(),type:this.entrypointType,endpoint:this._usesDevice?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,net:this._usesDevice&&this._net.trim()||void 0,mtu:this._usesDevice&&this._mtu||void 0,device_name:this._usesDevice&&this._deviceName.trim()||void 0,routes:this._usesDevice&&this._routes.trim()||void 0,dns:this._usesDevice&&this._dns.trim()||void 0,share_lan:this.entrypointType==="tun"&&this._shareLAN.trim()||void 0,share_mode:this.entrypointType==="tun"&&this._shareMode||void 0,direct:this.entrypointType==="tun"?this._direct:void 0,rules:this.entrypointType==="tungo"?this._rules.split(`
-`).map(s=>s.trim()).filter(Boolean):void 0};this.mode==="create"?(await b(()=>import("./index-BbgSiaFz.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.create(e)),this._showSnackbar(t("saved")),this._navigate("/")):(await b(()=>import("./index-BbgSiaFz.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.update(this.entrypointId,e)),this._showSnackbar(t("saved")),this.mode="view",await f())}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await D(this.entrypointId),this._showSnackbar(t("deleted")),this._navigate("/")}catch{this._showSnackbar(t("deleteFailed"))}}async _handleStart(){if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}const s=this._entrypoint?.options;if(!await x(s?.net??"",s?.routes??"",s?.mtu??0,s?.dns??"")){this._showSnackbar(t("vpnNotReady"));return}}try{await S(this.entrypointId),this._showSnackbar(t("started"))}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("startFailed")}${s?": "+s:""}`)}}async _handleStop(){try{await R(this.entrypointId),this._showSnackbar(t("stopped"))}catch{this._showSnackbar(t("stopFailed"))}}async _handleCopy(e){await L(e),this._showSnackbar(t("copiedToClipboard"))}_handleResetStats(e){this._resetKind=e,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await E(this.entrypointId,this._resetKind),this._entrypoint&&z(this.entrypointId,this._entrypoint.stats),this._showSnackbar(t("saved"))}catch{this._showSnackbar(t("saveFailed"))}}_cycleOption(e,s){const n=s.indexOf(e);return s[(n+1)%s.length]}_shareModeLabel(e){switch(e){case"kernel":return t("shareModeKernel");case"userspace":return t("shareModeUserspace");default:return t("shareModeAuto")}}render(){const e=this._entrypoint,s=e?e.stats:null,n=e?.options?.peer??"",p=e?.options?.rules??[],c=this._matchingRules();return i`
+            `:c}
+        `:c}
+    `:c}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(e){const s=(e??[])[0];if(!s)return t("eventsEntryDesc");const r=s.count||1;return r>1?`${s.message} ×${r}`:s.message}_hubNoReflow(e){for(const s of e??[]){if(s.message.includes("uplink without downlink"))return!0;if(s.message.includes("downlink recovered"))return!1}return!1}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}get _usesDevice(){return this.entrypointType==="tun"||this.entrypointType==="tungo"}async _handleSave(){if(!this._name.trim()){this._showSnackbar(t("requiredField"));return}if((this.entrypointType==="p2p"||this._usesDevice)&&!this._peer.trim()){this._showSnackbar(`${t("entrypointPeerKey")}: ${t("requiredField")}`);return}if(this._usesDevice){const e=T(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}if(!await D(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(t("vpnNotReady"));return}}this._saving=!0;try{const e={name:this._name.trim(),type:this.entrypointType,endpoint:this._usesDevice?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,net:this._usesDevice&&this._net.trim()||void 0,mtu:this._usesDevice&&this._mtu||void 0,device_name:this._usesDevice&&this._deviceName.trim()||void 0,routes:this._usesDevice&&this._routes.trim()||void 0,dns:this._usesDevice&&this._dns.trim()||void 0,share_lan:this.entrypointType==="tun"&&this._shareLAN.trim()||void 0,share_mode:this.entrypointType==="tun"&&this._shareMode||void 0,direct:this.entrypointType==="tun"?this._direct:void 0,rules:this.entrypointType==="tungo"?this._rules.split(`
+`).map(s=>s.trim()).filter(Boolean):void 0};this.mode==="create"?(await $(()=>import("./index-DrUh4Z_Y.js").then(s=>s.I),__vite__mapDeps([0,1])).then(s=>s.create(e)),this._showSnackbar(t("saved")),this._navigate("/")):(await $(()=>import("./index-DrUh4Z_Y.js").then(s=>s.I),__vite__mapDeps([0,1])).then(s=>s.update(this.entrypointId,e)),this._showSnackbar(t("saved")),this.mode="view",await x())}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await I(this.entrypointId),this._showSnackbar(t("deleted")),this._navigate("/")}catch{this._showSnackbar(t("deleteFailed"))}}async _handleStart(){if(this._usesDevice){const e=T(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}const s=this._entrypoint?.options;if(!await D(s?.net??"",s?.routes??"",s?.mtu??0,s?.dns??"")){this._showSnackbar(t("vpnNotReady"));return}}try{await A(this.entrypointId),this._showSnackbar(t("started"))}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("startFailed")}${s?": "+s:""}`)}}async _handleStop(){try{await N(this.entrypointId),this._showSnackbar(t("stopped"))}catch{this._showSnackbar(t("stopFailed"))}}async _handleCopy(e){await V(e),this._showSnackbar(t("copiedToClipboard"))}_handleResetStats(e){this._resetKind=e,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await L(this.entrypointId,this._resetKind),this._entrypoint&&M(this.entrypointId,this._entrypoint.stats),this._showSnackbar(t("saved"))}catch{this._showSnackbar(t("saveFailed"))}}_cycleOption(e,s){const r=s.indexOf(e);return s[(r+1)%s.length]}_shareModeLabel(e){switch(e){case"kernel":return t("shareModeKernel");case"userspace":return t("shareModeUserspace");default:return t("shareModeAuto")}}render(){const e=this._entrypoint,s=e?e.stats:null,r=e?.options?.peer??"",n=e?.options?.rules??[],d=this._matchingRules();return a`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._handleBack()}>
-            ${d("chevron-left")}
+            ${h("chevron-left")}
           </button>
-          <span class="page-title">${d(A(this.entrypointType))}</span>
+          <span class="page-title">${h(F(this.entrypointType))}</span>
 
-          ${this.mode==="view"&&e?i`
-              ${e.status==="running"?i`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
+          ${this.mode==="view"&&e?a`
+              ${e.status==="running"?a`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
                   ■ ${t("btnStop")}
-                </button>`:i`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
+                </button>`:a`<button class="pill-btn primary appbar-action" @click=${()=>this._handleStart()}>
                   ▶ ${t("btnStart")}
                 </button>`}
-            `:i`
+            `:a`
               <button class="pill-btn primary appbar-action" ?disabled=${this._saving} @click=${()=>this._handleSave()}>
-                ${d("check")} ${t("btnSave")}
+                ${h("check")} ${t("btnSave")}
               </button>
             `}
         </div>
 
         <!-- ── VIEW MODE ───────────────────────────────────────────── -->
-        ${this.mode==="view"&&e?i`
+        ${this.mode==="view"&&e?a`
             <div class="status-banner ${e.status}">
               <span class="status-dot-mini"></span>
               ${e.status==="running"?t("statusRunning"):e.status==="error"?t("statusError"):t("statusStopped")}
-              ${e.error?i` — ${e.error}`:""}
+              ${e.error?a` — ${e.error}`:""}
               <span class="status-spacer"></span>
             </div>
             <!-- Running yet one-way: uplink without downlink, still on. The
                  events derive it (see _hubNoReflow), so the banner survives
                  the instantaneous rates flickering and clears on recovery. -->
-            ${this.entrypointType==="tun"&&e.status==="running"&&this._hubNoReflow(e.events)?i`
+            ${this.entrypointType==="tun"&&e.status==="running"&&this._hubNoReflow(e.events)?a`
                 <div class="status-banner degraded" @click=${()=>this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`)}>
                   <span class="status-dot-mini"></span>
                   <div style="flex:1;">
@@ -89,8 +258,8 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                   </div>
                   <span style="color:var(--text-muted);">&rarr;</span>
                 </div>
-              `:h}
-            ${this.entrypointType==="tun"&&e.status==="running"&&e.peer_transport==="server-unreachable"?i`
+              `:c}
+            ${this.entrypointType==="tun"&&e.status==="running"&&e.peer_transport==="server-unreachable"?a`
                 <div class="status-banner degraded">
                   <span class="status-dot-mini"></span>
                   <div style="flex:1;">
@@ -98,7 +267,7 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                     <div class="degraded-hint">${t("serverUnreachableHint")}</div>
                   </div>
                 </div>
-              `:h}
+              `:c}
 
             <div class="section">
               <div class="card">
@@ -108,81 +277,81 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                 </div>
                 <div class="info-row">
                   <span class="info-label">${t("fieldCreated")}</span>
-                  <span class="info-value text">${C(e.created_at)}</span>
+                  <span class="info-value text">${K(e.created_at)}</span>
                 </div>
-                ${this.entrypointType==="p2p"||this._usesDevice?"":i`
+                ${this.entrypointType==="p2p"||this._usesDevice?"":a`
                 <div class="info-row">
                   <span class="info-label">${t("fieldTunnelId")}</span>
                   <span class="info-value uuid">${e.id??"—"}</span>
-                  ${e.id?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(e.id)}>
-                      ${d("copy")}
+                  ${e.id?a`<button class="copy-btn-mini" @click=${()=>this._handleCopy(e.id)}>
+                      ${h("copy")}
                     </button>`:""}
                 </div>`}
                 <div class="info-row">
                   <span class="info-label">${this._usesDevice?t("fieldNet"):t("fieldBindAddress")}</span>
                   <span class="info-value">${e.entrypoint}</span>
                 </div>
-                ${this._usesDevice?i`
-                    ${e.options?.mtu?i`<div class="info-row"><span class="info-label">${t("fieldMTU")}</span><span class="info-value text">${e.options.mtu}</span></div>`:""}
-                    ${e.options?.device_name?i`<div class="info-row"><span class="info-label">${t("fieldDeviceName")}</span><span class="info-value text">${e.options.device_name}</span></div>`:""}
+                ${this._usesDevice?a`
+                    ${e.options?.mtu?a`<div class="info-row"><span class="info-label">${t("fieldMTU")}</span><span class="info-value text">${e.options.mtu}</span></div>`:""}
+                    ${e.options?.device_name?a`<div class="info-row"><span class="info-label">${t("fieldDeviceName")}</span><span class="info-value text">${e.options.device_name}</span></div>`:""}
                     <!-- What this spoke asked to share, and what its hub
                          actually approved: the two are not the same value, and
                          only the second reaches the hub's peers. A hub that
                          approved nothing has no routes row at all. A tungo split
                          shares nothing at all, so neither row is its business. -->
-                    ${this.entrypointType==="tun"&&e.options?.share_lan?i`<div class="info-row"><span class="info-label">${t("fieldShareLAN")}</span><span class="info-value text">${e.options.share_lan}</span></div>`:""}
-                    ${this.entrypointType==="tun"?i`
+                    ${this.entrypointType==="tun"&&e.options?.share_lan?a`<div class="info-row"><span class="info-label">${t("fieldShareLAN")}</span><span class="info-value text">${e.options.share_lan}</span></div>`:""}
+                    ${this.entrypointType==="tun"?a`
                     <div class="info-row">
                       <span class="info-label">${t("fieldDirect")}</span>
                       <span class="info-value text">${e.options?.direct?t("directOn"):t("directOff")}</span>
                     </div>
-                    ${e.lan_routes?.length?i`<div class="info-row"><span class="info-label">${t("fieldLANRoutes")}</span><span class="info-value text">${e.lan_routes.join(", ")}</span></div>`:""}`:""}
-                    ${e.options?.routes?i`<div class="info-row"><span class="info-label">${t("fieldRoutes")}</span><span class="info-value text">${e.options.routes}</span></div>`:""}
-                    ${e.options?.dns?i`<div class="info-row"><span class="info-label">${t("fieldDNS")}</span><span class="info-value text">${e.options.dns}</span></div>`:""}
+                    ${e.lan_routes?.length?a`<div class="info-row"><span class="info-label">${t("fieldLANRoutes")}</span><span class="info-value text">${e.lan_routes.join(", ")}</span></div>`:""}`:""}
+                    ${e.options?.routes?a`<div class="info-row"><span class="info-label">${t("fieldRoutes")}</span><span class="info-value text">${e.options.routes}</span></div>`:""}
+                    ${e.options?.dns?a`<div class="info-row"><span class="info-label">${t("fieldDNS")}</span><span class="info-value text">${e.options.dns}</span></div>`:""}
                     <!-- The split itself. An empty list is a working split
                          (everything direct), so it is shown rather than
                          hidden as "not configured". -->
-                    ${this.entrypointType==="tungo"?i`
+                    ${this.entrypointType==="tungo"?a`
                         <div class="info-row">
                           <span class="info-label">${t("fieldRules")}</span>
                           <span class="info-value text">
-                            ${p.length===0?t("rulesEmptyDirect"):p.length<=8?p.join(", "):t("rulesCount",{n:p.length})}
+                            ${n.length===0?t("rulesEmptyDirect"):n.length<=8?n.join(", "):t("rulesCount",{n:n.length})}
                           </span>
                         </div>
-                        ${p.length>8?i`
+                        ${n.length>8?a`
                             <details class="rules-disclosure">
                               <summary>
-                                <span class="rules-show">${t("rulesShowAll",{n:p.length})}</span>
-                                <span class="rules-hide">${t("rulesHideAll",{n:p.length})}</span>
+                                <span class="rules-show">${t("rulesShowAll",{n:n.length})}</span>
+                                <span class="rules-hide">${t("rulesHideAll",{n:n.length})}</span>
                               </summary>
-                              <pre class="rules-pre" role="region" tabindex="0" aria-label=${t("fieldRules")}>${p.join(`
+                              <pre class="rules-pre" role="region" tabindex="0" aria-label=${t("fieldRules")}>${n.join(`
 `)}</pre>
                             </details>
-                          `:h}
+                          `:c}
                       `:""}
                     <div class="info-row">
                       <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?n:m(n)}</span>
-                      ${n?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(n)}>
-                          ${d("copy")}
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?r:w(r)}</span>
+                      ${r?a`<button class="copy-btn-mini" @click=${()=>this._handleCopy(r)}>
+                          ${h("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
                           @click=${()=>{this._showPeer=!this._showPeer}}>
-                          ${d(this._showPeer?"eye-off":"eye")}
+                          ${h(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
                     ${this._renderTransport(e)}
                     <div class="p2p-hint">${this.entrypointType==="tun"?t("tunPeerHint"):t("tungoPeerHint")}</div>
-                  `:this.entrypointType==="p2p"?i`
+                  `:this.entrypointType==="p2p"?a`
                     <div class="info-row">
                       <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?n:m(n)}</span>
-                      ${n?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(n)}>
-                          ${d("copy")}
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?r:w(r)}</span>
+                      ${r?a`<button class="copy-btn-mini" @click=${()=>this._handleCopy(r)}>
+                          ${h("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
                           @click=${()=>{this._showPeer=!this._showPeer}}>
-                          ${d(this._showPeer?"eye-off":"eye")}
+                          ${h(this._showPeer?"eye-off":"eye")}
                         </button>`:""}
                     </div>
                     ${this._renderTransport(e)}
@@ -197,37 +366,38 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
               </div>
 
               <!-- Stats grid -->
-              ${s?i`
+              ${s?a`
                   <div class="stats-grid">
                     <div class="stat-box">
-                      <div class="stat-label">${t("statTotalConns")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${t("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(s.total_conns)}</div>
-                      <div class="stat-rate">${v(s.current_conns)} active · ${s.request_rate.toFixed(2)} conns/s</div>
+                      <div class="stat-label">${t("statTotalConns")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${t("btnResetStats")}">${h("rotate-cw")}</span></div>
+                      <div class="stat-value">${m(s.total_conns)}</div>
+                      <div class="stat-rate">${m(s.current_conns)} active · ${s.request_rate.toFixed(2)} conns/s</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">${t("statTotalErrors")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${t("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${v(s.total_errs)}</div>
+                      <div class="stat-label">${t("statTotalErrors")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${t("btnResetStats")}">${h("rotate-cw")}</span></div>
+                      <div class="stat-value">${m(s.total_errs)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">${t("p2pColDown")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${t("btnResetOutput")}">${d("rotate-cw")}</span></div>
+                      <div class="stat-label">${t("p2pColDown")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${t("btnResetOutput")}">${h("rotate-cw")}</span></div>
                       <div class="stat-value">${g(s.output_bytes)}</div>
-                      <div class="stat-rate">${_(s.output_rate_bytes)}</div>
+                      <div class="stat-rate">${k(s.output_rate_bytes)}</div>
                     </div>
                     <div class="stat-box">
-                      <div class="stat-label">${t("p2pColUp")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${t("btnResetInput")}">${d("rotate-cw")}</span></div>
+                      <div class="stat-label">${t("p2pColUp")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("input")} title="${t("btnResetInput")}">${h("rotate-cw")}</span></div>
                       <div class="stat-value">${g(s.input_bytes)}</div>
-                      <div class="stat-rate">${_(s.input_rate_bytes)}</div>
+                      <div class="stat-rate">${k(s.input_rate_bytes)}</div>
                     </div>
                   </div>
                 `:""}
+              ${this.entrypointType==="tungo"?a`<entrypoint-requests-card .entrypoint=${e}></entrypoint-requests-card>`:c}
             </div>
 
-            ${this.mode==="view"&&this._entrypoint&&this.entrypointType==="tun"?i`
+            ${this.mode==="view"&&this._entrypoint&&this.entrypointType==="tun"?a`
                 <div class="section">
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
                       @click=${()=>this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/peers`)}>
-                      <span style="color:var(--accent);">${d("users")}</span>
+                      <span style="color:var(--accent);">${h("users")}</span>
                       <div style="flex:1;">
                         <div style="font-size:var(--font-sm);font-weight:600;">${t("entrypointPeersTitle")}</div>
                         <div style="font-size:var(--font-sm);color:var(--text-muted);">
@@ -238,14 +408,14 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                     </div>
                   </div>
                 </div>
-              `:h}
+              `:c}
 
-            ${this.mode==="view"&&this._entrypoint?i`
+            ${this.mode==="view"&&this._entrypoint?a`
                 <div class="section">
                   <div class="card" style="padding:0;">
                     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;"
                       @click=${()=>this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}/events`)}>
-                      <span style="color:var(--accent);">${d("activity")}</span>
+                      <span style="color:var(--accent);">${h("activity")}</span>
                       <div style="flex:1;">
                         <div style="font-size:var(--font-sm);font-weight:600;">${t("eventsEntryTitle")}</div>
                         <div style="font-size:var(--font-sm);color:var(--text-muted);">
@@ -256,49 +426,49 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                     </div>
                   </div>
                 </div>
-              `:h}
+              `:c}
 
             <div class="section">
               <button class="btn-edit-bottom" @click=${()=>this._enterEdit()}>
-                ${d("edit")} ${t("btnEdit")}
+                ${h("edit")} ${t("btnEdit")}
               </button>
             </div>
           `:""}
 
         <!-- ── EDIT / CREATE MODE ──────────────────────────────────── -->
-        ${this.mode!=="view"?i`
+        ${this.mode!=="view"?a`
             <div class="section">
               <div class="card" style="padding:16px;">
                 <!-- What a device entrypoint is and what it needs, before the
                      fields it implies: the device is the one thing here that can
                      make the save fail. -->
-                ${this._usesDevice?i`
+                ${this._usesDevice?a`
                     <div class="p2p-hint warn">${t("tunPrivilegeHint")}</div>
                     <div class="p2p-hint">${this.entrypointType==="tun"?t("tunPeerHint"):t("tungoPeerHint")}</div>
                   `:""}
 
                 <!-- A p2p or device entrypoint has no tunnel id to route by. -->
-                ${this.entrypointType==="p2p"||this._usesDevice?"":i`
+                ${this.entrypointType==="p2p"||this._usesDevice?"":a`
                 <div class="form-group">
                   <label class="form-label">${t("fieldTunnelId")}</label>
                   <input class="form-input"
                     ?readonly=${this.mode==="edit"}
                     .value=${this._tunnelId}
                     placeholder="${t("tunnelIdPlaceholder")}"
-                    @input=${a=>{this._tunnelId=a.target.value}}>
+                    @input=${i=>{this._tunnelId=i.target.value}}>
                 </div>`}
 
                 <div class="form-group">
                   <label class="form-label">${t("fieldName")}</label>
                   <input class="form-input" .value=${this._name} placeholder="${t("entrypointNamePlaceholder")}"
-                    @input=${a=>{this._name=a.target.value}}>
+                    @input=${i=>{this._name=i.target.value}}>
                 </div>
 
-                ${this._usesDevice?i`
+                ${this._usesDevice?a`
                     <div class="form-group">
                       <label class="form-label">${t("fieldNet")}</label>
                       <input class="form-input" .value=${this._net} placeholder="10.10.0.2/24"
-                        @input=${a=>{this._net=a.target.value}}>
+                        @input=${i=>{this._net=i.target.value}}>
                       <!-- What makes the two ends agree. The hub's assignment
                            lives on the hub's own peers page, which this page has
                            no view of — it knows only the net being typed here and
@@ -306,7 +476,7 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                            restating a subnet it cannot know. A tungo split's
                            address is not assigned by anyone: its peer is a p2p
                            tunnel, not a tun hub. -->
-                      ${this.entrypointType==="tun"?i`<div class="p2p-hint">${t("tunNetMatchesHub")}</div>`:""}
+                      ${this.entrypointType==="tun"?a`<div class="p2p-hint">${t("tunNetMatchesHub")}</div>`:""}
                     </div>
                     <!-- The hub this device dials. It belongs with the device
                          address above, not at the bottom of the form: the two
@@ -318,17 +488,17 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                         ${t("entrypointPeerKey")}<span class="required-mark" title="${t("requiredField")}">*</span>
                       </label>
                       <input class="form-input" .value=${this._peer} placeholder="${t("peersKeyPlaceholder")}"
-                        @input=${a=>{this._peer=a.target.value}}>
+                        @input=${i=>{this._peer=i.target.value}}>
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t("fieldMTU")}</label>
                       <input class="form-input" type="number" .value=${this._mtu?String(this._mtu):""} placeholder="1300"
-                        @input=${a=>{this._mtu=parseInt(a.target.value,10)||0}}>
+                        @input=${i=>{this._mtu=parseInt(i.target.value,10)||0}}>
                     </div>
                     <div class="form-group">
                       <label class="form-label">${t("fieldDeviceName")}</label>
                       <input class="form-input" .value=${this._deviceName} placeholder="wisper0"
-                        @input=${a=>{this._deviceName=a.target.value}}>
+                        @input=${i=>{this._deviceName=i.target.value}}>
                       <div class="p2p-hint">${t("fieldDeviceNameHint")}</div>
                     </div>
                     <div class="form-group">
@@ -341,7 +511,7 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                            stored value ends up as. -->
                       <input class="form-input" .value=${this._routes}
                         placeholder="${this.entrypointType==="tungo"?"0.0.0.0/0, ::/0":"0.0.0.0/0"}"
-                        @input=${a=>{this._routes=a.target.value}}>
+                        @input=${i=>{this._routes=i.target.value}}>
                       <!-- A split has no hub subnet to fall back to: what it
                            carries is decided by the rules below, not by the
                            net it was assigned. -->
@@ -354,9 +524,9 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                            split DNS answers the listed names. -->
                       <input class="form-input" .value=${this._dns}
                         placeholder="${this.entrypointType==="tungo"?"192.168.100.100":"10.10.0.1"}"
-                        @input=${a=>{this._dns=a.target.value}}>
+                        @input=${i=>{this._dns=i.target.value}}>
                     </div>
-                    ${this.entrypointType==="tungo"?i`
+                    ${this.entrypointType==="tungo"?a`
                     <!-- The split: one destination per line, because the list is
                          read and edited as a list of hosts, not as a sentence.
                          Listed traffic rides the tunnel to the peer above; the
@@ -373,34 +543,34 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                       <search>
                         <input id="rules-search" name="q" type="search" class="form-input"
                           .value=${this._rulesSearch} placeholder=${t("rulesSearchPlaceholder")}
-                          @input=${a=>{this._rulesSearch=a.target.value}}>
+                          @input=${i=>{this._rulesSearch=i.target.value}}>
                       </search>
-                      ${this._rulesSearch.trim()?i`
+                      ${this._rulesSearch.trim()?a`
                           <ul class="rules-match-list" aria-label=${t("rulesSearchLabel")}>
-                            ${c.map(a=>i`
+                            ${d.map(i=>a`
                               <li class="rules-match">
-                                <span class="rules-match-text">${a.value}</span>
+                                <span class="rules-match-text">${i.value}</span>
                                 <button type="button" class="rules-remove-btn"
-                                  aria-label=${t("rulesRemove",{rule:a.value})}
-                                  title=${t("rulesRemove",{rule:a.value})}
-                                  @click=${()=>this._removeRule(a.line)}>✕</button>
+                                  aria-label=${t("rulesRemove",{rule:i.value})}
+                                  title=${t("rulesRemove",{rule:i.value})}
+                                  @click=${()=>this._removeRule(i.line)}>✕</button>
                               </li>
                             `)}
                           </ul>
-                          ${c.length===0?i`<div class="rules-no-matches">${t("rulesNoMatches")}</div>`:h}
-                        `:h}
-                      <form @submit=${a=>{a.preventDefault(),this._addRule()}}>
+                          ${d.length===0?a`<div class="rules-no-matches">${t("rulesNoMatches")}</div>`:c}
+                        `:c}
+                      <form @submit=${i=>{i.preventDefault(),this._addRule()}}>
                         <label class="rules-control-label" for="rules-add">${t("rulesAddLabel")}</label>
                         <div class="rules-add-row">
                           <input id="rules-add" name="rule" class="form-input"
                             .value=${this._newRule} placeholder=${t("rulesAddPlaceholder")}
-                            @input=${a=>{this._newRule=a.target.value}}>
+                            @input=${i=>{this._newRule=i.target.value}}>
                           <button type="submit" class="pill-btn primary rules-add-btn">${t("rulesAdd")}</button>
                         </div>
                       </form>
                       <div class="p2p-hint">${t("fieldRulesHint")}</div>
                     </div>`:""}
-                    ${this.entrypointType==="tun"?i`
+                    ${this.entrypointType==="tun"?a`
                     <!-- LAN sharing, last: the subnets of this node's own LAN the
                          hub may let its peers reach, and the backend that runs
                          them. Opt-in and decided by the hub (its peers page shows
@@ -409,14 +579,14 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                     <div class="form-group">
                       <label class="form-label">${t("fieldShareLAN")}</label>
                       <input class="form-input" .value=${this._shareLAN} placeholder="192.168.1.0/24"
-                        @input=${a=>{this._shareLAN=a.target.value}}>
+                        @input=${i=>{this._shareLAN=i.target.value}}>
                       <div class="p2p-hint">${t("fieldShareLANHint")}</div>
                     </div>
-                    <div class="switch-row" @click=${()=>{this._shareMode=this._cycleOption(this._shareMode,[...r.SHARE_MODES]),this.requestUpdate()}}>
+                    <div class="switch-row" @click=${()=>{this._shareMode=this._cycleOption(this._shareMode,[...l.SHARE_MODES]),this.requestUpdate()}}>
                       <span class="switch-label">${t("fieldShareMode")}</span>
                       <span class="protocol-value">
                         ${this._shareModeLabel(this._shareMode)}
-                        ${d("chevron-right")}
+                        ${h("chevron-right")}
                       </span>
                     </div>
                     <div class="p2p-hint">${t("fieldShareModeHint")}</div>
@@ -428,23 +598,23 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                       </div>
                     </div>
                     <div class="p2p-hint">${t("fieldDirectHint")}</div>`:""}
-                  `:i`
+                  `:a`
                 <div class="form-group">
                   <label class="form-label">${t("fieldBindAddress")}</label>
                   <input class="form-input" .value=${this._endpoint} placeholder="0.0.0.0:9090"
-                    @input=${a=>{this._endpoint=a.target.value}}>
+                    @input=${i=>{this._endpoint=i.target.value}}>
                 </div>`}
 
                 <!-- The peer key and the controls only a p2p entrypoint has. A
                      device entrypoint's key sits above, with the device it
                      dials from. -->
-                ${this.entrypointType==="p2p"?i`
+                ${this.entrypointType==="p2p"?a`
                     <div class="form-group">
                       <label class="form-label">
                         ${t("entrypointPeerKey")}<span class="required-mark" title="${t("requiredField")}">*</span>
                       </label>
                       <input class="form-input" .value=${this._peer} placeholder="${t("peersKeyPlaceholder")}"
-                        @input=${a=>{this._peer=a.target.value}}>
+                        @input=${i=>{this._peer=i.target.value}}>
                     </div>
                     <!-- No keepalive, no ttl: this entrypoint reaches its hub
                          over p2p and nothing else, the handshake that registers
@@ -455,10 +625,10 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                       <span class="switch-label">${t("fieldProtocol")}</span>
                       <span class="protocol-value">
                         ${this._protocol==="udp"?t("protocolUdp"):t("protocolTcp")}
-                        ${d("chevron-right")}
+                        ${h("chevron-right")}
                       </span>
                     </div>
-                    ${this._protocol==="udp"?i`
+                    ${this._protocol==="udp"?a`
                     <div class="switch-row">
                       <span class="switch-label">${t("switchKeepalive")}</span>
                       <div class="switch ${this._keepalive?"on":""}"
@@ -469,11 +639,11 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
                     <div class="p2p-hint">${t("keepaliveHint")}</div>`:""}
                   `:""}
 
-                ${this.mode==="edit"?i`
+                ${this.mode==="edit"?a`
                     <div class="danger-zone">
                       <div class="danger-zone-label">${t("dangerZone")}</div>
                       <button class="pill-btn danger" @click=${()=>{this._showDeleteDialog=!0}}>
-                        ${d("trash")} ${t("btnDelete")}
+                        ${h("trash")} ${t("btnDelete")}
                       </button>
                     </div>
                   `:""}
@@ -481,11 +651,11 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
             </div>
           `:""}
 
-        ${this._snackbar?i`<div class="toast">${this._snackbar}</div>`:""}
+        ${this._snackbar?a`<div class="toast">${this._snackbar}</div>`:""}
 
-        ${this._showResetDialog?i`
+        ${this._showResetDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showResetDialog=!1}}>
-              <div class="dialog-box" @click=${a=>a.stopPropagation()}>
+              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${t("resetStatsConfirmTitle")}</div>
                 <div class="dialog-message">${t("resetStatsConfirm")}</div>
                 <div class="dialog-actions">
@@ -500,9 +670,9 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
             </div>
           `:""}
 
-        ${this._showDeleteDialog?i`
+        ${this._showDeleteDialog?a`
             <div class="dialog-overlay" @click=${()=>{this._showDeleteDialog=!1}}>
-              <div class="dialog-box" @click=${a=>a.stopPropagation()}>
+              <div class="dialog-box" @click=${i=>i.stopPropagation()}>
                 <div class="dialog-title">${t("deleteConfirmTitle")}</div>
                 <div class="dialog-message">${t("deleteConfirmMessage")}</div>
                 <div class="dialog-actions">
@@ -518,7 +688,7 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
           `:""}
       </app-scaffold>
 
-      ${this._rulesEditorOpen?i`
+      ${this._rulesEditorOpen?a`
           <div class="rules-editor-overlay" @keydown=${this._handleRulesEditorKeydown}>
             <div class="rules-editor-panel" role="dialog" aria-modal="true" aria-labelledby="rules-editor-title">
               <div class="rules-editor-panel-head">
@@ -528,7 +698,7 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
               <textarea id="rules-bulk-editor" class="form-input rules-bulk-textarea"
                 aria-label=${t("fieldRules")} spellcheck="false"
                 .value=${this._rulesDraft}
-                @input=${a=>{this._rulesDraft=a.target.value}}></textarea>
+                @input=${i=>{this._rulesDraft=i.target.value}}></textarea>
               <div class="rules-editor-actions">
                 <button type="button" class="dialog-btn cancel" @click=${()=>this._closeRulesEditor(!1)}>
                   ${t("rulesCancel")}
@@ -539,8 +709,8 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
               </div>
             </div>
           </div>
-        `:h}
-    `}};r.SHARE_MODES=["auto","kernel","userspace"];r.styles=P`
+        `:c}
+    `}};l.SHARE_MODES=["auto","kernel","userspace"];l.styles=R`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -1082,4 +1252,4 @@ ${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentT
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([$()],r.prototype,"entrypointType",2);o([$()],r.prototype,"entrypointId",2);o([l()],r.prototype,"mode",2);o([l()],r.prototype,"_entrypoint",2);o([l()],r.prototype,"_saving",2);o([l()],r.prototype,"_snackbar",2);o([l()],r.prototype,"_showDeleteDialog",2);o([l()],r.prototype,"_showResetDialog",2);o([l()],r.prototype,"_name",2);o([l()],r.prototype,"_endpoint",2);o([l()],r.prototype,"_tunnelId",2);o([l()],r.prototype,"_peer",2);o([l()],r.prototype,"_showPeer",2);o([l()],r.prototype,"_showTransportDetail",2);o([l()],r.prototype,"_protocol",2);o([l()],r.prototype,"_keepalive",2);o([l()],r.prototype,"_net",2);o([l()],r.prototype,"_mtu",2);o([l()],r.prototype,"_deviceName",2);o([l()],r.prototype,"_routes",2);o([l()],r.prototype,"_dns",2);o([l()],r.prototype,"_rules",2);o([l()],r.prototype,"_rulesSearch",2);o([l()],r.prototype,"_newRule",2);o([l()],r.prototype,"_rulesEditorOpen",2);o([l()],r.prototype,"_rulesDraft",2);o([l()],r.prototype,"_shareLAN",2);o([l()],r.prototype,"_shareMode",2);o([l()],r.prototype,"_direct",2);r=o([I("entrypoint-detail-page")],r);export{r as EntrypointDetailPage};
+  `;p([_()],l.prototype,"entrypointType",2);p([_()],l.prototype,"entrypointId",2);p([o()],l.prototype,"mode",2);p([o()],l.prototype,"_entrypoint",2);p([o()],l.prototype,"_saving",2);p([o()],l.prototype,"_snackbar",2);p([o()],l.prototype,"_showDeleteDialog",2);p([o()],l.prototype,"_showResetDialog",2);p([o()],l.prototype,"_name",2);p([o()],l.prototype,"_endpoint",2);p([o()],l.prototype,"_tunnelId",2);p([o()],l.prototype,"_peer",2);p([o()],l.prototype,"_showPeer",2);p([o()],l.prototype,"_showTransportDetail",2);p([o()],l.prototype,"_protocol",2);p([o()],l.prototype,"_keepalive",2);p([o()],l.prototype,"_net",2);p([o()],l.prototype,"_mtu",2);p([o()],l.prototype,"_deviceName",2);p([o()],l.prototype,"_routes",2);p([o()],l.prototype,"_dns",2);p([o()],l.prototype,"_rules",2);p([o()],l.prototype,"_rulesSearch",2);p([o()],l.prototype,"_newRule",2);p([o()],l.prototype,"_rulesEditorOpen",2);p([o()],l.prototype,"_rulesDraft",2);p([o()],l.prototype,"_shareLAN",2);p([o()],l.prototype,"_shareMode",2);p([o()],l.prototype,"_direct",2);l=p([E("entrypoint-detail-page")],l);export{l as EntrypointDetailPage};
