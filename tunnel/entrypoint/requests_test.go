@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -38,6 +39,255 @@ func TestRequestRingCapacityAndOrdering(t *testing.T) {
 	}
 	if all := ring.list(0); len(all) != 500 {
 		t.Errorf("unlimited ring length = %d, want 500", len(all))
+	}
+}
+
+func TestRequestRecorderMergesSplitFlowBySID(t *testing.T) {
+	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	path := []xrecorder.PathHop{{Hop: 0, Addr: "203.0.113.10:443", ConnectMs: 8}}
+	request := xrecorder.HandlerRecorderObject{
+		SID:         "split-flow",
+		Time:        base,
+		Host:        "example.com:443",
+		DstAddr:     "203.0.113.10:443",
+		Network:     "tcp",
+		Proto:       "http",
+		Path:        path,
+		InputBytes:  100,
+		OutputBytes: 40,
+		Duration:    250 * time.Millisecond,
+		Err:         "request error",
+	}
+	connection := xrecorder.HandlerRecorderObject{
+		SID:         "split-flow",
+		Time:        base.Add(time.Second),
+		Host:        "example.com:443",
+		DstAddr:     "203.0.113.10:443",
+		Network:     "tcp",
+		InputBytes:  120,
+		OutputBytes: 30,
+		Duration:    500 * time.Millisecond,
+		Err:         "connection reset",
+	}
+	wantPath := []RequestPathHop{{Hop: 0, Addr: "203.0.113.10:443", ConnectMS: 8}}
+	for _, tt := range []struct {
+		name         string
+		requestFirst bool
+	}{
+		{name: "request then connection", requestFirst: true},
+		{name: "connection then request", requestFirst: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ring := newRequestRing(0)
+			records := []xrecorder.HandlerRecorderObject{request, connection}
+			if !tt.requestFirst {
+				slices.Reverse(records)
+			}
+			for _, record := range records {
+				recordRequestObject(t, ring, record)
+			}
+
+			got := ring.list(0)
+			if len(got) != 1 {
+				t.Fatalf("Record(split SID %q) stored %d rows, want 1", request.SID, len(got))
+			}
+			merged := got[0]
+			if merged.Host != request.Host || merged.Dst != request.DstAddr || merged.Network != request.Network || merged.Proto != request.Proto {
+				t.Errorf("Record(split SID %q) identity = %q/%q/%q/%q, want %q/%q/%q/%q",
+					request.SID, merged.Host, merged.Dst, merged.Network, merged.Proto,
+					request.Host, request.DstAddr, request.Network, request.Proto)
+			}
+			if merged.Tunneled {
+				t.Errorf("Record(split SID %q) tunneled = true, want false for a target-only path", request.SID)
+			}
+			if merged.InputBytes != 120 || merged.OutputBytes != 40 || merged.DurationMS != 500 {
+				t.Errorf("Record(split SID %q) bytes/duration = %d/%d/%d, want 120/40/500",
+					request.SID, merged.InputBytes, merged.OutputBytes, merged.DurationMS)
+			}
+			if !slices.Equal(merged.Path, wantPath) {
+				t.Errorf("Record(split SID %q) path = %+v, want %+v", request.SID, merged.Path, wantPath)
+			}
+			wantErr := connection.Err
+			if !tt.requestFirst {
+				wantErr = request.Err
+			}
+			if merged.Err != wantErr {
+				t.Errorf("Record(split SID %q) error = %q, want newer error %q", request.SID, merged.Err, wantErr)
+			}
+			if !merged.Time.Equal(base) {
+				t.Errorf("Record(split SID %q) time = %s, want earlier time %s", request.SID, merged.Time, base)
+			}
+		})
+	}
+}
+
+func TestRequestRecorderMergesSameSIDFields(t *testing.T) {
+	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	rich := xrecorder.HandlerRecorderObject{
+		SID:     "merge-fields",
+		Time:    base,
+		Host:    "rich.example:443",
+		DstAddr: "203.0.113.10:443",
+		Network: "tcp",
+		Proto:   "http",
+		Path: []xrecorder.PathHop{
+			{Chain: "split", Hop: 0, Node: "hub", Addr: "relay-peer", ConnectMs: 4},
+			{Hop: 1, Addr: "203.0.113.10:443", ConnectMs: 8},
+		},
+		InputBytes:  20,
+		OutputBytes: 50,
+		Duration:    200 * time.Millisecond,
+		Err:         "rich error",
+	}
+	poor := xrecorder.HandlerRecorderObject{
+		SID:         "merge-fields",
+		Time:        base.Add(time.Second),
+		Host:        "poor.example:443",
+		DstAddr:     "198.51.100.20:443",
+		Network:     "udp",
+		Proto:       "quic",
+		Path:        []xrecorder.PathHop{{Addr: "198.51.100.20:443"}},
+		InputBytes:  10,
+		OutputBytes: 40,
+		Duration:    100 * time.Millisecond,
+	}
+	wantPath := []RequestPathHop{
+		{Chain: "split", Hop: 0, Node: "hub", Addr: "relay-peer", ConnectMS: 4},
+		{Hop: 1, Addr: "203.0.113.10:443", ConnectMS: 8},
+	}
+	for _, tt := range []struct {
+		name      string
+		richFirst bool
+		want      xrecorder.HandlerRecorderObject
+	}{
+		{name: "rich then poor", richFirst: true, want: rich},
+		{name: "poor then rich", richFirst: false, want: poor},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ring := newRequestRing(0)
+			records := []xrecorder.HandlerRecorderObject{rich, poor}
+			if !tt.richFirst {
+				slices.Reverse(records)
+			}
+			for _, record := range records {
+				recordRequestObject(t, ring, record)
+			}
+
+			got := ring.list(0)
+			if len(got) != 1 {
+				t.Fatalf("Record(SID %q) stored %d rows, want 1", rich.SID, len(got))
+			}
+			merged := got[0]
+			if merged.Host != tt.want.Host || merged.Dst != tt.want.DstAddr || merged.Network != tt.want.Network || merged.Proto != tt.want.Proto {
+				t.Errorf("Record(SID %q) identity = %q/%q/%q/%q, want first non-empty %q/%q/%q/%q",
+					rich.SID, merged.Host, merged.Dst, merged.Network, merged.Proto,
+					tt.want.Host, tt.want.DstAddr, tt.want.Network, tt.want.Proto)
+			}
+			if !merged.Tunneled {
+				t.Errorf("Record(SID %q) tunneled = false, want true from either record", rich.SID)
+			}
+			if merged.InputBytes != 20 || merged.OutputBytes != 50 || merged.DurationMS != 200 {
+				t.Errorf("Record(SID %q) bytes/duration = %d/%d/%d, want maxima 20/50/200",
+					rich.SID, merged.InputBytes, merged.OutputBytes, merged.DurationMS)
+			}
+			if !slices.Equal(merged.Path, wantPath) {
+				t.Errorf("Record(SID %q) path = %+v, want longer path %+v", rich.SID, merged.Path, wantPath)
+			}
+			if merged.Err != rich.Err {
+				t.Errorf("Record(SID %q) error = %q, want retained/newer error %q", rich.SID, merged.Err, rich.Err)
+			}
+			if !merged.Time.Equal(base) {
+				t.Errorf("Record(SID %q) time = %s, want earlier time %s", rich.SID, merged.Time, base)
+			}
+		})
+	}
+}
+
+func TestRequestRecorderKeepsDifferentSIDsAndAppendsEmptySIDs(t *testing.T) {
+	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		name      string
+		firstSID  string
+		secondSID string
+	}{
+		{name: "different SIDs", firstSID: "flow-1", secondSID: "flow-2"},
+		{name: "empty SIDs", firstSID: "", secondSID: ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ring := newRequestRing(0)
+			recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
+				SID: tt.firstSID, Time: base, Host: "first.example", DstAddr: "203.0.113.10:443", Network: "tcp",
+			})
+			recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
+				SID: tt.secondSID, Time: base.Add(time.Second), Host: "second.example", DstAddr: "198.51.100.20:443", Network: "tcp",
+			})
+
+			got := ring.list(0)
+			if len(got) != 2 {
+				t.Fatalf("Record(SIDs %q and %q) stored %d rows, want 2", tt.firstSID, tt.secondSID, len(got))
+			}
+			if got[0].Host != "second.example" || got[1].Host != "first.example" {
+				t.Errorf("Record(SIDs %q and %q) order = %q, %q, want second.example, first.example",
+					tt.firstSID, tt.secondSID, got[0].Host, got[1].Host)
+			}
+		})
+	}
+}
+
+func TestRequestRingMergeCapacityAndEviction(t *testing.T) {
+	ring := newRequestRing(2)
+	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	record := func(sid, host string, input uint64, timestamp time.Time) {
+		t.Helper()
+		recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
+			SID: sid, Time: timestamp, Host: host, DstAddr: "203.0.113.10:443", Network: "tcp", InputBytes: input,
+		})
+	}
+
+	record("a", "a", 1, base)
+	record("b", "b", 1, base.Add(time.Second))
+	record("a", "a-updated", 2, base.Add(2*time.Second))
+	got := ring.list(0)
+	if len(got) != 2 || got[0].Host != "b" || got[1].Host != "a" || got[1].InputBytes != 2 || !got[1].Time.Equal(base) {
+		t.Fatalf("append/merge(a) = %+v, want two rows b and a with merged bytes and earlier time", got)
+	}
+
+	record("c", "c", 1, base.Add(3*time.Second))
+	record("d", "d", 1, base.Add(4*time.Second))
+	record("a", "a-new", 3, base.Add(5*time.Second))
+	record("a", "a-new-updated", 4, base.Add(6*time.Second))
+	record("e", "e", 1, base.Add(7*time.Second))
+
+	got = ring.list(0)
+	if len(got) != 2 {
+		t.Fatalf("ring length after wrapped merges and evictions = %d, want 2", len(got))
+	}
+	if got[0].Host != "e" || got[1].Host != "a-new" || got[1].InputBytes != 4 || !got[1].Time.Equal(base.Add(5*time.Second)) {
+		t.Errorf("append/merge after eviction wrap = %+v, want e and a-new with merged bytes and earlier time", got)
+	}
+}
+
+func TestRequestRecorderFiltersBeforeSIDMerge(t *testing.T) {
+	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	for _, dst := range []string{"relay-peer-key", "8.8.8.8:53"} {
+		t.Run(dst, func(t *testing.T) {
+			ring := newRequestRing(0)
+			recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
+				SID: "filtered-merge", Time: base, Host: "kept.example", DstAddr: "203.0.113.10:443", Network: "tcp", InputBytes: 1,
+			})
+			recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
+				SID: "filtered-merge", Time: base.Add(time.Second), Host: "dropped.example", DstAddr: dst, Network: "udp",
+				InputBytes: 99, Duration: time.Second, Err: "must not merge",
+			})
+
+			got := ring.list(0)
+			if len(got) != 1 {
+				t.Fatalf("Record(filtered dst %q) stored %d rows, want the one kept row", dst, len(got))
+			}
+			if got[0].Host != "kept.example" || got[0].Dst != "203.0.113.10:443" || got[0].InputBytes != 1 || got[0].Err != "" {
+				t.Errorf("Record(filtered dst %q) changed the kept row: %+v", dst, got[0])
+			}
+		})
 	}
 }
 
@@ -449,5 +699,16 @@ func TestRestartRunningKeepsRequestHistory(t *testing.T) {
 	}).Requests(10)
 	if len(got) != 1 || got[0].Host != "before-restart.example" {
 		t.Fatalf("request history after restart = %+v, want the pre-restart record", got)
+	}
+}
+
+func recordRequestObject(t *testing.T, ring *requestRing, object xrecorder.HandlerRecorderObject) {
+	t.Helper()
+	data, err := json.Marshal(object)
+	if err != nil {
+		t.Fatalf("json.Marshal(HandlerRecorderObject SID %q) returned %v", object.SID, err)
+	}
+	if err := ring.Record(context.Background(), data); err != nil {
+		t.Fatalf("requestRing.Record(SID %q) returned %v", object.SID, err)
 	}
 }

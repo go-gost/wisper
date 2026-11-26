@@ -41,12 +41,14 @@ type Request struct {
 	OutputBytes uint64           `json:"output_bytes"`
 	DurationMS  int64            `json:"duration_ms"`
 	Err         string           `json:"err"`
+	sid         string
 }
 
 // requestRing is a fixed-size, concurrency-safe history. next is the oldest
 // slot once the ring is full; reads walk backward from it so the newest record
-// is always first. Non-IP-literal chain artifacts and port 53 DNS records are
-// excluded before storage.
+// is always first. Records with the same non-empty SID merge in place, and
+// non-IP-literal chain artifacts and port 53 DNS records are excluded before
+// storage.
 type requestRing struct {
 	mu       sync.RWMutex
 	records  []Request
@@ -88,6 +90,38 @@ func requestPath(path []xrecorder.PathHop) []RequestPathHop {
 	return out
 }
 
+// mergeRequests folds an incoming record for the same session into the stored
+// row without changing its position in the ring.
+func mergeRequests(existing, incoming Request) Request {
+	out := existing
+	if out.Host == "" {
+		out.Host = incoming.Host
+	}
+	if out.Dst == "" {
+		out.Dst = incoming.Dst
+	}
+	if out.Network == "" {
+		out.Network = incoming.Network
+	}
+	if out.Proto == "" {
+		out.Proto = incoming.Proto
+	}
+	out.Tunneled = out.Tunneled || incoming.Tunneled
+	out.InputBytes = max(out.InputBytes, incoming.InputBytes)
+	out.OutputBytes = max(out.OutputBytes, incoming.OutputBytes)
+	out.DurationMS = max(out.DurationMS, incoming.DurationMS)
+	if len(incoming.Path) > len(out.Path) {
+		out.Path = incoming.Path
+	}
+	if incoming.Err != "" {
+		out.Err = incoming.Err
+	}
+	if incoming.Time.Before(out.Time) {
+		out.Time = incoming.Time
+	}
+	return out
+}
+
 func (r *requestRing) append(req Request) {
 	if r == nil {
 		return
@@ -96,6 +130,15 @@ func (r *requestRing) append(req Request) {
 	defer r.mu.Unlock()
 	if len(r.records) == 0 {
 		r.records = make([]Request, defaultRequestRingCapacity)
+	}
+	if req.sid != "" {
+		for i := 0; i < r.count; i++ {
+			index := (r.next - 1 - i + len(r.records)) % len(r.records)
+			if r.records[index].sid == req.sid {
+				r.records[index] = mergeRequests(r.records[index], req)
+				return
+			}
+		}
 	}
 	r.records[r.next] = req
 	r.next = (r.next + 1) % len(r.records)
@@ -175,6 +218,7 @@ func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.
 		OutputBytes: ro.OutputBytes,
 		DurationMS:  ro.Duration.Milliseconds(),
 		Err:         ro.Err,
+		sid:         ro.SID,
 	})
 	return nil
 }
