@@ -169,7 +169,7 @@ export class EntrypointRequestsPage extends LitElement {
         ${(request.path ?? []).map(hop => html`
           <li>
             <span>${t('requestsHop', { n: hop.hop })} · ${hop.chain || '—'} · ${hop.node || '—'}</span>
-            <span>${hop.addr}</span>
+            <span class="path-address" title=${hop.addr}>${hop.addr}</span>
             <span>${formatDuration(hop.connect_ms * 1_000_000)}</span>
             ${hop.err ? html`<span class="request-error">${t('requestsFlowError')}: ${hop.err}</span>` : nothing}
           </li>
@@ -180,36 +180,32 @@ export class EntrypointRequestsPage extends LitElement {
 
   private _renderRequest(request: EntrypointRequest) {
     const destination = requestDestination(request);
+    const destinationLabel = `${destination.name}${destination.port ? `:${destination.port}` : ''}`;
     const rules = this._entrypoint?.options?.rules ?? [];
     const listed = rules.includes(destination.key);
-    const protocol = [request.network, request.proto].filter(Boolean).join('/');
+    const protocol = [request.network, request.proto].filter(Boolean).join(' · ');
+    const duration = `${(request.duration_ms / 1000).toFixed(1)} s`;
     const key = this._requestKey(request);
     const expanded = this._expanded.has(key);
     const hasPath = Boolean(request.path?.length);
     const rowError = this._rowErrors.get(destination.key);
-    const fields = html`
+    const actionLabel = listed
+      ? t('requestsRemoveRuleFor', { destination: destination.key })
+      : t('requestsAddRuleFor', { destination: destination.key });
+    const primary = html`
       <time datetime=${request.time}>${formatClockTime(Date.parse(request.time))}</time>
-      <span class="destination" title=${destination.name}>
+      <span class="destination" title=${destinationLabel}>
         ${destination.name}${destination.port ? html`<span class="destination-port">:${destination.port}</span>` : nothing}
       </span>
       <span class="route-badge ${request.tunneled ? 'tunnel' : 'direct'}">
         ${request.tunneled ? t('requestsTunnel') : t('requestsDirect')}
       </span>
-      ${protocol ? html`<span class="protocol">${protocol}</span>` : nothing}
-      <span class="traffic">${t('requestsTrafficValue', {
-        in: formatBytes(request.input_bytes),
-        out: formatBytes(request.output_bytes),
-      })}</span>
-      <span class="duration">${formatDuration(request.duration_ms * 1_000_000)}</span>
-      ${request.err
-        ? html`<span class="request-error" title=${request.err}>${request.err}</span>`
-        : nothing}
       ${hasPath
         ? html`
           <span class="path-chevron" aria-hidden="true">${icon(expanded ? 'chevron-down' : 'chevron-right')}</span>
           <span class="sr-only">${expanded
-            ? t('requestsPathHide', { destination: destination.name })
-            : t('requestsPathShow', { destination: destination.name })}</span>
+            ? t('requestsPathHide', { destination: destinationLabel })
+            : t('requestsPathShow', { destination: destinationLabel })}</span>
         `
         : nothing}
     `;
@@ -220,18 +216,28 @@ export class EntrypointRequestsPage extends LitElement {
           ${hasPath
             ? html`<button type="button" class="row-toggle"
                 aria-expanded=${expanded}
-                @click=${() => this._toggleExpanded(request)}>${fields}</button>`
-            : html`<div class="row-content">${fields}</div>`}
+                @click=${() => this._toggleExpanded(request)}>${primary}</button>`
+            : html`<div class="row-content">${primary}</div>`}
           ${destination.key
             ? html`<button type="button" class="rule-action"
-                aria-label=${listed
-                  ? t('requestsRemoveRuleFor', { destination: destination.key })
-                  : t('requestsAddRuleFor', { destination: destination.key })}
+                title=${actionLabel}
+                aria-label=${actionLabel}
                 ?disabled=${this._savingKey !== ''}
                 @click=${() => this._toggleRule(request)}>
-                <span aria-hidden="true">${icon(listed ? 'close' : 'plus')}</span>
-                <span>${listed ? t('requestsRemoveRule') : t('requestsAddRule')}</span>
+                <span aria-hidden="true">${icon(listed ? 'minus' : 'plus')}</span>
               </button>`
+            : nothing}
+        </div>
+        <div class="request-meta">
+          ${protocol ? html`<span class="protocol">${protocol}</span><span class="meta-separator">·</span>` : nothing}
+          <span class="traffic">${t('requestsTrafficValue', {
+            in: formatBytes(request.input_bytes),
+            out: formatBytes(request.output_bytes),
+          })}</span>
+          <span class="meta-separator">·</span>
+          <span class="duration">${duration}</span>
+          ${request.err
+            ? html`<span class="request-error" title=${request.err}>${request.err}</span>`
             : nothing}
         </div>
         ${rowError ? html`<div class="row-error" role="alert">${rowError}</div>` : nothing}
@@ -332,7 +338,7 @@ export class EntrypointRequestsPage extends LitElement {
     .auto-toggle[aria-pressed='true'] .toggle-track { background: var(--accent); }
     .auto-toggle[aria-pressed='true'] .toggle-knob { transform: translateX(12px); }
     .requests-panel {
-      margin: 16px; background: var(--surface); border: 1px solid var(--border-subtle);
+      min-width: 0; margin: 16px; background: var(--surface); border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg); overflow: hidden; container-type: inline-size;
     }
     .panel-header {
@@ -346,23 +352,26 @@ export class EntrypointRequestsPage extends LitElement {
       font-size: var(--font-sm); line-height: 1.4;
     }
     .requests-empty { padding: 32px 12px; text-align: center; color: var(--text-muted); font-size: var(--font-sm); }
-    .request-list { list-style: none; margin: 0; padding: 0; overflow-x: auto; }
-    .request-row { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); font-size: var(--font-sm); }
+    .request-list { list-style: none; min-width: 0; margin: 0; padding: 0; overflow-x: hidden; }
+    .request-row {
+      min-width: 0; padding: 6px 12px; border-bottom: 1px solid var(--border-subtle); font-size: var(--font-sm);
+    }
     .request-row:last-child { border-bottom: none; }
     .request-row:hover { background: var(--border-subtle); }
-    .request-line { display: flex; align-items: center; gap: 7px; min-width: max-content; }
+    .request-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .row-toggle, .row-content {
-      flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px;
+      flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px;
       border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: left;
       white-space: nowrap;
     }
     .row-toggle { cursor: pointer; }
-    .row-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
-    .request-row time, .traffic, .duration, .protocol {
+    .row-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 2px; }
+    .request-row time {
       color: var(--text-muted); font-family: var(--font-mono, 'SF Mono', monospace); flex-shrink: 0;
     }
     .destination {
-      max-width: 190px; overflow: hidden; text-overflow: ellipsis; color: var(--text); flex-shrink: 0;
+      flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; color: var(--text);
     }
     .destination-port { color: var(--text-muted); }
     .route-badge {
@@ -371,29 +380,45 @@ export class EntrypointRequestsPage extends LitElement {
     }
     .route-badge.tunnel { color: var(--info); background: var(--info-bg); }
     .route-badge.direct { color: var(--green-text); background: var(--green-bg); }
-    .request-error {
-      max-width: 170px; overflow: hidden; text-overflow: ellipsis; color: var(--red-text); flex-shrink: 0;
-    }
     .path-chevron { display: inline-flex; color: var(--text-muted); flex-shrink: 0; }
     .path-chevron svg { width: 12px; height: 12px; }
     .rule-action {
-      min-height: 26px; margin-left: 8px; padding: 2px 7px; display: inline-flex; align-items: center; gap: 4px;
+      flex: 0 0 24px; width: 24px; height: 24px; min-height: 24px; box-sizing: border-box;
+      padding: 0; display: inline-flex; align-items: center; justify-content: center;
       border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
-      background: var(--surface); color: var(--accent); font-family: inherit; font-size: var(--font-xs);
-      font-weight: 600; white-space: nowrap; cursor: pointer; flex-shrink: 0;
+      background: var(--surface); color: var(--accent); cursor: pointer; flex-shrink: 0;
     }
+    .rule-action > span { display: inline-flex; }
     .rule-action svg { width: 12px; height: 12px; }
-    .row-error { margin-top: 5px; color: var(--red-text); font-size: var(--font-xs); line-height: 1.4; }
+    .request-meta {
+      min-width: 0; margin-top: 2px; color: var(--text-muted); font-size: var(--font-xs);
+      line-height: 1.4; overflow-wrap: anywhere;
+    }
+    .protocol, .traffic, .duration {
+      color: var(--text-muted); font-family: var(--font-mono, 'SF Mono', monospace);
+    }
+    .meta-separator { color: var(--text-muted); }
+    .request-error {
+      display: block; min-width: 0; max-width: 100%; margin-top: 2px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; color: var(--red-text);
+    }
+    .row-error {
+      min-width: 0; margin-top: 5px; color: var(--red-text); font-size: var(--font-xs);
+      line-height: 1.4; overflow-wrap: anywhere;
+    }
     .path-heading { margin-top: 6px; color: var(--text-muted); font-size: var(--font-xs); font-weight: 600; }
     .request-path {
-      margin: 2px 0 0; padding: 0; list-style: none; color: var(--text-muted); font-size: var(--font-xs);
+      min-width: 0; margin: 2px 0 0; padding: 0; list-style: none; color: var(--text-muted); font-size: var(--font-xs);
     }
-    .request-path li { display: flex; align-items: center; gap: 8px; min-width: 0; line-height: 1.6; }
-    .request-path li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .request-path li {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; line-height: 1.5;
+    }
+    .request-path li > span { min-width: 0; overflow-wrap: anywhere; }
+    .request-path .path-address { flex: 1 1 100%; }
     .request-path .request-error { color: var(--red-text); }
     .showing-count { padding: 8px 12px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--font-xs); }
     @media (pointer: coarse) {
-      .back-btn, .auto-toggle, .refresh-button, .rule-action { min-height: 36px; }
+      .back-btn, .auto-toggle, .refresh-button { min-height: 36px; }
     }
   `;
 }

@@ -283,7 +283,7 @@ const zh: Record<string, string> = {
   requestsDestination: '目标',
   requestsProtocol: '协议',
   requestsTraffic: '流量',
-  requestsTrafficValue: '↓ {out} · ↑ {in}',
+  requestsTrafficValue: '↑ {in} · ↓ {out}',
   requestsDuration: '耗时',
   requestsFlowError: '错误',
   hubNoReflowTitle: 'hub 无回流：只发包、无回包',

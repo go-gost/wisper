@@ -6,29 +6,46 @@ export interface RequestDestination {
   port: string;
 }
 
-/** Split a destination into the compact host/address and port the list shows. */
-export function requestDestination(request: Pick<EntrypointRequest, 'host' | 'dst'>): RequestDestination {
-  const dst = request.dst.trim();
-  let address = dst;
-  let port = '';
+interface EndpointParts {
+  address: string;
+  port: string;
+  ipv6: boolean;
+}
 
-  if (dst.startsWith('[')) {
-    const end = dst.indexOf(']');
+function splitEndpoint(value: string): EndpointParts {
+  if (value.startsWith('[')) {
+    const end = value.indexOf(']');
     if (end > 0) {
-      address = dst.slice(1, end);
-      const suffix = dst.slice(end + 1);
-      if (/^:\d+$/.test(suffix)) port = suffix.slice(1);
-    }
-  } else {
-    const match = dst.match(/^(.*):(\d+)$/);
-    if (match && !match[1].includes(':')) {
-      address = match[1];
-      port = match[2];
+      const suffix = value.slice(end + 1);
+      return {
+        address: value.slice(1, end),
+        port: /^:\d+$/.test(suffix) ? suffix.slice(1) : '',
+        ipv6: true,
+      };
     }
   }
 
-  const host = request.host.trim();
-  return { key: host || address, name: host || address, port };
+  const separator = value.indexOf(':');
+  if (separator > 0 && separator === value.lastIndexOf(':')) {
+    const port = value.slice(separator + 1);
+    if (/^\d+$/.test(port)) {
+      return { address: value.slice(0, separator), port, ipv6: false };
+    }
+  }
+
+  return { address: value, port: '', ipv6: value.includes(':') };
+}
+
+/** Split a destination into the compact host/address and port the list shows. */
+export function requestDestination(request: Pick<EntrypointRequest, 'host' | 'dst'>): RequestDestination {
+  const dst = splitEndpoint(request.dst.trim());
+  const hostValue = request.host.trim();
+  const host = hostValue ? splitEndpoint(hostValue) : null;
+  const endpoint = host ?? dst;
+  const address = endpoint.ipv6 ? `[${endpoint.address}]` : endpoint.address;
+  const port = host?.port || dst.port;
+
+  return { key: hostValue || dst.address, name: address, port };
 }
 
 export function requestDestinationLabel(request: Pick<EntrypointRequest, 'host' | 'dst'>): string {

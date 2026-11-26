@@ -291,7 +291,7 @@ const en: Record<string, string> = {
   requestsDestination: 'Destination',
   requestsProtocol: 'Protocol',
   requestsTraffic: 'Traffic',
-  requestsTrafficValue: '↓ {out} · ↑ {in}',
+  requestsTrafficValue: '↑ {in} · ↓ {out}',
   requestsDuration: 'Duration',
   requestsFlowError: 'Error',
   hubNoReflowTitle: 'No return traffic from the hub',

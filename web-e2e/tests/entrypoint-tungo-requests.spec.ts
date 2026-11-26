@@ -45,6 +45,18 @@ const FLOWS = [
     duration_ms: 0,
     err: 'lookup failed',
   },
+  {
+    time: '2026-11-26T12:00:00Z',
+    host: '',
+    dst: '[2001:4860:4860::8888]:443',
+    network: 'tcp',
+    proto: 'tls',
+    tunneled: false,
+    input_bytes: 128,
+    output_bytes: 256,
+    duration_ms: 1900,
+    err: '',
+  },
 ];
 
 function entrypoint(rules = ['192.0.2.20']) {
@@ -130,10 +142,10 @@ test('renders compact newest-first tunnel and direct flows and polls on the two-
   const requestsPage = page.locator('entrypoint-requests-page');
   await expect(requestsPage).toBeVisible();
   await expect(requestsPage.getByRole('heading', { name: 'Recent requests' })).toBeVisible();
-  await expect(requestsPage.locator('.requests-count')).toHaveText('3 requests');
+  await expect(requestsPage.locator('.requests-count')).toHaveText('4 requests');
   const rows = requestsPage.locator('.request-row');
-  await expect(rows).toHaveCount(3);
-  await expect(rows.first()).toHaveCSS('padding', '8px 12px');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.first()).toHaveCSS('padding', '6px 12px');
   await expect(requestsPage.locator('.requests-panel')).toBeVisible();
 
   const tunneled = rows.nth(0);
@@ -141,10 +153,10 @@ test('renders compact newest-first tunnel and direct flows and polls on the two-
   await expect(tunneled).toContainText(':443');
   await expect(tunneled).not.toContainText('198.51.100.10');
   await expect(tunneled.locator('.route-badge')).toHaveText('Tunnel');
-  await expect(tunneled).toContainText('tcp/http');
+  await expect(tunneled).toContainText('tcp · http');
   await expect(tunneled).toContainText('1.00 KB');
   await expect(tunneled).toContainText('2.00 KB');
-  await expect(tunneled).toContainText('12.00ms');
+  await expect(tunneled).toContainText('0.0 s');
   await expect(tunneled.locator('time')).toHaveText(/^\d{2}:\d{2}:\d{2}$/);
 
   const direct = rows.nth(1);
@@ -153,9 +165,13 @@ test('renders compact newest-first tunnel and direct flows and polls on the two-
 
   const udp = rows.nth(2);
   await expect(udp).toContainText('198.51.100.53:5353');
-  await expect(udp).toContainText('udp/dns');
+  await expect(udp).toContainText('udp · dns');
   await expect(udp.locator('.route-badge')).toHaveText('Tunnel');
   await expect(udp.locator('.request-error')).toContainText('lookup failed');
+
+  const ipv6 = rows.nth(3);
+  await expect(ipv6.locator('.destination')).toHaveText('[2001:4860:4860::8888]:443');
+  await expect(ipv6).toContainText('1.9 s');
 
   // Path hops stay out of the default one-line row and expand from it. The
   // row's accessible name keeps its facts instead of only saying "Show path".
@@ -173,6 +189,70 @@ test('renders compact newest-first tunnel and direct flows and polls on the two-
   await expect.poll(() => mock.requestCalls()).toBe(1);
   await page.clock.runFor(2000);
   await expect.poll(() => mock.requestCalls()).toBe(2);
+});
+
+test.describe('phone-width request rows', () => {
+  test.use({ viewport: { width: 360, height: 800 } });
+
+  test('keeps every row and rule action inside the viewport', async ({ page }) => {
+    await mockEntrypoint(page);
+    await page.goto(REQUESTS);
+
+    const requestsPage = page.locator('entrypoint-requests-page');
+    const rows = requestsPage.locator('.request-row');
+    await expect(rows).toHaveCount(FLOWS.length);
+    const viewport = page.viewportSize()!;
+
+    for (const row of await rows.all()) {
+      const size = await row.evaluate(element => ({
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+      }));
+      expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth + 1);
+
+      const action = row.locator('.rule-action');
+      await expect(action).toBeVisible();
+      await expect(action).toHaveAttribute('title', /Add to rules|Remove from rule/);
+      await expect(action).toHaveCSS('width', '24px');
+      await expect(action).toHaveCSS('height', '24px');
+      const actionBox = await action.boundingBox();
+      expect(actionBox).not.toBeNull();
+      expect(actionBox!.x).toBeGreaterThanOrEqual(0);
+      expect(actionBox!.y).toBeGreaterThanOrEqual(0);
+      expect(actionBox!.x + actionBox!.width).toBeLessThanOrEqual(viewport.width);
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(viewport.height);
+
+      const destination = row.locator('.destination');
+      const destinationSize = await destination.evaluate(element => ({
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        textOverflow: getComputedStyle(element).textOverflow,
+        whiteSpace: getComputedStyle(element).whiteSpace,
+        overflowX: getComputedStyle(element).overflowX,
+      }));
+      expect(destinationSize.scrollWidth).toBeGreaterThanOrEqual(destinationSize.clientWidth);
+      expect(destinationSize.textOverflow).toBe('ellipsis');
+      expect(destinationSize.whiteSpace).toBe('nowrap');
+      expect(destinationSize.overflowX).toBe('hidden');
+    }
+
+    const ipv6 = rows.nth(3);
+    await expect(ipv6.locator('.destination')).toHaveText('[2001:4860:4860::8888]:443');
+    const ipv6Destination = await ipv6.locator('.destination').evaluate(element => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }));
+    expect(ipv6Destination.scrollWidth).toBeGreaterThan(ipv6Destination.clientWidth);
+
+    const expandedRow = rows.first();
+    await expandedRow.locator('.row-toggle').click();
+    await expect(expandedRow.locator('.request-path')).toBeVisible();
+    const expandedSize = await expandedRow.evaluate(element => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }));
+    expect(expandedSize.scrollWidth).toBeLessThanOrEqual(expandedSize.clientWidth + 1);
+  });
 });
 
 test('adds a host to the rules and removes an already listed destination', async ({ page }) => {
@@ -205,7 +285,7 @@ test('turning auto refresh off stops the timer while manual refresh still works'
   await page.goto(REQUESTS);
 
   const requestsPage = page.locator('entrypoint-requests-page');
-  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  await expect(requestsPage.locator('.request-row')).toHaveCount(4);
   const auto = requestsPage.getByRole('button', { name: 'Auto', exact: true });
   await expect(auto).toHaveAttribute('aria-pressed', 'true');
   await auto.click();
@@ -215,7 +295,7 @@ test('turning auto refresh off stops the timer while manual refresh still works'
 
   await requestsPage.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(() => mock.requestCalls()).toBe(2);
-  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  await expect(requestsPage.locator('.request-row')).toHaveCount(4);
 });
 
 test('pauses the timer while the page is hidden and resumes when visible', async ({ page }) => {
@@ -226,7 +306,7 @@ test('pauses the timer while the page is hidden and resumes when visible', async
   await page.goto(REQUESTS);
 
   const requestsPage = page.locator('entrypoint-requests-page');
-  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  await expect(requestsPage.locator('.request-row')).toHaveCount(4);
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -248,10 +328,10 @@ test('a failed refresh keeps the last rows and shows an inline error', async ({ 
   await page.goto(REQUESTS);
 
   const requestsPage = page.locator('entrypoint-requests-page');
-  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  await expect(requestsPage.locator('.request-row')).toHaveCount(4);
   await requestsPage.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(requestsPage.locator('.requests-error')).toContainText('Could not load recent requests');
-  await expect(requestsPage.locator('.request-row')).toHaveCount(3);
+  await expect(requestsPage.locator('.request-row')).toHaveCount(4);
   expect(mock.requestCalls()).toBe(2);
 });
 
