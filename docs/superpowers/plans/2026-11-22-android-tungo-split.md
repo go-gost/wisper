@@ -1402,6 +1402,13 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
     `path` 取更长、`tunneled` 取或、err 取更新者、时间取更早；空 SID 不合并。
   - **改成二级页面**（`4eca132`）：详情页只保留一个「最近请求」入口卡片（图标 + 标题 + 最新一条的摘要 + chevron），
     列表移到 `/entrypoint/:type/:id/requests`，与「历史事件」页同构（自己的取数、定时器与返回路径）。
+  - **窄屏不再横向溢出**（`640e71b`）：真机 420px 下原布局把字节/耗时/“加规则”按钮整块裁掉。改成两行：
+    第一行 时间 · 目标（`flex:1` + 省略号，IPv6 加方括号）· Tunnel/Direct 徽标 · 展开箭头 · 动作按钮；
+    第二行 `network · proto · ↑in ↓out · 耗时`，错误红色截断。e2e 在 360×800 下断言每行
+    `scrollWidth <= clientWidth`、动作按钮的 bounding box 完全在视口内、IPv6 fixture 带括号。
+  - **规则匹配改为「覆盖」而非字符串全等**（`616c0fd`）：key 取裸主机名（不再带端口）；`.suffix` 覆盖 apex 与子域，
+    CIDR 覆盖其中的 IP（v4/v6）；行内三态 —— 精确规则 `－` 移除、被更宽规则覆盖显示灰勾（title 写明被哪条覆盖）、
+    否则 `＋` 添加裸主机名。
   - **行密度对齐 inspector**：单行 `padding 6–8px 12px`、`font-size: var(--font-sm)`，时间/目标/徽标/字节/耗时/错误
     一行放完，`path` hops 折叠在点击展开的第二行，不再用表格或卡片。
 
