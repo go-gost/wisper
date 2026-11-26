@@ -230,8 +230,8 @@ app → VpnService(tun fd) → x/listener/tungo → x/handler/tungo（gVisor 栈
 - **语义与 pi 的 `bypass-gfw` 完全相同**：`matched == whitelist` → 走代理。清单里 → 进隧道；
   不在清单里 → 直连。
 - 三种条目：① 需要代理的域名（与 pi 的 `gost:bypass:gfw` 对齐）；② 内网域名（写成前导点
-  形式，如 `.home.pi`、`.gost.local`、`dadax`）—— 匹配器按整名匹配，`home.pi` 只命中这一个
-  名字，`.home.pi` 才命中它及其下所有子域名；内网服务按子域名访问，所以这些条目就是内网访问的
+  形式，如 `.example.com`、`.gost.local`、`dadax`）—— 匹配器按整名匹配，`example.com` 只命中这一个
+  名字，`.example.com` 才命中它及其下所有子域名；内网服务按子域名访问，所以这些条目就是内网访问的
   主路径；③ `192.168.100.0/24`（给 DNS 用，也是按 IP 访问时的兜底）。
 - **判定用的地址**：`Router.Dial` 收到的那个地址 —— TCP 嗅到 SNI/Host 时是 `host:port`，嗅不到
   时是原始 `dstIP:port`；UDP 永远只有 `dstIP:port`。手机的默认动作是「不下发域名 → 直连」，

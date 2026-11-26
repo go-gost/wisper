@@ -1184,21 +1184,43 @@ func entrypointOptions(t *testing.T, body map[string]any) map[string]any {
 func TestEntrypointCreateTungoSafeDevice(t *testing.T) {
 	const peer = "dlDU8quxCanhD3AUC--KX3F1jhYoc-OjICF-Lez8FhA"
 
-	t.Run("no routes is refused", func(t *testing.T) {
-		srv := setupTestServer(t)
-		defer srv.Close()
+	t.Run("no routes defaults to full capture", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			routes any
+		}{
+			{name: "omitted"},
+			{name: "empty", routes: ""},
+			{name: "blank", routes: " \t "},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				srv := setupTestServer(t)
+				defer srv.Close()
+				useGostLogger(t)
 
-		resp, body := postJSON(t, srv.URL+"/api/entrypoints", map[string]any{
-			"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
-		})
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("create with no routes = %d: %v, want 400", resp.StatusCode, body)
-		}
-		if msg, _ := body["error"].(string); !strings.Contains(msg, "routes") {
-			t.Errorf("error = %q, want it to name routes", msg)
-		}
-		if n := entrypoint.Count(); n != 0 {
-			t.Errorf("%d entrypoints registered after a rejected create, want 0", n)
+				req := map[string]any{
+					"type": "tungo", "name": "phone", "net": "10.20.0.250/32", "peer": peer,
+					"device_name": refusedDeviceName,
+				}
+				if tc.routes != nil {
+					req["routes"] = tc.routes
+				}
+				resp, body := postJSON(t, srv.URL+"/api/entrypoints", req)
+				if resp.StatusCode != http.StatusCreated {
+					t.Fatalf("create with %s routes = %d: %v, want 201", tc.name, resp.StatusCode, body)
+				}
+				id, _ := body["id"].(string)
+				defer entrypoint.Delete(id)
+				requireStartRefused(t, id)
+
+				opts := entrypointOptions(t, body)
+				if got, _ := opts["routes"].(string); got != "0.0.0.0/0, ::/0" {
+					t.Errorf("routes = %q, want both catch-alls for full capture", got)
+				}
+				if got, _ := opts["dns"].(string); got != "192.168.100.100" {
+					t.Errorf("dns = %q, want the default resolver when full capture reaches it", got)
+				}
+			})
 		}
 	})
 

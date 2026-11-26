@@ -195,9 +195,10 @@ func validateTungoEntryPoint(r *entrypointCreateRequest) error {
 	return nil
 }
 
-// The two catch-alls a split's device needs. A device that captures only one
-// address family sends every flow of the other one around the tunnel — the one
-// leak this tool cannot have — so neither catch-all travels without the other.
+// The two catch-alls a split defaults to when its route list is empty. A device
+// that captures only one address family sends every flow of the other one around
+// the tunnel — the one leak this tool cannot have — so neither catch-all travels
+// without the other.
 const (
 	catchAllV4 = "0.0.0.0/0"
 	catchAllV6 = "::/0"
@@ -210,12 +211,12 @@ const (
 // the phone's own resolver".
 const tungoDefaultDNS = "192.168.100.100"
 
-// validateTungoSplit refuses the device that cannot work and normalises the one
-// that would leak, in place and before the entrypoint is built, so the value
-// that is stored is the safe one:
+// validateTungoSplit normalises the split's device fields in place and before
+// the entrypoint is built, so the value that is stored is the safe one:
 //
-//   - no routes at all captures nothing: every flow leaves on the phone's own
-//     network while the entrypoint still looks healthy, so it is refused;
+//   - an empty route list defaults to both catch-alls, capturing all traffic;
+//     the split rules then decide which flows use the tunnel and which go direct.
+//     A narrow list is a deliberate choice and is left exactly as written;
 //   - a catch-all without the other family's one leaks that family around the
 //     split, so the missing catch-all is appended (a named-subnet split, with
 //     neither catch-all, is left exactly as written);
@@ -226,7 +227,7 @@ const tungoDefaultDNS = "192.168.100.100"
 //     traffic into the tunnel the operator deliberately kept out.
 func validateTungoSplit(r *entrypointCreateRequest) error {
 	if strings.TrimSpace(r.Routes) == "" {
-		return fmt.Errorf("routes is required: a split entrypoint with no routes captures nothing, e.g. %q", catchAllV4+", "+catchAllV6)
+		r.Routes = catchAllV4 + ", " + catchAllV6
 	}
 	r.Routes = withCatchAlls(r.Routes)
 	if strings.TrimSpace(r.DNS) == "" && routesReach(r.Routes, tungoDefaultDNS) {
