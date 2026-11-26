@@ -1380,6 +1380,24 @@ cd wisper && git add docs/tun-integration.md && git commit -m "docs: document th
 - **回滚方式:** 把 pixel-9 加回 `p2p-tun` 的 peers（`PUT /api/tunnels/<p2p-tun>/peers`），并从 `gw-split`
   移除；停掉手机上的 `tungo` entrypoint、启动旧 `tun` entrypoint。pi 的 `relay-phone` 可以留着（只绑回环，
   无流量就不用）。
+
+**追加（2026-11-26，用户在使用后提出）：详情页的「最近请求」列表**
+- 数据来源：`x/handler/tungo` 每条流的 `HandlerRecorderObject`，经 recorder 直接进入 entrypoint 的内存环形缓冲
+  （**500 条/入口点**，进程内、并发安全），不解析日志、不额外网络跳、不改 `x/`。
+- **判据用结构化 `Path` 而不是旧的 `route` 字符串**：任一 hop 的 `chain`/`node` 非空 ⇒ 经链节点（隧道）；
+  只有 target hop ⇒ 直连；`Path` 为空的 UDP 用实时链判定兜底（`ch.Route(...)` 有节点即隧道）。
+- 两条数据清洗（真机记录发现）：`dst` 主机部分不是 IP 字面量的记录（链节点伪记录，每条嗅探流都会多一条且
+  `tunneled` 为假、错误为 `read response: context canceled`）一律丢弃；端口 53 的 DNS 记录不入 ring
+  （否则每次查询都占一格，真实请求会被挤出窗口）。
+- 接口：`GET /api/entrypoints/{id}/requests?limit=N`（新→旧，默认 50、上限 500）；
+  `PUT /api/entrypoints/{id}/rules`（走 `RuleSetter.SetRules` 原地生效，不重建、不 flap VPN）。
+- UI：详情页「最近请求」卡片，2 秒自动刷新（可关；页面隐藏或卡片折叠时暂停）+ 手动刷新；行内显示时间、
+  域名/IP、网络协议、Tunnel/Direct 徽标、字节、耗时、错误与可展开的 path hops；行尾 `Add to rules` /
+  `Remove from rule` 一键改规则。渲染上限 200 行并提示总数。
+- 提交：`797c632`（ring/recorder/API）、`1a8eaa1`（Path 判据 + 清洗）、`27b2ab2`（UI），均已推送；
+  门禁 `-race`、`make typecheck/ui-test`（51 passed）、`make web`、`go test ./api/`。
+- 已知口径：HTTP 嗅探路径的请求记录只有请求侧字节（下行记 0），属 x 侧计数口径，未在本计划内改动。
+
 - **遗留/限制:** i) 这台 Wi-Fi 无 v6，v6 穿越未验证；ii) 全捕获在无 v6 网络下会把 v6 流打进栈并立刻失败，
   日志 error 偏吵（v1 行为，与 ss-android 同类）；iii) HTTP/1.0（无 `Connection` 头）的请求在嗅探路径上
   没有拿到响应，HTTP/1.1 正常 —— 真实客户端不会这么发，未进一步追。
