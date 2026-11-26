@@ -164,6 +164,11 @@ func (s *tungoEntryPoint) init() error {
 		Handler: &xconfig.HandlerConfig{
 			Type:  "tungo",
 			Chain: s.opts.Name,
+			Metadata: map[string]any{
+				"sniffing":          true,
+				"sniffing.timeout":  time.Second,
+				"sniffing.fallback": true,
+			},
 		},
 		Listener: &xconfig.ListenerConfig{
 			Type: "tungo",

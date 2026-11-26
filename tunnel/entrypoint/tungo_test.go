@@ -172,6 +172,17 @@ func TestTungoEntryPointServiceConfig(t *testing.T) {
 	if svc.Handler.Chain != svc.Name {
 		t.Errorf("handler chain = %q, want the service's own chain %q", svc.Handler.Chain, svc.Name)
 	}
+	// Domain rules can match only if the handler reads the HTTP Host or TLS
+	// server name before routing; unknown protocols fall back to the IP.
+	if got := svc.Handler.Metadata["sniffing"]; got != true {
+		t.Errorf("handler metadata sniffing = %v, want true", got)
+	}
+	if got := svc.Handler.Metadata["sniffing.timeout"]; got != time.Second {
+		t.Errorf("handler metadata sniffing.timeout = %v, want %v", got, time.Second)
+	}
+	if got := svc.Handler.Metadata["sniffing.fallback"]; got != true {
+		t.Errorf("handler metadata sniffing.fallback = %v, want true", got)
+	}
 	if svc.Bypass != "" || len(svc.Bypasses) != 0 {
 		t.Errorf("service carries a bypass (%q/%v): a service-level hit drops the conn instead of dialling direct",
 			svc.Bypass, svc.Bypasses)
@@ -279,6 +290,24 @@ func TestTungoEntryPointServiceConfig(t *testing.T) {
 	}
 	if registry.BypassRegistry().IsRegistered(rulesName) {
 		t.Errorf("%s still registered after Close", rulesName)
+	}
+}
+
+// TestTungoEntryPointSniffingIsTungoOnly keeps the domain-splitting behavior
+// scoped to the userspace stack; the ordinary tun handler forwards packets.
+func TestTungoEntryPointSniffingIsTungoOnly(t *testing.T) {
+	ep := NewTunEntryPoint(
+		tp.IDOption("tun-no-sniffing"),
+		tp.PeerOption(testPeerKey),
+		tp.NetOption("10.10.0.2/24"),
+	)
+	s := ep.(*tunEntryPoint)
+	if err := s.init(); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	if got, ok := s.config.Services[0].Handler.Metadata["sniffing"]; ok {
+		t.Errorf("tun handler metadata carries sniffing (%v): domain splitting is tungo-only", got)
 	}
 }
 
