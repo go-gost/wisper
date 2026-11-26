@@ -155,6 +155,45 @@ func TestRequestRecorderIgnoresMalformedRecords(t *testing.T) {
 	}
 }
 
+func TestRequestRecorderFiltersChainArtifactsAndDNS(t *testing.T) {
+	tests := []struct {
+		name      string
+		dst       string
+		network   string
+		wantCount int
+	}{
+		{name: "bare peer key", dst: "gfyuoMdKHdqS-example", network: "tcp", wantCount: 0},
+		{name: "udp DNS", dst: "8.8.8.8:53", network: "udp", wantCount: 0},
+		{name: "tcp DNS", dst: "8.8.8.8:53", network: "tcp", wantCount: 0},
+		{name: "IPv4 destination", dst: "149.154.167.99:80", network: "tcp", wantCount: 1},
+		{name: "IPv6 destination", dst: "[2001:db8::1]:443", network: "tcp", wantCount: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ring := newRequestRing(0)
+			data, err := json.Marshal(xrecorder.HandlerRecorderObject{
+				Time:     time.Now(),
+				DstAddr:  tt.dst,
+				Network:  tt.network,
+				Duration: time.Millisecond,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ring.Record(context.Background(), data); err != nil {
+				t.Fatalf("Record(%q) returned %v, want nil", tt.dst, err)
+			}
+			got := ring.list(0)
+			if len(got) != tt.wantCount {
+				t.Fatalf("Record(%q) stored %d rows, want %d", tt.dst, len(got), tt.wantCount)
+			}
+			if tt.wantCount > 0 && got[0].Dst != tt.dst {
+				t.Errorf("Record(%q) stored dst %q, want %q", tt.dst, got[0].Dst, tt.dst)
+			}
+		})
+	}
+}
+
 func TestRequestRecorderClassifiesUDPWithoutRoute(t *testing.T) {
 	ring := newRequestRing(0)
 	ring.setTunneledClassifier(func(ctx context.Context, network, host, dst string) bool {
@@ -164,7 +203,7 @@ func TestRequestRecorderClassifiesUDPWithoutRoute(t *testing.T) {
 		data, err := json.Marshal(xrecorder.HandlerRecorderObject{
 			Time:     time.Now(),
 			Host:     host,
-			DstAddr:  "203.0.113.53:53",
+			DstAddr:  "203.0.113.53:5353",
 			Network:  "udp",
 			Duration: time.Millisecond,
 		})
@@ -204,7 +243,7 @@ func TestTungoUDPRecorderUsesLiveRules(t *testing.T) {
 		data, err := json.Marshal(xrecorder.HandlerRecorderObject{
 			Time:     time.Now(),
 			Host:     host,
-			DstAddr:  "203.0.113.53:53",
+			DstAddr:  "203.0.113.53:5353",
 			Network:  "udp",
 			Duration: time.Millisecond,
 		})
@@ -217,11 +256,11 @@ func TestTungoUDPRecorderUsesLiveRules(t *testing.T) {
 		return ep.Requests(1)[0]
 	}
 
-	if got := record("203.0.113.53:53"); !got.Tunneled {
+	if got := record("203.0.113.53:5353"); !got.Tunneled {
 		t.Error("a UDP destination selected by the live rule was recorded as direct")
 	}
 	ep.SetRules([]string{"198.51.100.0/24"})
-	if got := record("203.0.113.53:53"); got.Tunneled {
+	if got := record("203.0.113.53:5353"); got.Tunneled {
 		t.Error("a UDP destination dropped by a live rule edit was still recorded as tunneled")
 	}
 }

@@ -3,6 +3,7 @@ package entrypoint
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +36,8 @@ type Request struct {
 
 // requestRing is a fixed-size, concurrency-safe history. next is the oldest
 // slot once the ring is full; reads walk backward from it so the newest record
-// is always first.
+// is always first. Non-IP-literal chain artifacts and port 53 DNS records are
+// excluded before storage.
 type requestRing struct {
 	mu       sync.RWMutex
 	records  []Request
@@ -49,6 +51,14 @@ func newRequestRing(capacity int) *requestRing {
 		capacity = defaultRequestRingCapacity
 	}
 	return &requestRing{records: make([]Request, capacity)}
+}
+
+func isRecordableDestination(dst string) bool {
+	host, port, err := net.SplitHostPort(dst)
+	if err != nil {
+		host = dst
+	}
+	return net.ParseIP(host) != nil && port != "53"
 }
 
 func (r *requestRing) append(req Request) {
@@ -96,14 +106,18 @@ func (r *requestRing) list(limit int) []Request {
 }
 
 // Record implements recorder.Recorder for handler-level tungo flow records.
-// Malformed payloads are deliberately ignored: request history must never take
-// down the data path that produced it.
+// Malformed payloads, non-IP-literal chain artifacts and port 53 DNS records
+// are deliberately ignored: request history must never take down the data path
+// that produced it.
 func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.RecordOption) error {
 	if r == nil {
 		return nil
 	}
 	var ro xrecorder.HandlerRecorderObject
 	if err := json.Unmarshal(data, &ro); err != nil || ro.Time.IsZero() || ro.Network == "" || ro.DstAddr == "" {
+		return nil
+	}
+	if !isRecordableDestination(ro.DstAddr) {
 		return nil
 	}
 	tunneled := strings.Contains(ro.Route, " > ")
