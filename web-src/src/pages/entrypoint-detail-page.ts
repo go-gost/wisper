@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
@@ -63,6 +64,11 @@ export class EntrypointDetailPage extends LitElement {
   /** A tungo entrypoint's split list, as the text box holds it: one destination
    *  per line. Converted to the API's array on save and back on load. */
   @state() private _rules = '';
+  @state() private _rulesSearch = '';
+  @state() private _newRule = '';
+  @state() private _rulesEditorOpen = false;
+  @state() private _rulesDraft = '';
+  private _rulesEditorTrigger: HTMLElement | null = null;
   // LAN sharing: the subnets of this node's own LAN that the hub may approve
   // for its peers (empty disables), and the backend that runs them — the
   // spoke's half of the hub's share_lan. Same fields, same defaults.
@@ -99,9 +105,21 @@ export class EntrypointDetailPage extends LitElement {
   disconnectedCallback() {
     window.clearInterval(this._poll);
     this._poll = 0;
+    this._setRulesBackgroundInert(false);
     super.disconnectedCallback();
     for (const fn of this._unsubs) fn();
     this._unsubs = [];
+  }
+
+  protected updated(changed: PropertyValues) {
+    if (!changed.has('_rulesEditorOpen')) return;
+    this._setRulesBackgroundInert(this._rulesEditorOpen);
+    if (this._rulesEditorOpen) {
+      this.renderRoot.querySelector<HTMLTextAreaElement>('.rules-bulk-textarea')?.focus();
+    } else {
+      this._rulesEditorTrigger?.focus();
+      this._rulesEditorTrigger = null;
+    }
   }
 
   private _load() {
@@ -148,6 +166,11 @@ export class EntrypointDetailPage extends LitElement {
     this._routes = '';
     this._dns = '';
     this._rules = '';
+    this._rulesSearch = '';
+    this._newRule = '';
+    this._rulesEditorOpen = false;
+    this._rulesDraft = '';
+    this._rulesEditorTrigger = null;
     this._shareLAN = '';
     this._shareMode = 'auto';
     this._direct = false;
@@ -173,6 +196,89 @@ export class EntrypointDetailPage extends LitElement {
     this._shareLAN = ep.options?.share_lan ?? '';
     this._shareMode = ep.options?.share_mode || 'auto';
     this._direct = ep.options?.direct === true;
+  }
+
+  // ── Split rules ──────────────────────────────────────────────────────
+
+  private _ruleLines(): { line: number; value: string }[] {
+    return this._rules
+      .split('\n')
+      .map((value, line) => ({ line, value: value.trim() }))
+      .filter((rule) => rule.value !== '');
+  }
+
+  private _ruleCountLabel(value = this._rules): string {
+    const n = value.split('\n').map((rule) => rule.trim()).filter(Boolean).length;
+    return n ? t('rulesCount', { n }) : t('rulesEmptyDirect');
+  }
+
+  private _matchingRules(): { line: number; value: string }[] {
+    const query = this._rulesSearch.trim().toLocaleLowerCase();
+    if (!query) return [];
+    return this._ruleLines()
+      .filter((rule) => rule.value.toLocaleLowerCase().includes(query))
+      .slice(0, 50);
+  }
+
+  private _removeRule(line: number) {
+    const lines = this._rules.split('\n');
+    lines.splice(line, 1);
+    this._rules = lines.join('\n');
+  }
+
+  private _addRule() {
+    const value = this._newRule.trim();
+    if (!value || this._ruleLines().some((rule) => rule.value === value)) {
+      this._newRule = '';
+      return;
+    }
+    const base = this._rules.trimEnd();
+    this._rules = base ? `${base}\n${value}` : value;
+    this._newRule = '';
+  }
+
+  private _openRulesEditor(event: Event) {
+    this._rulesEditorTrigger = event.currentTarget as HTMLElement;
+    this._rulesDraft = this._rules;
+    this._rulesEditorOpen = true;
+  }
+
+  private _closeRulesEditor(commit: boolean) {
+    if (commit) this._rules = this._rulesDraft;
+    this._rulesEditorOpen = false;
+  }
+
+  private _setRulesBackgroundInert(inert: boolean) {
+    this.renderRoot.querySelector('app-scaffold')?.toggleAttribute('inert', inert);
+  }
+
+  private _handleRulesEditorKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this._closeRulesEditor(false);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const panel = this.renderRoot.querySelector<HTMLElement>('.rules-editor-panel');
+    if (!panel) return;
+    const focusable = Array.from(
+      panel.querySelectorAll<HTMLElement>(
+        'textarea:not([disabled]), input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    if (!focusable.length) return;
+
+    const active = (panel.getRootNode() as ShadowRoot).activeElement;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   /** _renderTransport is the peer's path: one word, plus a tappable ⓘ whose
@@ -817,6 +923,143 @@ export class EntrypointDetailPage extends LitElement {
       line-height: 1.5;
     }
 
+    .rules-disclosure {
+      margin: 0 14px 12px 110px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+    .rules-disclosure summary {
+      cursor: pointer;
+      color: var(--accent);
+      font-size: var(--font-sm);
+      font-weight: 500;
+    }
+    .rules-disclosure .rules-hide { display: none; }
+    .rules-disclosure[open] .rules-show { display: none; }
+    .rules-disclosure[open] .rules-hide { display: inline; }
+    .rules-pre {
+      margin: 8px 0 0;
+      padding: 10px;
+      max-height: 320px;
+      overflow: auto;
+      background: var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-xs);
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .rules-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .rules-count {
+      color: var(--text-muted);
+      font-size: var(--font-sm);
+      font-variant-numeric: tabular-nums;
+    }
+    .rules-link-btn {
+      min-height: 24px;
+      padding: 2px 0;
+      border: none;
+      background: none;
+      color: var(--accent);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--font-sm);
+      font-weight: 600;
+    }
+    .rules-control-label {
+      display: block;
+      margin: 8px 0 4px;
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+    }
+    .rules-match-list {
+      max-height: 240px;
+      overflow: auto;
+      list-style: none;
+      margin: 6px 0;
+      padding: 0;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+    .rules-match {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .rules-match:last-child { border-bottom: none; }
+    .rules-match-text {
+      flex: 1;
+      min-width: 0;
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-xs);
+      overflow-wrap: anywhere;
+    }
+    .rules-remove-btn {
+      flex-shrink: 0;
+      min-width: 24px;
+      min-height: 24px;
+      padding: 2px 6px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: none;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .rules-remove-btn:hover { background: var(--red-bg); color: var(--red-text); }
+    .rules-no-matches {
+      margin: 6px 0;
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+    }
+    .rules-add-row { display: flex; align-items: center; gap: 8px; }
+    .rules-add-row .form-input { flex: 1; min-width: 0; }
+    .rules-add-btn { flex-shrink: 0; }
+
+    .rules-editor-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      overflow: auto;
+      padding: 16px;
+      background: rgba(0,0,0,0.5);
+      overscroll-behavior: contain;
+      animation: fade-in 0.15s ease;
+    }
+    .rules-editor-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: min(1100px, 100%);
+      max-height: calc(100dvh - 32px);
+      overflow: auto;
+      box-sizing: border-box;
+      padding: 16px;
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .rules-editor-panel-head { display: flex; align-items: center; gap: 12px; }
+    .rules-editor-title { flex: 1; margin: 0; font-size: var(--font-md); font-weight: 600; }
+    .rules-bulk-textarea { min-height: 60vh; resize: vertical; flex: 1; }
+    .rules-editor-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
     .danger-zone {
       margin-top: 20px; padding: 14px;
       border: 1px solid var(--red-border);
@@ -901,6 +1144,8 @@ export class EntrypointDetailPage extends LitElement {
     const ep = this._entrypoint;
     const stats = ep ? ep.stats : null;
     const peer = ep?.options?.peer ?? '';
+    const rules = ep?.options?.rules ?? [];
+    const ruleMatches = this._matchingRules();
 
     return html`
       <app-scaffold>
@@ -1029,10 +1274,29 @@ export class EntrypointDetailPage extends LitElement {
                          (everything direct), so it is shown rather than
                          hidden as "not configured". -->
                     ${this.entrypointType === 'tungo'
-                      ? html`<div class="info-row">
-                      <span class="info-label">${t('fieldRules')}</span>
-                      <span class="info-value text">${ep.options?.rules?.length ? ep.options.rules.join(', ') : '—'}</span>
-                    </div>`
+                      ? html`
+                        <div class="info-row">
+                          <span class="info-label">${t('fieldRules')}</span>
+                          <span class="info-value text">
+                            ${rules.length === 0
+                              ? t('rulesEmptyDirect')
+                              : rules.length <= 8
+                                ? rules.join(', ')
+                                : t('rulesCount', { n: rules.length })}
+                          </span>
+                        </div>
+                        ${rules.length > 8
+                          ? html`
+                            <details class="rules-disclosure">
+                              <summary>
+                                <span class="rules-show">${t('rulesShowAll', { n: rules.length })}</span>
+                                <span class="rules-hide">${t('rulesHideAll', { n: rules.length })}</span>
+                              </summary>
+                              <pre class="rules-pre" role="region" tabindex="0" aria-label=${t('fieldRules')}>${rules.join('\n')}</pre>
+                            </details>
+                          `
+                          : nothing}
+                      `
                       : ''}
                     <div class="info-row">
                       <span class="info-label">${t('entrypointPeerKey')}</span>
@@ -1262,9 +1526,45 @@ export class EntrypointDetailPage extends LitElement {
                          rest leaves through this device's own network. -->
                     <div class="form-group">
                       <label class="form-label">${t('fieldRules')}</label>
-                      <textarea class="form-input" rows="6" .value=${this._rules}
-                        placeholder="example.com&#10;192.168.100.0/24"
-                        @input=${(e: Event) => { this._rules = (e.target as HTMLTextAreaElement).value; }}></textarea>
+                      <div class="rules-editor-header">
+                        <span class="rules-count">${this._ruleCountLabel()}</span>
+                        <button type="button" class="rules-link-btn" @click=${this._openRulesEditor}>
+                          ${t('rulesEditAll')}
+                        </button>
+                      </div>
+                      <label class="rules-control-label" for="rules-search">${t('rulesSearchLabel')}</label>
+                      <search>
+                        <input id="rules-search" name="q" type="search" class="form-input"
+                          .value=${this._rulesSearch} placeholder=${t('rulesSearchPlaceholder')}
+                          @input=${(e: Event) => { this._rulesSearch = (e.target as HTMLInputElement).value; }}>
+                      </search>
+                      ${this._rulesSearch.trim()
+                        ? html`
+                          <ul class="rules-match-list" aria-label=${t('rulesSearchLabel')}>
+                            ${ruleMatches.map((rule) => html`
+                              <li class="rules-match">
+                                <span class="rules-match-text">${rule.value}</span>
+                                <button type="button" class="rules-remove-btn"
+                                  aria-label=${t('rulesRemove', { rule: rule.value })}
+                                  title=${t('rulesRemove', { rule: rule.value })}
+                                  @click=${() => this._removeRule(rule.line)}>✕</button>
+                              </li>
+                            `)}
+                          </ul>
+                          ${ruleMatches.length === 0
+                            ? html`<div class="rules-no-matches">${t('rulesNoMatches')}</div>`
+                            : nothing}
+                        `
+                        : nothing}
+                      <form @submit=${(e: SubmitEvent) => { e.preventDefault(); this._addRule(); }}>
+                        <label class="rules-control-label" for="rules-add">${t('rulesAddLabel')}</label>
+                        <div class="rules-add-row">
+                          <input id="rules-add" name="rule" class="form-input"
+                            .value=${this._newRule} placeholder=${t('rulesAddPlaceholder')}
+                            @input=${(e: Event) => { this._newRule = (e.target as HTMLInputElement).value; }}>
+                          <button type="submit" class="pill-btn primary rules-add-btn">${t('rulesAdd')}</button>
+                        </div>
+                      </form>
                       <div class="p2p-hint">${t('fieldRulesHint')}</div>
                     </div>`
                       : ''}
@@ -1404,6 +1704,31 @@ export class EntrypointDetailPage extends LitElement {
           `
           : ''}
       </app-scaffold>
+
+      ${this._rulesEditorOpen
+        ? html`
+          <div class="rules-editor-overlay" @keydown=${this._handleRulesEditorKeydown}>
+            <div class="rules-editor-panel" role="dialog" aria-modal="true" aria-labelledby="rules-editor-title">
+              <div class="rules-editor-panel-head">
+                <h2 id="rules-editor-title" class="rules-editor-title">${t('fieldRules')}</h2>
+                <span class="rules-count">${this._ruleCountLabel(this._rulesDraft)}</span>
+              </div>
+              <textarea id="rules-bulk-editor" class="form-input rules-bulk-textarea"
+                aria-label=${t('fieldRules')} spellcheck="false"
+                .value=${this._rulesDraft}
+                @input=${(e: Event) => { this._rulesDraft = (e.target as HTMLTextAreaElement).value; }}></textarea>
+              <div class="rules-editor-actions">
+                <button type="button" class="dialog-btn cancel" @click=${() => this._closeRulesEditor(false)}>
+                  ${t('rulesCancel')}
+                </button>
+                <button type="button" class="pill-btn primary" @click=${() => this._closeRulesEditor(true)}>
+                  ${t('rulesDone')}
+                </button>
+              </div>
+            </div>
+          </div>
+        `
+        : nothing}
     `;
   }
 

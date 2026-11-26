@@ -1,13 +1,18 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-C8xE5JG4.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
-import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n as P,x as R,u as I,i as N,t as z}from"./index-C8xE5JG4.js";import{d as A,m,c as u,a as g,b as _,n as w,r}from"./format-DULtooyz.js";import{i as d}from"./app-scaffold-Dwptpl7s.js";import{t as C}from"./type-icons-DvFgXXJ2.js";import{a as E}from"./transport-CUBfvXUe.js";import{t as y,a as $}from"./vpn-CHllqakJ.js";import{c as M}from"./clipboard-C3x8_sid.js";var H=Object.defineProperty,F=Object.getOwnPropertyDescriptor,o=(e,s,l,a)=>{for(var h=a>1?void 0:a?F(s,l):s,c=e.length-1,v;c>=0;c--)(v=e[c])&&(h=(a?v(s,l,h):v(h))||h);return a&&h&&H(s,l,h),h};let n=class extends x{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this._poll=0,this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._showTransportDetail=!1,this._formId="",this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._shareLAN="",this._shareMode="auto",this._direct=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>{f()},5e3),this._unsubs.push(k(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,super.disconnectedCallback();for(const e of this._unsubs)e();this._unsubs=[]}_load(){const e=this.entrypointId,s=window.location.search.includes("edit");if(e==="new"||!e){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===e)return;const l=T().find(a=>a.id===e);l&&(this._entrypoint=l,s?(this.mode="edit",this._populateForm(l)):(this.mode!=="edit"||this._entrypoint?.id!==e)&&(this.mode="view",this._populateForm(l)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._formId="",this._showTransportDetail=!1,this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._shareLAN="",this._shareMode="auto",this._direct=!1}_populateForm(e){this._name=e.name,this._endpoint=e.entrypoint,this._tunnelId=e.id??"",this._peer=e.options?.peer??"",this._formId!==e.id&&(this._formId=e.id??"",this._showTransportDetail=!1),this._protocol=e.options?.protocol==="udp"?"udp":"tcp",this._keepalive=e.options?.keepalive??!0,this._net=e.options?.net??"",this._mtu=e.options?.mtu??0,this._deviceName=e.options?.device_name??"",this._routes=e.options?.routes??"",this._dns=e.options?.dns??"",this._rules=(e.options?.rules??[]).join(`
-`),this._shareLAN=e.options?.share_lan??"",this._shareMode=e.options?.share_mode||"auto",this._direct=e.options?.direct===!0}_renderTransport(e){if(e.status!=="running")return p;const s=E(e.peer_transport);return s?i`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BbgSiaFz.js","assets/index-BPj8V9nW.css"])))=>i.map(i=>d[i]);
+import{a as w,v as f,h as k,d as T,c as t,A as h,b as i,_ as b,w as D,l as S,n as R,x as E,u as z,i as P,t as I}from"./index-BbgSiaFz.js";import{d as C,m,c as v,a as g,b as _,n as $,r as l}from"./format-4Eh0bGOY.js";import{i as d}from"./app-scaffold-DXLopf7S.js";import{t as A}from"./type-icons-DvFgXXJ2.js";import{a as N}from"./transport-DY3HT0IY.js";import{t as y,a as x}from"./vpn-CHD5idJc.js";import{c as L}from"./clipboard-C3x8_sid.js";var M=Object.defineProperty,O=Object.getOwnPropertyDescriptor,o=(e,s,n,p)=>{for(var c=p>1?void 0:p?O(s,n):s,a=e.length-1,u;a>=0;a--)(u=e[a])&&(c=(p?u(s,n,c):u(c))||c);return p&&c&&M(s,n,c),c};let r=class extends w{constructor(){super(...arguments),this.entrypointType="tcp",this.entrypointId="",this._poll=0,this.mode="view",this._entrypoint=null,this._saving=!1,this._snackbar="",this._showDeleteDialog=!1,this._showResetDialog=!1,this._resetKind="",this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._showPeer=!1,this._showTransportDetail=!1,this._formId="",this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._rulesSearch="",this._newRule="",this._rulesEditorOpen=!1,this._rulesDraft="",this._rulesEditorTrigger=null,this._shareLAN="",this._shareMode="auto",this._direct=!1,this._unsubs=[]}connectedCallback(){super.connectedCallback(),this._load(),this._poll=window.setInterval(()=>{f()},5e3),this._unsubs.push(k(()=>{this._load(),this.requestUpdate()}))}disconnectedCallback(){window.clearInterval(this._poll),this._poll=0,this._setRulesBackgroundInert(!1),super.disconnectedCallback();for(const e of this._unsubs)e();this._unsubs=[]}updated(e){e.has("_rulesEditorOpen")&&(this._setRulesBackgroundInert(this._rulesEditorOpen),this._rulesEditorOpen?this.renderRoot.querySelector(".rules-bulk-textarea")?.focus():(this._rulesEditorTrigger?.focus(),this._rulesEditorTrigger=null))}_load(){const e=this.entrypointId,s=window.location.search.includes("edit");if(e==="new"||!e){if(this.mode==="create")return;this.mode="create",this._entrypoint=null,this._resetForm();return}if(this.mode==="edit"&&this._entrypoint?.id===e)return;const n=T().find(p=>p.id===e);n&&(this._entrypoint=n,s?(this.mode="edit",this._populateForm(n)):(this.mode!=="edit"||this._entrypoint?.id!==e)&&(this.mode="view",this._populateForm(n)))}_resetForm(){this._name="",this._endpoint="",this._tunnelId="",this._peer="",this._formId="",this._showTransportDetail=!1,this._protocol="tcp",this._keepalive=!0,this._net="",this._mtu=0,this._deviceName="",this._routes="",this._dns="",this._rules="",this._rulesSearch="",this._newRule="",this._rulesEditorOpen=!1,this._rulesDraft="",this._rulesEditorTrigger=null,this._shareLAN="",this._shareMode="auto",this._direct=!1}_populateForm(e){this._name=e.name,this._endpoint=e.entrypoint,this._tunnelId=e.id??"",this._peer=e.options?.peer??"",this._formId!==e.id&&(this._formId=e.id??"",this._showTransportDetail=!1),this._protocol=e.options?.protocol==="udp"?"udp":"tcp",this._keepalive=e.options?.keepalive??!0,this._net=e.options?.net??"",this._mtu=e.options?.mtu??0,this._deviceName=e.options?.device_name??"",this._routes=e.options?.routes??"",this._dns=e.options?.dns??"",this._rules=(e.options?.rules??[]).join(`
+`),this._shareLAN=e.options?.share_lan??"",this._shareMode=e.options?.share_mode||"auto",this._direct=e.options?.direct===!0}_ruleLines(){return this._rules.split(`
+`).map((e,s)=>({line:s,value:e.trim()})).filter(e=>e.value!=="")}_ruleCountLabel(e=this._rules){const s=e.split(`
+`).map(n=>n.trim()).filter(Boolean).length;return s?t("rulesCount",{n:s}):t("rulesEmptyDirect")}_matchingRules(){const e=this._rulesSearch.trim().toLocaleLowerCase();return e?this._ruleLines().filter(s=>s.value.toLocaleLowerCase().includes(e)).slice(0,50):[]}_removeRule(e){const s=this._rules.split(`
+`);s.splice(e,1),this._rules=s.join(`
+`)}_addRule(){const e=this._newRule.trim();if(!e||this._ruleLines().some(n=>n.value===e)){this._newRule="";return}const s=this._rules.trimEnd();this._rules=s?`${s}
+${e}`:e,this._newRule=""}_openRulesEditor(e){this._rulesEditorTrigger=e.currentTarget,this._rulesDraft=this._rules,this._rulesEditorOpen=!0}_closeRulesEditor(e){e&&(this._rules=this._rulesDraft),this._rulesEditorOpen=!1}_setRulesBackgroundInert(e){this.renderRoot.querySelector("app-scaffold")?.toggleAttribute("inert",e)}_handleRulesEditorKeydown(e){if(e.key==="Escape"){e.preventDefault(),this._closeRulesEditor(!1);return}if(e.key!=="Tab")return;const s=this.renderRoot.querySelector(".rules-editor-panel");if(!s)return;const n=Array.from(s.querySelectorAll('textarea:not([disabled]), input:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'));if(!n.length)return;const p=s.getRootNode().activeElement,c=n[0],a=n[n.length-1];e.shiftKey&&p===c?(e.preventDefault(),a.focus()):!e.shiftKey&&p===a&&(e.preventDefault(),c.focus())}_renderTransport(e){if(e.status!=="running")return h;const s=N(e.peer_transport);return s?i`
       <div class="info-row">
         <span class="info-label">${t("p2pTransport")}</span>
         <span class="info-value text transport-value">
           <span class="peer-badge ${s.tone}" title=${s.hint}>
             ${d(s.icon)}<span>${s.label}</span>
           </span>
-          ${(e.peer_rtt_live??e.peer_kcp_live)&&(e.peer_rtt_ms??0)>0?i`<span class="peer-rtt" title="${t("peersRTTHint")} · ${e.peer_transport??""}">${e.peer_rtt_ms}ms</span>`:p}
+          ${(e.peer_rtt_live??e.peer_kcp_live)&&(e.peer_rtt_ms??0)>0?i`<span class="peer-rtt" title="${t("peersRTTHint")} · ${e.peer_transport??""}">${e.peer_rtt_ms}ms</span>`:h}
           <button class="detail-btn" title=${t("p2pTransportDetail")}
             aria-label=${t("p2pTransportDetail")} aria-expanded=${this._showTransportDetail?"true":"false"}
             @click=${()=>{this._showTransportDetail=!this._showTransportDetail}}>
@@ -30,7 +35,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                 <span class="info-label">${t("peersDiagRTT")}</span>
                 <span class="info-value text detail-text">${e.peer_rtt_ms}ms</span>
               </div>
-            `:p}
+            `:h}
           ${e.peer_kcp_live?i`
               <div class="info-row detail-row">
                 <span class="info-label">${t("peersDiagRTO")}</span>
@@ -40,16 +45,16 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                 <span class="info-label">${t("peersDiagRTTVar")}</span>
                 <span class="info-value text detail-text">${e.peer_rttvar_ms??0}ms</span>
               </div>
-            `:p}
-        `:p}
-    `:p}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(e){const s=(e??[])[0];if(!s)return t("eventsEntryDesc");const l=s.count||1;return l>1?`${s.message} ×${l}`:s.message}_hubNoReflow(e){for(const s of e??[]){if(s.message.includes("uplink without downlink"))return!0;if(s.message.includes("downlink recovered"))return!1}return!1}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}get _usesDevice(){return this.entrypointType==="tun"||this.entrypointType==="tungo"}async _handleSave(){if(!this._name.trim()){this._showSnackbar(t("requiredField"));return}if((this.entrypointType==="p2p"||this._usesDevice)&&!this._peer.trim()){this._showSnackbar(`${t("entrypointPeerKey")}: ${t("requiredField")}`);return}if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}if(!await $(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(t("vpnNotReady"));return}}this._saving=!0;try{const e={name:this._name.trim(),type:this.entrypointType,endpoint:this._usesDevice?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,net:this._usesDevice&&this._net.trim()||void 0,mtu:this._usesDevice&&this._mtu||void 0,device_name:this._usesDevice&&this._deviceName.trim()||void 0,routes:this._usesDevice&&this._routes.trim()||void 0,dns:this._usesDevice&&this._dns.trim()||void 0,share_lan:this.entrypointType==="tun"&&this._shareLAN.trim()||void 0,share_mode:this.entrypointType==="tun"&&this._shareMode||void 0,direct:this.entrypointType==="tun"?this._direct:void 0,rules:this.entrypointType==="tungo"?this._rules.split(`
-`).map(s=>s.trim()).filter(Boolean):void 0};this.mode==="create"?(await b(()=>import("./index-C8xE5JG4.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.create(e)),this._showSnackbar(t("saved")),this._navigate("/")):(await b(()=>import("./index-C8xE5JG4.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.update(this.entrypointId,e)),this._showSnackbar(t("saved")),this.mode="view",await f())}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await D(this.entrypointId),this._showSnackbar(t("deleted")),this._navigate("/")}catch{this._showSnackbar(t("deleteFailed"))}}async _handleStart(){if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}const s=this._entrypoint?.options;if(!await $(s?.net??"",s?.routes??"",s?.mtu??0,s?.dns??"")){this._showSnackbar(t("vpnNotReady"));return}}try{await S(this.entrypointId),this._showSnackbar(t("started"))}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("startFailed")}${s?": "+s:""}`)}}async _handleStop(){try{await P(this.entrypointId),this._showSnackbar(t("stopped"))}catch{this._showSnackbar(t("stopFailed"))}}async _handleCopy(e){await M(e),this._showSnackbar(t("copiedToClipboard"))}_handleResetStats(e){this._resetKind=e,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await R(this.entrypointId,this._resetKind),this._entrypoint&&I(this.entrypointId,this._entrypoint.stats),this._showSnackbar(t("saved"))}catch{this._showSnackbar(t("saveFailed"))}}_cycleOption(e,s){const l=s.indexOf(e);return s[(l+1)%s.length]}_shareModeLabel(e){switch(e){case"kernel":return t("shareModeKernel");case"userspace":return t("shareModeUserspace");default:return t("shareModeAuto")}}render(){const e=this._entrypoint,s=e?e.stats:null,l=e?.options?.peer??"";return i`
+            `:h}
+        `:h}
+    `:h}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}_latestEventLine(e){const s=(e??[])[0];if(!s)return t("eventsEntryDesc");const n=s.count||1;return n>1?`${s.message} ×${n}`:s.message}_hubNoReflow(e){for(const s of e??[]){if(s.message.includes("uplink without downlink"))return!0;if(s.message.includes("downlink recovered"))return!1}return!1}_enterEdit(){this._entrypoint&&(this._populateForm(this._entrypoint),this.mode="edit")}_handleBack(){if(this.mode==="edit"&&this.entrypointId){this.mode="view",this._navigate(`/entrypoint/${this.entrypointType}/${this.entrypointId}`);return}this._navigate("/")}_showSnackbar(e){this._snackbar=e,setTimeout(()=>{this._snackbar="",this.requestUpdate()},2500)}get _usesDevice(){return this.entrypointType==="tun"||this.entrypointType==="tungo"}async _handleSave(){if(!this._name.trim()){this._showSnackbar(t("requiredField"));return}if((this.entrypointType==="p2p"||this._usesDevice)&&!this._peer.trim()){this._showSnackbar(`${t("entrypointPeerKey")}: ${t("requiredField")}`);return}if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}if(!await x(this._net.trim(),this._routes.trim(),this._mtu||0,this._dns.trim())){this._showSnackbar(t("vpnNotReady"));return}}this._saving=!0;try{const e={name:this._name.trim(),type:this.entrypointType,endpoint:this._usesDevice?"":this._endpoint.trim(),id:this._tunnelId.trim()||void 0,peer:this._peer.trim()||void 0,protocol:this.entrypointType==="p2p"?this._protocol:void 0,keepalive:this.entrypointType==="p2p"&&this._protocol==="udp"?this._keepalive:void 0,net:this._usesDevice&&this._net.trim()||void 0,mtu:this._usesDevice&&this._mtu||void 0,device_name:this._usesDevice&&this._deviceName.trim()||void 0,routes:this._usesDevice&&this._routes.trim()||void 0,dns:this._usesDevice&&this._dns.trim()||void 0,share_lan:this.entrypointType==="tun"&&this._shareLAN.trim()||void 0,share_mode:this.entrypointType==="tun"&&this._shareMode||void 0,direct:this.entrypointType==="tun"?this._direct:void 0,rules:this.entrypointType==="tungo"?this._rules.split(`
+`).map(s=>s.trim()).filter(Boolean):void 0};this.mode==="create"?(await b(()=>import("./index-BbgSiaFz.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.create(e)),this._showSnackbar(t("saved")),this._navigate("/")):(await b(()=>import("./index-BbgSiaFz.js").then(s=>s.H),__vite__mapDeps([0,1])).then(s=>s.update(this.entrypointId,e)),this._showSnackbar(t("saved")),this.mode="view",await f())}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("saveFailed")}${s?": "+s:""}`)}this._saving=!1}async _handleDelete(){this._showDeleteDialog=!1;try{await D(this.entrypointId),this._showSnackbar(t("deleted")),this._navigate("/")}catch{this._showSnackbar(t("deleteFailed"))}}async _handleStart(){if(this._usesDevice){const e=y(this.entrypointId);if(e){this._showSnackbar(`${t("tunDeviceBusy")}: ${e.name}`);return}const s=this._entrypoint?.options;if(!await x(s?.net??"",s?.routes??"",s?.mtu??0,s?.dns??"")){this._showSnackbar(t("vpnNotReady"));return}}try{await S(this.entrypointId),this._showSnackbar(t("started"))}catch(e){const s=e instanceof Error?e.message:"";this._showSnackbar(`${t("startFailed")}${s?": "+s:""}`)}}async _handleStop(){try{await R(this.entrypointId),this._showSnackbar(t("stopped"))}catch{this._showSnackbar(t("stopFailed"))}}async _handleCopy(e){await L(e),this._showSnackbar(t("copiedToClipboard"))}_handleResetStats(e){this._resetKind=e,this._showResetDialog=!0}async _doResetStats(){this._showResetDialog=!1;try{await E(this.entrypointId,this._resetKind),this._entrypoint&&z(this.entrypointId,this._entrypoint.stats),this._showSnackbar(t("saved"))}catch{this._showSnackbar(t("saveFailed"))}}_cycleOption(e,s){const n=s.indexOf(e);return s[(n+1)%s.length]}_shareModeLabel(e){switch(e){case"kernel":return t("shareModeKernel");case"userspace":return t("shareModeUserspace");default:return t("shareModeAuto")}}render(){const e=this._entrypoint,s=e?e.stats:null,n=e?.options?.peer??"",p=e?.options?.rules??[],c=this._matchingRules();return i`
       <app-scaffold>
         <div slot="appBar" style="display:flex;align-items:center;gap:8px;">
           <button class="back-btn" @click=${()=>this._handleBack()}>
             ${d("chevron-left")}
           </button>
-          <span class="page-title">${d(C(this.entrypointType))}</span>
+          <span class="page-title">${d(A(this.entrypointType))}</span>
 
           ${this.mode==="view"&&e?i`
               ${e.status==="running"?i`<button class="pill-btn danger appbar-action" @click=${()=>this._handleStop()}>
@@ -84,7 +89,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                   </div>
                   <span style="color:var(--text-muted);">&rarr;</span>
                 </div>
-              `:p}
+              `:h}
             ${this.entrypointType==="tun"&&e.status==="running"&&e.peer_transport==="server-unreachable"?i`
                 <div class="status-banner degraded">
                   <span class="status-dot-mini"></span>
@@ -93,7 +98,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                     <div class="degraded-hint">${t("serverUnreachableHint")}</div>
                   </div>
                 </div>
-              `:p}
+              `:h}
 
             <div class="section">
               <div class="card">
@@ -103,7 +108,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                 </div>
                 <div class="info-row">
                   <span class="info-label">${t("fieldCreated")}</span>
-                  <span class="info-value text">${A(e.created_at)}</span>
+                  <span class="info-value text">${C(e.created_at)}</span>
                 </div>
                 ${this.entrypointType==="p2p"||this._usesDevice?"":i`
                 <div class="info-row">
@@ -137,14 +142,28 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                     <!-- The split itself. An empty list is a working split
                          (everything direct), so it is shown rather than
                          hidden as "not configured". -->
-                    ${this.entrypointType==="tungo"?i`<div class="info-row">
-                      <span class="info-label">${t("fieldRules")}</span>
-                      <span class="info-value text">${e.options?.rules?.length?e.options.rules.join(", "):"—"}</span>
-                    </div>`:""}
+                    ${this.entrypointType==="tungo"?i`
+                        <div class="info-row">
+                          <span class="info-label">${t("fieldRules")}</span>
+                          <span class="info-value text">
+                            ${p.length===0?t("rulesEmptyDirect"):p.length<=8?p.join(", "):t("rulesCount",{n:p.length})}
+                          </span>
+                        </div>
+                        ${p.length>8?i`
+                            <details class="rules-disclosure">
+                              <summary>
+                                <span class="rules-show">${t("rulesShowAll",{n:p.length})}</span>
+                                <span class="rules-hide">${t("rulesHideAll",{n:p.length})}</span>
+                              </summary>
+                              <pre class="rules-pre" role="region" tabindex="0" aria-label=${t("fieldRules")}>${p.join(`
+`)}</pre>
+                            </details>
+                          `:h}
+                      `:""}
                     <div class="info-row">
                       <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?l:m(l)}</span>
-                      ${l?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?n:m(n)}</span>
+                      ${n?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(n)}>
                           ${d("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
@@ -157,8 +176,8 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                   `:this.entrypointType==="p2p"?i`
                     <div class="info-row">
                       <span class="info-label">${t("entrypointPeerKey")}</span>
-                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?l:m(l)}</span>
-                      ${l?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(l)}>
+                      <span class="info-value ${this._showPeer?"":"masked"}">${this._showPeer?n:m(n)}</span>
+                      ${n?i`<button class="copy-btn-mini" @click=${()=>this._handleCopy(n)}>
                           ${d("copy")}
                         </button>
                         <button class="copy-btn-mini" title="${this._showPeer?t("hideKey"):t("revealKey")}"
@@ -182,12 +201,12 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                   <div class="stats-grid">
                     <div class="stat-box">
                       <div class="stat-label">${t("statTotalConns")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("conns")} title="${t("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${u(s.total_conns)}</div>
-                      <div class="stat-rate">${u(s.current_conns)} active · ${s.request_rate.toFixed(2)} conns/s</div>
+                      <div class="stat-value">${v(s.total_conns)}</div>
+                      <div class="stat-rate">${v(s.current_conns)} active · ${s.request_rate.toFixed(2)} conns/s</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">${t("statTotalErrors")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("errors")} title="${t("btnResetStats")}">${d("rotate-cw")}</span></div>
-                      <div class="stat-value">${u(s.total_errs)}</div>
+                      <div class="stat-value">${v(s.total_errs)}</div>
                     </div>
                     <div class="stat-box">
                       <div class="stat-label">${t("p2pColDown")} <span class="stat-reset-mini" @click=${()=>this._handleResetStats("output")} title="${t("btnResetOutput")}">${d("rotate-cw")}</span></div>
@@ -219,7 +238,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                     </div>
                   </div>
                 </div>
-              `:p}
+              `:h}
 
             ${this.mode==="view"&&this._entrypoint?i`
                 <div class="section">
@@ -237,7 +256,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                     </div>
                   </div>
                 </div>
-              `:p}
+              `:h}
 
             <div class="section">
               <button class="btn-edit-bottom" @click=${()=>this._enterEdit()}>
@@ -344,9 +363,41 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                          rest leaves through this device's own network. -->
                     <div class="form-group">
                       <label class="form-label">${t("fieldRules")}</label>
-                      <textarea class="form-input" rows="6" .value=${this._rules}
-                        placeholder="example.com&#10;192.168.100.0/24"
-                        @input=${a=>{this._rules=a.target.value}}></textarea>
+                      <div class="rules-editor-header">
+                        <span class="rules-count">${this._ruleCountLabel()}</span>
+                        <button type="button" class="rules-link-btn" @click=${this._openRulesEditor}>
+                          ${t("rulesEditAll")}
+                        </button>
+                      </div>
+                      <label class="rules-control-label" for="rules-search">${t("rulesSearchLabel")}</label>
+                      <search>
+                        <input id="rules-search" name="q" type="search" class="form-input"
+                          .value=${this._rulesSearch} placeholder=${t("rulesSearchPlaceholder")}
+                          @input=${a=>{this._rulesSearch=a.target.value}}>
+                      </search>
+                      ${this._rulesSearch.trim()?i`
+                          <ul class="rules-match-list" aria-label=${t("rulesSearchLabel")}>
+                            ${c.map(a=>i`
+                              <li class="rules-match">
+                                <span class="rules-match-text">${a.value}</span>
+                                <button type="button" class="rules-remove-btn"
+                                  aria-label=${t("rulesRemove",{rule:a.value})}
+                                  title=${t("rulesRemove",{rule:a.value})}
+                                  @click=${()=>this._removeRule(a.line)}>✕</button>
+                              </li>
+                            `)}
+                          </ul>
+                          ${c.length===0?i`<div class="rules-no-matches">${t("rulesNoMatches")}</div>`:h}
+                        `:h}
+                      <form @submit=${a=>{a.preventDefault(),this._addRule()}}>
+                        <label class="rules-control-label" for="rules-add">${t("rulesAddLabel")}</label>
+                        <div class="rules-add-row">
+                          <input id="rules-add" name="rule" class="form-input"
+                            .value=${this._newRule} placeholder=${t("rulesAddPlaceholder")}
+                            @input=${a=>{this._newRule=a.target.value}}>
+                          <button type="submit" class="pill-btn primary rules-add-btn">${t("rulesAdd")}</button>
+                        </div>
+                      </form>
                       <div class="p2p-hint">${t("fieldRulesHint")}</div>
                     </div>`:""}
                     ${this.entrypointType==="tun"?i`
@@ -361,7 +412,7 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
                         @input=${a=>{this._shareLAN=a.target.value}}>
                       <div class="p2p-hint">${t("fieldShareLANHint")}</div>
                     </div>
-                    <div class="switch-row" @click=${()=>{this._shareMode=this._cycleOption(this._shareMode,[...n.SHARE_MODES]),this.requestUpdate()}}>
+                    <div class="switch-row" @click=${()=>{this._shareMode=this._cycleOption(this._shareMode,[...r.SHARE_MODES]),this.requestUpdate()}}>
                       <span class="switch-label">${t("fieldShareMode")}</span>
                       <span class="protocol-value">
                         ${this._shareModeLabel(this._shareMode)}
@@ -466,7 +517,30 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
             </div>
           `:""}
       </app-scaffold>
-    `}};n.SHARE_MODES=["auto","kernel","userspace"];n.styles=N`
+
+      ${this._rulesEditorOpen?i`
+          <div class="rules-editor-overlay" @keydown=${this._handleRulesEditorKeydown}>
+            <div class="rules-editor-panel" role="dialog" aria-modal="true" aria-labelledby="rules-editor-title">
+              <div class="rules-editor-panel-head">
+                <h2 id="rules-editor-title" class="rules-editor-title">${t("fieldRules")}</h2>
+                <span class="rules-count">${this._ruleCountLabel(this._rulesDraft)}</span>
+              </div>
+              <textarea id="rules-bulk-editor" class="form-input rules-bulk-textarea"
+                aria-label=${t("fieldRules")} spellcheck="false"
+                .value=${this._rulesDraft}
+                @input=${a=>{this._rulesDraft=a.target.value}}></textarea>
+              <div class="rules-editor-actions">
+                <button type="button" class="dialog-btn cancel" @click=${()=>this._closeRulesEditor(!1)}>
+                  ${t("rulesCancel")}
+                </button>
+                <button type="button" class="pill-btn primary" @click=${()=>this._closeRulesEditor(!0)}>
+                  ${t("rulesDone")}
+                </button>
+              </div>
+            </div>
+          </div>
+        `:h}
+    `}};r.SHARE_MODES=["auto","kernel","userspace"];r.styles=P`
     .back-btn {
       background: none; border: none; cursor: pointer;
       color: var(--text); padding: 4px; border-radius: var(--radius-sm);
@@ -795,6 +869,143 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
       line-height: 1.5;
     }
 
+    .rules-disclosure {
+      margin: 0 14px 12px 110px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+    .rules-disclosure summary {
+      cursor: pointer;
+      color: var(--accent);
+      font-size: var(--font-sm);
+      font-weight: 500;
+    }
+    .rules-disclosure .rules-hide { display: none; }
+    .rules-disclosure[open] .rules-show { display: none; }
+    .rules-disclosure[open] .rules-hide { display: inline; }
+    .rules-pre {
+      margin: 8px 0 0;
+      padding: 10px;
+      max-height: 320px;
+      overflow: auto;
+      background: var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-xs);
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .rules-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .rules-count {
+      color: var(--text-muted);
+      font-size: var(--font-sm);
+      font-variant-numeric: tabular-nums;
+    }
+    .rules-link-btn {
+      min-height: 24px;
+      padding: 2px 0;
+      border: none;
+      background: none;
+      color: var(--accent);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--font-sm);
+      font-weight: 600;
+    }
+    .rules-control-label {
+      display: block;
+      margin: 8px 0 4px;
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+    }
+    .rules-match-list {
+      max-height: 240px;
+      overflow: auto;
+      list-style: none;
+      margin: 6px 0;
+      padding: 0;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+    .rules-match {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .rules-match:last-child { border-bottom: none; }
+    .rules-match-text {
+      flex: 1;
+      min-width: 0;
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: var(--font-xs);
+      overflow-wrap: anywhere;
+    }
+    .rules-remove-btn {
+      flex-shrink: 0;
+      min-width: 24px;
+      min-height: 24px;
+      padding: 2px 6px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: none;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .rules-remove-btn:hover { background: var(--red-bg); color: var(--red-text); }
+    .rules-no-matches {
+      margin: 6px 0;
+      color: var(--text-muted);
+      font-size: var(--font-xs);
+    }
+    .rules-add-row { display: flex; align-items: center; gap: 8px; }
+    .rules-add-row .form-input { flex: 1; min-width: 0; }
+    .rules-add-btn { flex-shrink: 0; }
+
+    .rules-editor-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      overflow: auto;
+      padding: 16px;
+      background: rgba(0,0,0,0.5);
+      overscroll-behavior: contain;
+      animation: fade-in 0.15s ease;
+    }
+    .rules-editor-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: min(1100px, 100%);
+      max-height: calc(100dvh - 32px);
+      overflow: auto;
+      box-sizing: border-box;
+      padding: 16px;
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .rules-editor-panel-head { display: flex; align-items: center; gap: 12px; }
+    .rules-editor-title { flex: 1; margin: 0; font-size: var(--font-md); font-weight: 600; }
+    .rules-bulk-textarea { min-height: 60vh; resize: vertical; flex: 1; }
+    .rules-editor-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
     .danger-zone {
       margin-top: 20px; padding: 14px;
       border: 1px solid var(--red-border);
@@ -871,4 +1082,4 @@ import{a as x,v as f,h as k,d as T,A as p,c as t,b as i,_ as b,w as D,l as S,n a
       height: 14px;
     }
     .btn-edit-bottom:hover { opacity: 0.8; }
-  `;o([w()],n.prototype,"entrypointType",2);o([w()],n.prototype,"entrypointId",2);o([r()],n.prototype,"mode",2);o([r()],n.prototype,"_entrypoint",2);o([r()],n.prototype,"_saving",2);o([r()],n.prototype,"_snackbar",2);o([r()],n.prototype,"_showDeleteDialog",2);o([r()],n.prototype,"_showResetDialog",2);o([r()],n.prototype,"_name",2);o([r()],n.prototype,"_endpoint",2);o([r()],n.prototype,"_tunnelId",2);o([r()],n.prototype,"_peer",2);o([r()],n.prototype,"_showPeer",2);o([r()],n.prototype,"_showTransportDetail",2);o([r()],n.prototype,"_protocol",2);o([r()],n.prototype,"_keepalive",2);o([r()],n.prototype,"_net",2);o([r()],n.prototype,"_mtu",2);o([r()],n.prototype,"_deviceName",2);o([r()],n.prototype,"_routes",2);o([r()],n.prototype,"_dns",2);o([r()],n.prototype,"_rules",2);o([r()],n.prototype,"_shareLAN",2);o([r()],n.prototype,"_shareMode",2);o([r()],n.prototype,"_direct",2);n=o([z("entrypoint-detail-page")],n);export{n as EntrypointDetailPage};
+  `;o([$()],r.prototype,"entrypointType",2);o([$()],r.prototype,"entrypointId",2);o([l()],r.prototype,"mode",2);o([l()],r.prototype,"_entrypoint",2);o([l()],r.prototype,"_saving",2);o([l()],r.prototype,"_snackbar",2);o([l()],r.prototype,"_showDeleteDialog",2);o([l()],r.prototype,"_showResetDialog",2);o([l()],r.prototype,"_name",2);o([l()],r.prototype,"_endpoint",2);o([l()],r.prototype,"_tunnelId",2);o([l()],r.prototype,"_peer",2);o([l()],r.prototype,"_showPeer",2);o([l()],r.prototype,"_showTransportDetail",2);o([l()],r.prototype,"_protocol",2);o([l()],r.prototype,"_keepalive",2);o([l()],r.prototype,"_net",2);o([l()],r.prototype,"_mtu",2);o([l()],r.prototype,"_deviceName",2);o([l()],r.prototype,"_routes",2);o([l()],r.prototype,"_dns",2);o([l()],r.prototype,"_rules",2);o([l()],r.prototype,"_rulesSearch",2);o([l()],r.prototype,"_newRule",2);o([l()],r.prototype,"_rulesEditorOpen",2);o([l()],r.prototype,"_rulesDraft",2);o([l()],r.prototype,"_shareLAN",2);o([l()],r.prototype,"_shareMode",2);o([l()],r.prototype,"_direct",2);r=o([I("entrypoint-detail-page")],r);export{r as EntrypointDetailPage};
