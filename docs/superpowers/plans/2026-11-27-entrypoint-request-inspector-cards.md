@@ -83,7 +83,7 @@
 ## Implementation record
 
 - **Date/status:** 2026-11-27 — complete.
-- **Repository + commit SHA:** `wisper` (`github.com/go-gost/wisper`, branch `main`); implementation commit `PENDING` (the plan is committed with the implementation, then its SHA is filled in a follow-up docs commit because a commit cannot contain its own hash).
+- **Repository + commit SHA:** `wisper` (`github.com/go-gost/wisper`, branch `main`); implementation commit `8c7eb21` — `fix(web): restyle the request list after the inspector feed` (not pushed).
 - **Files changed:** `web-src/src/pages/entrypoint-requests-page.ts`, `web-src/src/utils/format.ts`, `web-src/src/i18n/en.ts`, `web-src/src/i18n/zh.ts`, `web-e2e/tests/entrypoint-tungo-requests.spec.ts`, this plan, and rebuilt tracked `web/assets/*` plus `web/index.html`.
 - **Behavior:** request rows are 4px-gapped cards with a red error edge, monospace destination, lock-only tunnel marker, inspector duration, compact local timestamp, unchanged three-state rule control, and wrapping detail chips. Every row expands; unnamed final path hops render as their address rather than `@address`.
 - **Tests/commands and results:** request spec RED (5 expected failures) → GREEN (13/13); temporary 420×900 screenshot spec passed and both PNGs were read; `make typecheck && make ui-test && make web` passed (57/57 UI tests, Vite build succeeded); `go test ./api/ -count=1` passed (129.883s); locale-key diff and `git diff --check` clean.
