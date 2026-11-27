@@ -548,3 +548,111 @@ test('shows a translated empty state when no flows have been recorded', async ({
   await expect(requestsPage.locator('.requests-empty')).toHaveText('No recent requests');
   await expect(requestsPage.locator('.request-row')).toHaveCount(0);
 });
+
+test('filters requests by destination search across hosts, IPs, and ports', async ({ page }) => {
+  await mockEntrypoint(page);
+  await page.goto(REQUESTS);
+
+  const requestsPage = page.locator('entrypoint-requests-page');
+  const rows = requestsPage.locator('.request-row');
+  const search = requestsPage.getByRole('searchbox', { name: 'Search destination' });
+  await expect(rows).toHaveCount(4);
+
+  await search.fill('API.EXAMPLE');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('api.example.com');
+  await expect(requestsPage.locator('.requests-count')).toHaveText('Showing 1 of 4');
+
+  await search.fill('192.0.2.20');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('192.0.2.20:80');
+
+  await search.fill('2001:4860');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('[2001:4860:4860::8888]:443');
+
+  await search.fill(':5353');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('198.51.100.53:5353');
+
+  await search.fill('nothing.example');
+  await expect(rows).toHaveCount(0);
+  await expect(requestsPage.locator('.requests-no-matches')).toHaveText('No matching requests');
+  await expect(requestsPage.locator('.requests-count')).toHaveText('Showing 0 of 4');
+
+  await search.fill('');
+  await expect(rows).toHaveCount(4);
+});
+
+test('filters by direct, tunneled and error state and combines with the search', async ({ page }) => {
+  await mockEntrypoint(page);
+  await page.goto(REQUESTS);
+
+  const requestsPage = page.locator('entrypoint-requests-page');
+  const rows = requestsPage.locator('.request-row');
+  const all = requestsPage.getByRole('radio', { name: 'All', exact: true });
+  const direct = requestsPage.getByRole('radio', { name: 'Direct', exact: true });
+  const tunneled = requestsPage.getByRole('radio', { name: 'Tunnel', exact: true });
+  const errors = requestsPage.getByRole('radio', { name: 'Error', exact: true });
+  const directChip = requestsPage.locator('.filter-chip').filter({ hasText: 'Direct' });
+  const tunneledChip = requestsPage.locator('.filter-chip').filter({ hasText: 'Tunnel' });
+  const errorsChip = requestsPage.locator('.filter-chip').filter({ hasText: 'Error' });
+  const allChip = requestsPage.locator('.filter-chip').filter({ hasText: 'All' });
+  const search = requestsPage.getByRole('searchbox', { name: 'Search destination' });
+
+  await expect(all).toBeChecked();
+  await directChip.click();
+  await expect(direct).toBeChecked();
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('192.0.2.20:80');
+  await expect(rows.nth(1)).toContainText('[2001:4860:4860::8888]:443');
+  await expect(requestsPage.locator('.requests-count')).toHaveText('Showing 2 of 4');
+
+  await tunneledChip.click();
+  await expect(tunneled).toBeChecked();
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('api.example.com');
+  await expect(rows.nth(1)).toContainText('198.51.100.53:5353');
+
+  await errorsChip.click();
+  await expect(errors).toBeChecked();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveClass(/error/);
+  await expect(rows.first()).toContainText('198.51.100.53');
+
+  await search.fill('192.0.2');
+  await expect(rows).toHaveCount(0);
+  await expect(requestsPage.locator('.requests-no-matches')).toHaveText('No matching requests');
+
+  await search.fill('198.51.100');
+  await expect(rows).toHaveCount(1);
+
+  await allChip.click();
+  await expect(all).toBeChecked();
+  await expect(rows).toHaveCount(2);
+
+  await search.fill('');
+  await expect(rows).toHaveCount(4);
+});
+
+test('keeps the search and filter across polling refreshes', async ({ page }) => {
+  const now = new Date('2026-11-26T12:00:00Z');
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now);
+  const mock = await mockEntrypoint(page);
+  await page.goto(REQUESTS);
+
+  const requestsPage = page.locator('entrypoint-requests-page');
+  const rows = requestsPage.locator('.request-row');
+  const search = requestsPage.getByRole('searchbox', { name: 'Search destination' });
+  await search.fill('api.example');
+  await requestsPage.locator('.filter-chip').filter({ hasText: 'Tunnel' }).click();
+  await expect(requestsPage.getByRole('radio', { name: 'Tunnel', exact: true })).toBeChecked();
+  await expect(rows).toHaveCount(1);
+
+  await page.clock.runFor(2000);
+  await expect.poll(() => mock.requestCalls()).toBe(2);
+  await expect(rows).toHaveCount(1);
+  await expect(search).toHaveValue('api.example');
+  await expect(requestsPage.getByRole('radio', { name: 'Tunnel', exact: true })).toBeChecked();
+});

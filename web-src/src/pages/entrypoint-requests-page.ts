@@ -13,6 +13,15 @@ import '../components/app-scaffold';
 const POLL_MS = 2000;
 const MAX_RENDERED = 200;
 
+const FILTERS = [
+  { value: 'all', label: 'requestsFilterAll' },
+  { value: 'direct', label: 'requestsDirect' },
+  { value: 'tunneled', label: 'requestsTunnel' },
+  { value: 'error', label: 'requestsFlowError' },
+] as const;
+
+type RequestFilter = (typeof FILTERS)[number]['value'];
+
 @customElement('entrypoint-requests-page')
 export class EntrypointRequestsPage extends LitElement {
   @property({ attribute: 'parent-type' }) parentType = '';
@@ -27,6 +36,8 @@ export class EntrypointRequestsPage extends LitElement {
   @state() private _savingKey = '';
   @state() private _rowErrors = new Map<string, string>();
   @state() private _expanded = new Set<string>();
+  @state() private _query = '';
+  @state() private _filter: RequestFilter = 'all';
 
   private _backend = new GoBackend();
   private _timer: ReturnType<typeof setTimeout> | null = null;
@@ -68,6 +79,8 @@ export class EntrypointRequestsPage extends LitElement {
     this._savingKey = '';
     this._rowErrors = new Map();
     this._expanded = new Set();
+    this._query = '';
+    this._filter = 'all';
     this._configurePolling();
     void this._load();
   }
@@ -121,6 +134,39 @@ export class EntrypointRequestsPage extends LitElement {
 
   private _requestKey(request: EntrypointRequest): string {
     return [request.time, request.host, request.dst, request.network, request.proto].join('|');
+  }
+
+  private _onSearchInput(event: Event) {
+    this._query = (event.target as HTMLInputElement).value;
+  }
+
+  private _matchesFilter(request: EntrypointRequest): boolean {
+    switch (this._filter) {
+      case 'direct':
+        return !request.tunneled;
+      case 'tunneled':
+        return request.tunneled;
+      case 'error':
+        return request.err !== '';
+      default:
+        return true;
+    }
+  }
+
+  private _matchesQuery(request: EntrypointRequest): boolean {
+    const query = this._query.trim().toLowerCase();
+    if (!query) return true;
+    return [request.host, request.dst].some(value => value.toLowerCase().includes(query));
+  }
+
+  private get _filteredRequests(): EntrypointRequest[] {
+    return this._requests.filter(
+      request => this._matchesFilter(request) && this._matchesQuery(request),
+    );
+  }
+
+  private get _filtering(): boolean {
+    return this._query.trim() !== '' || this._filter !== 'all';
   }
 
   private _toggleExpanded(request: EntrypointRequest) {
@@ -276,7 +322,13 @@ export class EntrypointRequestsPage extends LitElement {
   }
 
   render() {
-    const visible = this._requests.slice(0, MAX_RENDERED);
+    const filtered = this._filteredRequests;
+    const visible = filtered.slice(0, MAX_RENDERED);
+    const count = this._filtering
+      ? t('requestsFilteredCount', { shown: filtered.length, total: this._requests.length })
+      : t(this._requests.length === 1 ? 'requestsCountOne' : 'requestsCount', {
+          n: this._requests.length,
+        });
     return html`
       <app-scaffold>
         <div slot="appBar" class="page-header">
@@ -301,26 +353,50 @@ export class EntrypointRequestsPage extends LitElement {
 
         <div class="requests-panel">
           <div class="panel-header">
-            <span class="requests-count">${t(
-              this._requests.length === 1 ? 'requestsCountOne' : 'requestsCount',
-              { n: this._requests.length },
-            )}</span>
+            <span class="requests-count">${count}</span>
             ${this._pageHidden ? html`<div class="pause-indicator" role="status">${t('requestsPausedHidden')}</div>` : nothing}
           </div>
+          ${this._requests.length > 0
+            ? html`
+              <div class="request-tools">
+                <search class="requests-search">
+                  <label class="sr-only" for="requests-search">${t('requestsSearchLabel')}</label>
+                  <input id="requests-search" name="q" type="search" class="search-input"
+                    .value=${this._query}
+                    placeholder=${t('requestsSearchPlaceholder')}
+                    autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                    @input=${this._onSearchInput}>
+                </search>
+                <fieldset class="request-filters">
+                  <legend class="sr-only">${t('requestsFilterLabel')}</legend>
+                  ${FILTERS.map(filter => html`
+                    <label class="filter-chip">
+                      <input class="sr-only" type="radio" name="request-filter" value=${filter.value}
+                        .checked=${this._filter === filter.value}
+                        @change=${() => { this._filter = filter.value; }}>
+                      <span>${t(filter.label)}</span>
+                    </label>
+                  `)}
+                </fieldset>
+              </div>
+            `
+            : nothing}
           ${this._error ? html`<div class="requests-error" role="alert">${this._error}</div>` : nothing}
           ${this._requests.length === 0
             ? html`<div class="requests-empty">${t('requestsEmpty')}</div>`
-            : html`
-              <ol class="request-list" role="list" aria-label=${t('requestsPageTitle')}>
-                ${visible.map(request => this._renderRequest(request))}
-              </ol>
-              ${this._requests.length > visible.length
-                ? html`<div class="showing-count">${t('requestsShowing', {
-                    shown: visible.length,
-                    total: this._requests.length,
-                  })}</div>`
-                : nothing}
-            `}
+            : filtered.length === 0
+              ? html`<div class="requests-no-matches">${t('requestsNoMatches')}</div>`
+              : html`
+                <ol class="request-list" role="list" aria-label=${t('requestsPageTitle')}>
+                  ${visible.map(request => this._renderRequest(request))}
+                </ol>
+                ${filtered.length > visible.length
+                  ? html`<div class="showing-count">${t('requestsShowing', {
+                      shown: visible.length,
+                      total: filtered.length,
+                    })}</div>`
+                  : nothing}
+              `}
         </div>
       </app-scaffold>
     `;
@@ -372,6 +448,36 @@ export class EntrypointRequestsPage extends LitElement {
       font-size: var(--font-sm); line-height: 1.4;
     }
     .requests-empty { padding: 32px 12px; text-align: center; color: var(--text-muted); font-size: var(--font-sm); }
+    .requests-no-matches { padding: 32px 12px; text-align: center; color: var(--text-muted); font-size: var(--font-sm); }
+    .request-tools {
+      min-width: 0; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .requests-search { min-width: 0; }
+    .search-input {
+      width: 100%; box-sizing: border-box; padding: 7px 10px;
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      background: var(--surface); color: var(--text);
+      font: inherit; font-size: max(1rem, 1em); outline: none;
+      transition: border-color var(--transition-fast);
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .request-filters {
+      min-width: 0; margin: 0; padding: 0; border: 0;
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .filter-chip {
+      position: relative; min-height: 28px; box-sizing: border-box; padding: 3px 10px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border-subtle); border-radius: 999px;
+      background: var(--surface); color: var(--text-secondary);
+      font-size: var(--font-xs); cursor: pointer;
+    }
+    .filter-chip:has(input:checked) {
+      border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600;
+    }
+    .filter-chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
     .request-list {
       list-style: none; min-width: 0; margin: 0; padding: 8px;
       display: flex; flex-direction: column; gap: 4px; overflow-x: hidden;
@@ -450,6 +556,7 @@ export class EntrypointRequestsPage extends LitElement {
     .showing-count { padding: 8px 12px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--font-xs); }
     @media (pointer: coarse) {
       .back-btn, .auto-toggle, .refresh-button { min-height: 36px; }
+      .filter-chip { min-height: 32px; }
     }
   `;
 }
