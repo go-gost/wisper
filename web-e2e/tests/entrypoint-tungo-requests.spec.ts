@@ -19,6 +19,7 @@ const FLOWS = [
     err: '',
     path: [
       { chain: 'hub', hop: 0, node: 'home', addr: '127.0.0.1:8421', connect_ms: 12, err: '' },
+      { chain: '', hop: 1, node: '', addr: '198.51.100.10:443', connect_ms: 0, err: '' },
     ],
   },
   {
@@ -130,7 +131,7 @@ async function mockEntrypoint(
   };
 }
 
-test('renders compact newest-first tunnel and direct flows and polls on the two-second tick', async ({ page }) => {
+test('renders inspector cards newest-first and polls on the two-second tick', async ({ page }) => {
   // Playwright's clock makes the polling assertion deterministic: runFor(2000)
   // advances exactly one refresh interval instead of racing a wall-clock timeout.
   const now = new Date('2026-11-26T12:00:00Z');
@@ -144,58 +145,121 @@ test('renders compact newest-first tunnel and direct flows and polls on the two-
   await expect(requestsPage.getByRole('heading', { name: 'Recent requests' })).toBeVisible();
   await expect(requestsPage.locator('.requests-count')).toHaveText('4 requests');
   const rows = requestsPage.locator('.request-row');
+  const list = requestsPage.locator('.request-list');
   await expect(rows).toHaveCount(4);
-  await expect(rows.first()).toHaveCSS('padding', '6px 12px');
-  await expect(requestsPage.locator('.requests-panel')).toBeVisible();
+  await expect(list).toHaveCSS('display', 'flex');
+  await expect(list).toHaveCSS('flex-direction', 'column');
+  await expect(list).toHaveCSS('row-gap', '4px');
+  await expect(rows.first()).toHaveCSS('padding', '8px 12px');
+  await expect(rows.first()).toHaveCSS('border-radius', '4px');
+  await expect(rows.first()).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(requestsPage.locator('.route-badge')).toHaveCount(0);
 
   const tunneled = rows.nth(0);
   await expect(tunneled).toContainText('api.example.com');
   await expect(tunneled).toContainText(':443');
   await expect(tunneled).not.toContainText('198.51.100.10');
-  await expect(tunneled.locator('.route-badge')).toHaveText('Tunnel');
+  const lock = tunneled.locator('.tunnel-lock');
+  await expect(lock).toHaveAttribute('title', 'Tunnel');
+  await expect(lock).toHaveAttribute('aria-label', 'Tunnel');
+  await expect(lock.locator('svg')).toHaveCount(1);
   await expect(tunneled).toContainText('tcp · http');
   await expect(tunneled).toContainText('1.00 KB');
   await expect(tunneled).toContainText('2.00 KB');
-  await expect(tunneled).toContainText('0.0 s');
-  await expect(tunneled.locator('time')).toHaveText(/^\d{2}:\d{2}:\d{2}$/);
+  await expect(tunneled.locator('.duration')).toHaveText('12.0ms');
+  await expect(tunneled.locator('.request-meta time')).toHaveText(/^\d{2}:\d{2}:\d{2}$/);
 
   const direct = rows.nth(1);
   await expect(direct).toContainText('192.0.2.20:80');
-  await expect(direct.locator('.route-badge')).toHaveText('Direct');
+  await expect(direct.locator('.tunnel-lock, .route-badge')).toHaveCount(0);
+  await expect(direct.locator('.duration')).toHaveText('4.0ms');
 
   const udp = rows.nth(2);
   await expect(udp).toContainText('198.51.100.53:5353');
   await expect(udp).toContainText('udp · dns');
-  await expect(udp.locator('.route-badge')).toHaveText('Tunnel');
-  await expect(udp.locator('.request-error')).toContainText('lookup failed');
+  await expect(udp.locator('.tunnel-lock')).toHaveAttribute('aria-label', 'Tunnel');
+  await expect(udp).toHaveClass(/error/);
+  await expect(udp).toHaveCSS('border-left-width', '2px');
+  await expect(udp.locator('.duration')).toHaveText('<1ms');
 
   const ipv6 = rows.nth(3);
   await expect(ipv6.locator('.destination')).toHaveText('[2001:4860:4860::8888]:443');
-  await expect(ipv6).toContainText('1.9 s');
+  await expect(ipv6.locator('.duration')).toHaveText('1.9s');
 
-  // Path hops stay out of the default one-line row and expand from it. The
-  // row's accessible name keeps its facts instead of only saying "Show path".
-  await expect(requestsPage.locator('.request-path')).toHaveCount(0);
-  await expect(tunneled.getByRole('button', { name: /api\.example\.com.*Tunnel.*Show path/ })).toBeVisible();
+  // Details stay out of the collapsed card. The row's accessible name keeps
+  // its destination and action instead of only saying "Show path".
+  await expect(requestsPage.locator('.detail-chips')).toHaveCount(0);
+  await expect(tunneled.getByRole('button', { name: /api\.example\.com.*Show path/ })).toBeVisible();
   await tunneled.locator('.row-toggle').click();
-  const path = tunneled.locator('.request-path');
-  await expect(path).toBeVisible();
-  await expect(path).toContainText('home');
-  await expect(path).toContainText('127.0.0.1:8421');
-  await expect(path).toContainText('12.00ms');
+  const details = tunneled.locator('.detail-chips');
+  await expect(details).toBeVisible();
+  await expect(details).toContainText('Host: api.example.com');
+  await expect(details).toContainText('Target: api.example.com:443');
+  await expect(details).toContainText('Route: home@127.0.0.1:8421 → 198.51.100.10:443');
+  await expect(details).toContainText('Duration: 12.0ms');
+  await expect(details).toContainText('Bytes: ↑1.00 KB ↓2.00 KB');
   await tunneled.locator('.row-toggle').click();
-  await expect(path).toBeHidden();
+  await expect(details).toBeHidden();
+
+  await direct.locator('.row-toggle').click();
+  await expect(direct.locator('.detail-chips')).toContainText('Route: direct');
+  await expect(direct.locator('.detail-chips')).not.toContainText('Host:');
+
+  await udp.locator('.row-toggle').click();
+  await expect(udp.locator('.detail-chip.error')).toHaveText('Error: lookup failed');
 
   await expect.poll(() => mock.requestCalls()).toBe(1);
   await page.clock.runFor(2000);
   await expect.poll(() => mock.requestCalls()).toBe(2);
 });
 
+test('uses a full local timestamp for older records and a clock time for today', async ({ page }) => {
+  const now = new Date(2026, 10, 27, 12, 0, 0);
+  await page.clock.install({ time: now });
+  const requests = [
+    { ...FLOWS[1], time: new Date(2026, 10, 27, 11, 59, 59).toISOString(), dst: '192.0.2.30:80' },
+    { ...FLOWS[1], time: new Date(2026, 10, 26, 12, 0, 0).toISOString(), dst: '192.0.2.31:80' },
+  ];
+  await mockEntrypoint(page, { requests });
+  await page.goto(REQUESTS);
+
+  const rows = page.locator('entrypoint-requests-page .request-row');
+  await expect(rows.nth(0).locator('.request-meta time')).toHaveText(/^\d{2}:\d{2}:\d{2}$/);
+  await expect(rows.nth(1).locator('.request-meta time')).toHaveText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+});
+
+test('formats request durations with the inspector units and precision', async ({ page }) => {
+  const cases = [
+    { duration_ms: 0.586, expected: '586µs' },
+    { duration_ms: 45.6, expected: '45.6ms' },
+    { duration_ms: 10_000, expected: '10.0s' },
+    { duration_ms: 61_000, expected: '1m1s' },
+    { duration_ms: 3_661_000, expected: '1h1m1s' },
+  ];
+  const requests = cases.map(({ duration_ms }, index) => ({
+    ...FLOWS[1],
+    time: new Date(Date.UTC(2026, 10, 26, 12, 0, index)).toISOString(),
+    dst: `192.0.2.${index + 40}:80`,
+    duration_ms,
+  }));
+  await mockEntrypoint(page, { requests });
+  await page.goto(REQUESTS);
+
+  const rows = page.locator('entrypoint-requests-page .request-row');
+  for (const [index, { expected }] of cases.entries()) {
+    const row = rows.filter({ hasText: `192.0.2.${index + 40}:80` });
+    await expect(row.locator('.duration')).toHaveText(expected);
+  }
+});
+
 test.describe('phone-width request rows', () => {
   test.use({ viewport: { width: 360, height: 800 } });
 
   test('keeps every row and rule action inside the viewport', async ({ page }) => {
-    await mockEntrypoint(page);
+    const requests = FLOWS.map((request, index) => index === 0
+      ? { ...request, host: 'a-very-long-hostname-that-must-truncate.example.com' }
+      : request);
+    await mockEntrypoint(page, { requests });
     await page.goto(REQUESTS);
 
     const requestsPage = page.locator('entrypoint-requests-page');
@@ -238,20 +302,35 @@ test.describe('phone-width request rows', () => {
 
     const ipv6 = rows.nth(3);
     await expect(ipv6.locator('.destination')).toHaveText('[2001:4860:4860::8888]:443');
-    const ipv6Destination = await ipv6.locator('.destination').evaluate(element => ({
+
+    const expandedRow = rows.first();
+    const longDestination = await expandedRow.locator('.destination').evaluate(element => ({
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
     }));
-    expect(ipv6Destination.scrollWidth).toBeGreaterThan(ipv6Destination.clientWidth);
-
-    const expandedRow = rows.first();
+    expect(longDestination.scrollWidth).toBeGreaterThan(longDestination.clientWidth);
     await expandedRow.locator('.row-toggle').click();
-    await expect(expandedRow.locator('.request-path')).toBeVisible();
+    await expect(expandedRow.locator('.detail-chips')).toBeVisible();
     const expandedSize = await expandedRow.evaluate(element => ({
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
     }));
     expect(expandedSize.scrollWidth).toBeLessThanOrEqual(expandedSize.clientWidth + 1);
+
+    const timestamp = expandedRow.locator('.request-meta time');
+    await expect(timestamp).toHaveCSS('white-space', 'nowrap');
+    await expect(timestamp).toHaveCSS('flex-shrink', '0');
+    const timestampSize = await timestamp.evaluate(element => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }));
+    expect(timestampSize.scrollWidth).toBeLessThanOrEqual(timestampSize.clientWidth + 1);
+
+    const pageWidth = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(pageWidth.scrollWidth).toBeLessThanOrEqual(pageWidth.clientWidth + 1);
   });
 });
 
@@ -320,7 +399,7 @@ test('renders exact, suffix, CIDR, and port-normalized rule coverage', async ({ 
     await expect(row.locator('.rule-covered')).toHaveAttribute('aria-label', label);
     await expect(row.locator('.rule-covered svg polyline')).toHaveCount(1);
     await expect(row.locator('.rule-action')).toHaveCount(0);
-    await expect(row.getByRole('button')).toHaveCount(0);
+    await expect(row.locator('.row-toggle')).toHaveAttribute('aria-expanded', 'false');
   }
 
   const exact = rows.filter({ hasText: 'exact.example:443' });

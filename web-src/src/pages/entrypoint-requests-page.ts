@@ -5,7 +5,7 @@ import { GoBackend } from '../api/backend';
 import type { Entrypoint, EntrypointRequest } from '../api/types';
 import { t } from '../i18n/i18n';
 import { icon } from '../utils/icons';
-import { formatBytes, formatClockTime, formatDuration } from '../utils/format';
+import { formatBytes, formatDuration, formatRequestTimestamp } from '../utils/format';
 import { requestDestination, ruleCovers } from '../utils/entrypoint-request';
 import { updateEntrypointRules } from '../store/entrypoint-store';
 import '../components/app-scaffold';
@@ -163,19 +163,32 @@ export class EntrypointRequestsPage extends LitElement {
     }
   }
 
-  private _renderPath(request: EntrypointRequest) {
+  private _renderDetailChip(label: string, value: string, error = false) {
     return html`
-      <div class="path-heading">${t('requestsPath')}</div>
-      <ol class="request-path" role="list">
-        ${(request.path ?? []).map(hop => html`
-          <li>
-            <span>${t('requestsHop', { n: hop.hop })} · ${hop.chain || '—'} · ${hop.node || '—'}</span>
-            <span class="path-address" title=${hop.addr}>${hop.addr}</span>
-            <span>${formatDuration(hop.connect_ms * 1_000_000)}</span>
-            ${hop.err ? html`<span class="request-error">${t('requestsFlowError')}: ${hop.err}</span>` : nothing}
-          </li>
-        `)}
-      </ol>
+      <span class="detail-chip ${error ? 'error' : ''}">
+        <span class="detail-label">${label}:</span>
+        <span class="detail-value">${value}</span>
+      </span>
+    `;
+  }
+
+  private _renderDetails(request: EntrypointRequest, destination: string, duration: string) {
+    const route = request.path?.length
+      ? request.path.map(hop => hop.node ? `${hop.node}@${hop.addr}` : hop.addr).join(' → ')
+      : t('requestsRouteDirect');
+    const bytes = t('requestsTrafficValue', {
+      in: formatBytes(request.input_bytes),
+      out: formatBytes(request.output_bytes),
+    });
+    return html`
+      <div class="detail-chips">
+        ${request.host ? this._renderDetailChip(t('requestsHost'), request.host) : nothing}
+        ${this._renderDetailChip(t('fieldTarget'), destination)}
+        ${this._renderDetailChip(t('requestsRoute'), route)}
+        ${this._renderDetailChip(t('requestsDuration'), duration)}
+        ${this._renderDetailChip(t('requestsBytes'), bytes)}
+        ${request.err ? this._renderDetailChip(t('requestsFlowError'), request.err, true) : nothing}
+      </div>
     `;
   }
 
@@ -187,40 +200,40 @@ export class EntrypointRequestsPage extends LitElement {
     const coveringRule = listed ? undefined : rules.find(rule => ruleCovers(rule, destination.key));
     const coveredLabel = coveringRule ? t('requestsRuleCoveredBy', { rule: coveringRule }) : '';
     const protocol = [request.network, request.proto].filter(Boolean).join(' · ');
-    const duration = `${(request.duration_ms / 1000).toFixed(1)} s`;
+    const traffic = t('requestsTrafficValue', {
+      in: formatBytes(request.input_bytes),
+      out: formatBytes(request.output_bytes),
+    });
+    const summary = [protocol, traffic].filter(Boolean).join(' · ');
+    const duration = formatDuration(request.duration_ms * 1_000_000);
     const key = this._requestKey(request);
     const expanded = this._expanded.has(key);
-    const hasPath = Boolean(request.path?.length);
     const rowError = this._rowErrors.get(destination.key);
     const actionLabel = listed
       ? t('requestsRemoveRuleFor', { destination: destination.key })
       : t('requestsAddRuleFor', { destination: destination.key });
     const primary = html`
-      <time datetime=${request.time}>${formatClockTime(Date.parse(request.time))}</time>
       <span class="destination" title=${destinationLabel}>
         ${destination.name}${destination.port ? html`<span class="destination-port">:${destination.port}</span>` : nothing}
       </span>
-      <span class="route-badge ${request.tunneled ? 'tunnel' : 'direct'}">
-        ${request.tunneled ? t('requestsTunnel') : t('requestsDirect')}
-      </span>
-      ${hasPath
-        ? html`
-          <span class="path-chevron" aria-hidden="true">${icon(expanded ? 'chevron-down' : 'chevron-right')}</span>
-          <span class="sr-only">${expanded
-            ? t('requestsPathHide', { destination: destinationLabel })
-            : t('requestsPathShow', { destination: destinationLabel })}</span>
-        `
+      ${request.tunneled
+        ? html`<span class="tunnel-lock" role="img" title=${t('requestsTunnel')} aria-label=${t('requestsTunnel')}>
+            ${icon('lock')}
+          </span>`
         : nothing}
+      <span class="duration">${duration}</span>
+      <span class="path-chevron" aria-hidden="true">${icon(expanded ? 'chevron-down' : 'chevron-right')}</span>
+      <span class="sr-only">${expanded
+        ? t('requestsPathHide', { destination: destinationLabel })
+        : t('requestsPathShow', { destination: destinationLabel })}</span>
     `;
 
     return html`
-      <li class="request-row">
+      <li class="request-row ${request.err ? 'error' : ''}">
         <div class="request-line">
-          ${hasPath
-            ? html`<button type="button" class="row-toggle"
-                aria-expanded=${expanded}
-                @click=${() => this._toggleExpanded(request)}>${primary}</button>`
-            : html`<div class="row-content">${primary}</div>`}
+          <button type="button" class="row-toggle"
+            aria-expanded=${expanded}
+            @click=${() => this._toggleExpanded(request)}>${primary}</button>
           ${destination.key
             ? listed
               ? html`<button type="button" class="rule-action"
@@ -244,19 +257,11 @@ export class EntrypointRequestsPage extends LitElement {
             : nothing}
         </div>
         <div class="request-meta">
-          ${protocol ? html`<span class="protocol">${protocol}</span><span class="meta-separator">·</span>` : nothing}
-          <span class="traffic">${t('requestsTrafficValue', {
-            in: formatBytes(request.input_bytes),
-            out: formatBytes(request.output_bytes),
-          })}</span>
-          <span class="meta-separator">·</span>
-          <span class="duration">${duration}</span>
-          ${request.err
-            ? html`<span class="request-error" title=${request.err}>${request.err}</span>`
-            : nothing}
+          <span class="meta-summary" title=${summary}>${summary}</span>
+          <time class="meta-time" datetime=${request.time}>${formatRequestTimestamp(request.time)}</time>
         </div>
         ${rowError ? html`<div class="row-error" role="alert">${rowError}</div>` : nothing}
-        ${hasPath && expanded ? this._renderPath(request) : nothing}
+        ${expanded ? this._renderDetails(request, destinationLabel, duration) : nothing}
       </li>
     `;
   }
@@ -367,34 +372,36 @@ export class EntrypointRequestsPage extends LitElement {
       font-size: var(--font-sm); line-height: 1.4;
     }
     .requests-empty { padding: 32px 12px; text-align: center; color: var(--text-muted); font-size: var(--font-sm); }
-    .request-list { list-style: none; min-width: 0; margin: 0; padding: 0; overflow-x: hidden; }
-    .request-row {
-      min-width: 0; padding: 6px 12px; border-bottom: 1px solid var(--border-subtle); font-size: var(--font-sm);
+    .request-list {
+      list-style: none; min-width: 0; margin: 0; padding: 8px;
+      display: flex; flex-direction: column; gap: 4px; overflow-x: hidden;
     }
-    .request-row:last-child { border-bottom: none; }
+    .request-row {
+      min-width: 0; box-sizing: border-box; padding: 8px 12px;
+      border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+      background: var(--surface); font-size: var(--font-sm);
+    }
+    .request-row.error { border-left: 2px solid var(--red); }
     .request-row:hover { background: var(--border-subtle); }
     .request-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .row-toggle, .row-content {
+    .row-toggle {
       flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px;
       border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: left;
-      white-space: nowrap;
+      white-space: nowrap; cursor: pointer;
     }
-    .row-toggle { cursor: pointer; }
     .row-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 2px; }
-    .request-row time {
-      color: var(--text-muted); font-family: var(--font-mono, 'SF Mono', monospace); flex-shrink: 0;
-    }
     .destination {
       flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-      white-space: nowrap; color: var(--text);
+      white-space: nowrap; color: var(--text); font-family: var(--font-mono, 'SF Mono', monospace);
+      font-weight: 500;
     }
     .destination-port { color: var(--text-muted); }
-    .route-badge {
-      display: inline-flex; align-items: center; justify-content: center; padding: 1px 6px;
-      border-radius: var(--radius-pill); font-size: var(--font-xs); font-weight: 600; flex-shrink: 0;
+    .tunnel-lock { display: inline-flex; color: var(--accent); flex-shrink: 0; }
+    .tunnel-lock svg { width: 13px; height: 13px; }
+    .duration {
+      margin-left: auto; flex-shrink: 0; color: var(--text-muted);
+      font-family: var(--font-mono, 'SF Mono', monospace);
     }
-    .route-badge.tunnel { color: var(--info); background: var(--info-bg); }
-    .route-badge.direct { color: var(--green-text); background: var(--green-bg); }
     .path-chevron { display: inline-flex; color: var(--text-muted); flex-shrink: 0; }
     .path-chevron svg { width: 12px; height: 12px; }
     .rule-action {
@@ -411,31 +418,35 @@ export class EntrypointRequestsPage extends LitElement {
       color: var(--text-muted); cursor: default; flex-shrink: 0;
     }
     .request-meta {
-      min-width: 0; margin-top: 2px; color: var(--text-muted); font-size: var(--font-xs);
-      line-height: 1.4; overflow-wrap: anywhere;
+      min-width: 0; margin-top: 2px; display: flex; align-items: center; gap: 8px;
+      color: var(--text-muted); font-size: var(--font-xs); line-height: 1.4;
     }
-    .protocol, .traffic, .duration {
-      color: var(--text-muted); font-family: var(--font-mono, 'SF Mono', monospace);
+    .meta-summary {
+      flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .meta-separator { color: var(--text-muted); }
-    .request-error {
-      display: block; min-width: 0; max-width: 100%; margin-top: 2px; overflow: hidden;
-      text-overflow: ellipsis; white-space: nowrap; color: var(--red-text);
+    .meta-time {
+      margin-left: auto; flex: 0 0 auto; color: var(--text-muted);
+      font-family: var(--font-mono, 'SF Mono', monospace); white-space: nowrap;
     }
+    .detail-chips {
+      min-width: 0; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .detail-chip {
+      min-width: 0; max-width: 100%; box-sizing: border-box; padding: 2px 6px;
+      display: inline-flex; align-items: baseline; gap: 4px; border-radius: var(--radius-sm);
+      background: var(--border-subtle); color: var(--text-secondary);
+      font-size: var(--font-xs); line-height: 1.4; overflow-wrap: anywhere;
+    }
+    .detail-label { flex-shrink: 0; color: var(--text-muted); }
+    .detail-value {
+      min-width: 0; font-family: var(--font-mono, 'SF Mono', monospace); overflow-wrap: anywhere;
+    }
+    .detail-chip.error { background: var(--red-bg); color: var(--red-text); }
+    .detail-chip.error .detail-label { color: var(--red-text); }
     .row-error {
       min-width: 0; margin-top: 5px; color: var(--red-text); font-size: var(--font-xs);
       line-height: 1.4; overflow-wrap: anywhere;
     }
-    .path-heading { margin-top: 6px; color: var(--text-muted); font-size: var(--font-xs); font-weight: 600; }
-    .request-path {
-      min-width: 0; margin: 2px 0 0; padding: 0; list-style: none; color: var(--text-muted); font-size: var(--font-xs);
-    }
-    .request-path li {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; line-height: 1.5;
-    }
-    .request-path li > span { min-width: 0; overflow-wrap: anywhere; }
-    .request-path .path-address { flex: 1 1 100%; }
-    .request-path .request-error { color: var(--red-text); }
     .showing-count { padding: 8px 12px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--font-xs); }
     @media (pointer: coarse) {
       .back-btn, .auto-toggle, .refresh-button { min-height: 36px; }

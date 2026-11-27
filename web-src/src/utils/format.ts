@@ -45,14 +45,38 @@ export function formatTimestamp(iso: string): string {
 }
 
 /**
- * Format a nanosecond duration as "<1ms" / "Nµs" / "N.Nms" / "N.Ns" —
- * matches go-gost/inspector's fmtDuration().
+ * Format a nanosecond duration as "<1ms" / "Nµs" / "N.Nms" / "N.Ns" /
+ * "NmNs" / "NhNmNs" — matches go-gost/inspector's fmtDuration().
  */
 export function formatDuration(ns: number): string {
   if (!ns || ns <= 0) return '<1ms';
   if (ns < 1_000_000) return `${Math.round(ns / 1000)}µs`;
-  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(2)}ms`;
-  return `${(ns / 1_000_000_000).toFixed(2)}s`;
+  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(1)}ms`;
+
+  const totalSec = ns / 1_000_000_000;
+  if (totalSec < 60) return `${totalSec.toFixed(1)}s`;
+
+  const min = Math.floor(totalSec / 60);
+  const sec = Math.floor(totalSec % 60);
+  if (min < 60) return `${min}m${sec}s`;
+
+  const hr = Math.floor(min / 60);
+  const rm = min % 60;
+  return `${hr}h${rm}m${sec}s`;
+}
+
+/** Format a request timestamp as a local clock time today, or a local date
+ * and clock time for older records. Milliseconds are omitted to keep narrow
+ * request rows readable. */
+export function formatRequestTimestamp(iso: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return '';
+  const now = new Date();
+  const today = date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate();
+  return today ? formatClockTime(date.getTime()) : formatTimestamp(iso);
 }
 
 /**
