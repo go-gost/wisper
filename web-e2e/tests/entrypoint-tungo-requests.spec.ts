@@ -194,8 +194,8 @@ test('renders inspector cards newest-first and polls on the two-second tick', as
   const details = tunneled.locator('.detail-chips');
   await expect(details).toBeVisible();
   await expect(details).toContainText('Host: api.example.com');
-  await expect(details).toContainText('Target: api.example.com:443');
-  await expect(details).toContainText('Route: home@127.0.0.1:8421 → 198.51.100.10:443');
+  await expect(details).toContainText('Target: 198.51.100.10:443');
+  await expect(details).toContainText('Route: hub/home → 198.51.100.10:443');
   await expect(details).toContainText('Duration: 12.0ms');
   await expect(details).toContainText('Bytes: ↑1.00 KB ↓2.00 KB');
   await tunneled.locator('.row-toggle').click();

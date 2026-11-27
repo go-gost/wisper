@@ -1,42 +1,42 @@
-import{a as T,G as P,c as r,C,b as l,A as c,i as D,t as I}from"./index-C6CHXxAQ.js";import{a as _,h as z,i as S,n as $,r as h}from"./format-TgQuDvMi.js";import{i as u}from"./app-scaffold-2XSuHyAg.js";import{a as y,b as w}from"./entrypoint-request-BlTsP51B.js";var H=Object.defineProperty,K=Object.getOwnPropertyDescriptor,p=(e,t,i,n)=>{for(var s=n>1?void 0:n?K(t,i):t,a=e.length-1,o;a>=0;a--)(o=e[a])&&(s=(n?o(t,i,s):o(s))||s);return n&&s&&H(t,i,s),s};const j=2e3,M=200;let d=class extends T{constructor(){super(...arguments),this.parentType="",this.parentId="",this._requests=[],this._entrypoint=null,this._error="",this._auto=!0,this._loading=!1,this._pageHidden=document.visibilityState!=="visible",this._savingKey="",this._rowErrors=new Map,this._expanded=new Set,this._backend=new P,this._timer=null,this._connected=!1,this._activeId="",this._loadToken=0,this._onVisibilityChange=()=>{this._pageHidden=document.visibilityState!=="visible",this._configurePolling(),!this._pageHidden&&this._auto&&this._load()}}connectedCallback(){super.connectedCallback(),this._connected=!0,this._activeId=this.parentId,this._pageHidden=document.visibilityState!=="visible",document.addEventListener("visibilitychange",this._onVisibilityChange),this._configurePolling(),this._load()}disconnectedCallback(){this._connected=!1,document.removeEventListener("visibilitychange",this._onVisibilityChange),this._clearTimer(),super.disconnectedCallback()}updated(e){!e.has("parentId")||!this._connected||this.parentId===this._activeId||(this._activeId=this.parentId,this._loadToken+=1,this._requests=[],this._entrypoint=null,this._error="",this._loading=!1,this._savingKey="",this._rowErrors=new Map,this._expanded=new Set,this._configurePolling(),this._load())}_clearTimer(){this._timer!==null&&clearTimeout(this._timer),this._timer=null}_configurePolling(){this._clearTimer(),!(!this._connected||!this._auto||this._pageHidden)&&(this._timer=window.setTimeout(()=>{this._timer=null,!(!this._connected||!this._auto||this._pageHidden)&&this._load().then(()=>this._configurePolling())},j))}async _load(e=!1){const t=this.parentId;if(!t||!this._connected||this._loading&&!e)return;const i=++this._loadToken;this._loading=!0;try{const[n,s]=await Promise.all([this._backend.getEntrypointRequests(t,500),this._backend.getEntrypoint(t)]);if(!this._connected||i!==this._loadToken||t!==this._activeId)return;this._requests=[...n.requests??[]].sort((a,o)=>Date.parse(o.time)-Date.parse(a.time)),this._entrypoint=s,this._error=""}catch(n){if(!this._connected||i!==this._loadToken||t!==this._activeId)return;const s=n instanceof Error?n.message:"";this._error=`${r("requestsError")}${s?`: ${s}`:""}`}finally{i===this._loadToken&&(this._loading=!1)}}_toggleAuto(){this._auto=!this._auto,this._configurePolling(),this._auto&&!this._pageHidden&&this._load()}_requestKey(e){return[e.time,e.host,e.dst,e.network,e.proto].join("|")}_toggleExpanded(e){const t=this._requestKey(e),i=new Set(this._expanded);i.has(t)?i.delete(t):i.add(t),this._expanded=i}_setRowError(e,t){const i=new Map(this._rowErrors);t?i.set(e,t):i.delete(e),this._rowErrors=i}async _toggleRule(e){const t=this.parentId,{key:i}=y(e);if(!t||!i||this._savingKey)return;const n=this._entrypoint?.options?.rules??[],s=n.includes(i);if(!s&&n.some(o=>w(o,i)))return;const a=s?n.filter(o=>o!==i):[...new Set([...n,i])];this._savingKey=i,this._setRowError(i,"");try{const o=await C(t,a);if(!this._connected||t!==this._activeId)return;this._entrypoint=o,await this._load(!0)}catch(o){if(!this._connected||t!==this._activeId)return;const g=o instanceof Error?o.message:"";this._setRowError(i,`${r("requestsRuleError")}${g?`: ${g}`:""}`)}finally{this._connected&&t===this._activeId&&(this._savingKey="")}}_renderDetailChip(e,t,i=!1){return l`
+import{a as T,G as P,c as s,C,b as o,A as c,i as D,t as I}from"./index-BV5MD0R3.js";import{a as _,h as z,i as S,n as $,r as h}from"./format-CQwwV_7H.js";import{i as u}from"./app-scaffold-E4RdUWBi.js";import{a as y,b as w}from"./entrypoint-request-BlTsP51B.js";var H=Object.defineProperty,K=Object.getOwnPropertyDescriptor,d=(e,t,i,n)=>{for(var r=n>1?void 0:n?K(t,i):t,p=e.length-1,a;p>=0;p--)(a=e[p])&&(r=(n?a(t,i,r):a(r))||r);return n&&r&&H(t,i,r),r};const j=2e3,M=200;let l=class extends T{constructor(){super(...arguments),this.parentType="",this.parentId="",this._requests=[],this._entrypoint=null,this._error="",this._auto=!0,this._loading=!1,this._pageHidden=document.visibilityState!=="visible",this._savingKey="",this._rowErrors=new Map,this._expanded=new Set,this._backend=new P,this._timer=null,this._connected=!1,this._activeId="",this._loadToken=0,this._onVisibilityChange=()=>{this._pageHidden=document.visibilityState!=="visible",this._configurePolling(),!this._pageHidden&&this._auto&&this._load()}}connectedCallback(){super.connectedCallback(),this._connected=!0,this._activeId=this.parentId,this._pageHidden=document.visibilityState!=="visible",document.addEventListener("visibilitychange",this._onVisibilityChange),this._configurePolling(),this._load()}disconnectedCallback(){this._connected=!1,document.removeEventListener("visibilitychange",this._onVisibilityChange),this._clearTimer(),super.disconnectedCallback()}updated(e){!e.has("parentId")||!this._connected||this.parentId===this._activeId||(this._activeId=this.parentId,this._loadToken+=1,this._requests=[],this._entrypoint=null,this._error="",this._loading=!1,this._savingKey="",this._rowErrors=new Map,this._expanded=new Set,this._configurePolling(),this._load())}_clearTimer(){this._timer!==null&&clearTimeout(this._timer),this._timer=null}_configurePolling(){this._clearTimer(),!(!this._connected||!this._auto||this._pageHidden)&&(this._timer=window.setTimeout(()=>{this._timer=null,!(!this._connected||!this._auto||this._pageHidden)&&this._load().then(()=>this._configurePolling())},j))}async _load(e=!1){const t=this.parentId;if(!t||!this._connected||this._loading&&!e)return;const i=++this._loadToken;this._loading=!0;try{const[n,r]=await Promise.all([this._backend.getEntrypointRequests(t,500),this._backend.getEntrypoint(t)]);if(!this._connected||i!==this._loadToken||t!==this._activeId)return;this._requests=[...n.requests??[]].sort((p,a)=>Date.parse(a.time)-Date.parse(p.time)),this._entrypoint=r,this._error=""}catch(n){if(!this._connected||i!==this._loadToken||t!==this._activeId)return;const r=n instanceof Error?n.message:"";this._error=`${s("requestsError")}${r?`: ${r}`:""}`}finally{i===this._loadToken&&(this._loading=!1)}}_toggleAuto(){this._auto=!this._auto,this._configurePolling(),this._auto&&!this._pageHidden&&this._load()}_requestKey(e){return[e.time,e.host,e.dst,e.network,e.proto].join("|")}_toggleExpanded(e){const t=this._requestKey(e),i=new Set(this._expanded);i.has(t)?i.delete(t):i.add(t),this._expanded=i}_setRowError(e,t){const i=new Map(this._rowErrors);t?i.set(e,t):i.delete(e),this._rowErrors=i}async _toggleRule(e){const t=this.parentId,{key:i}=y(e);if(!t||!i||this._savingKey)return;const n=this._entrypoint?.options?.rules??[],r=n.includes(i);if(!r&&n.some(a=>w(a,i)))return;const p=r?n.filter(a=>a!==i):[...new Set([...n,i])];this._savingKey=i,this._setRowError(i,"");try{const a=await C(t,p);if(!this._connected||t!==this._activeId)return;this._entrypoint=a,await this._load(!0)}catch(a){if(!this._connected||t!==this._activeId)return;const g=a instanceof Error?a.message:"";this._setRowError(i,`${s("requestsRuleError")}${g?`: ${g}`:""}`)}finally{this._connected&&t===this._activeId&&(this._savingKey="")}}_renderDetailChip(e,t,i=!1){return o`
       <span class="detail-chip ${i?"error":""}">
         <span class="detail-label">${e}:</span>
         <span class="detail-value">${t}</span>
       </span>
-    `}_renderDetails(e,t,i){const n=e.path?.length?e.path.map(a=>a.node?`${a.node}@${a.addr}`:a.addr).join(" → "):r("requestsRouteDirect"),s=r("requestsTrafficValue",{in:_(e.input_bytes),out:_(e.output_bytes)});return l`
+    `}_renderDetails(e,t){const i=e.path?.length?e.path.map(r=>r.chain&&r.node?`${r.chain}/${r.node}`:r.chain||r.node||r.addr).join(" → "):s("requestsRouteDirect"),n=s("requestsTrafficValue",{in:_(e.input_bytes),out:_(e.output_bytes)});return o`
       <div class="detail-chips">
-        ${e.host?this._renderDetailChip(r("requestsHost"),e.host):c}
-        ${this._renderDetailChip(r("fieldTarget"),t)}
-        ${this._renderDetailChip(r("requestsRoute"),n)}
-        ${this._renderDetailChip(r("requestsDuration"),i)}
-        ${this._renderDetailChip(r("requestsBytes"),s)}
-        ${e.err?this._renderDetailChip(r("requestsFlowError"),e.err,!0):c}
+        ${e.host&&e.host!==e.dst?this._renderDetailChip(s("requestsHost"),e.host):c}
+        ${this._renderDetailChip(s("fieldTarget"),e.dst)}
+        ${this._renderDetailChip(s("requestsRoute"),i)}
+        ${this._renderDetailChip(s("requestsDuration"),t)}
+        ${this._renderDetailChip(s("requestsBytes"),n)}
+        ${e.err?this._renderDetailChip(s("requestsFlowError"),e.err,!0):c}
       </div>
-    `}_renderRequest(e){const t=y(e),i=`${t.name}${t.port?`:${t.port}`:""}`,n=this._entrypoint?.options?.rules??[],s=n.includes(t.key),a=s?void 0:n.find(R=>w(R,t.key)),o=a?r("requestsRuleCoveredBy",{rule:a}):"",g=[e.network,e.proto].filter(Boolean).join(" · "),k=r("requestsTrafficValue",{in:_(e.input_bytes),out:_(e.output_bytes)}),b=[g,k].filter(Boolean).join(" · "),x=z(e.duration_ms*1e6),q=this._requestKey(e),f=this._expanded.has(q),m=this._rowErrors.get(t.key),v=s?r("requestsRemoveRuleFor",{destination:t.key}):r("requestsAddRuleFor",{destination:t.key}),E=l`
+    `}_renderRequest(e){const t=y(e),i=`${t.name}${t.port?`:${t.port}`:""}`,n=this._entrypoint?.options?.rules??[],r=n.includes(t.key),p=r?void 0:n.find(R=>w(R,t.key)),a=p?s("requestsRuleCoveredBy",{rule:p}):"",g=[e.network,e.proto].filter(Boolean).join(" · "),k=s("requestsTrafficValue",{in:_(e.input_bytes),out:_(e.output_bytes)}),x=[g,k].filter(Boolean).join(" · "),b=z(e.duration_ms*1e6),q=this._requestKey(e),f=this._expanded.has(q),m=this._rowErrors.get(t.key),v=r?s("requestsRemoveRuleFor",{destination:t.key}):s("requestsAddRuleFor",{destination:t.key}),E=o`
       <span class="destination" title=${i}>
-        ${t.name}${t.port?l`<span class="destination-port">:${t.port}</span>`:c}
+        ${t.name}${t.port?o`<span class="destination-port">:${t.port}</span>`:c}
       </span>
-      ${e.tunneled?l`<span class="tunnel-lock" role="img" title=${r("requestsTunnel")} aria-label=${r("requestsTunnel")}>
+      ${e.tunneled?o`<span class="tunnel-lock" role="img" title=${s("requestsTunnel")} aria-label=${s("requestsTunnel")}>
             ${u("lock")}
           </span>`:c}
-      <span class="duration">${x}</span>
+      <span class="duration">${b}</span>
       <span class="path-chevron" aria-hidden="true">${u(f?"chevron-down":"chevron-right")}</span>
-      <span class="sr-only">${f?r("requestsPathHide",{destination:i}):r("requestsPathShow",{destination:i})}</span>
-    `;return l`
+      <span class="sr-only">${f?s("requestsPathHide",{destination:i}):s("requestsPathShow",{destination:i})}</span>
+    `;return o`
       <li class="request-row ${e.err?"error":""}">
         <div class="request-line">
           <button type="button" class="row-toggle"
             aria-expanded=${f}
             @click=${()=>this._toggleExpanded(e)}>${E}</button>
-          ${t.key?s?l`<button type="button" class="rule-action"
+          ${t.key?r?o`<button type="button" class="rule-action"
                   title=${v}
                   aria-label=${v}
                   ?disabled=${this._savingKey!==""}
                   @click=${()=>this._toggleRule(e)}>
                   <span aria-hidden="true">${u("minus")}</span>
-                </button>`:a?l`<span class="rule-covered" role="img" title=${o} aria-label=${o}>
+                </button>`:p?o`<span class="rule-covered" role="img" title=${a} aria-label=${a}>
                     <span aria-hidden="true">${u("check")}</span>
-                  </span>`:l`<button type="button" class="rule-action"
+                  </span>`:o`<button type="button" class="rule-action"
                     title=${v}
                     aria-label=${v}
                     ?disabled=${this._savingKey!==""}
@@ -45,49 +45,49 @@ import{a as T,G as P,c as r,C,b as l,A as c,i as D,t as I}from"./index-C6CHXxAQ.
                   </button>`:c}
         </div>
         <div class="request-meta">
-          <span class="meta-summary" title=${b}>${b}</span>
+          <span class="meta-summary" title=${x}>${x}</span>
           <time class="meta-time" datetime=${e.time}>${S(e.time)}</time>
         </div>
-        ${m?l`<div class="row-error" role="alert">${m}</div>`:c}
-        ${f?this._renderDetails(e,i,x):c}
+        ${m?o`<div class="row-error" role="alert">${m}</div>`:c}
+        ${f?this._renderDetails(e,b):c}
       </li>
-    `}get _backPath(){return`/entrypoint/${this.parentType}/${this.parentId}`}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){const e=this._requests.slice(0,M);return l`
+    `}get _backPath(){return`/entrypoint/${this.parentType}/${this.parentId}`}_navigate(e){window.history.pushState({},"",e),window.dispatchEvent(new PopStateEvent("popstate"))}render(){const e=this._requests.slice(0,M);return o`
       <app-scaffold>
         <div slot="appBar" class="page-header">
-          <button type="button" class="back-btn" aria-label=${r("requestsBack")}
+          <button type="button" class="back-btn" aria-label=${s("requestsBack")}
             @click=${()=>this._navigate(this._backPath)}>
             <span aria-hidden="true">${u("chevron-left")}</span>
           </button>
-          <h1 class="page-title">${r("requestsPageTitle")}</h1>
+          <h1 class="page-title">${s("requestsPageTitle")}</h1>
           <div class="controls">
             <button type="button" class="auto-toggle" aria-pressed=${this._auto}
               @click=${this._toggleAuto}>
               <span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>
-              <span>${r("requestsAuto")}</span>
+              <span>${s("requestsAuto")}</span>
             </button>
             <button type="button" class="refresh-button" ?disabled=${this._loading}
               @click=${()=>this._load(!0)}>
               <span aria-hidden="true">${u("rotate-cw")}</span>
-              <span>${r("requestsRefresh")}</span>
+              <span>${s("requestsRefresh")}</span>
             </button>
           </div>
         </div>
 
         <div class="requests-panel">
           <div class="panel-header">
-            <span class="requests-count">${r(this._requests.length===1?"requestsCountOne":"requestsCount",{n:this._requests.length})}</span>
-            ${this._pageHidden?l`<div class="pause-indicator" role="status">${r("requestsPausedHidden")}</div>`:c}
+            <span class="requests-count">${s(this._requests.length===1?"requestsCountOne":"requestsCount",{n:this._requests.length})}</span>
+            ${this._pageHidden?o`<div class="pause-indicator" role="status">${s("requestsPausedHidden")}</div>`:c}
           </div>
-          ${this._error?l`<div class="requests-error" role="alert">${this._error}</div>`:c}
-          ${this._requests.length===0?l`<div class="requests-empty">${r("requestsEmpty")}</div>`:l`
-              <ol class="request-list" role="list" aria-label=${r("requestsPageTitle")}>
+          ${this._error?o`<div class="requests-error" role="alert">${this._error}</div>`:c}
+          ${this._requests.length===0?o`<div class="requests-empty">${s("requestsEmpty")}</div>`:o`
+              <ol class="request-list" role="list" aria-label=${s("requestsPageTitle")}>
                 ${e.map(t=>this._renderRequest(t))}
               </ol>
-              ${this._requests.length>e.length?l`<div class="showing-count">${r("requestsShowing",{shown:e.length,total:this._requests.length})}</div>`:c}
+              ${this._requests.length>e.length?o`<div class="showing-count">${s("requestsShowing",{shown:e.length,total:this._requests.length})}</div>`:c}
             `}
         </div>
       </app-scaffold>
-    `}};d.styles=D`
+    `}};l.styles=D`
     :host { display: block; }
     .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -193,10 +193,10 @@ import{a as T,G as P,c as r,C,b as l,A as c,i as D,t as I}from"./index-C6CHXxAQ.
       min-width: 0; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;
     }
     .detail-chip {
-      min-width: 0; max-width: 100%; box-sizing: border-box; padding: 2px 6px;
-      display: inline-flex; align-items: baseline; gap: 4px; border-radius: var(--radius-sm);
-      background: var(--border-subtle); color: var(--text-secondary);
-      font-size: var(--font-xs); line-height: 1.4; overflow-wrap: anywhere;
+      min-width: 0; max-width: 100%; box-sizing: border-box; padding: 2px 8px;
+      display: inline-flex; align-items: baseline; gap: 5px; border-radius: var(--radius-sm);
+      background: var(--border); color: var(--text);
+      font-size: var(--font-xs); line-height: 1.5; overflow-wrap: anywhere;
     }
     .detail-label { flex-shrink: 0; color: var(--text-muted); }
     .detail-value {
@@ -212,4 +212,4 @@ import{a as T,G as P,c as r,C,b as l,A as c,i as D,t as I}from"./index-C6CHXxAQ.
     @media (pointer: coarse) {
       .back-btn, .auto-toggle, .refresh-button { min-height: 36px; }
     }
-  `;p([$({attribute:"parent-type"})],d.prototype,"parentType",2);p([$({attribute:"parent-id"})],d.prototype,"parentId",2);p([h()],d.prototype,"_requests",2);p([h()],d.prototype,"_entrypoint",2);p([h()],d.prototype,"_error",2);p([h()],d.prototype,"_auto",2);p([h()],d.prototype,"_loading",2);p([h()],d.prototype,"_pageHidden",2);p([h()],d.prototype,"_savingKey",2);p([h()],d.prototype,"_rowErrors",2);p([h()],d.prototype,"_expanded",2);d=p([I("entrypoint-requests-page")],d);export{d as EntrypointRequestsPage};
+  `;d([$({attribute:"parent-type"})],l.prototype,"parentType",2);d([$({attribute:"parent-id"})],l.prototype,"parentId",2);d([h()],l.prototype,"_requests",2);d([h()],l.prototype,"_entrypoint",2);d([h()],l.prototype,"_error",2);d([h()],l.prototype,"_auto",2);d([h()],l.prototype,"_loading",2);d([h()],l.prototype,"_pageHidden",2);d([h()],l.prototype,"_savingKey",2);d([h()],l.prototype,"_rowErrors",2);d([h()],l.prototype,"_expanded",2);l=d([I("entrypoint-requests-page")],l);export{l as EntrypointRequestsPage};

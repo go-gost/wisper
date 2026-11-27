@@ -172,9 +172,9 @@ export class EntrypointRequestsPage extends LitElement {
     `;
   }
 
-  private _renderDetails(request: EntrypointRequest, destination: string, duration: string) {
+  private _renderDetails(request: EntrypointRequest, duration: string) {
     const route = request.path?.length
-      ? request.path.map(hop => hop.node ? `${hop.node}@${hop.addr}` : hop.addr).join(' → ')
+      ? request.path.map(hop => hop.chain && hop.node ? `${hop.chain}/${hop.node}` : hop.chain || hop.node || hop.addr).join(' → ')
       : t('requestsRouteDirect');
     const bytes = t('requestsTrafficValue', {
       in: formatBytes(request.input_bytes),
@@ -182,8 +182,8 @@ export class EntrypointRequestsPage extends LitElement {
     });
     return html`
       <div class="detail-chips">
-        ${request.host ? this._renderDetailChip(t('requestsHost'), request.host) : nothing}
-        ${this._renderDetailChip(t('fieldTarget'), destination)}
+        ${request.host && request.host !== request.dst ? this._renderDetailChip(t('requestsHost'), request.host) : nothing}
+        ${this._renderDetailChip(t('fieldTarget'), request.dst)}
         ${this._renderDetailChip(t('requestsRoute'), route)}
         ${this._renderDetailChip(t('requestsDuration'), duration)}
         ${this._renderDetailChip(t('requestsBytes'), bytes)}
@@ -261,7 +261,7 @@ export class EntrypointRequestsPage extends LitElement {
           <time class="meta-time" datetime=${request.time}>${formatRequestTimestamp(request.time)}</time>
         </div>
         ${rowError ? html`<div class="row-error" role="alert">${rowError}</div>` : nothing}
-        ${expanded ? this._renderDetails(request, destinationLabel, duration) : nothing}
+        ${expanded ? this._renderDetails(request, duration) : nothing}
       </li>
     `;
   }
@@ -432,10 +432,10 @@ export class EntrypointRequestsPage extends LitElement {
       min-width: 0; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;
     }
     .detail-chip {
-      min-width: 0; max-width: 100%; box-sizing: border-box; padding: 2px 6px;
-      display: inline-flex; align-items: baseline; gap: 4px; border-radius: var(--radius-sm);
-      background: var(--border-subtle); color: var(--text-secondary);
-      font-size: var(--font-xs); line-height: 1.4; overflow-wrap: anywhere;
+      min-width: 0; max-width: 100%; box-sizing: border-box; padding: 2px 8px;
+      display: inline-flex; align-items: baseline; gap: 5px; border-radius: var(--radius-sm);
+      background: var(--border); color: var(--text);
+      font-size: var(--font-xs); line-height: 1.5; overflow-wrap: anywhere;
     }
     .detail-label { flex-shrink: 0; color: var(--text-muted); }
     .detail-value {
