@@ -46,9 +46,11 @@ type Request struct {
 
 // requestRing is a fixed-size, concurrency-safe history. next is the oldest
 // slot once the ring is full; reads walk backward from it so the newest record
-// is always first. Records with the same non-empty SID merge in place, and
-// non-IP-literal chain artifacts and port 53 DNS records are excluded before
-// storage.
+// is always first. Records with the same non-empty SID merge in place. A
+// tunneled flow's dialed address is the chain node — the p2p stream names it
+// after the peer's base64 key — so its record is stored under the sniffed
+// host; chain artifacts with no host, and port 53 DNS records, are excluded
+// before storage.
 type requestRing struct {
 	mu       sync.RWMutex
 	records  []Request
@@ -64,12 +66,42 @@ func newRequestRing(capacity int) *requestRing {
 	return &requestRing{records: make([]Request, capacity)}
 }
 
-func isRecordableDestination(dst string) bool {
-	host, port, err := net.SplitHostPort(dst)
+// endpointHostPort splits an endpoint into its host and port. An endpoint with
+// no port is its own host.
+func endpointHostPort(endpoint string) (host, port string) {
+	host, port, err := net.SplitHostPort(endpoint)
 	if err != nil {
-		host = dst
+		return strings.Trim(endpoint, "[]"), ""
 	}
-	return net.ParseIP(host) != nil && port != "53"
+	return strings.Trim(host, "[]"), port
+}
+
+// isIPEndpoint reports whether the endpoint names an IP literal.
+func isIPEndpoint(endpoint string) bool {
+	host, _ := endpointHostPort(endpoint)
+	return net.ParseIP(host) != nil
+}
+
+// recordDestination returns the destination a request record is stored under.
+// A tunneled TCP flow records the upstream conn's address as its destination,
+// and that conn is the relay node's p2p stream, whose address is the hub's
+// base64 peer key. A non-IP dialed address is therefore replaced with the
+// sniffed host, which the handler seeds with the tun destination and the
+// sniffer narrows to the request's name. It returns false when neither
+// identity is usable: chain artifacts with no host, and port 53 DNS records,
+// stay out of the request ring.
+func recordDestination(host, dst string) (string, bool) {
+	endpoint := dst
+	if !isIPEndpoint(endpoint) {
+		endpoint = host
+	}
+	if endpoint == "" {
+		return "", false
+	}
+	if _, port := endpointHostPort(endpoint); port == "53" {
+		return "", false
+	}
+	return endpoint, true
 }
 
 func requestPath(path []xrecorder.PathHop) []RequestPathHop {
@@ -97,7 +129,10 @@ func mergeRequests(existing, incoming Request) Request {
 	if out.Host == "" {
 		out.Host = incoming.Host
 	}
-	if out.Dst == "" {
+	// A sniffed request row names the chain peer as its dialed address and is
+	// stored under the sniffed host; the handler's connection row carries the
+	// tun destination. Prefer the IP so the merged row shows the target.
+	if out.Dst == "" || (!isIPEndpoint(out.Dst) && isIPEndpoint(incoming.Dst)) {
 		out.Dst = incoming.Dst
 	}
 	if out.Network == "" {
@@ -177,9 +212,10 @@ func (r *requestRing) list(limit int) []Request {
 
 // Record implements recorder.Recorder for handler-level tungo flow records.
 // Tunneled is derived from Path, with the live chain classifying an empty UDP
-// path. Malformed payloads, non-IP-literal chain artifacts and port 53 DNS
-// records are deliberately ignored: request history must never take down the
-// data path that produced it.
+// path. A flow dialed through the chain peer is stored under its sniffed host;
+// malformed payloads, chain artifacts with no host, and port 53 DNS records are
+// deliberately ignored: request history must never take down the data path
+// that produced it.
 func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.RecordOption) error {
 	if r == nil {
 		return nil
@@ -188,7 +224,8 @@ func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.
 	if err := json.Unmarshal(data, &ro); err != nil || ro.Time.IsZero() || ro.Network == "" || ro.DstAddr == "" {
 		return nil
 	}
-	if !isRecordableDestination(ro.DstAddr) {
+	dst, ok := recordDestination(ro.Host, ro.DstAddr)
+	if !ok {
 		return nil
 	}
 	tunneled := false
@@ -209,7 +246,7 @@ func (r *requestRing) Record(ctx context.Context, data []byte, opts ...recorder.
 	r.append(Request{
 		Time:        ro.Time,
 		Host:        ro.Host,
-		Dst:         ro.DstAddr,
+		Dst:         dst,
 		Network:     ro.Network,
 		Proto:       ro.Proto,
 		Path:        requestPath(ro.Path),

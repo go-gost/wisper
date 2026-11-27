@@ -269,23 +269,32 @@ func TestRequestRingMergeCapacityAndEviction(t *testing.T) {
 
 func TestRequestRecorderFiltersBeforeSIDMerge(t *testing.T) {
 	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
-	for _, dst := range []string{"relay-peer-key", "8.8.8.8:53"} {
-		t.Run(dst, func(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		host string
+		dst  string
+	}{
+		// A chain artifact carries no host of its own: the ring only keeps a
+		// non-IP dialed address when the sniffed host identifies the request.
+		{name: "chain artifact", host: "", dst: "relay-peer-key"},
+		{name: "DNS", host: "dropped.example", dst: "8.8.8.8:53"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
 			ring := newRequestRing(0)
 			recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
 				SID: "filtered-merge", Time: base, Host: "kept.example", DstAddr: "203.0.113.10:443", Network: "tcp", InputBytes: 1,
 			})
 			recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
-				SID: "filtered-merge", Time: base.Add(time.Second), Host: "dropped.example", DstAddr: dst, Network: "udp",
+				SID: "filtered-merge", Time: base.Add(time.Second), Host: tt.host, DstAddr: tt.dst, Network: "udp",
 				InputBytes: 99, Duration: time.Second, Err: "must not merge",
 			})
 
 			got := ring.list(0)
 			if len(got) != 1 {
-				t.Fatalf("Record(filtered dst %q) stored %d rows, want the one kept row", dst, len(got))
+				t.Fatalf("Record(filtered dst %q) stored %d rows, want the one kept row", tt.dst, len(got))
 			}
 			if got[0].Host != "kept.example" || got[0].Dst != "203.0.113.10:443" || got[0].InputBytes != 1 || got[0].Err != "" {
-				t.Errorf("Record(filtered dst %q) changed the kept row: %+v", dst, got[0])
+				t.Errorf("Record(filtered dst %q) changed the kept row: %+v", tt.dst, got[0])
 			}
 		})
 	}
@@ -582,6 +591,100 @@ func TestRequestRecorderFiltersChainArtifactsAndDNS(t *testing.T) {
 			}
 			if tt.wantCount > 0 && got[0].Dst != tt.dst {
 				t.Errorf("Record(%q) stored dst %q, want %q", tt.dst, got[0].Dst, tt.dst)
+			}
+		})
+	}
+}
+
+// TestRequestRecorderKeepsTunneledTLSFlowNamedAfterTheChainPeer pins what a
+// sniffed TLS flow through the split's relay node records: x overwrites the
+// flow's destination with the upstream conn's address, and that conn is the
+// p2p stream, whose RemoteAddr is the hub's base64 peer key. The request is
+// still a real one the phone sent, so the ring must use the sniffed host as
+// its destination instead of discarding the row as a chain artifact.
+func TestRequestRecorderKeepsTunneledTLSFlowNamedAfterTheChainPeer(t *testing.T) {
+	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	ring := newRequestRing(0)
+	recordRequestObject(t, ring, xrecorder.HandlerRecorderObject{
+		SID:        "tunneled-tls",
+		Time:       base,
+		Host:       "example.com:443",
+		DstAddr:    "gfyuoMdKHdqS-example",
+		Network:    "tcp",
+		Proto:      "tls",
+		Path:       []xrecorder.PathHop{{Chain: "split", Hop: 0, Node: "hub", Addr: "gfyuoMdKHdqS-example"}},
+		Duration:   time.Second,
+		InputBytes: 10,
+	})
+
+	got := ring.list(0)
+	if len(got) != 1 {
+		t.Fatalf("Record(tunneled TLS over the chain peer) stored %d rows, want 1", len(got))
+	}
+	request := got[0]
+	if request.Host != "example.com:443" || request.Dst != "example.com:443" {
+		t.Errorf("recorded host/dst = %q/%q, want the sniffed host as the destination", request.Host, request.Dst)
+	}
+	if !request.Tunneled {
+		t.Error("recorded tunneled = false, want true for a chain hop")
+	}
+}
+
+// TestRequestRecorderPrefersTheDialedIPOnMerge: a tunneled HTTP flow records
+// twice — once from the sniffer with the chain peer as its dialed address, once
+// from the handler's deferred record with the tun destination. The merged row
+// must keep the IP target so the request list does not show the peer key as
+// the destination.
+func TestRequestRecorderPrefersTheDialedIPOnMerge(t *testing.T) {
+	base := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	sniffed := xrecorder.HandlerRecorderObject{
+		SID:     "tunneled-http",
+		Time:    base,
+		Host:    "example.com:80",
+		DstAddr: "gfyuoMdKHdqS-example",
+		Network: "tcp",
+	}
+	connection := xrecorder.HandlerRecorderObject{
+		SID:     "tunneled-http",
+		Time:    base.Add(time.Second),
+		Host:    "example.com:80",
+		DstAddr: "203.0.113.10:80",
+		Network: "tcp",
+		Path: []xrecorder.PathHop{
+			{Chain: "split", Hop: 0, Node: "hub", Addr: "gfyuoMdKHdqS-example"},
+			{Hop: 1, Addr: "203.0.113.10:80"},
+		},
+		Duration: time.Second,
+	}
+	for _, tt := range []struct {
+		name         string
+		sniffedFirst bool
+	}{
+		{name: "sniffed then connection", sniffedFirst: true},
+		{name: "connection then sniffed", sniffedFirst: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ring := newRequestRing(0)
+			records := []xrecorder.HandlerRecorderObject{sniffed, connection}
+			if !tt.sniffedFirst {
+				slices.Reverse(records)
+			}
+			for _, record := range records {
+				recordRequestObject(t, ring, record)
+			}
+
+			got := ring.list(0)
+			if len(got) != 1 {
+				t.Fatalf("Record(SID %q) stored %d rows, want 1", sniffed.SID, len(got))
+			}
+			if got[0].Dst != connection.DstAddr {
+				t.Errorf("Record(SID %q) dst = %q, want the dialed %q", sniffed.SID, got[0].Dst, connection.DstAddr)
+			}
+			if got[0].Host != connection.Host {
+				t.Errorf("Record(SID %q) host = %q, want %q", sniffed.SID, got[0].Host, connection.Host)
+			}
+			if !got[0].Tunneled {
+				t.Errorf("Record(SID %q) tunneled = false, want true from the chain hop", sniffed.SID)
 			}
 		})
 	}
